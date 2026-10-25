@@ -1,5 +1,4 @@
-import { HostSession } from './host.js';
-import { PlayerSession } from './client.js';
+import { Session } from './session.js';
 import { inviteLink, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
 import { BUILDINGS, BUILDING_KEYS, STORAGE, stateAt, upgradeCost, buildDuration, covers, score, fmt, UNIVERSE, MOVE_COOLDOWN, DIRS, distance } from './game.js';
@@ -8,6 +7,8 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 let session = null;
+// Accès depuis la console du navigateur, pour déboguer : astra.session
+window.astra = { get session() { return session; } };
 let liveTimer = null;
 let wakeLock = null;
 
@@ -105,11 +106,12 @@ for (const el of document.querySelectorAll('[data-go]')) {
   };
 }
 
-$('btn-create').onclick = () => {
+$('btn-create').onclick = async () => {
   const name = playerName();
   if (!name) return;
-  session = new HostSession(name);
+  session = await Session.create(name);
   session.ontoast = toast;
+  session.onchange = onSessionChange;
   startGame();
   openInviteSheet();
 };
@@ -151,10 +153,13 @@ async function useOffer(text) {
   $('join-error').hidden = true;
   const name = playerName();
   if (!name) return show('home');
-  if (!session || session.role !== 'player') {
-    session = new PlayerSession(name);
+  if (!session || session.status === 'playing') {
+    // Rejoindre une autre partie (ou les autres, si on était resté seul) :
+    // on quitte la copie locale, l'identité est gardée pour revenir.
+    session?.end();
+    session = new Session(name);
     session.ontoast = toast;
-    session.onchange = onPlayerChange;
+    session.onchange = onSessionChange;
   }
   try {
     $('join-status').textContent = 'Préparation de ta réponse…';
@@ -171,9 +176,14 @@ async function useOffer(text) {
 $('btn-copy-answer').onclick = () => copy(answerCode, 'Réponse copiée. Envoie-la au maître du jeu.');
 $('btn-share-answer').onclick = () => share(answerCode, 'Ma réponse Astra');
 
-function onPlayerChange() {
+function onSessionChange() {
   const s = session;
-  if (s.status === 'waiting') $('join-status').textContent = 'Connecté. Le maître du jeu doit valider ton arrivée…';
+  if (!s) return;
+  if (s.status === 'waiting') {
+    $('join-status').textContent = s.helloAcked
+      ? 'Connecté. Le maître du jeu doit valider ton arrivée…'
+      : 'Connecté. Envoi de ta demande au maître du jeu…';
+  }
   if (s.status === 'failed') {
     $('join-step-1').hidden = false;
     $('join-step-2').hidden = true;
@@ -186,18 +196,15 @@ function onPlayerChange() {
     show('join');
   }
   if (s.status === 'playing' && $('screen-game').hidden) startGame();
-  if (s.status === 'lost') $('lost').hidden = false;
-  if (s.status === 'ended') {
-    stopGame();
-    show('home');
-    $('home-note').textContent = 'Le maître du jeu a terminé la partie.';
-    $('home-note').hidden = false;
+  if (!s.isLeader && !$('sheet-invite').hidden) {
+    s.cancelInvite();
+    closeInviteSheet();
   }
   if (!$('screen-game').hidden) renderState();
 }
 
+// Resté seul : la partie continue ici ; ce bouton permet de rejoindre les autres.
 $('btn-rejoin').onclick = () => {
-  $('lost').hidden = true;
   stopGame();
   startJoin();
 };
@@ -283,16 +290,12 @@ $('btn-answer-ok').onclick = () => useAnswer($('answer-input').value);
 
 function startGame() {
   show('game');
-  $('lost').hidden = true;
-  $('btn-invite').hidden = session.role !== 'mj';
-  if (session.role === 'mj') session.onchange = (kind) => kind === 'state' && renderState();
   buildStatic();
   showTab('planet');
   renderState();
   clearInterval(liveTimer);
   liveTimer = setInterval(renderLive, 200);
   keepAwake();
-  window.onbeforeunload = session.role === 'mj' ? () => 'La partie s’arrêtera pour tout le monde.' : null;
 }
 
 function stopGame() {
@@ -301,7 +304,6 @@ function stopGame() {
   liveTimer = null;
   wakeLock?.release?.().catch(() => {});
   wakeLock = null;
-  window.onbeforeunload = null;
 }
 
 const RES = [
@@ -352,9 +354,12 @@ function renderState() {
     $('me-name').textContent = me.name;
     $('me-dot').style.background = me.color;
   }
-  $('me-role').textContent = session.role === 'mj' ? 'Maître du jeu' : 'Commandant';
+  $('me-role').textContent = session.isLeader ? 'Maître du jeu' : 'Commandant';
+  $('btn-invite').hidden = !session.isLeader;
+  $('lost').hidden = !session.alone;
+  $('requests').innerHTML = '';
 
-  if (session.role === 'mj') {
+  if (session.isLeader) {
     $('requests').innerHTML = session.pending
       .map(
         (r) => `<div class="banner">
@@ -371,7 +376,7 @@ function renderState() {
       (p) => `<div class="player card${p.online ? '' : ' offline'}" data-player="${p.id}">
         <span class="dot" style="background:${esc(p.color)}"></span>
         <div class="p-main">
-          <div class="p-name">${esc(p.name)}${p.id === session.me ? ' <span class="you">toi</span>' : ''}${p.mj ? ' <span class="tag">MJ</span>' : ''}</div>
+          <div class="p-name">${esc(p.name)}${p.id === session.me ? ' <span class="you">toi</span>' : ''}${p.id === st.leader ? ' <span class="tag">MJ</span>' : ''}</div>
           <div class="p-sub mono" data-psub="${p.id}"></div>
         </div>
         <div class="p-score mono" data-pscore="${p.id}"></div>
@@ -401,12 +406,12 @@ function renderLive() {
   const me = st.players[session.me];
   const now = session.now();
 
-  if (session.role === 'player') {
+  if (!session.isLeader) {
     const rtt = session.clock.rtt;
     $('net').textContent = rtt == null ? 'synchro…' : `${rtt} ms${session.route ? ' · ' + routeLabel(session.route) : ''}`;
     $('net').className = 'net' + (rtt != null && rtt > 250 ? ' slow' : '');
   } else {
-    const online = Object.values(st.players).filter((p) => !p.mj && p.online).length;
+    const online = Object.values(st.players).filter((p) => p.id !== st.leader && p.online).length;
     $('net').textContent = `${online} joueur${online > 1 ? 's' : ''} connecté${online > 1 ? 's' : ''}`;
     $('net').className = 'net';
   }
@@ -435,7 +440,7 @@ function renderLive() {
       card.classList.toggle('affordable', ok && !s.queue);
       card.classList.toggle('building-now', s.queue?.key === k);
       const btn = document.querySelector(`[data-build="${k}"]`);
-      btn.disabled = !!s.queue || !ok || (session.role === 'player' && session.status !== 'playing');
+      btn.disabled = !!s.queue || !ok || (!session.isLeader && session.status !== 'playing');
       btn.textContent = s.queue?.key === k ? 'En chantier' : `Niveau ${level + 1}`;
     }
 
@@ -454,7 +459,7 @@ function renderLive() {
     if (!sub) continue;
     const s = stateAt(p.planet, now);
     const doing = s.queue ? `${BUILDINGS[s.queue.key].short} ${s.queue.level} dans ${Math.ceil((s.queue.end - now) / 1000)} s` : 'aucun chantier';
-    const net = !p.online ? 'déconnecté' : p.mj ? 'hôte' : p.rtt != null ? `${p.rtt} ms${p.route ? ' ' + routeLabel(p.route) : ''}` : '';
+    const net = !p.online ? 'déconnecté' : p.id === st.leader ? 'MJ' : p.rtt != null ? `${p.rtt} ms${p.route ? ' ' + routeLabel(p.route) : ''}` : '';
     sub.textContent = `${fmt(s.stock.metal)} métal · ${doing}${net ? ' · ' + net : ''}`;
     document.querySelector(`[data-pscore="${p.id}"]`).textContent = `${score(s.levels)} pts`;
   }

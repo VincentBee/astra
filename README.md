@@ -1,6 +1,6 @@
 # Astra P2P — prototype
 
-Jeu de conquête spatiale entre téléphones, en pair à pair. Aucun serveur de jeu : le site est un dossier de fichiers statiques, le téléphone du maître du jeu (MJ) garde l'état officiel, et les joueurs s'y connectent directement en WebRTC après un échange de QR codes.
+Jeu de conquête spatiale entre téléphones, en pair à pair. Aucun serveur de jeu : le site est un dossier de fichiers statiques, chaque téléphone garde une copie complète de la partie, et les joueurs se connectent directement en WebRTC après un échange de QR codes. **Tant qu'il reste un joueur, la partie continue.**
 
 JS vanilla, modules ES, aucune étape de build.
 
@@ -31,8 +31,7 @@ Ensuite : le MJ crée la partie, le joueur scanne le QR avec l'appareil photo de
 | Fichier | Rôle |
 |---|---|
 | `js/game.js` | Règles pures (port de `game.rs`), en vitesse ×60 : une « heure » de jeu = une minute |
-| `js/host.js` | MJ : état officiel, validation des ordres, journal, diffusion aux joueurs |
-| `js/client.js` | Joueur : reçoit l'état, envoie ses ordres, se synchronise sur l'horloge du MJ |
+| `js/session.js` | Une partie vue d'un téléphone : rôle de MJ ou de joueur, copie de l'état, connexions entre joueurs, relève du MJ |
 | `js/peer.js` | WebRTC : offre/réponse sans serveur de signalisation, canal de données |
 | `js/invite.js` | Code d'invitation compact (≈150 car.) et dessin du QR code |
 | `js/clock.js` | Synchronisation d'horloge façon NTP |
@@ -41,10 +40,14 @@ Ensuite : le MJ crée la partie, le joueur scanne le QR avec l'appareil photo de
 | `sw.js`, `manifest.json` | Appli installable et utilisable hors ligne |
 
 - **Invitation** : le MJ génère une offre WebRTC. Seul l'essentiel est gardé (identifiants ICE, empreinte de chiffrement, adresses), packé en binaire : un QR de version 6 à 8, lisible d'un écran à l'autre. Le SDP complet est reconstruit à l'arrivée.
-- **Topologie** : en étoile, chaque joueur est connecté au MJ seulement.
+- **Topologie** : chaque joueur est connecté au MJ **et** aux autres joueurs. Le MJ fait les présentations : quand quelqu'un arrive, il relaie les offres WebRTC entre lui et chaque joueur déjà présent.
+- **Relève du MJ** : le MJ du moment valide les ordres et diffuse l'état ; tout le monde en garde une copie. S'il disparaît (plus de nouvelles depuis 6 s), le plus ancien joueur encore en ligne devient MJ et reprend depuis sa copie. Resté seul, un joueur continue la partie.
+- **Ancienneté et époques** : l'ancienneté est l'ordre d'arrivée dans la partie. Chaque changement de MJ ouvre une nouvelle époque ; en cas de désaccord, l'époque la plus récente gagne, puis le plus ancien. Un MJ ne peut s'annoncer que lui-même (pas de rumeur relayée).
 - **Temps réel** : seuls les événements circulent (chantier lancé à T, fini à T+x). Chaque téléphone anime ressources et comptes à rebours localement, sur l'heure du MJ.
 - **Univers** : onglet « Univers », grille de 20 × 20 où chaque commandant a sa planète mère et un vaisseau. Flèches à l'écran (maintien pour avancer) ou au clavier, un pas toutes les 150 ms au plus. Le vaisseau bouge tout de suite à l'écran ; le MJ valide chaque pas et le diffuse, et la position se recale si un pas est refusé.
-- **Reconnexion** : un joueur qui perd la connexion scanne une nouvelle invitation ; le MJ voit « veut revenir » et il retrouve sa planète.
+- **Reconnexion** : un joueur qui perd la connexion scanne une invitation du MJ du moment. Un secret gardé sur son téléphone (dont le MJ ne connaît que l'empreinte SHA-256) prouve que c'est bien lui : il revient sans validation et retrouve sa planète.
+- **Horloge** : monotone (`performance.now`), elle ne saute pas si le téléphone recale son heure. Un nouveau MJ fige son décalage pour que l'heure de la partie continue sans à-coup.
+- **Débogage** : `astra.session` dans la console du navigateur.
 - **Écran allumé** : l'appli le demande au téléphone (Wake Lock) pendant la partie.
 
 ## Réseau
@@ -55,10 +58,12 @@ Ensuite : le MJ crée la partie, le joueur scanne le QR avec l'appareil photo de
 
 ## Limites du prototype
 
-- Si le MJ ferme l'appli ou que son écran s'éteint longtemps, la partie s'arrête pour tout le monde (pas de MJ de secours, pas de sauvegarde).
-- Une invitation ne sert qu'une fois ; reconnexion manuelle (nouveau scan).
+- **Partie coupée en deux** : si le groupe se scinde (réseau), chaque côté continue de son côté et les deux parties ne fusionnent pas. En revenant, on reprend la partie du MJ dont on scanne l'invitation.
+- Rien n'est sauvegardé sur le téléphone : si tous les joueurs quittent, la partie est perdue.
+- Une invitation ne sert qu'une fois, et seul le MJ du moment peut inviter ; reconnexion par un nouveau scan.
+- Chaque joueur a la partie complète : un joueur curieux peut tout lire dans la console (pas de brouillard de guerre possible).
 - Contenu de jeu minimal : 4 bâtiments et des déplacements, pas encore de flottes ni de combats.
-- Testé dans Chromium (connexion, scan de QR par caméra simulée, temps réel, reconnexion). Pas encore testé sur de vrais iPhone et Android en 4G.
+- Testé dans Chromium (connexion, scan de QR par caméra simulée, temps réel, reconnexion, relève du MJ à 3 joueurs, joueur resté seul). Pas encore testé sur de vrais iPhone et Android en 4G.
 
 ## Licences des bibliothèques incluses
 

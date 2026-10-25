@@ -20,28 +20,44 @@ function waitIce(pc) {
   });
 }
 
+/**
+ * Écoute un canal dès sa création et garde les messages arrivés avant qu'on
+ * ait branché le Link : sans ça, le tout premier message de l'autre côté
+ * (par exemple la demande d'arrivée d'un joueur) peut se perdre.
+ */
+function earlyBuffer(channel) {
+  const early = [];
+  channel.onmessage = (e) => early.push(e.data);
+  return early;
+}
+
 /** Enveloppe un canal de données : messages JSON, état de connexion. */
 export class Link {
-  constructor(pc, channel) {
+  constructor(pc, channel, early = []) {
     this.pc = pc;
     this.channel = channel;
-    this.onmessage = null;
     this.onclose = null;
     this.closed = false;
-    channel.onmessage = (e) => {
+    this._onmessage = null;
+    this._queue = [];
+    const receive = (data) => {
       let msg;
       try {
-        msg = JSON.parse(e.data);
+        msg = JSON.parse(data);
       } catch {
         return;
       }
-      this.onmessage?.(msg);
+      if (this._onmessage) this._onmessage(msg);
+      else this._queue.push(msg);
     };
+    early.forEach(receive);
+    channel.onmessage = (e) => receive(e.data);
     const close = () => {
       if (this.closed) return;
       this.closed = true;
       this.onclose?.();
     };
+    this._close = close;
     channel.onclose = close;
     pc.addEventListener('connectionstatechange', () => {
       if (['failed', 'closed', 'disconnected'].includes(pc.connectionState)) {
@@ -54,6 +70,19 @@ export class Link {
     });
   }
 
+  get onmessage() {
+    return this._onmessage;
+  }
+
+  /** Brancher un écouteur rejoue d'abord les messages déjà reçus. */
+  set onmessage(fn) {
+    this._onmessage = fn;
+    if (!fn) return;
+    const queued = this._queue;
+    this._queue = [];
+    for (const m of queued) fn(m);
+  }
+
   send(msg) {
     if (this.channel.readyState === 'open') this.channel.send(JSON.stringify(msg));
   }
@@ -63,6 +92,7 @@ export class Link {
       this.channel.close();
       this.pc.close();
     } catch {}
+    this._close(); // prévient tout de suite, sans attendre l'événement du navigateur
   }
 
   /** Type de chemin réseau utilisé : direct local, direct Internet ou relais. */
@@ -97,6 +127,7 @@ function openChannel(channel) {
 export async function createInvite() {
   const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
   const channel = pc.createDataChannel('astra', { ordered: true });
+  const early = earlyBuffer(channel);
   await pc.setLocalDescription(await pc.createOffer());
   await waitIce(pc);
   const code = await encode('o', pc.localDescription.sdp);
@@ -126,7 +157,7 @@ export async function createInvite() {
           25000,
           'La connexion ne s’établit pas.',
         );
-        return new Link(pc, channel);
+        return new Link(pc, channel, early);
       })();
       return pending;
     },
@@ -161,16 +192,16 @@ export async function answerInvite(offerInput) {
   const { kind, sdp } = await decode(offerInput);
   if (kind !== 'o') throw new Error("C'est une réponse de joueur, pas une invitation du MJ.");
   const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-  const channelReady = new Promise((resolve) => (pc.ondatachannel = (e) => resolve(e.channel)));
+  const channelReady = new Promise((resolve) => (pc.ondatachannel = (e) => resolve({ channel: e.channel, early: earlyBuffer(e.channel) })));
   await pc.setRemoteDescription({ type: 'offer', sdp });
   await pc.setLocalDescription(await pc.createAnswer());
   await waitIce(pc);
   const code = await encode('a', pc.localDescription.sdp);
   const link = withTimeout(
     Promise.race([
-      channelReady.then(async (channel) => {
+      channelReady.then(async ({ channel, early }) => {
         await openChannel(channel);
-        return new Link(pc, channel);
+        return new Link(pc, channel, early);
       }),
       failed(pc),
     ]),
@@ -183,4 +214,49 @@ export async function answerInvite(offerInput) {
 
 function withTimeout(promise, ms, message) {
   return Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error(message)), ms))]);
+}
+
+// ---------------------------------------------------------------------------
+// Connexions entre joueurs : l'offre et la réponse (SDP complet) passent par
+// un canal déjà ouvert (celui du MJ), donc pas besoin de les compresser.
+// ---------------------------------------------------------------------------
+
+/** Côté qui appelle : prépare une offre. `connect(answerSdp)` ouvre le canal. */
+export async function makeOffer() {
+  const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+  const channel = pc.createDataChannel('astra', { ordered: true });
+  const early = earlyBuffer(channel);
+  await pc.setLocalDescription(await pc.createOffer());
+  await waitIce(pc);
+  return {
+    sdp: pc.localDescription.sdp,
+    async connect(answerSdp) {
+      await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+      await withTimeout(Promise.race([openChannel(channel), failed(pc)]), 25000, 'Connexion entre joueurs impossible.');
+      return new Link(pc, channel, early);
+    },
+    cancel: () => pc.close(),
+  };
+}
+
+/** Côté appelé : répond à une offre. `link` se résout quand le canal est ouvert. */
+export async function makeAnswer(offerSdp) {
+  const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+  const channelReady = new Promise((resolve) => (pc.ondatachannel = (e) => resolve({ channel: e.channel, early: earlyBuffer(e.channel) })));
+  await pc.setRemoteDescription({ type: 'offer', sdp: offerSdp });
+  await pc.setLocalDescription(await pc.createAnswer());
+  await waitIce(pc);
+  const link = withTimeout(
+    Promise.race([
+      channelReady.then(async ({ channel, early }) => {
+        await openChannel(channel);
+        return new Link(pc, channel, early);
+      }),
+      failed(pc),
+    ]),
+    30000,
+    'Connexion entre joueurs impossible.',
+  );
+  link.catch(() => pc.close());
+  return { sdp: pc.localDescription.sdp, link };
 }
