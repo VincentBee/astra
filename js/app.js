@@ -3,9 +3,10 @@ import { loadGame, describeSave } from './save.js';
 import { inviteLink, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
 import {
-  RACES, RACE_KEYS, RES_INFO, POWERS, POWER_KEYS, STORAGE, stateAt, upgradeCost, buildDuration, covers, score, power,
+  RACES, RACE_KEYS, RES_INFO, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
   powerReadyAt, powerCost, fmt, UNIVERSE, MOVE_COOLDOWN, DIRS, distance,
 } from './game.js';
+import { GUIDE } from './guide.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -365,6 +366,48 @@ function renderRaceOthers() {
     : '';
 }
 
+// ---------------------------------------------------------------------------
+// Guide des races
+// ---------------------------------------------------------------------------
+
+/** Guide d'une race, avec des boutons pour passer aux autres. */
+function renderGuide(el, race) {
+  const G = GUIDE[race];
+  const R = RACES[race];
+  const tabs = RACE_KEYS.map(
+    (k) => `<button class="secondary" data-guide-race="${k}" aria-pressed="${k === race}" style="--race:${RACES[k].color}">${RACES[k].icon} ${RACES[k].name}</button>`,
+  ).join('');
+  const strategies = G.strategies
+    .map(
+      (st) => `<article class="strat card">
+      <div class="strat-head"><h4>${esc(st.name)}</h4></div>
+      <p class="strat-goal">${esc(st.goal)}</p>
+      <ol>${st.steps
+        .map(([k, l, m]) => `<li>${esc(R.buildings[k].name)} ${l}<span class="t">${m ? `vers ${m} min` : 'tout de suite'}</span></li>`)
+        .join('')}</ol>
+      <p class="strat-then">${esc(st.then)}</p>
+      <p class="strat-result">${esc(st.result)}</p>
+    </article>`,
+    )
+    .join('');
+  el.innerHTML = `<div class="guide-races">${tabs}</div>
+    <p class="guide-intro">${esc(G.intro)}</p>
+    <section><h3 class="section-title">Principes</h3><ul>${G.principles.map((p) => `<li>${esc(p)}</li>`).join('')}</ul></section>
+    <section class="guide"><h3 class="section-title">Ordres de construction</h3>${strategies}</section>
+    <section><h3 class="section-title">Pièges</h3><ul class="traps">${G.traps.map((p) => `<li>${esc(p)}</li>`).join('')}</ul></section>
+    <p class="hint">Ordres trouvés en simulant des milliers de parties : heures approximatives, en lançant chaque chantier dès qu’il est payable.</p>`;
+  el.onclick = (e) => {
+    const b = e.target.closest('[data-guide-race]');
+    if (b) renderGuide(el, b.dataset.guideRace);
+  };
+}
+
+$('btn-race-guide').onclick = () => {
+  renderGuide($('guide-sheet-body'), pickedRace || 'human');
+  $('sheet-guide').hidden = false;
+};
+$('btn-guide-close').onclick = () => ($('sheet-guide').hidden = true);
+
 $('races').addEventListener('click', (e) => {
   const el = e.target.closest('[data-race]');
   if (!el) return;
@@ -583,7 +626,7 @@ function renderPlanet(me, now) {
   const q = (sel) => document.querySelector(sel);
 
   for (const r of R.resources) {
-    const cap = r === 'energy' ? f.energyCap : STORAGE;
+    const cap = f.caps[r];
     q(`[data-res="${r}"]`).textContent = fmt(s.stock[r]);
     const short = r === 'energy' ? f.effE < 1 : r === 'food' ? f.effF < 1 : false;
     const rate = q(`[data-rate="${r}"]`);
@@ -650,17 +693,17 @@ function renderPlanet(me, now) {
   } else $('queue').hidden = true;
 
   if (me.race === 'alien') {
+    const trance = Math.max(0, (me.planet.trance || 0) - now);
     for (const k of POWER_KEYS) {
       const cost = powerCost(me.planet, k, s.pop);
       const wait = Math.max(0, powerReadyAt(me.planet, k) - now);
-      const needsQueue = k === 'rush' && !s.queue;
       const ok = covers(s.stock, cost);
       q(`[data-pcost="${k}"]`).textContent = `${costText(cost)} · recharge ${POWERS[k].cooldown / 60000} min`;
-      q(`[data-pready="${k}"]`).textContent = wait ? clock(wait) : 'Prêt';
-      q(`[data-pcard="${k}"]`).classList.toggle('affordable', ok && !wait && !needsQueue);
+      q(`[data-pready="${k}"]`).textContent = k === 'trance' && trance ? `En transe ${clock(trance)}` : wait ? clock(wait) : 'Prêt';
+      q(`[data-pcard="${k}"]`).classList.toggle('affordable', ok && !wait);
       const btn = q(`[data-power="${k}"]`);
-      btn.disabled = !!wait || !ok || needsQueue || session.status !== 'playing';
-      btn.textContent = wait ? 'En recharge' : needsQueue ? 'Aucun chantier' : 'Déclencher';
+      btn.disabled = !!wait || !ok || session.status !== 'playing';
+      btn.textContent = wait ? 'En recharge' : 'Déclencher';
     }
   }
 }
@@ -683,6 +726,8 @@ function showTab(tab) {
   currentTab = tab;
   $('view-planet').hidden = tab !== 'planet';
   $('view-universe').hidden = tab !== 'universe';
+  $('view-guide').hidden = tab !== 'guide';
+  if (tab === 'guide') renderGuide($('view-guide'), session.myRace || 'human');
   for (const b of document.querySelectorAll('[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
   if (tab === 'universe') {
     $('map-size').textContent = `${UNIVERSE.w} × ${UNIVERSE.h}`;

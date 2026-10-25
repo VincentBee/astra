@@ -81,6 +81,7 @@
       </header>
       <div id="races" class="races" role="radiogroup" aria-label="Races jouables"></div>
       <button id="btn-race" class="primary" disabled>Choisis une race</button>
+      <button id="btn-race-guide" class="ghost">Guide des races et ordres de construction</button>
       <p id="race-others" class="hint"></p>
     </div>
   </section>
@@ -104,7 +105,10 @@
     <nav class="tabs" role="tablist" aria-label="Vues de la partie">
       <button id="tab-planet" class="tab" role="tab" aria-selected="true" aria-controls="view-planet" data-tab="planet">Planète</button>
       <button id="tab-universe" class="tab" role="tab" aria-selected="false" aria-controls="view-universe" data-tab="universe">Univers</button>
+      <button id="tab-guide" class="tab" role="tab" aria-selected="false" aria-controls="view-guide" data-tab="guide">Guide</button>
     </nav>
+
+    <section id="view-guide" class="guide" role="tabpanel" aria-labelledby="tab-guide" hidden></section>
 
     <section id="view-universe" class="universe" role="tabpanel" aria-labelledby="tab-universe" hidden>
       <div class="map-head">
@@ -190,6 +194,17 @@
         <p id="invite-status" class="status"></p>
       </div>
       <p class="hint">Une invitation ne sert qu'une fois. Pour un autre joueur, rouvre cette fenêtre.</p>
+    </div>
+  </div>
+
+  <!-- Guide des races (depuis l'écran de choix) -->
+  <div id="sheet-guide" class="sheet" hidden>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="guide-title">
+      <div class="sheet-head">
+        <h2 id="guide-title">Guide des races</h2>
+        <button id="btn-guide-close" class="ghost">Fermer</button>
+      </div>
+      <div id="guide-sheet-body" class="guide"></div>
     </div>
   </div>
 
