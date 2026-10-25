@@ -248,6 +248,51 @@ details > button { width: 100%; }
 }
 .fab { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); }
 
+/* ----- Onglets ----- */
+
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.tab { min-height: 40px; background: transparent; color: var(--muted); font-weight: 600; }
+.tab[aria-selected="true"] { background: var(--panel-2); color: var(--text); border-color: var(--line); }
+
+/* ----- Univers ----- */
+
+.universe { display: grid; gap: 14px; }
+.map-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.map-head strong { color: var(--accent); }
+.map-wrap {
+  background: #05070f;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px;
+}
+.map-wrap canvas { display: block; width: 100%; height: auto; aspect-ratio: 1; border-radius: 8px; touch-action: none; }
+
+.dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 64px);
+  grid-template-rows: repeat(3, 64px);
+  gap: 8px;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.pad { min-height: 0; padding: 0; font-size: 1.3rem; border-radius: 16px; background: var(--panel-2); border: 1px solid var(--line); }
+.pad:active, .pad.pressed { background: var(--accent); color: var(--accent-ink); }
+.pad.up { grid-area: 1 / 2; }
+.pad.left { grid-area: 2 / 1; }
+.pad.home { grid-area: 2 / 2; display: grid; place-items: center; font-size: 0.8rem; color: var(--muted); background: transparent; border-style: dashed; }
+.pad.right { grid-area: 2 / 3; }
+.pad.down { grid-area: 3 / 2; }
+
 /* ----- Feuille d'invitation ----- */
 
 .sheet {
@@ -293,7 +338,8 @@ details > button { width: 100%; }
 .toast {
   position: fixed;
   left: 50%;
-  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  top: calc(64px + env(safe-area-inset-top, 0px));
+  pointer-events: none; /* ne bloque jamais les boutons en dessous */
   transform: translateX(-50%);
   z-index: 40;
   width: max-content;

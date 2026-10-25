@@ -43,6 +43,7 @@ Ensuite : le MJ crée la partie, le joueur scanne le QR avec l'appareil photo de
 - **Invitation** : le MJ génère une offre WebRTC. Seul l'essentiel est gardé (identifiants ICE, empreinte de chiffrement, adresses), packé en binaire : un QR de version 6 à 8, lisible d'un écran à l'autre. Le SDP complet est reconstruit à l'arrivée.
 - **Topologie** : en étoile, chaque joueur est connecté au MJ seulement.
 - **Temps réel** : seuls les événements circulent (chantier lancé à T, fini à T+x). Chaque téléphone anime ressources et comptes à rebours localement, sur l'heure du MJ.
+- **Univers** : onglet « Univers », grille de 20 × 20 où chaque commandant a sa planète mère et un vaisseau. Flèches à l'écran (maintien pour avancer) ou au clavier, un pas toutes les 150 ms au plus. Le vaisseau bouge tout de suite à l'écran ; le MJ valide chaque pas et le diffuse, et la position se recale si un pas est refusé.
 - **Reconnexion** : un joueur qui perd la connexion scanne une nouvelle invitation ; le MJ voit « veut revenir » et il retrouve sa planète.
 - **Écran allumé** : l'appli le demande au téléphone (Wake Lock) pendant la partie.
 
@@ -56,7 +57,7 @@ Ensuite : le MJ crée la partie, le joueur scanne le QR avec l'appareil photo de
 
 - Si le MJ ferme l'appli ou que son écran s'éteint longtemps, la partie s'arrête pour tout le monde (pas de MJ de secours, pas de sauvegarde).
 - Une invitation ne sert qu'une fois ; reconnexion manuelle (nouveau scan).
-- Contenu de jeu minimal : 4 bâtiments, pas encore de flottes ni de combats.
+- Contenu de jeu minimal : 4 bâtiments et des déplacements, pas encore de flottes ni de combats.
 - Testé dans Chromium (connexion, scan de QR par caméra simulée, temps réel, reconnexion). Pas encore testé sur de vrais iPhone et Android en 4G.
 
 ## Licences des bibliothèques incluses

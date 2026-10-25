@@ -82,7 +82,32 @@
 
     <div id="requests" class="requests"></div>
 
-    <main class="game">
+    <nav class="tabs" role="tablist" aria-label="Vues de la partie">
+      <button id="tab-planet" class="tab" role="tab" aria-selected="true" aria-controls="view-planet" data-tab="planet">Planète</button>
+      <button id="tab-universe" class="tab" role="tab" aria-selected="false" aria-controls="view-universe" data-tab="universe">Univers</button>
+    </nav>
+
+    <section id="view-universe" class="universe" role="tabpanel" aria-labelledby="tab-universe" hidden>
+      <div class="map-head">
+        <span>Ta position <strong id="my-coords" class="mono"></strong></span>
+        <span id="map-size" class="hint mono"></span>
+      </div>
+      <div class="map-wrap"><canvas id="map" aria-label="Carte de l'univers"></canvas></div>
+      <div class="dpad" aria-label="Déplacer ton vaisseau">
+        <button class="pad up" data-dir="up" aria-label="Haut">▲</button>
+        <button class="pad left" data-dir="left" aria-label="Gauche">◀</button>
+        <span class="pad home mono" id="home-dist" title="Pas jusqu'à ta planète mère"></span>
+        <button class="pad right" data-dir="right" aria-label="Droite">▶</button>
+        <button class="pad down" data-dir="down" aria-label="Bas">▼</button>
+      </div>
+      <p class="hint">Flèches à l'écran ou du clavier. Maintiens appuyé pour avancer en continu. ◉ planète mère, ▲ vaisseau.</p>
+      <div>
+        <h3 class="section-title">Positions</h3>
+        <div id="positions" class="players"></div>
+      </div>
+    </section>
+
+    <main id="view-planet" class="game" role="tabpanel" aria-labelledby="tab-planet">
       <section class="resources" id="resources"></section>
 
       <section id="queue" class="queue card" hidden>

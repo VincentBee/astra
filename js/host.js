@@ -2,7 +2,7 @@
 // diffuse les changements. Les joueurs sont connectés en étoile au MJ.
 
 import { createInvite } from './peer.js';
-import { newPlanet, settle, startBuild, BUILDINGS } from './game.js';
+import { newPlanet, settle, startBuild, BUILDINGS, step, freeCell, DIRS, MOVE_COOLDOWN } from './game.js';
 
 const COLORS = ['#7aa2ff', '#ff9f6b', '#7cf0b4', '#f7d06b', '#d38bff', '#6fd3ff', '#ff7a93', '#b7e36b'];
 const MAX_PLAYERS = 8;
@@ -26,7 +26,9 @@ export class HostSession {
     this.ontoast = null;
     this.invite = null;
     const now = this.now();
-    this.players.mj = { id: 'mj', name, color: COLORS[0], planet: newPlanet(now), online: true, mj: true, rtt: 0, route: null };
+    const home = freeCell([]);
+    this.players.mj = { id: 'mj', name, color: COLORS[0], planet: newPlanet(now), online: true, mj: true, rtt: 0, route: null, home, pos: { ...home }, moveSeq: 0 };
+    this.mySeq = 0;
     this.addLog(`${name} ouvre la partie.`);
     this.timer = setInterval(() => this.tick(), 250);
   }
@@ -85,7 +87,11 @@ export class HostSession {
         return this.changed();
       }
       pid = rid(6);
+      const home = freeCell(Object.values(this.players).map((p) => p.home));
       this.players[pid] = {
+        home,
+        pos: { ...home },
+        moveSeq: 0,
         id: pid,
         name: req.name,
         color: COLORS[count % COLORS.length],
@@ -140,6 +146,8 @@ export class HostSession {
         p.rtt = Number.isFinite(msg.rtt) ? Math.round(msg.rtt) : null;
         p.route = typeof msg.route === 'string' ? msg.route.slice(0, 8) : null;
         return;
+      case 'move':
+        return this.applyMove(pid, msg.dir, msg.seq);
       case 'build': {
         const err = this.applyBuild(pid, msg.key);
         if (err) link.send({ type: 'error', message: err });
@@ -156,6 +164,34 @@ export class HostSession {
     this.addLog(`${p.name} lance ${BUILDINGS[key].name} niv. ${q.level}.`);
     this.broadcast();
     return null;
+  }
+
+  /**
+   * Déplace un vaisseau d'une case. Le numéro `seq` est toujours renvoyé,
+   * même si le pas est refusé (trop rapide), pour que le joueur recale sa
+   * position prédite sur celle du MJ.
+   */
+  applyMove(pid, dir, seq) {
+    const p = this.players[pid];
+    if (!p || !DIRS[dir] || !Number.isFinite(seq)) return;
+    const now = this.now();
+    if (now - (p.lastMove || 0) >= MOVE_COOLDOWN - 40) {
+      p.pos = step(p.pos, dir);
+      p.lastMove = now;
+    }
+    p.moveSeq = Math.max(p.moveSeq || 0, seq);
+    const msg = { type: 'pos', id: pid, x: p.pos.x, y: p.pos.y, seq: p.moveSeq };
+    for (const link of this.links.values()) link.send(msg);
+    this.onchange?.('pos');
+  }
+
+  /** Déplacement du vaisseau du MJ. */
+  move(dir) {
+    this.applyMove('mj', dir, ++this.mySeq);
+  }
+
+  myPos() {
+    return this.players.mj.pos;
   }
 
   /** Ordre du MJ pour sa propre planète. */
@@ -189,7 +225,10 @@ export class HostSession {
   snapshot() {
     const players = {};
     for (const [id, p] of Object.entries(this.players)) {
-      players[id] = { id, name: p.name, color: p.color, planet: p.planet, online: p.online, mj: !!p.mj, rtt: p.rtt, route: p.route };
+      players[id] = {
+        id, name: p.name, color: p.color, planet: p.planet, online: p.online, mj: !!p.mj, rtt: p.rtt, route: p.route,
+        home: p.home, pos: p.pos, moveSeq: p.moveSeq,
+      };
     }
     return { players, log: this.log.slice(-20) };
   }

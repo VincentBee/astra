@@ -3,6 +3,7 @@
 
 import { answerInvite } from './peer.js';
 import { Clock } from './clock.js';
+import { step, MOVE_COOLDOWN } from './game.js';
 
 const REJOIN_KEY = 'astra.rejoin';
 
@@ -33,6 +34,9 @@ export class PlayerSession {
     this.onchange = null;
     this.ontoast = null;
     this.route = null;
+    this.moveSeq = 0;
+    this.pendingMoves = []; // pas envoyés au MJ, pas encore confirmés
+    this.lastMoveAt = 0;
   }
 
   now() {
@@ -100,13 +104,24 @@ export class PlayerSession {
       case 'welcome':
         this.me = msg.you;
         this.gid = msg.gid;
+        this.moveSeq = msg.state.players[msg.you]?.moveSeq || 0;
+        this.pendingMoves = [];
         this._state = msg.state;
         this.status = 'playing';
         saveRejoin({ pid: msg.you, gid: msg.gid });
         return this.changed();
       case 'state':
         this._state = msg.state;
+        this.ackMoves(this._state.players[this.me]?.moveSeq);
         return this.changed();
+      case 'pos': {
+        const p = this._state.players[msg.id];
+        if (!p) return;
+        p.pos = { x: msg.x, y: msg.y };
+        p.moveSeq = msg.seq;
+        if (msg.id === this.me) this.ackMoves(msg.seq);
+        return;
+      }
       case 'error':
         return this.ontoast?.(msg.message);
       case 'refused':
@@ -117,6 +132,28 @@ export class PlayerSession {
         this.status = 'ended';
         return this.changed();
     }
+  }
+
+  /** Pas vers une direction : appliqué tout de suite à l'écran, confirmé par le MJ. */
+  move(dir) {
+    if (this.status !== 'playing') return;
+    const now = Date.now();
+    if (now - this.lastMoveAt < MOVE_COOLDOWN) return;
+    this.lastMoveAt = now;
+    const seq = ++this.moveSeq;
+    this.pendingMoves.push({ seq, dir });
+    this.link.send({ type: 'move', dir, seq });
+  }
+
+  ackMoves(seq) {
+    if (Number.isFinite(seq)) this.pendingMoves = this.pendingMoves.filter((m) => m.seq > seq);
+  }
+
+  /** Position du MJ + pas pas encore confirmés (prédiction locale). */
+  myPos() {
+    const me = this._state.players[this.me];
+    if (!me?.pos) return null;
+    return this.pendingMoves.reduce((pos, m) => step(pos, m.dir), me.pos);
   }
 
   build(key) {

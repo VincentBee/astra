@@ -166,3 +166,45 @@ export function score(levels) {
 export function fmt(v) {
   return Math.floor(Math.max(0, v)).toLocaleString('fr-FR');
 }
+
+// ---------------------------------------------------------------------------
+// Univers : grille 2D où chaque commandant déplace son vaisseau
+// ---------------------------------------------------------------------------
+
+export const UNIVERSE = { w: 20, h: 20 };
+/** Délai minimal entre deux pas d'un même vaisseau (ms). */
+export const MOVE_COOLDOWN = 150;
+export const DIRS = {
+  up: { dx: 0, dy: -1 },
+  down: { dx: 0, dy: 1 },
+  left: { dx: -1, dy: 0 },
+  right: { dx: 1, dy: 0 },
+};
+
+export const inUniverse = (x, y) => x >= 0 && y >= 0 && x < UNIVERSE.w && y < UNIVERSE.h;
+
+/** Position après un pas ; reste sur place au bord de l'univers. */
+export function step(pos, dir) {
+  const d = DIRS[dir];
+  if (!d) return pos;
+  const x = pos.x + d.dx;
+  const y = pos.y + d.dy;
+  return inUniverse(x, y) ? { x, y } : pos;
+}
+
+/** Distance en nombre de pas (sans diagonales). */
+export const distance = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+
+/**
+ * Case de départ libre, à au moins `minGap` pas des planètes existantes.
+ * `random` est injectable pour les tests.
+ */
+export function freeCell(taken, random = Math.random, minGap = 4) {
+  for (let gap = minGap; gap >= 0; gap--) {
+    for (let tries = 0; tries < 200; tries++) {
+      const c = { x: 1 + Math.floor(random() * (UNIVERSE.w - 2)), y: 1 + Math.floor(random() * (UNIVERSE.h - 2)) };
+      if (taken.every((t) => distance(t, c) >= Math.max(gap, 1))) return c;
+    }
+  }
+  return { x: Math.floor(UNIVERSE.w / 2), y: Math.floor(UNIVERSE.h / 2) };
+}
