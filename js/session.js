@@ -14,12 +14,17 @@
 
 import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Clock } from './clock.js';
+import { saveGame, loadGame, mergeStates } from './save.js';
 import { newPlanet, settle, startBuild, BUILDINGS, step, freeCell, DIRS, MOVE_COOLDOWN } from './game.js';
 
 const COLORS = ['#7aa2ff', '#ff9f6b', '#7cf0b4', '#f7d06b', '#d38bff', '#6fd3ff', '#ff7a93', '#b7e36b'];
 const MAX_PLAYERS = 8;
 const HEARTBEAT_MS = 1500;
-const SILENCE_MS = 6000; // sans nouvelles depuis 6 s : la connexion est considérée perdue
+// Sans nouvelles depuis ce délai, la connexion est considérée perdue. Court
+// pour le MJ (la relève doit être rapide), long pour un joueur (un écran
+// verrouillé quelques secondes ne doit pas le faire sortir de la partie).
+const SILENCE_LEADER_MS = 6000;
+const SILENCE_PLAYER_MS = 30000;
 const ID_KEY = 'astra.identity';
 
 function rid(n = 8) {
@@ -79,6 +84,28 @@ export class Session {
     saveIdentity({ gid: s.state.gid, pid: s.me, secret });
     s.status = 'playing';
     s.start();
+    s.save();
+    return s;
+  }
+
+  /**
+   * Reprend une partie sauvegardée sur ce téléphone, même des jours après :
+   * on en devient le MJ, le temps écoulé est rattrapé (production,
+   * chantiers terminés) et les autres peuvent revenir avec une invitation.
+   */
+  static resume(saved) {
+    const s = new Session(saved.state.players[saved.me]?.name || 'Commandant');
+    s.me = saved.me;
+    s.state = saved.state;
+    s.state.epoch += 1;
+    s.state.leader = s.me;
+    for (const p of Object.values(s.state.players)) p.online = p.id === s.me;
+    s.clock.lead();
+    s.addLog(`${s.name} reprend la partie.`);
+    s.status = 'playing';
+    s.start();
+    s.tick();
+    s.save();
     return s;
   }
 
@@ -115,6 +142,9 @@ export class Session {
       pid: id?.pid,
       secret: id?.secret,
       secretHash: await sha256(this.newSecret),
+      // Ma copie de la partie, si j'en ai une : le MJ la fusionne avec la
+      // sienne, pour que la progression faite chacun de son côté soit gardée.
+      copy: loadGame()?.state,
     };
     // Le tout premier message d'un canal qui vient de s'ouvrir se perd
     // parfois : on le renvoie chaque seconde jusqu'à l'accusé de réception.
@@ -136,6 +166,17 @@ export class Session {
       setInterval(() => this.tick(), 250),
       setInterval(() => this.isLeader && this.broadcast(), 3000),
     );
+    // Au réveil du téléphone, les anciennes mesures d'horloge sont faussées.
+    this.onVisible = () => {
+      if (document.visibilityState === 'hidden') return this.save();
+      if (document.visibilityState !== 'visible' || !this.state) return;
+      if (!this.isLeader) {
+        this.clock.follow();
+        this.pingBurst();
+      }
+      this.changed();
+    };
+    document.addEventListener('visibilitychange', this.onVisible);
     this.pingBurst();
   }
 
@@ -187,10 +228,11 @@ export class Session {
   heartbeat() {
     const now = performance.now();
     for (const link of [...this.links.values()]) {
-      if (now - link.lastSeen > SILENCE_MS) link.close();
+      const limit = link.pid === this.state?.leader ? SILENCE_LEADER_MS : SILENCE_PLAYER_MS;
+      if (now - link.lastSeen > limit) link.close();
       else link.send({ type: 'hb' });
     }
-    if (this.firstLink && !this.firstLink.closed && now - this.firstLink.lastSeen > SILENCE_MS * 3) this.firstLink.close();
+    if (this.firstLink && !this.firstLink.closed && now - this.firstLink.lastSeen > SILENCE_PLAYER_MS) this.firstLink.close();
   }
 
   onLinkClosed(link) {
@@ -376,6 +418,14 @@ export class Session {
       return setTimeout(() => link.close(), 300);
     }
     const name = String(msg.name || '').trim().slice(0, 16) || 'Joueur';
+    if (msg.copy && msg.copy.gid === this.state.gid) {
+      // Même partie : on fusionne, joueur par joueur, la copie qu'il apporte.
+      const leader = this.state.leader;
+      this.state = mergeStates(this.state, msg.copy);
+      this.state.leader = leader;
+      this.state.epoch += 1;
+      for (const p of Object.values(this.state.players)) p.online = this.online(p.id);
+    }
     const st = this.state;
     const known = msg.gid === st.gid && st.players[msg.pid];
     if (known && typeof msg.secret === 'string' && (await sha256(msg.secret)) === known.secretHash) {
@@ -518,6 +568,7 @@ export class Session {
       online: true,
       rtt: null,
       route: null,
+      actAt: this.now(), // dernière action du joueur (sert à fusionner les copies)
     };
   }
 
@@ -538,6 +589,7 @@ export class Session {
     if (!p) return 'Joueur inconnu.';
     const err = startBuild(p.planet, key, this.now());
     if (err) return err;
+    p.actAt = this.now();
     this.addLog(`${p.name} lance ${BUILDINGS[key].name} niv. ${p.planet.queue.level}.`);
     this.broadcast();
     return null;
@@ -564,11 +616,13 @@ export class Session {
     if (now - (p.lastMove || 0) >= MOVE_COOLDOWN - 40) {
       p.pos = step(p.pos, dir);
       p.lastMove = now;
+      p.actAt = now;
     }
     p.moveSeq = Math.max(p.moveSeq || 0, seq);
     if (pid === this.me) this.mySeq = p.moveSeq;
-    const msg = { type: 'pos', id: pid, x: p.pos.x, y: p.pos.y, seq: p.moveSeq };
+    const msg = { type: 'pos', id: pid, x: p.pos.x, y: p.pos.y, seq: p.moveSeq, actAt: p.actAt };
     for (const link of this.links.values()) link.send(msg);
+    this.scheduleSave();
   }
 
   onPos(msg) {
@@ -576,7 +630,9 @@ export class Session {
     if (!p) return;
     p.pos = { x: msg.x, y: msg.y };
     p.moveSeq = msg.seq;
+    if (Number.isFinite(msg.actAt)) p.actAt = msg.actAt;
     if (msg.id === this.me) this.ackMoves(msg.seq);
+    this.scheduleSave();
   }
 
   ackMoves(seq) {
@@ -642,7 +698,21 @@ export class Session {
   }
 
   changed() {
+    this.save(); // tout de suite : l'appli peut être fermée juste après une action
     this.onchange?.('state');
+  }
+
+  /** Sauvegarde (au plus deux fois par seconde) de ma copie de la partie. */
+  scheduleSave() {
+    if (!this.state || !this.me || this.status !== 'playing' || this.saveTimer) return;
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null;
+      this.save();
+    }, 500);
+  }
+
+  save() {
+    if (this.state && this.me && this.status === 'playing') saveGame(this.me, this.state);
   }
 
   /** Nombre de joueurs connectés à ce téléphone (hors lui-même). */
@@ -656,6 +726,10 @@ export class Session {
   }
 
   end() {
+    clearTimeout(this.saveTimer);
+    this.saveTimer = null;
+    this.save();
+    if (this.onVisible) document.removeEventListener('visibilitychange', this.onVisible);
     this.timers.forEach(clearInterval);
     this.timers = [];
     clearInterval(this.pinger);

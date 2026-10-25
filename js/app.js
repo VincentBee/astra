@@ -1,4 +1,5 @@
 import { Session } from './session.js';
+import { loadGame, describeSave } from './save.js';
 import { inviteLink, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
 import { BUILDINGS, BUILDING_KEYS, STORAGE, stateAt, upgradeCost, buildDuration, covers, score, fmt, UNIVERSE, MOVE_COOLDOWN, DIRS, distance } from './game.js';
@@ -103,12 +104,50 @@ for (const el of document.querySelectorAll('[data-go]')) {
     session?.end?.();
     session = null;
     show(el.dataset.go);
+    showSaved();
   };
 }
+
+// Partie sauvegardée sur ce téléphone : la reprendre, ou en créer une autre.
+let confirmNew = false;
+function showSaved() {
+  const saved = loadGame();
+  $('saved').hidden = !saved;
+  $('btn-create').textContent = saved ? 'Nouvelle partie' : 'Créer une partie';
+  $('btn-create').className = saved ? 'secondary' : 'primary';
+  $('new-warning').hidden = true;
+  confirmNew = false;
+  if (!saved) return;
+  const d = describeSave(saved);
+  $('saved-names').textContent = d.names.join(', ');
+  const when = new Date(d.savedAt);
+  const sameDay = when.toDateString() === new Date().toDateString();
+  const time = when.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  $('saved-when').textContent = `Tu y joues sous le nom ${d.me || '?'} · dernière activité ${
+    sameDay ? `aujourd'hui à ${time}` : `le ${when.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} à ${time}`
+  }.`;
+}
+
+$('btn-resume').onclick = () => {
+  const saved = loadGame();
+  if (!saved) return showSaved();
+  session = Session.resume(saved);
+  session.ontoast = toast;
+  session.onchange = onSessionChange;
+  startGame();
+  toast('Partie reprise. Invite les autres pour qu’ils te rejoignent.');
+};
+
+window.addEventListener('pagehide', () => session?.save?.());
 
 $('btn-create').onclick = async () => {
   const name = playerName();
   if (!name) return;
+  if (loadGame() && !confirmNew) {
+    confirmNew = true;
+    $('new-warning').hidden = false;
+    return;
+  }
   session = await Session.create(name);
   session.ontoast = toast;
   session.onchange = onSessionChange;
@@ -674,6 +713,7 @@ async function boot() {
   show('home');
 }
 
+showSaved();
 boot();
 // Lien d'invitation ouvert alors que l'appli est déjà affichée dans cet onglet.
 window.addEventListener('hashchange', () => location.hash.length > 1 && !session && boot());

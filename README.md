@@ -1,6 +1,6 @@
 # Astra P2P — prototype
 
-Jeu de conquête spatiale entre téléphones, en pair à pair. Aucun serveur de jeu : le site est un dossier de fichiers statiques, chaque téléphone garde une copie complète de la partie, et les joueurs se connectent directement en WebRTC après un échange de QR codes. **Tant qu'il reste un joueur, la partie continue.**
+Jeu de conquête spatiale entre téléphones, en pair à pair. Aucun serveur de jeu : le site est un dossier de fichiers statiques, chaque téléphone garde une copie complète de la partie, et les joueurs se connectent directement en WebRTC après un échange de QR codes. **La partie continue même quand tout le monde est déconnecté, et n'importe qui peut la reprendre, même le lendemain.**
 
 JS vanilla, modules ES, aucune étape de build.
 
@@ -31,6 +31,7 @@ Ensuite : le MJ crée la partie, le joueur scanne le QR avec l'appareil photo de
 | Fichier | Rôle |
 |---|---|
 | `js/game.js` | Règles pures (port de `game.rs`), en vitesse ×60 : une « heure » de jeu = une minute |
+| `js/save.js` | Sauvegarde de la partie sur le téléphone et fusion de deux copies |
 | `js/session.js` | Une partie vue d'un téléphone : rôle de MJ ou de joueur, copie de l'état, connexions entre joueurs, relève du MJ |
 | `js/peer.js` | WebRTC : offre/réponse sans serveur de signalisation, canal de données |
 | `js/invite.js` | Code d'invitation compact (≈150 car.) et dessin du QR code |
@@ -46,6 +47,9 @@ Ensuite : le MJ crée la partie, le joueur scanne le QR avec l'appareil photo de
 - **Ancienneté et époques** : l'ancienneté est l'ordre d'arrivée dans la partie. Chaque changement de MJ ouvre une nouvelle époque ; en cas de désaccord, l'époque la plus récente gagne, puis le plus ancien. Un MJ ne peut s'annoncer que lui-même (pas de rumeur relayée).
 - **Temps réel** : seuls les événements circulent (chantier lancé à T, fini à T+x). Chaque téléphone anime ressources et comptes à rebours localement, sur l'heure du MJ.
 - **Univers** : onglet « Univers », grille de 20 × 20 où chaque commandant a sa planète mère et un vaisseau. Flèches à l'écran (maintien pour avancer) ou au clavier, un pas toutes les 150 ms au plus. Le vaisseau bouge tout de suite à l'écran ; le MJ valide chaque pas et le diffuse, et la position se recale si un pas est refusé.
+- **Sauvegarde et reprise** : chaque téléphone enregistre sa copie de la partie à chaque changement (et quand l'appli passe en arrière-plan). Tout se calcule à partir du temps écoulé, donc la partie « continue » sans personne : celui qui la reprend (« Reprendre la partie » à l'accueil) retrouve production et chantiers à jour, devient MJ et invite les autres.
+- **Fusion des copies** : si plusieurs joueurs ont repris la partie chacun de son côté, la copie de celui qui arrive est fusionnée avec celle du MJ, joueur par joueur : pour chacun, on garde la copie où il a agi le plus récemment. Le journal est l'union des deux.
+- **Écran verrouillé** : un joueur sans nouvelles depuis 30 s est considéré parti (6 s pour le MJ, pour que la relève reste rapide). L'horloge se recale au réveil du téléphone.
 - **Reconnexion** : un joueur qui perd la connexion scanne une invitation du MJ du moment. Un secret gardé sur son téléphone (dont le MJ ne connaît que l'empreinte SHA-256) prouve que c'est bien lui : il revient sans validation et retrouve sa planète.
 - **Horloge** : monotone (`performance.now`), elle ne saute pas si le téléphone recale son heure. Un nouveau MJ fige son décalage pour que l'heure de la partie continue sans à-coup.
 - **Débogage** : `astra.session` dans la console du navigateur.
@@ -60,11 +64,13 @@ Ensuite : le MJ crée la partie, le joueur scanne le QR avec l'appareil photo de
 ## Limites du prototype
 
 - **Partie coupée en deux** : si le groupe se scinde (réseau), chaque côté continue de son côté et les deux parties ne fusionnent pas. En revenant, on reprend la partie du MJ dont on scanne l'invitation.
-- Rien n'est sauvegardé sur le téléphone : si tous les joueurs quittent, la partie est perdue.
+- La fusion garde la dernière progression de chaque joueur, mais pas les deux versions d'un même joueur s'il a joué sur deux copies à la fois. Avec des combats entre joueurs (à venir), les conflits seront plus délicats à fusionner.
+- La sauvegarde est sur le téléphone : vider les données du navigateur ou changer de téléphone fait perdre sa copie (les autres ont la leur).
+- Une copie apportée par un joueur est crue sur parole : entre amis seulement.
 - Une invitation ne sert qu'une fois, et seul le MJ du moment peut inviter ; reconnexion par un nouveau scan.
 - Chaque joueur a la partie complète : un joueur curieux peut tout lire dans la console (pas de brouillard de guerre possible).
 - Contenu de jeu minimal : 4 bâtiments et des déplacements, pas encore de flottes ni de combats.
-- Testé dans Chromium (connexion, scan de QR par caméra simulée, temps réel, reconnexion, relève du MJ à 3 joueurs, joueur resté seul). Pas encore testé sur de vrais iPhone et Android en 4G.
+- Testé dans Chromium (connexion, scan de QR par caméra simulée, temps réel, reconnexion, relève du MJ à 3 joueurs, joueur resté seul, reprise après départ de tous, fusion de deux copies jouées séparément). Pas encore testé sur de vrais iPhone et Android en 4G.
 
 ## Licences des bibliothèques incluses
 

@@ -22,6 +22,12 @@
         <h1>Astra</h1>
         <p>Conquête spatiale entre téléphones. Sans serveur, sans compte.</p>
       </header>
+      <section id="saved" class="saved card" hidden>
+        <p class="eyebrow">Partie en cours sur ce téléphone</p>
+        <p id="saved-names" class="saved-names"></p>
+        <p id="saved-when" class="hint"></p>
+        <button id="btn-resume" class="primary">Reprendre la partie</button>
+      </section>
       <label class="field" for="name">Ton nom de commandant
         <input id="name" maxlength="16" autocomplete="nickname" placeholder="ex. Vincent">
       </label>
@@ -29,7 +35,8 @@
         <button id="btn-create" class="primary">Créer une partie</button>
         <button id="btn-join" class="secondary">Rejoindre une partie</button>
       </div>
-      <p class="hint">Le téléphone qui crée la partie en est le maître du jeu : il garde l'état officiel. Les autres le rejoignent en scannant son QR code, ou via un lien envoyé par message.</p>
+      <p id="new-warning" class="note" hidden>Une nouvelle partie remplace celle en cours sur ce téléphone. Appuie encore une fois pour confirmer.</p>
+      <p class="hint">Le téléphone qui crée la partie en est le maître du jeu. Les autres le rejoignent en scannant son QR code, ou via un lien envoyé par message. La partie est sauvegardée sur chaque téléphone : n'importe qui peut la reprendre, même le lendemain.</p>
       <p id="home-note" class="note" hidden></p>
     </div>
   </section>
@@ -76,7 +83,7 @@
     </header>
 
     <div id="lost" class="banner warn" hidden>
-      <p>Tu es seul en ligne : la partie continue sur ton téléphone. Les autres peuvent revenir avec une invitation de ta part, ou tu peux rejoindre leur partie.</p>
+      <p>Tu es seul en ligne. La partie continue et reste sauvegardée sur ce téléphone. Invite les autres, ou rejoins leur partie : vos progressions seront fusionnées.</p>
       <button id="btn-rejoin" class="secondary small">Rejoindre les autres</button>
     </div>
 

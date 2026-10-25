@@ -118,6 +118,13 @@ details > button { width: 100%; }
 }
 .hero p { color: var(--muted); margin: 10px 0 0; }
 
+/* ----- Partie sauvegardée ----- */
+
+.saved { padding: 14px 16px; display: grid; gap: 8px; border-color: rgba(122, 162, 255, 0.45); }
+.saved p { margin: 0; }
+.eyebrow { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); }
+.saved-names { font-weight: 600; }
+
 /* ----- Parcours d'invitation ----- */
 
 .flow { display: grid; gap: 18px; }
