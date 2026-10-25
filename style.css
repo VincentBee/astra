@@ -187,6 +187,7 @@ details > button { width: 100%; }
 .resources { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .tile {
   --c: var(--accent);
+  position: relative;
   background: var(--panel);
   border: 1px solid var(--line);
   border-top: 2px solid var(--c);
@@ -202,8 +203,14 @@ details > button { width: 100%; }
 .tile.pop { --c: var(--pop); }
 .tile .label { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--c); }
 .tile .amount { font-size: 1.45rem; font-weight: 700; }
+.tile .amount .cap { font-size: 0.8rem; font-weight: 500; color: var(--muted); }
 .tile .rate { font-size: 0.78rem; color: var(--muted); }
 .tile .rate.neg { color: var(--warn); }
+/* Mini-graphe de l'historique : derrière le texte, en haut à droite, très discret. */
+.spark { position: absolute; top: 10px; right: 12px; width: 48%; height: 34px; pointer-events: none; overflow: visible; }
+.spark-line { fill: none; stroke: var(--c); stroke-width: 1.5; vector-effect: non-scaling-stroke; opacity: 0.45; }
+.spark-area { fill: var(--c); opacity: 0.07; }
+.tile > :not(.spark) { position: relative; }
 .gauge { margin-top: 6px; height: 4px; border-radius: 99px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
 .gauge-fill { height: 100%; width: 0; background: var(--c); transition: width 0.2s linear; }
 
@@ -275,8 +282,6 @@ details > button { width: 100%; }
 .chip.energy { --c: var(--energy); }
 .chip.pop { --c: var(--pop); }
 
-.log { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 0.86rem; color: var(--muted); }
-.log .mono { font-size: 0.75rem; opacity: 0.7; margin-right: 6px; }
 
 .requests { display: grid; gap: 8px; margin-bottom: 10px; }
 .banner {
@@ -299,20 +304,14 @@ details > button { width: 100%; }
 }
 .fab { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); }
 
-/* ----- Onglets ----- */
+/* ----- Planète du joueur ----- */
 
-.tabs {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 4px;
-  padding: 4px;
-  margin-bottom: 16px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-}
-.tab { min-height: 40px; background: transparent; color: var(--muted); font-weight: 600; }
-.tab[aria-selected="true"] { background: var(--panel-2); color: var(--text); border-color: var(--line); }
+.planet-head { display: flex; align-items: center; gap: 12px; }
+.planet-head h2 { margin: 0; font-size: 1.2rem; }
+.soil { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.tile.empty .amount { color: var(--warn); }
+.planet-info { padding: 12px 14px; display: grid; gap: 10px; }
+.planet-info .b-desc { margin: 0; }
 
 /* ----- Univers ----- */
 
@@ -327,22 +326,6 @@ details > button { width: 100%; }
 }
 .map-wrap canvas { display: block; width: 100%; height: auto; aspect-ratio: 1; border-radius: 8px; touch-action: none; }
 
-.dpad {
-  display: grid;
-  grid-template-columns: repeat(3, 64px);
-  grid-template-rows: repeat(3, 64px);
-  gap: 8px;
-  justify-content: center;
-  user-select: none;
-  -webkit-user-select: none;
-}
-.pad { min-height: 0; padding: 0; font-size: 1.3rem; border-radius: 16px; background: var(--panel-2); border: 1px solid var(--line); }
-.pad:active, .pad.pressed { background: var(--accent); color: var(--accent-ink); }
-.pad.up { grid-area: 1 / 2; }
-.pad.left { grid-area: 2 / 1; }
-.pad.home { grid-area: 2 / 2; display: grid; place-items: center; font-size: 0.8rem; color: var(--muted); background: transparent; border-style: dashed; }
-.pad.right { grid-area: 2 / 3; }
-.pad.down { grid-area: 3 / 2; }
 
 /* ----- Feuille d'invitation ----- */
 

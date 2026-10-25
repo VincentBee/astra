@@ -101,33 +101,44 @@
       <button id="btn-rejoin" class="secondary small">Rejoindre les autres</button>
     </div>
 
-    <nav class="tabs" role="tablist" aria-label="Vues de la partie">
-      <button id="tab-planet" class="tab" role="tab" aria-selected="true" aria-controls="view-planet" data-tab="planet">Planète</button>
-      <button id="tab-universe" class="tab" role="tab" aria-selected="false" aria-controls="view-universe" data-tab="universe">Univers</button>
-    </nav>
-
-    <section id="view-universe" class="universe" role="tabpanel" aria-labelledby="tab-universe" hidden>
+    <section id="view-universe" class="universe" aria-label="Carte de l'univers">
+      <div id="pick" class="banner" hidden>
+        <p><strong>Choisis ta planète de départ.</strong> Touche une planète libre sur la carte pour voir ses gisements, puis installe-toi. Ce choix est définitif.</p>
+      </div>
       <div class="map-head">
-        <span>Ta position <strong id="my-coords" class="mono"></strong></span>
+        <span>Ta planète <strong id="my-coords" class="mono"></strong></span>
         <span id="map-size" class="hint mono"></span>
       </div>
-      <div class="map-wrap"><canvas id="map" aria-label="Carte de l'univers"></canvas></div>
-      <div class="dpad" aria-label="Déplacer ton vaisseau">
-        <button class="pad up" data-dir="up" aria-label="Haut">▲</button>
-        <button class="pad left" data-dir="left" aria-label="Gauche">◀</button>
-        <span class="pad home mono" id="home-dist" title="Pas jusqu'à ta planète mère"></span>
-        <button class="pad right" data-dir="right" aria-label="Droite">▶</button>
-        <button class="pad down" data-dir="down" aria-label="Bas">▼</button>
-      </div>
-      <p class="hint">Flèches à l'écran ou du clavier. Maintiens appuyé pour avancer en continu. ◉ planète mère, ▲ vaisseau.</p>
-      <div>
-        <h3 class="section-title">Positions</h3>
-        <div id="positions" class="players"></div>
-      </div>
+      <div class="map-wrap"><canvas id="map" aria-label="Carte de l'univers : touche une planète"></canvas></div>
+
+      <article id="planet-info" class="card planet-info" hidden>
+        <div class="b-head"><h4 id="pi-name"></h4><span id="pi-where" class="level mono"></span></div>
+        <p id="pi-owner" class="b-desc"></p>
+        <div id="pi-soil" class="soil"></div>
+        <button id="btn-claim" class="primary" hidden>S'installer ici</button>
+        <button id="btn-open-planet" class="secondary" hidden>Voir mes bâtiments</button>
+      </article>
+
+      <p class="hint">Touche une planète pour voir ses gisements, la tienne pour ouvrir ses bâtiments. Planètes en pointillés : libres.</p>
+
+      <section>
+        <h3 class="section-title">Commandants</h3>
+        <div id="players" class="players"></div>
+      </section>
     </section>
 
-    <main id="view-planet" class="game" role="tabpanel" aria-labelledby="tab-planet">
+    <main id="view-planet" class="game" hidden>
+      <div class="planet-head">
+        <button id="btn-back-map" class="ghost small">← Carte</button>
+        <h2 id="planet-title"></h2>
+      </div>
+
       <section class="resources" id="resources"></section>
+
+      <section id="soil-zone" hidden>
+        <h3 class="section-title">Gisements de la planète</h3>
+        <div id="soil" class="soil"></div>
+      </section>
 
       <section id="queue" class="queue card" hidden>
         <div class="queue-head"><span id="queue-label"></span><span id="queue-left" class="mono"></span></div>
@@ -142,16 +153,6 @@
       <section>
         <h3 class="section-title">Bâtiments</h3>
         <div id="buildings" class="buildings"></div>
-      </section>
-
-      <section>
-        <h3 class="section-title">Commandants</h3>
-        <div id="players" class="players"></div>
-      </section>
-
-      <section>
-        <h3 class="section-title">Journal</h3>
-        <ol id="log" class="log"></ol>
       </section>
     </main>
 

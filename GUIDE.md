@@ -4,6 +4,8 @@ Principes, ordres de construction et pièges pour chaque race.
 
 Les ordres viennent d’une recherche par simulation (règles de `js/game.js`) : on joue des milliers d’ordres possibles et on garde les meilleurs à un horizon donné, en écartant ceux qui provoquent une famine ou une panne juste après. Les heures sont approximatives : elles supposent qu’on lance chaque chantier dès qu’il est payable. « Le moins cher d’abord » sert de repère. **À refaire si l’équilibrage change.**
 
+> Ces ordres datent d’avant les gisements des planètes : ils supposent une extraction sans limite. Sur une planète au gisement maigre, l’extraction plafonne plus tôt.
+
 ## ◆ Humains
 
 Tout part de la population. Au départ, 8 habitants pour 15 postes : mines et fermes tournent à moitié. Loger et alimenter avant de creuser.

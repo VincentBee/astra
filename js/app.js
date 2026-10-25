@@ -4,7 +4,7 @@ import { inviteLink, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
 import {
   RACES, RACE_KEYS, RES_INFO, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
-  powerReadyAt, powerCost, fmt, UNIVERSE, MOVE_COOLDOWN, DIRS, distance,
+  powerReadyAt, powerCost, fmt, UNIVERSE, SOIL, sameCell,
 } from './game.js';
 
 const $ = (id) => document.getElementById(id);
@@ -154,7 +154,7 @@ $('btn-create').onclick = async () => {
   session = await Session.create(name);
   session.ontoast = toast;
   session.onchange = onSessionChange;
-  inviteAfterRace = true; // la fenêtre d'invitation s'ouvre une fois la race choisie
+  inviteAfterRace = true; // la fenêtre d'invitation s'ouvre une fois la planète choisie
   startGame();
 };
 
@@ -376,10 +376,6 @@ $('btn-race').onclick = () => {
   if (!pickedRace || !session) return;
   if (!session.chooseRace(pickedRace)) return;
   startGame();
-  if (inviteAfterRace) {
-    inviteAfterRace = false;
-    openInviteSheet();
-  }
 };
 
 // ---------------------------------------------------------------------------
@@ -388,7 +384,8 @@ function startGame() {
   if (!session.myRace) return showRace();
   show('game');
   buildStatic();
-  showTab('planet');
+  selected = null;
+  showView('map');
   renderState();
   clearInterval(liveTimer);
   liveTimer = setInterval(renderLive, 200);
@@ -411,7 +408,7 @@ function buildStatic() {
   const R = RACES[race];
   builtFor = race;
   const tiles = R.resources.map(
-    (r) => `<div class="tile ${r}">
+    (r) => `<div class="tile ${r}">${spark(r)}
       <span class="label">${RES_INFO[r].name}</span>
       <span class="amount mono" data-res="${r}">0</span>
       <span class="rate mono" data-rate="${r}"></span>
@@ -419,18 +416,20 @@ function buildStatic() {
     </div>`,
   );
   if (R.pop) {
-    tiles.push(`<div class="tile pop"><span class="label">${R.pop.label}</span>
+    tiles.push(`<div class="tile pop">${spark('pop')}<span class="label">${R.pop.label}</span>
       <span class="amount mono" data-pop></span>
       <span class="rate mono" data-poprate></span>
       <span class="rate mono" data-popextra></span>
       <div class="gauge"><div class="gauge-fill" data-popgauge></div></div></div>`);
   } else {
-    tiles.push(`<div class="tile grid"><span class="label">Réseau</span>
+    tiles.push(`<div class="tile grid">${spark('grid')}<span class="label">Réseau</span>
       <span class="amount mono" data-grid></span>
       <span class="rate mono" data-gridrate></span>
       <span class="rate mono" data-gridextra></span></div>`);
   }
   $('resources').innerHTML = tiles.join('');
+  $('soil').innerHTML = soilTiles('soil');
+  drawSparks();
 
   $('buildings').innerHTML = Object.entries(R.buildings)
     .map(
@@ -457,10 +456,117 @@ function buildStatic() {
       : '';
 }
 
+/** Tuiles des gisements (minéraux et nourriture du sol), remplies par fillSoil. */
+function soilTiles(prefix) {
+  return SOIL.map(
+    (r) => `<div class="tile ${r}" data-${prefix}-tile="${r}">${prefix === 'soil' ? spark(`soil-${r}`) : ''}
+      <span class="label">${RES_INFO[r].name}</span>
+      <span class="amount mono" data-${prefix}-amount="${r}"></span>
+      <span class="rate mono" data-${prefix}-rate="${r}"></span>
+      <span class="rate mono" data-${prefix}-detail="${r}"></span>
+      <div class="gauge"><div class="gauge-fill" data-${prefix}-gauge="${r}"></div></div>
+    </div>`,
+  ).join('');
+}
+
+/**
+ * Gisements : ce qu'il reste dans le sol, et ce qu'on en tire. `soil` est
+ * l'extraction en cours (null pour une planète libre).
+ */
+function fillSoil(prefix, nature, reserve, soil) {
+  const q = (sel) => document.querySelector(sel);
+  for (const r of SOIL) {
+    const n = nature[r];
+    const left = reserve[r];
+    const empty = left < 1;
+    const limited = !!soil && empty && soil[r].want > n.regen + 0.5;
+    q(`[data-${prefix}-tile="${r}"]`).classList.toggle('empty', empty);
+    q(`[data-${prefix}-amount="${r}"]`).innerHTML = withCap(left, n.max);
+    q(`[data-${prefix}-gauge="${r}"]`).style.width = `${Math.min(100, (left / n.max) * 100)}%`;
+    const rate = q(`[data-${prefix}-rate="${r}"]`);
+    const detail = q(`[data-${prefix}-detail="${r}"]`);
+    // Solde du gisement : ce qu'il produit de lui-même, moins ce qu'on en extrait.
+    if (!soil) rate.textContent = 'Intact';
+    else if (limited) rate.textContent = `Épuisé : limité à ${fmt(n.regen)} / min`;
+    else if (left >= n.max - 0.5 && soil[r].got <= n.regen) rate.textContent = 'Plein : il se régénère plus vite qu’on n’extrait';
+    else rate.textContent = rateText(n.regen - soil[r].got);
+    rate.classList.toggle('neg', limited || (!!soil && soil[r].got > n.regen + 0.5));
+    detail.textContent = soil ? `extraction ${fmt(soil[r].got)} · régénère ${fmt(n.regen)} / min` : `régénère ${fmt(n.regen)} / min`;
+  }
+}
+
 $('powers').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-power]');
   if (btn && !btn.disabled) session.power(btn.dataset.power);
 });
+
+// ---------------------------------------------------------------------------
+// Historique des ressources : un mini-graphe discret dans chaque tuile
+// ---------------------------------------------------------------------------
+//
+// Chaque téléphone relève ses propres valeurs toutes les 5 s et garde les
+// 10 dernières minutes, pour la partie en cours (gardées au rechargement).
+
+const HISTORY_KEY = 'astra.history';
+const SAMPLE_MS = 5000;
+const HISTORY_MS = 10 * 60_000;
+let history = null; // { id, t: [instants], v: { clé: [valeurs] } }
+
+const spark = (k) =>
+  `<svg class="spark" data-spark="${k}" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><path class="spark-area"/><path class="spark-line"/></svg>`;
+
+function sampleHistory(now, values) {
+  const id = `${session.state.gid}|${session.me}`;
+  if (history?.id !== id) {
+    try {
+      history = JSON.parse(localStorage.getItem(HISTORY_KEY) || 'null');
+    } catch {
+      history = null;
+    }
+    if (history?.id !== id) history = { id, t: [], v: {} };
+  }
+  if (history.t.length && now - history.t[history.t.length - 1] < SAMPLE_MS) return;
+  history.t.push(now);
+  for (const [k, v] of Object.entries(values)) (history.v[k] ||= []).push(Math.round(v * 10) / 10);
+  // On oublie ce qui a plus de 10 minutes.
+  const drop = history.t.findIndex((t) => now - t <= HISTORY_MS);
+  if (drop > 0) {
+    history.t.splice(0, drop);
+    for (const a of Object.values(history.v)) a.splice(0, a.length - history.t.length);
+  }
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch {}
+  drawSparks();
+}
+
+/** Courbe de chaque tuile, à l'échelle de ses propres valeurs (de la plus basse à la plus haute). */
+function drawSparks() {
+  if (!history) return;
+  for (const svg of document.querySelectorAll('[data-spark]')) {
+    const vals = history.v[svg.dataset.spark] || [];
+    const n = Math.min(vals.length, history.t.length);
+    if (n < 2) continue;
+    // Axe du temps : du plus ancien relevé au plus récent (10 min au plus).
+    const t1 = history.t[history.t.length - 1];
+    const t0 = history.t[history.t.length - n];
+    const width = Math.max(1, t1 - t0);
+    const lo = Math.min(...vals), hi = Math.max(...vals);
+    const span = hi - lo || 1;
+    const pts = [];
+    for (let i = vals.length - n; i < vals.length; i++) {
+      const x = ((history.t[i - vals.length + history.t.length] - t0) / width) * 100;
+      const y = hi === lo ? 15 : 28 - ((vals[i] - lo) / span) * 26;
+      pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+    }
+    const line = `M${pts.join('L')}`;
+    svg.querySelector('.spark-line').setAttribute('d', line);
+    svg.querySelector('.spark-area').setAttribute('d', `${line}L${pts[pts.length - 1].split(',')[0]},30L${pts[0].split(',')[0]},30Z`);
+  }
+}
+
+/** « 220 / 1 000 » : la quantité et, en plus discret, la capacité maximale. */
+const withCap = (v, cap) => `${fmt(v)}<span class="cap"> / ${fmt(cap)}</span>`;
 
 /** « 1 234 min. · 30 én. » */
 function costText(cost) {
@@ -518,14 +624,23 @@ function renderState() {
     )
     .join('');
 
-  const time = (t) => new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  $('log').innerHTML = st.log
-    .slice()
-    .reverse()
-    .map((l) => `<li><span class="mono">${time(l.at)}</span> ${esc(l.text)}</li>`)
-    .join('');
-
+  printLog(st.log);
   renderLive();
+}
+
+/**
+ * Journal de la partie : il n'est pas affiché dans le jeu, on l'écrit dans
+ * la console du navigateur (chaque entrée une seule fois, dans l'ordre).
+ */
+const printed = new Set();
+function printLog(log) {
+  const time = (t) => new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  for (const l of [...log].sort((a, b) => a.at - b.at)) {
+    const k = `${l.at}|${l.text}`;
+    if (printed.has(k)) continue;
+    printed.add(k);
+    console.info(`[Astra ${time(l.at)}] ${l.text}`);
+  }
 }
 
 function routeLabel(route) {
@@ -535,7 +650,6 @@ function routeLabel(route) {
 /** Rendu des valeurs qui bougent en continu (5 fois par seconde). */
 function renderLive() {
   if (!session) return;
-  if (currentTab === 'universe') renderPositions();
   const st = session.state;
   const me = st.players[session.me];
   const now = session.now();
@@ -553,7 +667,8 @@ function renderLive() {
   if (me?.planet) {
     if (builtFor !== me.race) buildStatic();
     renderPlanet(me, now);
-  }
+  } else if (currentView === 'planet') showView('map');
+  renderPick(me, now);
 
   for (const p of Object.values(st.players)) {
     const sub = document.querySelector(`[data-psub="${p.id}"]`);
@@ -562,7 +677,7 @@ function renderLive() {
     const net = p.id === session.me ? '' : !info ? 'déconnecté' : info.rtt != null ? `${info.rtt} ms${info.route ? ' ' + routeLabel(info.route) : ''}` : '';
     const scoreEl = document.querySelector(`[data-pscore="${p.id}"]`);
     if (!p.race || !p.planet) {
-      sub.textContent = `choisit sa race…${net ? ' · ' + net : ''}`;
+      sub.textContent = `${p.race ? 'choisit sa planète…' : 'choisit sa race…'}${net ? ' · ' + net : ''}`;
       scoreEl.textContent = '—';
       continue;
     }
@@ -580,11 +695,17 @@ function renderPlanet(me, now) {
   const R = RACES[me.race];
   const s = stateAt(me.planet, now);
   const f = s.prod;
+  const soil = s.reserve ? Object.fromEntries(SOIL.map((r) => [`soil-${r}`, s.reserve[r]])) : {};
+  sampleHistory(now, { ...s.stock, pop: s.pop, grid: f.effE * 100, ...soil });
   const q = (sel) => document.querySelector(sel);
+
+  $('planet-title').textContent = session.myWorld?.name || 'Ta planète';
+  $('soil-zone').hidden = !me.planet.nature;
+  if (me.planet.nature) fillSoil('soil', me.planet.nature, s.reserve, f.soil);
 
   for (const r of R.resources) {
     const cap = f.caps[r];
-    q(`[data-res="${r}"]`).textContent = fmt(s.stock[r]);
+    q(`[data-res="${r}"]`).innerHTML = withCap(s.stock[r], cap);
     const short = r === 'energy' ? f.effE < 1 : r === 'food' ? f.effF < 1 : false;
     const rate = q(`[data-rate="${r}"]`);
     rate.textContent = short
@@ -604,11 +725,16 @@ function renderPlanet(me, now) {
     const rate = q('[data-poprate]');
     const extra = q('[data-popextra]');
     if (me.race === 'human') {
-      q('[data-pop]').textContent = fmt(s.pop);
-      rate.textContent = f.effF < 1 ? 'Famine !' : `${rateText(delta)} · max ${fmt(cap)}`;
-      extra.textContent = f.work < 1 ? `Ouvriers ${Math.round(f.work * 100)} % des postes` : 'Tous les postes pourvus';
+      q('[data-pop]').innerHTML = withCap(s.pop, cap);
+      rate.textContent = f.effF < 1 ? 'Famine !' : rateText(delta);
+      // Habitants au travail (autant que de postes, au plus) sur l'ensemble des habitants.
+      const people = Math.floor(s.pop);
+      const active = Math.min(people, f.jobs);
+      const vacant = Math.max(0, f.jobs - people);
+      extra.textContent = `${fmt(active)} actifs / ${fmt(people)} habitants${vacant ? ` · ${fmt(vacant)} postes vides` : ''}`;
+      extra.classList.toggle('neg', vacant > 0);
     } else {
-      q('[data-pop]').textContent = fmt(s.pop);
+      q('[data-pop]').innerHTML = withCap(s.pop, cap);
       const starving = Math.min(f.effE, f.effF) < 1;
       const next = (Math.floor(s.pop) + 1 - s.pop) / 0.06; // heures de jeu = minutes réelles
       rate.textContent = starving
@@ -672,22 +798,21 @@ function clock(ms) {
 }
 
 // ---------------------------------------------------------------------------
-// Univers : grille 2D, déplacements aux flèches
+// Univers : la carte des planètes, vue principale de la partie
 // ---------------------------------------------------------------------------
 
-let currentTab = 'planet';
+let currentView = 'map';
 let mapFrame = null;
-const shown = new Map(); // id -> position affichée (glisse vers la position réelle)
+let selected = null; // planète touchée sur la carte : { x, y }
 
-function showTab(tab) {
-  currentTab = tab;
-  $('view-planet').hidden = tab !== 'planet';
-  $('view-universe').hidden = tab !== 'universe';
-  for (const b of document.querySelectorAll('[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
-  if (tab === 'universe') {
+/** Carte (vue principale) ou bâtiments de ma planète. */
+function showView(view) {
+  currentView = view;
+  $('view-universe').hidden = view !== 'map';
+  $('view-planet').hidden = view !== 'planet';
+  window.scrollTo(0, 0);
+  if (view === 'map') {
     $('map-size').textContent = `${UNIVERSE.w} × ${UNIVERSE.h}`;
-    shown.clear();
-    renderPositions();
     if (!mapFrame) mapFrame = requestAnimationFrame(drawMap);
   } else stopMap();
 }
@@ -695,21 +820,28 @@ function showTab(tab) {
 function stopMap() {
   if (mapFrame) cancelAnimationFrame(mapFrame);
   mapFrame = null;
-  stopRepeat();
 }
 
-for (const b of document.querySelectorAll('[data-tab]')) b.onclick = () => showTab(b.dataset.tab);
+$('btn-back-map').onclick = () => showView('map');
+$('btn-open-planet').onclick = () => showView('planet');
 
-/** Positions de tout le monde. */
-function positions() {
-  const out = [];
+/**
+ * Toutes les planètes à afficher : celles de l'univers, avec leur
+ * propriétaire, et les planètes mères des joueurs d'avant le choix de
+ * planète (placées hors de la liste).
+ */
+function mapPlanets() {
+  const out = session.planets.map((w) => ({ ...w, owner: session.ownerAt(w) }));
   for (const p of Object.values(session.state.players)) {
-    if (!p.pos) continue;
-    const pos = p.id === session.me ? session.myPos() || p.pos : p.pos;
-    out.push({ p, pos });
+    if (p.home && !out.some((w) => sameCell(w, p.home))) {
+      out.push({ id: `home-${p.id}`, name: `Planète ${de(p.name)}`, x: p.home.x, y: p.home.y, owner: p, nature: null });
+    }
   }
   return out;
 }
+
+/** « de Beta », « d'Alpha ». */
+const de = (name) => (/^[aeiouyhàâéèêëîïôöûü]/i.test(name) ? `d’${name}` : `de ${name}`);
 
 /** Petit bruit déterministe : les mêmes étoiles de fond sur tous les téléphones. */
 function noise(x, y) {
@@ -719,7 +851,7 @@ function noise(x, y) {
 
 function drawMap() {
   mapFrame = null;
-  if (!session || currentTab !== 'universe') return;
+  if (!session || currentView !== 'map') return;
   const canvas = $('map');
   const dpr = Math.min(3, window.devicePixelRatio || 1);
   const css = canvas.clientWidth;
@@ -755,122 +887,121 @@ function drawMap() {
   }
   ctx.stroke();
 
-  const list = positions();
+  const me = session.state.players[session.me];
+  const picking = !me?.home;
+  const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 300);
 
-  // Planètes mères
-  for (const { p } of list) {
-    if (!p.home) continue;
-    const cx = (p.home.x + 0.5) * cell;
-    const cy = (p.home.y + 0.5) * cell;
-    ctx.globalAlpha = p.online ? 1 : 0.4;
-    ctx.fillStyle = p.color;
+  for (const w of mapPlanets()) {
+    const cx = (w.x + 0.5) * cell;
+    const cy = (w.y + 0.5) * cell;
+    const o = w.owner;
+    const mine = o?.id === session.me;
+    // Planète libre : grise, plus lumineuse quand on cherche où s'installer.
+    ctx.globalAlpha = o ? (o.online ? 1 : 0.45) : picking ? 0.55 + 0.35 * pulse : 0.6;
+    const color = o ? o.color : '#8d95b3';
+    ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(cx, cy, cell * 0.24, 0, Math.PI * 2);
+    ctx.arc(cx, cy, cell * (o ? 0.26 : 0.2), 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = p.color;
+    ctx.strokeStyle = color;
     ctx.lineWidth = Math.max(1, cell * 0.06);
+    if (!o) ctx.setLineDash([cell * 0.12, cell * 0.1]);
     ctx.beginPath();
     ctx.ellipse(cx, cy, cell * 0.42, cell * 0.14, -0.35, 0, Math.PI * 2);
     ctx.stroke();
-  }
-
-  // Vaisseaux (ils glissent vers leur case)
-  for (const { p, pos } of list) {
-    const prev = shown.get(p.id) || { x: pos.x, y: pos.y };
-    const k = 0.35;
-    const cur = { x: prev.x + (pos.x - prev.x) * k, y: prev.y + (pos.y - prev.y) * k };
-    if (Math.abs(cur.x - pos.x) < 0.01) cur.x = pos.x;
-    if (Math.abs(cur.y - pos.y) < 0.01) cur.y = pos.y;
-    shown.set(p.id, cur);
-    const cx = (cur.x + 0.5) * cell;
-    const cy = (cur.y + 0.5) * cell;
-    const mine = p.id === session.me;
-    ctx.globalAlpha = p.online ? 1 : 0.35;
-    if (mine) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.setLineDash([]);
+    if (mine || sameCell(selected, w)) {
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = mine ? 'rgba(255,255,255,0.85)' : '#ffffff';
       ctx.lineWidth = Math.max(1.5, cell * 0.07);
       ctx.beginPath();
-      ctx.arc(cx, cy, cell * 0.46, 0, Math.PI * 2);
+      ctx.arc(cx, cy, cell * 0.5, 0, Math.PI * 2);
       ctx.stroke();
     }
-    ctx.fillStyle = p.color;
-    ctx.strokeStyle = '#05070f';
-    ctx.lineWidth = Math.max(1, cell * 0.05);
-    ctx.beginPath();
-    ctx.moveTo(cx, cy - cell * 0.3);
-    ctx.lineTo(cx + cell * 0.24, cy + cell * 0.24);
-    ctx.lineTo(cx - cell * 0.24, cy + cell * 0.24);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    // Nom au-dessus
-    ctx.font = `600 ${Math.max(9 * dpr, cell * 0.38)}px system-ui, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.fillStyle = mine ? '#ffffff' : 'rgba(232,235,247,0.8)';
-    const label = p.name.length > 8 ? p.name.slice(0, 7) + '…' : p.name;
-    ctx.fillText(label, cx, Math.max(cell * 0.4, cy - cell * 0.45));
+    // Nom du propriétaire au-dessus
+    if (o) {
+      ctx.globalAlpha = o.online ? 1 : 0.6;
+      ctx.font = `600 ${Math.max(9 * dpr, cell * 0.36)}px system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = mine ? '#ffffff' : 'rgba(232,235,247,0.8)';
+      const label = o.name.length > 8 ? o.name.slice(0, 7) + '…' : o.name;
+      ctx.fillText(label, cx, Math.max(cell * 0.4, cy - cell * 0.5));
+    }
   }
   ctx.globalAlpha = 1;
 
-  const me = session.myPos();
-  $('my-coords').textContent = me ? `[${me.x}:${me.y}]` : '';
-  const home = session.state.players[session.me]?.home;
-  $('home-dist').textContent = me && home ? `⌂ ${distance(me, home)}` : '⌂';
+  $('my-coords').textContent = me?.home ? `[${me.home.x}:${me.home.y}]` : 'à choisir';
 
   mapFrame = requestAnimationFrame(drawMap);
 }
 
-function renderPositions() {
-  const me = session.myPos();
-  const rows = positions()
-    .map(({ p, pos }) => ({ p, pos, d: me ? distance(me, pos) : null }))
-    .sort((a, b) => (a.p.id === session.me ? -1 : b.p.id === session.me ? 1 : (a.d ?? 0) - (b.d ?? 0)));
-  $('positions').innerHTML = rows
-    .map(({ p, pos, d }) => {
-      const atHome = p.home && pos.x === p.home.x && pos.y === p.home.y;
-      const where = p.id === session.me ? 'toi' : `${d} pas de toi`;
-      return `<div class="player card${p.online ? '' : ' offline'}">
-        <span class="dot" style="background:${esc(p.color)}"></span>
-        <div class="p-main"><div class="p-name">${esc(p.name)}</div>
-        <div class="p-sub mono">${where}${atHome ? ' · sur sa planète' : ''}</div></div>
-        <div class="p-score mono">[${pos.x}:${pos.y}]</div></div>`;
-    })
-    .join('');
+/** Toucher la carte : ma planète ouvre ses bâtiments, une autre montre ses gisements. */
+$('map').addEventListener('click', (e) => {
+  if (!session?.state) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const size = rect.width / UNIVERSE.w; // en pixels CSS (le canvas, lui, est à l'échelle de l'écran)
+  const fx = (e.clientX - rect.left) / size - 0.5;
+  const fy = (e.clientY - rect.top) / size - 0.5;
+  let best = null;
+  for (const w of mapPlanets()) {
+    const d = Math.hypot(w.x - fx, w.y - fy);
+    if (d < 1.2 && (!best || d < best.d)) best = { w, d };
+  }
+  if (!best) {
+    selected = null;
+    return renderPick();
+  }
+  const { w } = best;
+  if (w.owner?.id === session.me && session.state.players[session.me]?.planet) {
+    selected = null;
+    renderPick();
+    return showView('planet');
+  }
+  selected = { x: w.x, y: w.y };
+  renderPick();
+  $('planet-info').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+});
+
+/** Bandeau de choix de la planète de départ et fiche de la planète touchée. */
+function renderPick(me = session?.state?.players[session.me], now = session?.now()) {
+  if (!session?.state) return;
+  const picking = !me?.home;
+  $('pick').hidden = !picking;
+  const w = selected && mapPlanets().find((x) => sameCell(x, selected));
+  $('planet-info').hidden = !w;
+  if (!w) return;
+  const o = w.owner;
+  $('pi-name').textContent = w.name;
+  $('pi-where').textContent = `[${w.x}:${w.y}]`;
+  $('pi-owner').textContent = o
+    ? `${o.id === session.me ? 'Ta planète' : `Planète ${de(o.name)}`}${o.race ? ` · ${RACES[o.race].icon} ${RACES[o.race].name}` : ''}`
+    : 'Planète libre. Ses gisements se vident quand on les exploite, et se reconstituent d’eux-mêmes jusqu’à leur maximum.';
+  // Gisements : pleins pour une planète libre, calculés chez son propriétaire sinon.
+  const s = o?.planet?.nature ? stateAt(o.planet, now) : null;
+  const nature = o ? o.planet?.nature : w.nature;
+  const box = $('pi-soil');
+  if (!nature) box.innerHTML = '';
+  else {
+    if (!box.firstChild) box.innerHTML = soilTiles('pi');
+    fillSoil('pi', nature, s ? s.reserve : w.reserve, s ? s.prod.soil : null);
+  }
+  $('btn-claim').hidden = !picking || !!o;
+  $('btn-claim').textContent = `S'installer sur ${w.name} (définitif)`;
+  $('btn-open-planet').hidden = o?.id !== session.me || !me?.planet;
 }
 
-// Commandes : un pas immédiat à l'appui, puis un pas toutes les MOVE_COOLDOWN ms tant qu'on maintient.
-let repeatTimer = null;
-let pressedBtn = null;
-function stopRepeat() {
-  clearInterval(repeatTimer);
-  repeatTimer = null;
-  pressedBtn?.classList.remove('pressed');
-  pressedBtn = null;
-}
-function moveOnce(dir) {
-  if (session && DIRS[dir]) session.move(dir);
-}
-for (const btn of document.querySelectorAll('[data-dir]')) {
-  btn.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    stopRepeat();
-    pressedBtn = btn;
-    btn.classList.add('pressed');
-    moveOnce(btn.dataset.dir);
-    repeatTimer = setInterval(() => moveOnce(btn.dataset.dir), MOVE_COOLDOWN + 10);
-  });
-  for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(ev, stopRepeat);
-  btn.addEventListener('contextmenu', (e) => e.preventDefault());
-}
-const KEY_DIRS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
-document.addEventListener('keydown', (e) => {
-  const dir = KEY_DIRS[e.key];
-  if (!dir || currentTab !== 'universe' || $('screen-game').hidden || !$('sheet-invite').hidden) return;
-  if (/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) return;
-  e.preventDefault();
-  moveOnce(dir);
-});
-window.addEventListener('blur', stopRepeat);
+$('btn-claim').onclick = () => {
+  const w = selected && session.planets.find((x) => sameCell(x, selected));
+  if (!w || !session.claimPlanet(w.id)) return;
+  selected = null;
+  buildStatic();
+  renderPick();
+  showView('planet');
+  if (inviteAfterRace) {
+    inviteAfterRace = false;
+    openInviteSheet();
+  }
+};
 
 // ---------------------------------------------------------------------------
 // Démarrage : lien d'invitation dans l'adresse ?

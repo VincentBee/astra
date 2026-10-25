@@ -3,7 +3,7 @@
 // et chacun peut inviter de nouveaux joueurs.
 //
 // Comment rester d'accord sans arbitre : chaque joueur est le seul à écrire
-// sa propre fiche (sa planète, son vaisseau). Il applique ses ordres tout de
+// sa propre fiche (sa planète). Il applique ses ordres tout de
 // suite chez lui, puis envoie sa fiche à jour aux autres. Une fiche porte
 // l'heure de sa dernière modification (`actAt`) : entre deux versions de la
 // même fiche, la plus récente l'emporte. Comme personne n'écrit la fiche d'un
@@ -20,7 +20,7 @@
 import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates } from './save.js';
-import { newPlanet, settle, startBuild, usePower, RACES, POWERS, step, freeCell, DIRS, MOVE_COOLDOWN } from './game.js';
+import { newPlanet, settle, startBuild, usePower, RACES, POWERS, planetsFor, sameCell } from './game.js';
 
 const COLORS = ['#7aa2ff', '#ff9f6b', '#7cf0b4', '#f7d06b', '#d38bff', '#6fd3ff', '#ff7a93', '#b7e36b'];
 const MAX_PLAYERS = 8;
@@ -60,6 +60,7 @@ const saveIdentity = (v) => {
  * encore de planète, son joueur choisira sa race en revenant.
  */
 function normalize(p) {
+  delete p.pos; // vaisseaux d'avant : on ne se déplace plus sur la carte
   if (!RACES[p.race]) {
     p.race = null;
     p.planet = null;
@@ -87,7 +88,6 @@ export class Session {
     this.status = 'idle'; // idle | answering | waiting | playing | failed | refused
     this.invite = null;
     this.dialing = new Map(); // pid -> offre en cours vers ce joueur
-    this.lastMoveAt = 0;
     this.onchange = null;
     this.ontoast = null;
     this.timers = [];
@@ -401,7 +401,7 @@ export class Session {
     if (log && typeof log.text === 'string' && Number.isFinite(log.at)) this.pushLog(log);
     this.spread(rec, log, link);
     this.scheduleSave();
-    this.onchange?.(log ? 'state' : 'pos');
+    this.onchange?.('state');
   }
 
   /** Envoie une fiche à tous mes voisins (sauf celui d'où elle vient). */
@@ -522,7 +522,6 @@ export class Session {
   addPlayer(pid, name, secretHash) {
     const st = this.state;
     const others = Object.values(st.players);
-    const home = freeCell(others.map((p) => p.home));
     const used = new Set(others.map((p) => p.color));
     const now = this.now();
     st.players[pid] = {
@@ -531,11 +530,10 @@ export class Session {
       rank: now, // ordre d'arrivée
       color: COLORS.find((c) => !used.has(c)) || COLORS[others.length % COLORS.length],
       secretHash,
-      // La race se choisit à l'arrivée, une fois pour toutes ; la planète naît avec elle.
+      // À l'arrivée, on choisit sa race (une fois pour toutes), puis sa planète de départ.
       race: null,
       planet: null,
-      home,
-      pos: { ...home },
+      home: null,
       online: true,
       actAt: now, // dernière modification de la fiche (sert à garder la plus récente)
     };
@@ -556,10 +554,83 @@ export class Session {
       return false;
     }
     p.race = race;
-    p.planet = newPlanet(race, this.now());
+    // Joueur d'avant le choix de planète : il garde la sienne.
+    if (p.home) p.planet = newPlanet(race, this.now());
     this.touch(this.addLog(`${p.name} rejoint le camp des ${RACES[race].name}.`));
     this.changed();
     return true;
+  }
+
+  // ----- planètes ---------------------------------------------------------------
+
+  /** Planètes de l'univers (les mêmes sur tous les téléphones, tirées de l'identifiant de la partie). */
+  get planets() {
+    if (this.world?.gid !== this.state?.gid) this.world = { gid: this.state?.gid, list: this.state ? planetsFor(this.state.gid) : [] };
+    return this.world.list;
+  }
+
+  /**
+   * Propriétaire d'une case : le premier à s'y être installé. Deux joueurs
+   * peuvent choisir la même planète au même moment (ou coupés l'un de
+   * l'autre) ; c'est le plus ancien choix qui compte, partout pareil.
+   */
+  ownerAt(cell) {
+    let best = null;
+    for (const p of Object.values(this.state?.players || {})) {
+      if (!sameCell(p.home, cell)) continue;
+      const k = [p.claimAt || p.rank || 0, p.id];
+      if (!best || k[0] < best.k[0] || (k[0] === best.k[0] && k[1] < best.k[1])) best = { p, k };
+    }
+    return best?.p || null;
+  }
+
+  /** Ma planète de l'univers (avec ses gisements de départ), ou null. */
+  get myWorld() {
+    const home = this.state?.players[this.me]?.home;
+    return (home && this.planets.find((w) => sameCell(w, home))) || null;
+  }
+
+  /** M'installer sur une planète libre : une fois la race choisie, au début de la partie. */
+  claimPlanet(id) {
+    if (this.status !== 'playing') return false;
+    const p = this.state.players[this.me];
+    const w = this.planets.find((x) => x.id === id);
+    if (!p?.race || !w) return false;
+    if (p.home) {
+      this.ontoast?.('Tu as déjà une planète.');
+      return false;
+    }
+    const owner = this.ownerAt(w);
+    if (owner) {
+      this.ontoast?.(`${w.name} appartient déjà à ${owner.name}.`);
+      return false;
+    }
+    const now = this.now();
+    p.home = { x: w.x, y: w.y };
+    p.claimAt = now;
+    p.planet ||= newPlanet(p.race, now, w);
+    this.touch(this.addLog(`${p.name} s'installe sur ${w.name}.`));
+    this.changed();
+    return true;
+  }
+
+  /**
+   * Quelqu'un s'est installé sur ma planète avant moi (choix simultanés) : je
+   * la lui laisse et je repars au choix. Je suis le seul à écrire ma fiche,
+   * c'est donc à mon téléphone de le faire.
+   */
+  checkClaim() {
+    const p = this.state?.players[this.me];
+    if (!p?.home) return;
+    const owner = this.ownerAt(p.home);
+    if (!owner || owner.id === this.me) return;
+    const w = this.myWorld;
+    p.home = null;
+    p.planet = null;
+    delete p.claimAt;
+    this.touch();
+    this.ontoast?.(`${owner.name} s'est installé sur ${w?.name || 'cette planète'} juste avant toi : choisis-en une autre.`);
+    this.changed();
   }
 
   build(key) {
@@ -585,25 +656,10 @@ export class Session {
     this.changed();
   }
 
-  move(dir) {
-    if (!DIRS[dir] || this.status !== 'playing') return;
-    const t = performance.now();
-    if (t - this.lastMoveAt < MOVE_COOLDOWN) return;
-    this.lastMoveAt = t;
-    const p = this.state.players[this.me];
-    p.pos = step(p.pos, dir);
-    this.touch();
-    this.scheduleSave();
-    this.onchange?.('pos');
-  }
-
-  myPos() {
-    return this.state?.players[this.me]?.pos || null;
-  }
-
   /** Je termine moi-même mes chantiers (l'affichage des autres se calcule seul). */
   tick() {
     if (this.status !== 'playing' || !this.state) return;
+    this.checkClaim();
     const p = this.state.players[this.me];
     if (!p?.planet?.queue || p.planet.queue.end > this.now()) return;
     const done = settle(p.planet, this.now());
