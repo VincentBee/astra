@@ -135,7 +135,7 @@ $('btn-resume').onclick = () => {
   session.ontoast = toast;
   session.onchange = onSessionChange;
   startGame();
-  toast('Partie reprise. Invite les autres pour qu’ils te rejoignent.');
+  toast('Partie reprise. Les autres te retrouveront dès qu’ils ouvriront l’appli.');
 };
 
 window.addEventListener('pagehide', () => session?.save?.());
@@ -209,10 +209,10 @@ async function useOffer(text) {
   drawQr($('answer-qr'), answerCode);
   $('join-step-1').hidden = true;
   $('join-step-2').hidden = false;
-  $('join-status').textContent = 'En attente du maître du jeu…';
+  $('join-status').textContent = 'En attente de la personne qui t’invite…';
 }
 
-$('btn-copy-answer').onclick = () => copy(answerCode, 'Réponse copiée. Envoie-la au maître du jeu.');
+$('btn-copy-answer').onclick = () => copy(answerCode, 'Réponse copiée. Envoie-la à la personne qui t’invite.');
 $('btn-share-answer').onclick = () => share(answerCode, 'Ma réponse Astra');
 
 function onSessionChange() {
@@ -224,19 +224,15 @@ function onSessionChange() {
   if (s.status === 'failed') {
     $('join-step-1').hidden = false;
     $('join-step-2').hidden = true;
-    joinError(`${s.failure} Demande au maître du jeu une nouvelle invitation et scanne-la.`);
+    joinError(`${s.failure} Demande une nouvelle invitation à n’importe quel joueur et scanne-la.`);
     show('join');
   }
   if (s.status === 'refused') {
-    joinError(s.refusal || 'Le maître du jeu a refusé ta demande.');
+    joinError(s.refusal || 'Ta demande a été refusée.');
     $('join-status').textContent = '';
     show('join');
   }
   if (s.status === 'playing' && $('screen-game').hidden) startGame();
-  if (!s.isLeader && !$('sheet-invite').hidden) {
-    s.cancelInvite();
-    closeInviteSheet();
-  }
   if (!$('screen-game').hidden) renderState();
 }
 
@@ -247,7 +243,7 @@ $('btn-rejoin').onclick = () => {
 };
 
 // ---------------------------------------------------------------------------
-// Invitations (MJ)
+// Invitations (tout le monde peut inviter)
 // ---------------------------------------------------------------------------
 
 let offerCode = '';
@@ -384,8 +380,7 @@ function renderState() {
     $('me-name').textContent = me.name;
     $('me-dot').style.background = me.color;
   }
-  $('me-role').textContent = session.isLeader ? 'Maître du jeu' : 'Commandant';
-  $('btn-invite').hidden = !session.isLeader;
+  $('me-role').textContent = 'Commandant';
   $('lost').hidden = !session.alone;
 
 
@@ -395,7 +390,7 @@ function renderState() {
       (p) => `<div class="player card${p.online ? '' : ' offline'}" data-player="${p.id}">
         <span class="dot" style="background:${esc(p.color)}"></span>
         <div class="p-main">
-          <div class="p-name">${esc(p.name)}${p.id === session.me ? ' <span class="you">toi</span>' : ''}${p.id === st.leader ? ' <span class="tag">MJ</span>' : ''}</div>
+          <div class="p-name">${esc(p.name)}${p.id === session.me ? ' <span class="you">toi</span>' : ''}</div>
           <div class="p-sub mono" data-psub="${p.id}"></div>
         </div>
         <div class="p-score mono" data-pscore="${p.id}"></div>
@@ -425,14 +420,14 @@ function renderLive() {
   const me = st.players[session.me];
   const now = session.now();
 
-  if (!session.isLeader) {
-    const rtt = session.clock.rtt;
-    $('net').textContent = rtt == null ? 'synchro…' : `${rtt} ms${session.route ? ' · ' + routeLabel(session.route) : ''}`;
-    $('net').className = 'net' + (rtt != null && rtt > 250 ? ' slow' : '');
-  } else {
-    const online = Object.values(st.players).filter((p) => p.id !== st.leader && p.online).length;
-    $('net').textContent = `${online} joueur${online > 1 ? 's' : ''} connecté${online > 1 ? 's' : ''}`;
-    $('net').className = 'net';
+  {
+    const online = session.peerCount;
+    const rtts = [...session.links.values()].map((l) => l.rtt).filter((v) => v != null);
+    const worst = rtts.length ? Math.max(...rtts) : null;
+    $('net').textContent = online
+      ? `${online} joueur${online > 1 ? 's' : ''} en ligne${worst != null ? ` · ${worst} ms` : ''}`
+      : 'seul en ligne';
+    $('net').className = 'net' + (worst != null && worst > 250 ? ' slow' : '');
   }
 
   if (me) {
@@ -459,7 +454,7 @@ function renderLive() {
       card.classList.toggle('affordable', ok && !s.queue);
       card.classList.toggle('building-now', s.queue?.key === k);
       const btn = document.querySelector(`[data-build="${k}"]`);
-      btn.disabled = !!s.queue || !ok || (!session.isLeader && session.status !== 'playing');
+      btn.disabled = !!s.queue || !ok || session.status !== 'playing';
       btn.textContent = s.queue?.key === k ? 'En chantier' : `Niveau ${level + 1}`;
     }
 
@@ -478,7 +473,8 @@ function renderLive() {
     if (!sub) continue;
     const s = stateAt(p.planet, now);
     const doing = s.queue ? `${BUILDINGS[s.queue.key].short} ${s.queue.level} dans ${Math.ceil((s.queue.end - now) / 1000)} s` : 'aucun chantier';
-    const net = !p.online ? 'déconnecté' : p.id === st.leader ? 'MJ' : p.rtt != null ? `${p.rtt} ms${p.route ? ' ' + routeLabel(p.route) : ''}` : '';
+    const info = session.linkInfo(p.id);
+    const net = p.id === session.me ? '' : !info ? 'déconnecté' : info.rtt != null ? `${info.rtt} ms${info.route ? ' ' + routeLabel(info.route) : ''}` : '';
     sub.textContent = `${fmt(s.stock.metal)} métal · ${doing}${net ? ' · ' + net : ''}`;
     document.querySelector(`[data-pscore="${p.id}"]`).textContent = `${score(s.levels)} pts`;
   }
@@ -513,7 +509,7 @@ function stopMap() {
 
 for (const b of document.querySelectorAll('[data-tab]')) b.onclick = () => showTab(b.dataset.tab);
 
-/** Positions de tout le monde ; la mienne inclut les pas pas encore confirmés. */
+/** Positions de tout le monde. */
 function positions() {
   const out = [];
   for (const p of Object.values(session.state.players)) {
@@ -703,7 +699,7 @@ async function boot() {
         return show('home');
       }
       $('home-note').textContent =
-        "Ce lien est la réponse d'un joueur : colle-la dans l'écran d'invitation de ta partie en cours, dans l'onglet où tu es maître du jeu.";
+        "Ce lien est la réponse d'un joueur : colle-la dans l'écran d'invitation de ta partie en cours, sur le téléphone qui l'a invité.";
       $('home-note').hidden = false;
     } catch (e) {
       $('home-note').textContent = e.message;

@@ -36,7 +36,7 @@ export function forgetGame() {
 
 /**
  * Fusionne `other` dans `base` (copies de la même partie) et renvoie une
- * nouvelle copie. `base` l'emporte à égalité. Ne touche ni au MJ ni aux
+ * nouvelle copie. `base` l'emporte à égalité. Ne touche pas aux
  * statuts en ligne : c'est à l'appelant de les fixer.
  */
 export function mergeStates(base, other) {

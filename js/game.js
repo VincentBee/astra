@@ -2,9 +2,9 @@
 // Port de game.rs (version serveur), en version accélérée pour des parties courtes.
 //
 // Principe : pas de tick. Une planète stocke son stock à l'instant `at`
-// (heure du MJ, en ms) ; la valeur à tout instant se calcule avec la
-// production et le temps écoulé. Le MJ fait foi ; les joueurs refont le
-// même calcul pour animer leur écran.
+// (heure du téléphone, en ms) ; la valeur à tout instant se calcule avec la
+// production et le temps écoulé. Chaque joueur fait foi
+// pour sa propre planète ; les autres refont le même calcul pour l'afficher.
 
 /** Facteur de vitesse : 60 = une « heure » de jeu dure une minute. */
 export const SPEED = 60;
@@ -127,7 +127,7 @@ export function stateAt(planet, now) {
   return { stock: accrue(stock, prod.perHour, now - at), levels, queue, prod };
 }
 
-/** Version « solde » : écrit l'état courant dans la planète (MJ uniquement). */
+/** Version « solde » : écrit l'état courant dans la planète (par son propriétaire uniquement). */
 export function settle(planet, now) {
   const s = stateAt(planet, now);
   const finished = planet.queue && !s.queue ? planet.queue : null;

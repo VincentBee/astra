@@ -36,7 +36,7 @@
         <button id="btn-join" class="secondary">Rejoindre une partie</button>
       </div>
       <p id="new-warning" class="note" hidden>Une nouvelle partie remplace celle en cours sur ce téléphone. Appuie encore une fois pour confirmer.</p>
-      <p class="hint">Le téléphone qui crée la partie en est le maître du jeu. Les autres le rejoignent en scannant son QR code, ou via un lien envoyé par message. La partie est sauvegardée sur chaque téléphone : n'importe qui peut la reprendre, même le lendemain.</p>
+      <p class="hint">Tous les joueurs sont au même niveau : n'importe qui dans la partie peut en inviter d'autres, avec un QR code ou un lien envoyé par message. La partie est sauvegardée sur chaque téléphone : n'importe qui peut la reprendre, même le lendemain.</p>
       <p id="home-note" class="note" hidden></p>
     </div>
   </section>
@@ -47,7 +47,7 @@
       <button class="back" data-go="home">← Retour</button>
 
       <div id="join-step-1" class="step">
-        <h2><span class="num">1</span> Lis l'invitation du maître du jeu</h2>
+        <h2><span class="num">1</span> Lis l'invitation d'un joueur</h2>
         <button id="btn-scan-offer" class="primary">Scanner son QR code</button>
         <details>
           <summary>Pas de caméra ? Colle le lien ou le code</summary>
@@ -57,14 +57,14 @@
       </div>
 
       <div id="join-step-2" class="step" hidden>
-        <h2><span class="num">2</span> Montre ta réponse au maître du jeu</h2>
+        <h2><span class="num">2</span> Montre-lui ta réponse</h2>
         <p class="hint">Il la scanne depuis son écran d'invitation. À distance : copie la réponse et envoie-la-lui par message.</p>
         <div class="qr-box"><canvas id="answer-qr" aria-label="QR code de ta réponse"></canvas></div>
         <div class="row">
           <button id="btn-copy-answer" class="secondary">Copier la réponse</button>
           <button id="btn-share-answer" class="secondary">Partager</button>
         </div>
-        <p id="join-status" class="status">En attente du maître du jeu…</p>
+        <p id="join-status" class="status">En attente de la personne qui t’invite…</p>
       </div>
 
       <p id="join-error" class="error" hidden></p>
@@ -79,7 +79,7 @@
         <span id="me-name" class="me-name"></span>
         <span id="me-role" class="badge"></span>
       </div>
-      <div id="net" class="net" title="Latence avec le maître du jeu"></div>
+      <div id="net" class="net" title="Joueurs connectés à ce téléphone"></div>
     </header>
 
     <div id="lost" class="banner warn" hidden>
@@ -137,11 +137,11 @@
     </main>
 
     <div class="fab-zone">
-      <button id="btn-invite" class="primary fab" hidden>Inviter un joueur</button>
+      <button id="btn-invite" class="primary fab">Inviter un joueur</button>
     </div>
   </section>
 
-  <!-- Feuille d'invitation (MJ) -->
+  <!-- Feuille d'invitation (tout le monde) -->
   <div id="sheet-invite" class="sheet" hidden>
     <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="invite-title">
       <div class="sheet-head">

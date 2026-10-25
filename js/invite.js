@@ -7,7 +7,7 @@
 // caractères, soit un QR code assez simple pour être lu d'un écran à l'autre.
 // Le SDP complet est reconstruit à l'arrivée.
 //
-// Format du code : "<o|a>2.<base64url>"  (o = offre du MJ, a = réponse du joueur)
+// Format du code : "<o|a>2.<base64url>"  (o = offre de l'hôte, a = réponse de l'invité)
 // Le lien d'invitation met ce code après le "#", qui n'est jamais envoyé au
 // site qui héberge l'appli.
 

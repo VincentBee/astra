@@ -121,7 +121,7 @@ function openChannel(channel) {
 }
 
 /**
- * MJ : prépare une invitation.
+ * Hôte (n'importe quel joueur) : prépare une invitation.
  * Renvoie { code, accept(answerCode) -> Promise<Link>, cancel() }.
  */
 export async function createInvite() {
@@ -184,13 +184,13 @@ function failed(pc) {
 
 /**
  * Joueur : répond à une invitation.
- * Renvoie { code, link: Promise<Link> } ; `code` est la réponse à montrer au MJ.
+ * Renvoie { code, link: Promise<Link> } ; `code` est la réponse à montrer à l'hôte.
  * `link` échoue si la connexion n'aboutit pas (WebRTC abandonne, ou 3 minutes
- * sans que le MJ ait scanné la réponse).
+ * sans que l'hôte ait scanné la réponse).
  */
 export async function answerInvite(offerInput) {
   const { kind, sdp } = await decode(offerInput);
-  if (kind !== 'o') throw new Error("C'est une réponse de joueur, pas une invitation du MJ.");
+  if (kind !== 'o') throw new Error("C'est une réponse de joueur, pas une invitation.");
   const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
   const channelReady = new Promise((resolve) => (pc.ondatachannel = (e) => resolve({ channel: e.channel, early: earlyBuffer(e.channel) })));
   await pc.setRemoteDescription({ type: 'offer', sdp });
@@ -206,7 +206,7 @@ export async function answerInvite(offerInput) {
       failed(pc),
     ]),
     180000,
-    'Le maître du jeu n’a pas scanné ta réponse à temps.',
+    'La personne qui t’invite n’a pas scanné ta réponse à temps.',
   );
   link.catch(() => pc.close());
   return { code, link, cancel: () => pc.close() };
@@ -218,7 +218,7 @@ function withTimeout(promise, ms, message) {
 
 // ---------------------------------------------------------------------------
 // Connexions entre joueurs : l'offre et la réponse (SDP complet) passent par
-// un canal déjà ouvert (celui du MJ), donc pas besoin de les compresser.
+// un canal déjà ouvert (celui du joueur qui fait les présentations), donc pas besoin de les compresser.
 // ---------------------------------------------------------------------------
 
 /** Côté qui appelle : prépare une offre. `connect(answerSdp)` ouvre le canal. */
