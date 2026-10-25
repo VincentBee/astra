@@ -2,7 +2,10 @@ import { Session } from './session.js';
 import { loadGame, describeSave } from './save.js';
 import { inviteLink, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
-import { BUILDINGS, BUILDING_KEYS, STORAGE, stateAt, upgradeCost, buildDuration, covers, score, fmt, UNIVERSE, MOVE_COOLDOWN, DIRS, distance } from './game.js';
+import {
+  RACES, RACE_KEYS, RES_INFO, POWERS, POWER_KEYS, STORAGE, stateAt, upgradeCost, buildDuration, covers, score, power,
+  powerReadyAt, powerCost, fmt, UNIVERSE, MOVE_COOLDOWN, DIRS, distance,
+} from './game.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -151,8 +154,8 @@ $('btn-create').onclick = async () => {
   session = await Session.create(name);
   session.ontoast = toast;
   session.onchange = onSessionChange;
+  inviteAfterRace = true; // la fenêtre d'invitation s'ouvre une fois la race choisie
   startGame();
-  openInviteSheet();
 };
 
 $('btn-join').onclick = () => {
@@ -232,7 +235,8 @@ function onSessionChange() {
     $('join-status').textContent = '';
     show('join');
   }
-  if (s.status === 'playing' && $('screen-game').hidden) startGame();
+  if (s.status === 'playing' && $('screen-game').hidden && $('screen-race').hidden) startGame();
+  if (!$('screen-race').hidden) renderRaceOthers();
   if (!$('screen-game').hidden) renderState();
 }
 
@@ -321,7 +325,67 @@ $('btn-answer-ok').onclick = () => useAnswer($('answer-input').value);
 // Partie
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Choix de la race, à l'arrivée dans la partie (définitif)
+// ---------------------------------------------------------------------------
+
+let inviteAfterRace = false;
+let pickedRace = null;
+
+function showRace() {
+  pickedRace = null;
+  $('races').innerHTML = RACE_KEYS.map((k) => {
+    const R = RACES[k];
+    const res = R.resources.map((r) => `<span class="chip ${r}">${RES_INFO[r].name}</span>`).join('');
+    return `<button class="race card" role="radio" aria-checked="false" data-race="${k}" style="--race:${R.color}">
+      <span class="race-top"><span class="race-icon" aria-hidden="true">${R.icon}</span><span class="race-name">${R.name}</span></span>
+      <span class="race-pitch">${esc(R.pitch)}</span>
+      <ul class="race-traits">${R.traits.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+      <span class="chips">${res}${R.pop ? `<span class="chip pop">${R.pop.label}</span>` : '<span class="chip none">Sans population</span>'}</span>
+    </button>`;
+  }).join('');
+  updateRacePick();
+  renderRaceOthers();
+  show('race');
+}
+
+function updateRacePick() {
+  for (const el of document.querySelectorAll('[data-race]')) el.setAttribute('aria-checked', String(el.dataset.race === pickedRace));
+  const btn = $('btn-race');
+  btn.disabled = !pickedRace;
+  btn.textContent = pickedRace ? `Jouer les ${RACES[pickedRace].name} (définitif)` : 'Choisis une race';
+}
+
+/** Ce qu'ont choisi les autres, pour se décider. */
+function renderRaceOthers() {
+  if (!session?.state) return;
+  const others = Object.values(session.state.players).filter((p) => p.id !== session.me);
+  $('race-others').textContent = others.length
+    ? 'Dans la partie : ' + others.map((p) => `${p.name} (${p.race ? RACES[p.race].name : 'en train de choisir'})`).join(', ') + '.'
+    : '';
+}
+
+$('races').addEventListener('click', (e) => {
+  const el = e.target.closest('[data-race]');
+  if (!el) return;
+  pickedRace = el.dataset.race;
+  updateRacePick();
+});
+
+$('btn-race').onclick = () => {
+  if (!pickedRace || !session) return;
+  if (!session.chooseRace(pickedRace)) return;
+  startGame();
+  if (inviteAfterRace) {
+    inviteAfterRace = false;
+    openInviteSheet();
+  }
+};
+
+// ---------------------------------------------------------------------------
+
 function startGame() {
+  if (!session.myRace) return showRace();
   show('game');
   buildStatic();
   showTab('planet');
@@ -339,32 +403,86 @@ function stopGame() {
   wakeLock = null;
 }
 
-const RES = [
-  { key: 'metal', label: 'Métal' },
-  { key: 'crystal', label: 'Cristal' },
-  { key: 'deuterium', label: 'Deutérium' },
-];
+/** Interface construite pour cette race (les tuiles et bâtiments en dépendent). */
+let builtFor = null;
 
 function buildStatic() {
-  $('resources').innerHTML =
-    RES.map(
-      (r) => `<div class="tile ${r.key}">
-        <span class="label">${r.label}</span>
-        <span class="amount mono" data-res="${r.key}">0</span>
-        <span class="rate mono" data-rate="${r.key}"></span>
-        <div class="gauge"><div class="gauge-fill" data-gauge="${r.key}"></div></div>
-      </div>`,
-    ).join('') +
-    `<div class="tile energy"><span class="label">Énergie</span>
-      <span class="amount mono" data-energy></span><span class="rate mono" data-eff></span></div>`;
+  const race = session.myRace;
+  const R = RACES[race];
+  builtFor = race;
+  const tiles = R.resources.map(
+    (r) => `<div class="tile ${r}">
+      <span class="label">${RES_INFO[r].name}</span>
+      <span class="amount mono" data-res="${r}">0</span>
+      <span class="rate mono" data-rate="${r}"></span>
+      <div class="gauge"><div class="gauge-fill" data-gauge="${r}"></div></div>
+    </div>`,
+  );
+  if (R.pop) {
+    tiles.push(`<div class="tile pop"><span class="label">${R.pop.label}</span>
+      <span class="amount mono" data-pop></span>
+      <span class="rate mono" data-poprate></span>
+      <span class="rate mono" data-popextra></span>
+      <div class="gauge"><div class="gauge-fill" data-popgauge></div></div></div>`);
+  } else {
+    tiles.push(`<div class="tile grid"><span class="label">Réseau</span>
+      <span class="amount mono" data-grid></span>
+      <span class="rate mono" data-gridrate></span>
+      <span class="rate mono" data-gridextra></span></div>`);
+  }
+  $('resources').innerHTML = tiles.join('');
 
-  $('buildings').innerHTML = BUILDING_KEYS.map(
-    (k) => `<article class="building card" data-card="${k}">
-      <div class="b-head"><h4>${BUILDINGS[k].name}</h4><span class="level mono" data-level="${k}"></span></div>
+  $('buildings').innerHTML = Object.entries(R.buildings)
+    .map(
+      ([k, b]) => `<article class="building card" data-card="${k}">
+      <div class="b-head"><h4>${b.name}</h4><span class="level mono" data-level="${k}"></span></div>
+      <p class="b-desc">${esc(b.desc)}</p>
       <p class="cost mono" data-cost="${k}"></p>
       <button class="secondary small" data-build="${k}">Améliorer</button>
     </article>`,
-  ).join('');
+    )
+    .join('');
+
+  $('powers-zone').hidden = race !== 'alien';
+  $('powers').innerHTML =
+    race === 'alien'
+      ? POWER_KEYS.map(
+          (k) => `<article class="building power card" data-pcard="${k}">
+        <div class="b-head"><h4>${POWERS[k].name}</h4><span class="level mono" data-pready="${k}"></span></div>
+        <p class="b-desc">${esc(POWERS[k].desc)}</p>
+        <p class="cost mono" data-pcost="${k}"></p>
+        <button class="secondary small" data-power="${k}">Déclencher</button>
+      </article>`,
+        ).join('')
+      : '';
+}
+
+$('powers').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-power]');
+  if (btn && !btn.disabled) session.power(btn.dataset.power);
+});
+
+/** « 1 234 min. · 30 én. » */
+function costText(cost) {
+  return Object.entries(cost)
+    .filter(([, v]) => v > 0)
+    .map(([r, v]) => `${fmt(v)} ${RES_INFO[r].short}`)
+    .join(' · ');
+}
+
+/** Solde par minute réelle (= heure de jeu), signé. */
+function rateText(v) {
+  const n = Math.round(v);
+  if (n === 0) return '±0 / min';
+  return `${n > 0 ? '+' : '−'}${fmt(Math.abs(n))} / min`;
+}
+
+/** Résumé d'une planète pour la liste des commandants. */
+function popText(race, pop) {
+  const R = RACES[race];
+  if (!R.pop) return null;
+  const n = Math.floor(pop);
+  return `${fmt(n)} ${R.pop.unit}${n > 1 ? 's' : ''}`;
 }
 
 $('buildings').addEventListener('click', (e) => {
@@ -380,7 +498,7 @@ function renderState() {
     $('me-name').textContent = me.name;
     $('me-dot').style.background = me.color;
   }
-  $('me-role').textContent = 'Commandant';
+  $('me-role').textContent = me?.race ? `${RACES[me.race].icon} ${RACES[me.race].name}` : 'Commandant';
   $('lost').hidden = !session.alone;
 
 
@@ -390,7 +508,9 @@ function renderState() {
       (p) => `<div class="player card${p.online ? '' : ' offline'}" data-player="${p.id}">
         <span class="dot" style="background:${esc(p.color)}"></span>
         <div class="p-main">
-          <div class="p-name">${esc(p.name)}${p.id === session.me ? ' <span class="you">toi</span>' : ''}</div>
+          <div class="p-name">${esc(p.name)}${p.id === session.me ? ' <span class="you">toi</span>' : ''}${
+            p.race ? ` <span class="tag race-tag" style="--race:${RACES[p.race].color}">${RACES[p.race].icon} ${RACES[p.race].name}</span>` : ''
+          }</div>
           <div class="p-sub mono" data-psub="${p.id}"></div>
         </div>
         <div class="p-score mono" data-pscore="${p.id}"></div>
@@ -430,54 +550,125 @@ function renderLive() {
     $('net').className = 'net' + (worst != null && worst > 250 ? ' slow' : '');
   }
 
-  if (me) {
-    const s = stateAt(me.planet, now);
-    for (const r of RES) {
-      document.querySelector(`[data-res="${r.key}"]`).textContent = fmt(s.stock[r.key]);
-      const full = s.stock[r.key] >= STORAGE;
-      document.querySelector(`[data-rate="${r.key}"]`).textContent = full ? 'Entrepôt plein' : `+${fmt(s.prod.perHour[r.key])} / min`;
-      document.querySelector(`[data-gauge="${r.key}"]`).style.width = `${Math.min(100, (s.stock[r.key] / STORAGE) * 100)}%`;
-    }
-    document.querySelector('[data-energy]').textContent = `${fmt(s.prod.energyProduced)} / ${fmt(s.prod.energyNeeded)}`;
-    document.querySelector('[data-eff]').textContent = `Rendement ${Math.round(s.prod.efficiency * 100)} %`;
-
-    for (const k of BUILDING_KEYS) {
-      const level = s.levels[k];
-      const cost = upgradeCost(k, level);
-      const ok = covers(s.stock, cost);
-      document.querySelector(`[data-level="${k}"]`).textContent = `Niv. ${level}`;
-      const parts = [['métal', cost.metal], ['cristal', cost.crystal], ['deut.', cost.deuterium]]
-        .filter(([, v]) => v > 0)
-        .map(([n, v]) => `${fmt(v)} ${n}`);
-      document.querySelector(`[data-cost="${k}"]`).textContent = `${parts.join(' · ')} · ${buildDuration(cost) / 1000} s`;
-      const card = document.querySelector(`[data-card="${k}"]`);
-      card.classList.toggle('affordable', ok && !s.queue);
-      card.classList.toggle('building-now', s.queue?.key === k);
-      const btn = document.querySelector(`[data-build="${k}"]`);
-      btn.disabled = !!s.queue || !ok || session.status !== 'playing';
-      btn.textContent = s.queue?.key === k ? 'En chantier' : `Niveau ${level + 1}`;
-    }
-
-    if (s.queue) {
-      const total = s.queue.end - s.queue.start;
-      const left = Math.max(0, s.queue.end - now);
-      $('queue').hidden = false;
-      $('queue-label').textContent = `${BUILDINGS[s.queue.key].name} → niv. ${s.queue.level}`;
-      $('queue-left').textContent = `${Math.ceil(left / 1000)} s`;
-      $('queue-bar').style.width = `${Math.min(100, (1 - left / total) * 100)}%`;
-    } else $('queue').hidden = true;
+  if (me?.planet) {
+    if (builtFor !== me.race) buildStatic();
+    renderPlanet(me, now);
   }
 
   for (const p of Object.values(st.players)) {
     const sub = document.querySelector(`[data-psub="${p.id}"]`);
     if (!sub) continue;
-    const s = stateAt(p.planet, now);
-    const doing = s.queue ? `${BUILDINGS[s.queue.key].short} ${s.queue.level} dans ${Math.ceil((s.queue.end - now) / 1000)} s` : 'aucun chantier';
     const info = session.linkInfo(p.id);
     const net = p.id === session.me ? '' : !info ? 'déconnecté' : info.rtt != null ? `${info.rtt} ms${info.route ? ' ' + routeLabel(info.route) : ''}` : '';
-    sub.textContent = `${fmt(s.stock.metal)} métal · ${doing}${net ? ' · ' + net : ''}`;
-    document.querySelector(`[data-pscore="${p.id}"]`).textContent = `${score(s.levels)} pts`;
+    const scoreEl = document.querySelector(`[data-pscore="${p.id}"]`);
+    if (!p.race || !p.planet) {
+      sub.textContent = `choisit sa race…${net ? ' · ' + net : ''}`;
+      scoreEl.textContent = '—';
+      continue;
+    }
+    const s = stateAt(p.planet, now);
+    const R = RACES[p.race];
+    const doing = s.queue ? `${R.buildings[s.queue.key].short} ${s.queue.level} dans ${Math.ceil((s.queue.end - now) / 1000)} s` : 'aucun chantier';
+    const people = popText(p.race, s.pop);
+    sub.textContent = [`${fmt(s.stock.minerals)} min.`, people, doing, net].filter(Boolean).join(' · ');
+    scoreEl.textContent = `${score(p.race, s.levels)} pts`;
   }
+}
+
+/** Ma planète : ressources, population, chantier, bâtiments, pouvoirs. */
+function renderPlanet(me, now) {
+  const R = RACES[me.race];
+  const s = stateAt(me.planet, now);
+  const f = s.prod;
+  const q = (sel) => document.querySelector(sel);
+
+  for (const r of R.resources) {
+    const cap = r === 'energy' ? f.energyCap : STORAGE;
+    q(`[data-res="${r}"]`).textContent = fmt(s.stock[r]);
+    const short = r === 'energy' ? f.effE < 1 : r === 'food' ? f.effF < 1 : false;
+    const rate = q(`[data-rate="${r}"]`);
+    rate.textContent = short
+      ? `Pénurie · ${Math.round((r === 'energy' ? f.effE : f.effF) * 100)} % servis`
+      : s.stock[r] >= cap && f.net[r] >= 0
+        ? `Stock plein (${fmt(cap)})`
+        : rateText(f.net[r]);
+    rate.classList.toggle('neg', short || f.net[r] < -0.5);
+    q(`[data-gauge="${r}"]`).style.width = `${Math.min(100, (s.stock[r] / cap) * 100)}%`;
+  }
+
+  if (R.pop) {
+    const cap = f.popCap;
+    const later = stateAt(me.planet, now + 60_000).pop; // dans une minute
+    const delta = later - s.pop;
+    q('[data-popgauge]').style.width = `${Math.min(100, (s.pop / Math.max(cap, 1)) * 100)}%`;
+    const rate = q('[data-poprate]');
+    const extra = q('[data-popextra]');
+    if (me.race === 'human') {
+      q('[data-pop]').textContent = fmt(s.pop);
+      rate.textContent = f.effF < 1 ? 'Famine !' : `${rateText(delta)} · max ${fmt(cap)}`;
+      extra.textContent = f.work < 1 ? `Ouvriers ${Math.round(f.work * 100)} % des postes` : 'Tous les postes pourvus';
+    } else {
+      q('[data-pop]').textContent = fmt(s.pop);
+      const starving = Math.min(f.effE, f.effF) < 1;
+      const next = (Math.floor(s.pop) + 1 - s.pop) / 0.06; // heures de jeu = minutes réelles
+      rate.textContent = starving
+        ? 'Ils dépérissent !'
+        : s.pop >= cap - 1e-6
+          ? `Sanctuaire plein (${fmt(cap)})`
+          : `Naissance dans ${Math.ceil(next)} min`;
+      extra.textContent = `Puissance ≈ ${fmt(power(me.race, s.pop))} humains`;
+    }
+    rate.classList.toggle('neg', delta < -0.01 || f.effF < 1 || (me.race === 'alien' && f.effE < 1));
+  } else {
+    q('[data-grid]').textContent = `${Math.round(f.effE * 100)} %`;
+    q('[data-gridrate]').textContent = `Prod. ${fmt(f.in.energy)} · conso. ${fmt(f.out.energy / Math.max(f.effE, 1e-9))}`;
+    q('[data-gridextra]').textContent = f.effE < 1 ? 'Foreuses au ralenti' : 'Tout tourne à plein';
+    q('[data-gridrate]').classList.toggle('neg', f.effE < 1);
+  }
+
+  for (const k of Object.keys(R.buildings)) {
+    const level = s.levels[k] || 0;
+    const cost = upgradeCost(me.race, k, level);
+    const ok = covers(s.stock, cost);
+    q(`[data-level="${k}"]`).textContent = `Niv. ${level}`;
+    q(`[data-cost="${k}"]`).textContent = `${costText(cost)} · ${buildDuration(me.race, s.levels, cost) / 1000} s`;
+    const card = q(`[data-card="${k}"]`);
+    card.classList.toggle('affordable', ok && !s.queue);
+    card.classList.toggle('building-now', s.queue?.key === k);
+    const btn = q(`[data-build="${k}"]`);
+    btn.disabled = !!s.queue || !ok || session.status !== 'playing';
+    btn.textContent = s.queue?.key === k ? 'En chantier' : `Niveau ${level + 1}`;
+  }
+
+  if (s.queue) {
+    const total = s.queue.end - s.queue.start;
+    const left = Math.max(0, s.queue.end - now);
+    $('queue').hidden = false;
+    $('queue-label').textContent = `${R.buildings[s.queue.key].name} → niv. ${s.queue.level}`;
+    $('queue-left').textContent = `${Math.ceil(left / 1000)} s`;
+    $('queue-bar').style.width = `${Math.min(100, (1 - left / total) * 100)}%`;
+  } else $('queue').hidden = true;
+
+  if (me.race === 'alien') {
+    for (const k of POWER_KEYS) {
+      const cost = powerCost(me.planet, k, s.pop);
+      const wait = Math.max(0, powerReadyAt(me.planet, k) - now);
+      const needsQueue = k === 'rush' && !s.queue;
+      const ok = covers(s.stock, cost);
+      q(`[data-pcost="${k}"]`).textContent = `${costText(cost)} · recharge ${POWERS[k].cooldown / 60000} min`;
+      q(`[data-pready="${k}"]`).textContent = wait ? clock(wait) : 'Prêt';
+      q(`[data-pcard="${k}"]`).classList.toggle('affordable', ok && !wait && !needsQueue);
+      const btn = q(`[data-power="${k}"]`);
+      btn.disabled = !!wait || !ok || needsQueue || session.status !== 'playing';
+      btn.textContent = wait ? 'En recharge' : needsQueue ? 'Aucun chantier' : 'Déclencher';
+    }
+  }
+}
+
+/** « 2:05 » */
+function clock(ms) {
+  const t = Math.ceil(ms / 1000);
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
 }
 
 // ---------------------------------------------------------------------------

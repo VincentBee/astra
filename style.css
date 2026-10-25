@@ -9,9 +9,9 @@
   --muted: #8d95b3;
   --accent: #7aa2ff;
   --accent-ink: #0a1024;
-  --metal: #b9c2d6;
-  --crystal: #6fd3ff;
-  --deuterium: #7cf0b4;
+  --minerals: #b9c2d6;
+  --food: #7cf0b4;
+  --pop: #ff9f6b;
   --energy: #ffd166;
   --ok: #7cf0b4;
   --warn: #ffb36b;
@@ -196,13 +196,14 @@ details > button { width: 100%; }
   gap: 2px;
   min-width: 0;
 }
-.tile.metal { --c: var(--metal); }
-.tile.crystal { --c: var(--crystal); }
-.tile.deuterium { --c: var(--deuterium); }
-.tile.energy { --c: var(--energy); }
+.tile.minerals { --c: var(--minerals); }
+.tile.food { --c: var(--food); }
+.tile.energy, .tile.grid { --c: var(--energy); }
+.tile.pop { --c: var(--pop); }
 .tile .label { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--c); }
 .tile .amount { font-size: 1.45rem; font-weight: 700; }
 .tile .rate { font-size: 0.78rem; color: var(--muted); }
+.tile .rate.neg { color: var(--warn); }
 .gauge { margin-top: 6px; height: 4px; border-radius: 99px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
 .gauge-fill { height: 100%; width: 0; background: var(--c); transition: width 0.2s linear; }
 
@@ -216,7 +217,10 @@ details > button { width: 100%; }
 .b-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .b-head h4 { font-size: 1rem; }
 .level { color: var(--accent); font-size: 0.85rem; white-space: nowrap; }
+.b-desc { margin: 0; font-size: 0.85rem; color: var(--muted); }
 .cost { margin: 0; font-size: 0.8rem; color: var(--danger); }
+.power { border-color: rgba(211, 139, 255, 0.35); }
+.power .level { color: #d38bff; }
 .building.affordable .cost { color: var(--ok); }
 .building.building-now { border-color: rgba(122, 162, 255, 0.5); }
 .building button { justify-self: start; }
@@ -230,6 +234,46 @@ details > button { width: 100%; }
 .p-score { font-size: 0.85rem; color: var(--energy); white-space: nowrap; }
 .you, .tag { font-size: 0.7rem; padding: 1px 6px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); font-weight: 500; }
 .tag { color: var(--accent); }
+.race-tag { color: var(--race); border-color: color-mix(in srgb, var(--race) 45%, transparent); white-space: nowrap; }
+
+/* ----- Choix de la race ----- */
+
+.race-head { display: grid; gap: 6px; padding-top: 4vh; }
+.race-head h2 { font-size: 1.6rem; }
+.races { display: grid; gap: 12px; }
+.race {
+  --race: var(--accent);
+  display: grid;
+  gap: 8px;
+  text-align: left;
+  padding: 14px 16px;
+  min-height: 0;
+  font-weight: 400;
+  border-left: 3px solid var(--race);
+}
+.race[aria-checked="true"] {
+  background: color-mix(in srgb, var(--race) 14%, var(--panel));
+  border-color: var(--race);
+  box-shadow: 0 0 0 1px var(--race);
+}
+.race-top { display: flex; align-items: center; gap: 10px; }
+.race-icon { color: var(--race); font-size: 1.4rem; line-height: 1; }
+.race-name { font-size: 1.15rem; font-weight: 700; }
+.race-pitch { color: var(--text); }
+.race-traits { margin: 0; padding-left: 18px; color: var(--muted); font-size: 0.86rem; display: grid; gap: 2px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  --c: var(--muted);
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 1px solid color-mix(in srgb, var(--c) 50%, transparent);
+  color: var(--c);
+}
+.chip.minerals { --c: var(--minerals); }
+.chip.food { --c: var(--food); }
+.chip.energy { --c: var(--energy); }
+.chip.pop { --c: var(--pop); }
 
 .log { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 0.86rem; color: var(--muted); }
 .log .mono { font-size: 0.75rem; opacity: 0.7; margin-right: 6px; }

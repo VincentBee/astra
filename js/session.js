@@ -20,7 +20,7 @@
 import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates } from './save.js';
-import { newPlanet, settle, startBuild, BUILDINGS, step, freeCell, DIRS, MOVE_COOLDOWN } from './game.js';
+import { newPlanet, settle, startBuild, usePower, RACES, POWERS, step, freeCell, DIRS, MOVE_COOLDOWN } from './game.js';
 
 const COLORS = ['#7aa2ff', '#ff9f6b', '#7cf0b4', '#f7d06b', '#d38bff', '#6fd3ff', '#ff7a93', '#b7e36b'];
 const MAX_PLAYERS = 8;
@@ -54,13 +54,27 @@ const saveIdentity = (v) => {
   } catch {}
 };
 
-/** Copie sans les champs des anciennes versions (maître du jeu, époques). */
+/**
+ * Fiche d'un joueur au format actuel. Avant les races, les planètes
+ * produisaient métal, cristal et deutérium : une fiche sans race n'a pas
+ * encore de planète, son joueur choisira sa race en revenant.
+ */
+function normalize(p) {
+  if (!RACES[p.race]) {
+    p.race = null;
+    p.planet = null;
+  }
+  return p;
+}
+
+/** Copie sans les champs des anciennes versions (maître du jeu, époques, ressources d'avant les races). */
 function clean(state) {
   const st = JSON.parse(JSON.stringify(state));
   delete st.leader;
   delete st.epoch;
   delete st.nextRank;
   st.log ||= [];
+  for (const p of Object.values(st.players || {})) normalize(p);
   return st;
 }
 
@@ -379,11 +393,11 @@ export class Session {
 
   /** Fiche d'un joueur, reçue de proche en proche. */
   onRecord(link, rec, log) {
-    if (!rec || typeof rec.id !== 'string' || !rec.planet || !this.state) return;
+    if (!rec || typeof rec.id !== 'string' || !this.state) return;
     const ours = this.state.players[rec.id];
     if (ours && (rec.actAt || 0) <= (ours.actAt || 0)) return; // déjà vue
     if (!ours && Object.keys(this.state.players).length >= MAX_PLAYERS * 2) return;
-    this.state.players[rec.id] = { ...JSON.parse(JSON.stringify(rec)), online: this.online(rec.id) };
+    this.state.players[rec.id] = normalize({ ...JSON.parse(JSON.stringify(rec)), online: this.online(rec.id) });
     if (log && typeof log.text === 'string' && Number.isFinite(log.at)) this.pushLog(log);
     this.spread(rec, log, link);
     this.scheduleSave();
@@ -517,7 +531,9 @@ export class Session {
       rank: now, // ordre d'arrivée
       color: COLORS.find((c) => !used.has(c)) || COLORS[others.length % COLORS.length],
       secretHash,
-      planet: newPlanet(now),
+      // La race se choisit à l'arrivée, une fois pour toutes ; la planète naît avec elle.
+      race: null,
+      planet: null,
       home,
       pos: { ...home },
       online: true,
@@ -525,12 +541,47 @@ export class Session {
     };
   }
 
+  /** Ma race, ou null tant que je ne l'ai pas choisie. */
+  get myRace() {
+    return this.state?.players[this.me]?.race || null;
+  }
+
+  /** Choix de race : une seule fois, il ne se défait pas. */
+  chooseRace(race) {
+    if (this.status !== 'playing' || !RACES[race]) return false;
+    const p = this.state.players[this.me];
+    if (!p) return false;
+    if (p.race) {
+      this.ontoast?.(`Tu as déjà choisi : ${RACES[p.race].name}. Ce choix est définitif.`);
+      return false;
+    }
+    p.race = race;
+    p.planet = newPlanet(race, this.now());
+    this.touch(this.addLog(`${p.name} rejoint le camp des ${RACES[race].name}.`));
+    this.changed();
+    return true;
+  }
+
   build(key) {
     if (this.status !== 'playing') return;
     const p = this.state.players[this.me];
+    if (!p?.planet) return this.ontoast?.('Choisis d’abord ta race.');
     const err = startBuild(p.planet, key, this.now());
     if (err) return this.ontoast?.(err);
-    this.touch(this.addLog(`${p.name} lance ${BUILDINGS[key].name} niv. ${p.planet.queue.level}.`));
+    const b = RACES[p.race].buildings[key];
+    this.touch(this.addLog(`${p.name} lance ${b.name} niv. ${p.planet.queue.level}.`));
+    this.changed();
+  }
+
+  /** Pouvoir psychique (aliens). */
+  power(key) {
+    if (this.status !== 'playing') return;
+    const p = this.state.players[this.me];
+    if (!p?.planet) return;
+    const res = usePower(p.planet, key, this.now());
+    if (res.error) return this.ontoast?.(res.error);
+    this.touch(this.addLog(`${p.name} ${res.text}.`));
+    this.ontoast?.(`${POWERS[key].name} !`);
     this.changed();
   }
 
@@ -554,10 +605,10 @@ export class Session {
   tick() {
     if (this.status !== 'playing' || !this.state) return;
     const p = this.state.players[this.me];
-    if (!p?.planet.queue || p.planet.queue.end > this.now()) return;
+    if (!p?.planet?.queue || p.planet.queue.end > this.now()) return;
     const done = settle(p.planet, this.now());
     if (!done) return;
-    this.touch(this.addLog(`${p.name} termine ${BUILDINGS[done.key].name} niv. ${done.level}.`));
+    this.touch(this.addLog(`${p.name} termine ${RACES[p.race].buildings[done.key].name} niv. ${done.level}.`));
     this.changed();
   }
 

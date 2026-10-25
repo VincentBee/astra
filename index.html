@@ -71,6 +71,20 @@
     </div>
   </section>
 
+  <!-- Choix de la race (à l'arrivée, définitif) -->
+  <section id="screen-race" class="screen" hidden>
+    <div class="flow">
+      <header class="race-head">
+        <p class="eyebrow">Arrivée dans la partie</p>
+        <h2>Choisis ta race</h2>
+        <p class="hint">Ce choix est définitif : tu ne pourras plus en changer dans cette partie.</p>
+      </header>
+      <div id="races" class="races" role="radiogroup" aria-label="Races jouables"></div>
+      <button id="btn-race" class="primary" disabled>Choisis une race</button>
+      <p id="race-others" class="hint"></p>
+    </div>
+  </section>
+
   <!-- Partie -->
   <section id="screen-game" class="screen" hidden>
     <header class="topbar">
@@ -118,6 +132,11 @@
       <section id="queue" class="queue card" hidden>
         <div class="queue-head"><span id="queue-label"></span><span id="queue-left" class="mono"></span></div>
         <div class="bar"><div id="queue-bar" class="bar-fill"></div></div>
+      </section>
+
+      <section id="powers-zone" hidden>
+        <h3 class="section-title">Pouvoirs psychiques</h3>
+        <div id="powers" class="buildings"></div>
       </section>
 
       <section>

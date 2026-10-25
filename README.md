@@ -48,6 +48,8 @@ Ensuite : quelqu'un crée la partie. Pour inviter, n'importe quel joueur appuie 
 - **Topologie** : chacun est connecté à tous les autres. Sans Internet, celui qui invite fait les présentations : il relaie les offres WebRTC entre le nouveau et les joueurs déjà là. Avec Internet, le rendez-vous automatique relie tout le monde.
 - **De proche en proche** : un téléphone qui reçoit une fiche plus récente que la sienne la transmet à ses autres voisins ; une partie reliée en chaîne reste donc à jour.
 - **Temps réel** : seuls les événements circulent (chantier lancé à T, fini à T+x). Chaque téléphone anime ressources et comptes à rebours localement. L'heure de référence est celle des téléphones, réglée automatiquement par le réseau mobile ou Internet.
+- **Races** : en arrivant dans une partie (création, invitation ou reprise d'une ancienne sauvegarde), chaque joueur choisit sa race, définitivement. **Humains** : population qui travaille, mange et grandit selon la nourriture et les habitats. **Machines** : sans population ni nourriture, tout tourne à l'énergie (foreuses gourmandes, batteries, nœud de calcul). **Aliens** : quelques psioniques (chacun vaut 120 humains) qui mangent et consomment de l'énergie, extraient les minéraux par télékinésie et ont deux pouvoirs (arrachement, accélération de chantier).
+- **Ressources** : minéraux (constructions), nourriture (population), énergie (bâtiments, et vie des machines). Comme la population varie selon les stocks, l'économie s'intègre par petits pas (300 au plus par calcul, même après une journée).
 - **Univers** : onglet « Univers », grille de 20 × 20 où chaque commandant a sa planète mère et un vaisseau. Flèches à l'écran (maintien pour avancer) ou au clavier, un pas toutes les 150 ms au plus. On déplace son propre vaisseau, et sa position est envoyée aux autres.
 - **Sauvegarde et reprise** : chaque téléphone enregistre sa copie de la partie à chaque changement (et quand l'appli passe en arrière-plan). Tout se calcule à partir du temps écoulé, donc la partie « continue » sans personne : celui qui la reprend (« Reprendre la partie » à l'accueil) retrouve production et chantiers à jour.
 - **Fusion des copies** : quand deux téléphones se retrouvent, ils échangent leurs copies et gardent, pour chaque joueur, la fiche la plus récente. Chacun garde sa progression, même si tout le monde a joué de son côté.
@@ -73,7 +75,8 @@ Ensuite : quelqu'un crée la partie. Pour inviter, n'importe quel joueur appuie 
 - La sauvegarde est sur le téléphone : vider les données du navigateur ou changer de téléphone fait perdre sa copie (les autres ont la leur).
 - Une invitation ne sert qu'une fois.
 - Chaque joueur a la partie complète : un joueur curieux peut tout lire dans la console (pas de brouillard de guerre possible).
-- Contenu de jeu minimal : 4 bâtiments et des déplacements, pas encore de flottes ni de combats.
+- Contenu de jeu minimal : 3 races à 4 bâtiments, 2 pouvoirs aliens et des déplacements, pas encore de flottes ni de combats. Équilibrage à affiner.
+- Les planètes d'avant les races (métal, cristal, deutérium) repartent de zéro : leur joueur choisit sa race en revenant.
 - Testé dans Chromium : invitation par QR, invitation par un joueur qui n'a pas créé la partie, maillage à 3 sans Internet, départ du créateur de la partie, reprise après départ de tous, fusion de copies jouées séparément, reconnexion automatique avec un relais Nostr local. Pas encore testé sur de vrais iPhone et Android en 4G, ni avec les relais Nostr publics.
 
 ## Licences des bibliothèques incluses
