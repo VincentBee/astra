@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#070a14">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Astra</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+
+  <!-- Accueil -->
+  <section id="screen-home" class="screen">
+    <div class="home">
+      <header class="hero">
+        <h1>Astra</h1>
+        <p>Conquête spatiale entre téléphones. Sans serveur, sans compte.</p>
+      </header>
+      <label class="field" for="name">Ton nom de commandant
+        <input id="name" maxlength="16" autocomplete="nickname" placeholder="ex. Vincent">
+      </label>
+      <div class="stack">
+        <button id="btn-create" class="primary">Créer une partie</button>
+        <button id="btn-join" class="secondary">Rejoindre une partie</button>
+      </div>
+      <p class="hint">Le téléphone qui crée la partie en est le maître du jeu : il garde l'état officiel. Les autres le rejoignent en scannant son QR code, ou via un lien envoyé par message.</p>
+      <p id="home-note" class="note" hidden></p>
+    </div>
+  </section>
+
+  <!-- Rejoindre -->
+  <section id="screen-join" class="screen" hidden>
+    <div class="flow">
+      <button class="back" data-go="home">← Retour</button>
+
+      <div id="join-step-1" class="step">
+        <h2><span class="num">1</span> Lis l'invitation du maître du jeu</h2>
+        <button id="btn-scan-offer" class="primary">Scanner son QR code</button>
+        <details>
+          <summary>Pas de caméra ? Colle le lien ou le code</summary>
+          <textarea id="offer-input" rows="3" placeholder="https://…#o1.… ou o1.…"></textarea>
+          <button id="btn-offer-ok" class="secondary">Valider</button>
+        </details>
+      </div>
+
+      <div id="join-step-2" class="step" hidden>
+        <h2><span class="num">2</span> Montre ta réponse au maître du jeu</h2>
+        <p class="hint">Il la scanne depuis son écran d'invitation. À distance : copie la réponse et envoie-la-lui par message.</p>
+        <div class="qr-box"><canvas id="answer-qr" aria-label="QR code de ta réponse"></canvas></div>
+        <div class="row">
+          <button id="btn-copy-answer" class="secondary">Copier la réponse</button>
+          <button id="btn-share-answer" class="secondary">Partager</button>
+        </div>
+        <p id="join-status" class="status">En attente du maître du jeu…</p>
+      </div>
+
+      <p id="join-error" class="error" hidden></p>
+    </div>
+  </section>
+
+  <!-- Partie -->
+  <section id="screen-game" class="screen" hidden>
+    <header class="topbar">
+      <div class="who">
+        <span id="me-dot" class="dot"></span>
+        <span id="me-name" class="me-name"></span>
+        <span id="me-role" class="badge"></span>
+      </div>
+      <div id="net" class="net" title="Latence avec le maître du jeu"></div>
+    </header>
+
+    <div id="lost" class="banner warn" hidden>
+      <p>Connexion perdue avec le maître du jeu.</p>
+      <button id="btn-rejoin" class="secondary small">Revenir dans la partie</button>
+    </div>
+
+    <div id="requests" class="requests"></div>
+
+    <main class="game">
+      <section class="resources" id="resources"></section>
+
+      <section id="queue" class="queue card" hidden>
+        <div class="queue-head"><span id="queue-label"></span><span id="queue-left" class="mono"></span></div>
+        <div class="bar"><div id="queue-bar" class="bar-fill"></div></div>
+      </section>
+
+      <section>
+        <h3 class="section-title">Bâtiments</h3>
+        <div id="buildings" class="buildings"></div>
+      </section>
+
+      <section>
+        <h3 class="section-title">Commandants</h3>
+        <div id="players" class="players"></div>
+      </section>
+
+      <section>
+        <h3 class="section-title">Journal</h3>
+        <ol id="log" class="log"></ol>
+      </section>
+    </main>
+
+    <div class="fab-zone">
+      <button id="btn-invite" class="primary fab" hidden>Inviter un joueur</button>
+    </div>
+  </section>
+
+  <!-- Feuille d'invitation (MJ) -->
+  <div id="sheet-invite" class="sheet" hidden>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="invite-title">
+      <div class="sheet-head">
+        <h2 id="invite-title">Inviter un joueur</h2>
+        <button id="btn-invite-close" class="ghost">Fermer</button>
+      </div>
+
+      <div class="step">
+        <h3><span class="num">1</span> Le joueur scanne ce QR code</h3>
+        <div class="qr-box"><canvas id="offer-qr" aria-label="QR code d'invitation"></canvas>
+          <p id="offer-wait" class="qr-wait">Préparation de l'invitation…</p>
+        </div>
+        <div class="row">
+          <button id="btn-copy-offer" class="secondary">Copier le lien</button>
+          <button id="btn-share-offer" class="secondary">Partager</button>
+        </div>
+      </div>
+
+      <div class="step">
+        <h3><span class="num">2</span> Scanne la réponse qu'il affiche</h3>
+        <button id="btn-scan-answer" class="primary">Scanner sa réponse</button>
+        <details>
+          <summary>Il est à distance ? Colle la réponse reçue</summary>
+          <textarea id="answer-input" rows="3" placeholder="a1.…"></textarea>
+          <button id="btn-answer-ok" class="secondary">Valider</button>
+        </details>
+        <p id="invite-status" class="status"></p>
+      </div>
+      <p class="hint">Une invitation ne sert qu'une fois. Pour un autre joueur, rouvre cette fenêtre.</p>
+    </div>
+  </div>
+
+  <!-- Caméra -->
+  <div id="scanner" class="scanner" hidden>
+    <video id="scanner-video" playsinline muted></video>
+    <div class="scanner-frame"></div>
+    <p class="scanner-hint">Vise le QR code. Monte la luminosité de l'autre écran si besoin.</p>
+    <button id="btn-scan-cancel" class="secondary scanner-cancel">Annuler</button>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
