@@ -32,7 +32,6 @@ Ensuite : quelqu'un crée la partie. Pour inviter, n'importe quel joueur appuie 
 
 | Fichier | Rôle |
 |---|---|
-| `js/guide.js` | Guide par race : principes, ordres de construction, pièges |
 | `js/game.js` | Règles pures (port de `game.rs`), en vitesse ×60 : une « heure » de jeu = une minute |
 | `js/save.js` | Sauvegarde de la partie sur le téléphone et fusion de deux copies |
 | `js/session.js` | Une partie vue d'un téléphone : copie de l'état, fiches des joueurs, connexions entre joueurs, invitations |
@@ -50,7 +49,7 @@ Ensuite : quelqu'un crée la partie. Pour inviter, n'importe quel joueur appuie 
 - **De proche en proche** : un téléphone qui reçoit une fiche plus récente que la sienne la transmet à ses autres voisins ; une partie reliée en chaîne reste donc à jour.
 - **Temps réel** : seuls les événements circulent (chantier lancé à T, fini à T+x). Chaque téléphone anime ressources et comptes à rebours localement. L'heure de référence est celle des téléphones, réglée automatiquement par le réseau mobile ou Internet.
 - **Races** : en arrivant dans une partie (création, invitation ou reprise d'une ancienne sauvegarde), chaque joueur choisit sa race, définitivement. **Humains** : population qui travaille, mange et grandit selon la nourriture et les habitats. **Machines** : sans population ni nourriture, tout tourne à l'énergie (foreuses gourmandes, batteries, nœud de calcul). **Aliens** : quelques psioniques (chacun vaut 120 humains) qui mangent et consomment de l'énergie, extraient les minéraux par télékinésie et ont deux pouvoirs (arrachement, transe collective).
-- **Difficulté et guide** : départ serré (de quoi lancer deux ou trois chantiers, énergie juste à l'équilibre, entrepôts de 1 000), donc l'ordre de construction compte, surtout au début. Onglet « Guide » (et bouton sur l'écran de choix) : principes, ordres de construction par stratégie et pièges, trouvés en simulant des milliers d'ordres (`js/guide.js`, à refaire si l'équilibrage change).
+- **Difficulté et guide** : départ serré (de quoi lancer deux ou trois chantiers, énergie juste à l'équilibre, entrepôts de 1 000), donc l'ordre de construction compte, surtout au début. Le guide des races ([GUIDE.md](GUIDE.md)) donne les principes, des ordres de construction par stratégie et les pièges, trouvés en simulant des milliers d'ordres (à refaire si l'équilibrage change). Il n'est pas affiché dans le jeu.
 - **Ressources** : minéraux (constructions), nourriture (population), énergie (bâtiments, et vie des machines). Comme la population varie selon les stocks, l'économie s'intègre par petits pas (300 au plus par calcul, même après une journée).
 - **Univers** : onglet « Univers », grille de 20 × 20 où chaque commandant a sa planète mère et un vaisseau. Flèches à l'écran (maintien pour avancer) ou au clavier, un pas toutes les 150 ms au plus. On déplace son propre vaisseau, et sa position est envoyée aux autres.
 - **Sauvegarde et reprise** : chaque téléphone enregistre sa copie de la partie à chaque changement (et quand l'appli passe en arrière-plan). Tout se calcule à partir du temps écoulé, donc la partie « continue » sans personne : celui qui la reprend (« Reprendre la partie » à l'accueil) retrouve production et chantiers à jour.
