@@ -2,6 +2,8 @@
 
 Jeu de conquête spatiale entre téléphones, en pair à pair. Aucun serveur de jeu : le site est un dossier de fichiers statiques, chaque téléphone garde une copie complète de la partie, et les joueurs se connectent directement en WebRTC après un échange de QR codes. **La partie continue même quand tout le monde est déconnecté, et n'importe qui peut la reprendre, même le lendemain.**
 
+**Jouer : https://vincentbee.github.io/astra/** (à ouvrir sur chaque téléphone)
+
 JS vanilla, modules ES, aucune étape de build.
 
 ## Tester
