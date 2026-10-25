@@ -15,7 +15,7 @@ Ouvre http://localhost:8080 dans **deux fenêtres de navigateur différentes** (
 1. Fenêtre A : ton nom → **Créer une partie**.
 2. **Copier le lien** et l'ouvrir dans la fenêtre B.
 3. Fenêtre B : **Copier la réponse**.
-4. Fenêtre A : « Il est à distance ? Colle la réponse reçue » → coller → **Valider**, puis **Accepter**.
+4. Fenêtre A : « Il est à distance ? Colle la réponse reçue » → coller → **Valider**. Le joueur entre directement dans la partie.
 
 ### Sur téléphones
 La caméra et l'installation sur l'écran d'accueil exigent du **https**. Il faut donc mettre le dossier en ligne sur un hébergeur statique gratuit :
@@ -39,6 +39,7 @@ Ensuite : le MJ crée la partie, le joueur scanne le QR avec l'appareil photo de
 | `js/config.js` | Serveurs STUN/TURN |
 | `sw.js`, `manifest.json` | Appli installable et utilisable hors ligne |
 
+- **Pas de validation** : le MJ montre son QR puis scanne la réponse du joueur ; ce geste vaut accord, et une invitation ne sert qu'une fois. Le joueur entre dès que la connexion est établie (8 joueurs au plus).
 - **Invitation** : le MJ génère une offre WebRTC. Seul l'essentiel est gardé (identifiants ICE, empreinte de chiffrement, adresses), packé en binaire : un QR de version 6 à 8, lisible d'un écran à l'autre. Le SDP complet est reconstruit à l'arrivée.
 - **Topologie** : chaque joueur est connecté au MJ **et** aux autres joueurs. Le MJ fait les présentations : quand quelqu'un arrive, il relaie les offres WebRTC entre lui et chaque joueur déjà présent.
 - **Relève du MJ** : le MJ du moment valide les ordres et diffuse l'état ; tout le monde en garde une copie. S'il disparaît (plus de nouvelles depuis 6 s), le plus ancien joueur encore en ligne devient MJ et reprend depuis sa copie. Resté seul, un joueur continue la partie.

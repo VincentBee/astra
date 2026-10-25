@@ -180,9 +180,7 @@ function onSessionChange() {
   const s = session;
   if (!s) return;
   if (s.status === 'waiting') {
-    $('join-status').textContent = s.helloAcked
-      ? 'Connecté. Le maître du jeu doit valider ton arrivée…'
-      : 'Connecté. Envoi de ta demande au maître du jeu…';
+    $('join-status').textContent = 'Connecté. Arrivée dans la partie…';
   }
   if (s.status === 'failed') {
     $('join-step-1').hidden = false;
@@ -258,7 +256,7 @@ async function useAnswer(text) {
     await session.acceptAnswer(text);
     $('invite-status').textContent = '';
     closeInviteSheet();
-    toast('Joueur connecté. Valide son arrivée en haut de l’écran.');
+    toast('Joueur connecté.');
   } catch (e) {
     if (e.used || /connexion/i.test(e.message)) {
       // L'invitation est consommée : on en prépare une neuve, à faire rescanner.
@@ -339,13 +337,6 @@ $('buildings').addEventListener('click', (e) => {
   if (btn && !btn.disabled) session.build(btn.dataset.build);
 });
 
-$('requests').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-approve],[data-refuse]');
-  if (!b) return;
-  if (b.dataset.approve) session.approve(b.dataset.approve);
-  else session.refuse(b.dataset.refuse);
-});
-
 /** Rendu des parties qui changent avec l'état (joueurs, journal, demandes). */
 function renderState() {
   const st = session.state;
@@ -357,18 +348,7 @@ function renderState() {
   $('me-role').textContent = session.isLeader ? 'Maître du jeu' : 'Commandant';
   $('btn-invite').hidden = !session.isLeader;
   $('lost').hidden = !session.alone;
-  $('requests').innerHTML = '';
 
-  if (session.isLeader) {
-    $('requests').innerHTML = session.pending
-      .map(
-        (r) => `<div class="banner">
-          <p><strong>${esc(r.name)}</strong> ${r.back ? 'veut revenir' : 'veut rejoindre'}.</p>
-          <div class="row"><button class="primary small" data-approve="${r.id}">Accepter</button>
-          <button class="ghost small" data-refuse="${r.id}">Refuser</button></div></div>`,
-      )
-      .join('');
-  }
 
   const players = Object.values(st.players);
   $('players').innerHTML = players

@@ -54,7 +54,6 @@ export class Session {
     this.clock = new Clock();
     this.links = new Map(); // pid -> Link (MJ et autres joueurs)
     this.status = 'idle'; // idle | answering | waiting | playing | failed | refused
-    this.pending = []; // MJ : demandes d'arrivée à valider
     this.invite = null;
     this.dialing = new Map(); // pid -> offre en cours vers ce joueur
     this.moveSeq = 0;
@@ -191,7 +190,6 @@ export class Session {
       if (now - link.lastSeen > SILENCE_MS) link.close();
       else link.send({ type: 'hb' });
     }
-    for (const r of this.pending) r.link.send({ type: 'hb' }); // demandes en attente de validation
     if (this.firstLink && !this.firstLink.closed && now - this.firstLink.lastSeen > SILENCE_MS * 3) this.firstLink.close();
   }
 
@@ -202,7 +200,6 @@ export class Session {
       this.failure = 'La connexion avec le maître du jeu a été perdue.';
       return this.changed();
     }
-    this.pending = this.pending.filter((r) => r.link !== link);
     if (!link.pid || this.links.get(link.pid) !== link) return this.changed();
     this.links.delete(link.pid);
     const p = this.state?.players[link.pid];
@@ -259,8 +256,6 @@ export class Session {
 
   stepDown() {
     this.cancelInvite();
-    for (const r of this.pending) r.link.send({ type: 'refused', reason: 'Le maître du jeu a changé. Demande une nouvelle invitation.' });
-    this.pending = [];
     this.clock.follow();
     this.pingBurst();
   }
@@ -389,32 +384,16 @@ export class Session {
     }
     if (typeof msg.secretHash !== 'string' || msg.secretHash.length !== 64) return;
     link.send({ type: 'hello-ack' });
-    this.pending.push({ id: rid(), name, link, secretHash: msg.secretHash });
-    this.ontoast?.(`${name} veut rejoindre la partie.`);
-    this.changed();
-  }
-
-  approve(reqId) {
-    const req = this.pending.find((r) => r.id === reqId);
-    if (!req || !this.isLeader) return;
-    this.pending = this.pending.filter((r) => r !== req);
-    if (Object.keys(this.state.players).length >= MAX_PLAYERS) {
-      req.link.send({ type: 'refused', reason: 'La partie est complète.' });
-      setTimeout(() => req.link.close(), 300);
-      return this.changed();
+    // Pas de validation : le MJ a lui-même scanné (ou collé) la réponse de ce
+    // joueur, et une invitation ne sert qu'une fois. C'est déjà son accord.
+    if (Object.keys(st.players).length >= MAX_PLAYERS) {
+      link.send({ type: 'refused', reason: 'La partie est complète (8 joueurs).' });
+      return setTimeout(() => link.close(), 300);
     }
     const pid = rid(6);
-    this.addPlayer(pid, req.name, req.secretHash);
-    this.admit(req.link, pid, false);
-  }
-
-  refuse(reqId) {
-    const req = this.pending.find((r) => r.id === reqId);
-    if (!req) return;
-    this.pending = this.pending.filter((r) => r !== req);
-    req.link.send({ type: 'refused', reason: 'Le maître du jeu a refusé ta demande.' });
-    setTimeout(() => req.link.close(), 300);
-    this.changed();
+    this.addPlayer(pid, name, msg.secretHash);
+    this.admit(link, pid, false);
+    this.ontoast?.(`${name} a rejoint la partie.`);
   }
 
   admit(link, pid, back) {
