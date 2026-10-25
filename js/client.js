@@ -49,7 +49,16 @@ export class PlayerSession {
     const ans = await answerInvite(offer);
     this.pendingAnswer = ans;
     this.status = 'answering';
-    ans.link.then((link) => this.onLink(link)).catch(() => {});
+    ans.link.then(
+      (link) => this.onLink(link),
+      (e) => {
+        if (this.pendingAnswer !== ans) return;
+        this.pendingAnswer = null;
+        this.status = 'failed';
+        this.failure = e.message;
+        this.changed();
+      },
+    );
     return ans.code;
   }
 

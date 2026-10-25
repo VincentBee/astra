@@ -45,10 +45,10 @@ export class HostSession {
 
   /** Le MJ fournit la réponse scannée ou collée. */
   async acceptAnswer(answer) {
-    if (!this.invite) throw new Error("Crée d'abord une invitation.");
+    if (!this.invite) throw Object.assign(new Error('Cette invitation a déjà servi.'), { used: true });
     const invite = this.invite;
     const link = await invite.accept(answer);
-    this.invite = null;
+    if (this.invite === invite) this.invite = null;
     link.onmessage = (msg) => this.onPreJoin(link, msg);
     link.onclose = () => {
       this.pending = this.pending.filter((p) => p.link !== link);

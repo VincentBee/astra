@@ -100,14 +100,35 @@ export async function createInvite() {
   await pc.setLocalDescription(await pc.createOffer());
   await waitIce(pc);
   const code = await encode('o', pc.localDescription.sdp);
+  let pending = null; // connexion en cours avec une réponse donnée
+  let pendingUfrag = null;
   return {
     code,
+    /** true si une réponse a déjà été appliquée à cette invitation. */
+    get used() {
+      return pending !== null;
+    },
     async accept(answerInput) {
       const { kind, sdp } = await decode(answerInput);
       if (kind !== 'a') throw new Error("C'est une invitation, pas une réponse. Scanne le QR affiché par le joueur.");
-      await pc.setRemoteDescription({ type: 'answer', sdp });
-      await withTimeout(openChannel(channel), 20000, 'La connexion ne s’établit pas. Vérifie que les deux téléphones ont du réseau, puis recommence.');
-      return new Link(pc, channel);
+      const ufrag = (/a=ice-ufrag:(\S+)/.exec(sdp) || [])[1];
+      if (pending) {
+        // La même réponse scannée deux fois : on attend la connexion déjà en cours.
+        if (ufrag === pendingUfrag) return pending;
+        throw usedError();
+      }
+      if (pc.signalingState !== 'have-local-offer') throw usedError();
+      pendingUfrag = ufrag;
+      pending = (async () => {
+        await pc.setRemoteDescription({ type: 'answer', sdp });
+        await withTimeout(
+          Promise.race([openChannel(channel), failed(pc)]),
+          25000,
+          'La connexion ne s’établit pas.',
+        );
+        return new Link(pc, channel);
+      })();
+      return pending;
     },
     cancel() {
       pc.close();
@@ -115,9 +136,26 @@ export async function createInvite() {
   };
 }
 
+function usedError() {
+  const e = new Error('Cette invitation a déjà servi.');
+  e.used = true;
+  return e;
+}
+
+/** Rejette dès que WebRTC abandonne la connexion. */
+function failed(pc) {
+  return new Promise((_, reject) => {
+    const check = () => pc.connectionState === 'failed' && reject(new Error('La connexion ne s’établit pas.'));
+    pc.addEventListener('connectionstatechange', check);
+    check();
+  });
+}
+
 /**
  * Joueur : répond à une invitation.
  * Renvoie { code, link: Promise<Link> } ; `code` est la réponse à montrer au MJ.
+ * `link` échoue si la connexion n'aboutit pas (WebRTC abandonne, ou 3 minutes
+ * sans que le MJ ait scanné la réponse).
  */
 export async function answerInvite(offerInput) {
   const { kind, sdp } = await decode(offerInput);
@@ -128,10 +166,18 @@ export async function answerInvite(offerInput) {
   await pc.setLocalDescription(await pc.createAnswer());
   await waitIce(pc);
   const code = await encode('a', pc.localDescription.sdp);
-  const link = channelReady.then(async (channel) => {
-    await openChannel(channel);
-    return new Link(pc, channel);
-  });
+  const link = withTimeout(
+    Promise.race([
+      channelReady.then(async (channel) => {
+        await openChannel(channel);
+        return new Link(pc, channel);
+      }),
+      failed(pc),
+    ]),
+    180000,
+    'Le maître du jeu n’a pas scanné ta réponse à temps.',
+  );
+  link.catch(() => pc.close());
   return { code, link, cancel: () => pc.close() };
 }
 

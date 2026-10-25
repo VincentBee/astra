@@ -174,6 +174,12 @@ $('btn-share-answer').onclick = () => share(answerCode, 'Ma réponse Astra');
 function onPlayerChange() {
   const s = session;
   if (s.status === 'waiting') $('join-status').textContent = 'Connecté. Le maître du jeu doit valider ton arrivée…';
+  if (s.status === 'failed') {
+    $('join-step-1').hidden = false;
+    $('join-step-2').hidden = true;
+    joinError(`${s.failure} Demande au maître du jeu une nouvelle invitation et scanne-la.`);
+    show('join');
+  }
   if (s.status === 'refused') {
     joinError(s.refusal || 'Le maître du jeu a refusé ta demande.');
     $('join-status').textContent = '';
@@ -204,7 +210,7 @@ let offerCode = '';
 
 async function openInviteSheet() {
   $('sheet-invite').hidden = false;
-  $('invite-status').textContent = '';
+  if (!connecting) $('invite-status').textContent = '';
   $('answer-input').value = '';
   $('offer-qr').hidden = true;
   $('offer-wait').hidden = false;
@@ -231,7 +237,15 @@ $('btn-invite-close').onclick = () => {
 $('btn-copy-offer').onclick = () => copy(inviteLink(offerCode), 'Lien copié. Envoie-le au joueur.');
 $('btn-share-offer').onclick = () => share(inviteLink(offerCode), 'Rejoins ma partie Astra');
 
+let connecting = false;
+function setInviteBusy(busy) {
+  connecting = busy;
+  for (const id of ['btn-scan-answer', 'btn-answer-ok']) $(id).disabled = busy;
+}
+
 async function useAnswer(text) {
+  if (connecting) return;
+  setInviteBusy(true);
   $('invite-status').textContent = 'Connexion en cours…';
   try {
     await session.acceptAnswer(text);
@@ -239,11 +253,22 @@ async function useAnswer(text) {
     closeInviteSheet();
     toast('Joueur connecté. Valide son arrivée en haut de l’écran.');
   } catch (e) {
-    $('invite-status').textContent = e.message;
+    if (e.used || /connexion/i.test(e.message)) {
+      // L'invitation est consommée : on en prépare une neuve, à faire rescanner.
+      await openInviteSheet();
+      $('invite-status').textContent = e.used
+        ? 'Cette invitation avait déjà servi. Nouvelle invitation prête : le joueur doit rescanner ce QR code, puis te montrer sa nouvelle réponse.'
+        : 'La connexion n’a pas abouti. Nouvelle invitation prête : le joueur doit rescanner ce QR code. Si ça recommence en 4G, essayez sur le même Wi-Fi ou le partage de connexion.';
+    } else {
+      $('invite-status').textContent = e.message;
+    }
+  } finally {
+    setInviteBusy(false);
   }
 }
 
 $('btn-scan-answer').onclick = async () => {
+  if (connecting) return;
   try {
     useAnswer(await scan());
   } catch (e) {
