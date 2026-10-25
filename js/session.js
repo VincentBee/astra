@@ -11,9 +11,13 @@
 //   continue, même seul.
 // - Chaque changement de MJ ouvre une nouvelle « époque » ; en cas de
 //   désaccord, l'époque la plus récente l'emporte, puis le plus ancien.
+// - Reconnexion sans rescanner : tous les téléphones de la partie se donnent
+//   rendez-vous via des relais publics (js/rendezvous.js) et se reconnectent
+//   tout seuls. Deux MJ qui se retrouvent fusionnent leurs copies.
 
 import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Clock } from './clock.js';
+import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates } from './save.js';
 import { newPlanet, settle, startBuild, BUILDINGS, step, freeCell, DIRS, MOVE_COOLDOWN } from './game.js';
 
@@ -77,7 +81,8 @@ export class Session {
     const s = new Session(name);
     const secret = rid(16);
     s.me = rid(6);
-    s.state = { gid: rid(6), epoch: 1, leader: s.me, nextRank: 0, players: {}, log: [] };
+    // key : clé de la partie, qui protège le rendez-vous automatique.
+    s.state = { gid: rid(6), key: rid(16), epoch: 1, leader: s.me, nextRank: 0, players: {}, log: [] };
     s.clock.lead();
     s.addPlayer(s.me, name, await sha256(secret));
     s.addLog(`${name} ouvre la partie.`);
@@ -160,6 +165,7 @@ export class Session {
   }
 
   start() {
+    this.meet();
     if (this.timers.length) return;
     this.timers.push(
       setInterval(() => this.heartbeat(), HEARTBEAT_MS),
@@ -170,6 +176,8 @@ export class Session {
     this.onVisible = () => {
       if (document.visibilityState === 'hidden') return this.save();
       if (document.visibilityState !== 'visible' || !this.state) return;
+      // Au réveil, les connexions ont pu tomber : on se réannonce tout de suite.
+      if (!this.isLeader ? !this.leaderLink() : this.alone) this.rdv?.refresh();
       if (!this.isLeader) {
         this.clock.follow();
         this.pingBurst();
@@ -211,6 +219,12 @@ export class Session {
   // ----- connexions ------------------------------------------------------------
 
   attach(link, pid) {
+    const prev = pid && this.links.get(pid);
+    if (prev && !prev.closed && prev.viaRoom && !link.viaRoom) {
+      // Déjà reliés par le rendez-vous : cette connexion-ci est en trop.
+      link.onclose = null;
+      return link.close();
+    }
     link.pid = pid;
     link.lastSeen = performance.now();
     link.onmessage = (msg) => {
@@ -369,6 +383,9 @@ export class Session {
         return;
       case 'signal':
         return this.onSignal(link, msg);
+      case 'sync':
+        if (link.pid) this.onSync(link, msg.state);
+        return;
 
       // --- reçus par les joueurs ---
       case 'hello-ack':
@@ -478,6 +495,64 @@ export class Session {
     this.start();
     this.pingBurst();
     this.changed();
+  }
+
+  // ----- rendez-vous automatique (reconnexion sans rescanner) ---------------
+
+  /** Clé de la partie (les parties d'avant le rendez-vous n'en ont pas). */
+  get gameKey() {
+    return this.state.key || `k-${this.state.gid}`;
+  }
+
+  /** Rejoint le salon de la partie, ou en change si on a changé de partie. */
+  meet() {
+    if (!this.state || !this.me || this.status !== 'playing') return;
+    const r = this.rdv;
+    if (r && r.gid === this.state.gid && r.me === this.me && r.key === this.gameKey) return;
+    r?.leave();
+    this.rdv = new Rendezvous({
+      gid: this.state.gid,
+      key: this.gameKey,
+      me: this.me,
+      onLink: (link, pid) => this.onRoomLink(link, pid),
+    });
+    this.rdv.join();
+  }
+
+  /** Un joueur de la partie retrouvé au rendez-vous. */
+  onRoomLink(link, pid) {
+    if (this.status !== 'playing' || !this.state) return link.close();
+    this.attach(link, pid);
+    // Chacun montre d'abord sa copie : si l'autre est MJ, il la fusionne.
+    link.send({ type: 'sync', state: this.snapshot() });
+    if (this.isLeader) link.send({ type: 'state', state: this.snapshot() });
+    else if (pid === this.state.leader) {
+      clearTimeout(this.electionTimer);
+      this.clock.follow();
+      this.pingBurst();
+    }
+    this.changed();
+  }
+
+  /**
+   * Le MJ reçoit la copie d'un joueur retrouvé. Joueur par joueur, il garde
+   * la progression la plus récente. Si l'autre suivait un autre MJ (chacun
+   * avait repris la partie de son côté), on ouvre une nouvelle époque : les
+   * deux MJ font la même fusion et le plus ancien des deux reste MJ.
+   */
+  onSync(link, st) {
+    if (!this.isLeader || !st?.players || st.gid !== this.state.gid) return;
+    const mine = this.state;
+    const wasOnline = !!mine.players[link.pid]?.online;
+    const known = !!mine.players[link.pid];
+    const merged = mergeStates(mine, st);
+    merged.leader = this.me;
+    if (st.leader !== this.me) merged.epoch = Math.max(mine.epoch, st.epoch) + 1;
+    for (const p of Object.values(merged.players)) p.online = this.online(p.id);
+    this.state = merged;
+    const p = merged.players[link.pid];
+    if (p && !wasOnline) this.addLog(known ? `${p.name} est de retour.` : `${p.name} rejoint la partie.`);
+    this.broadcast();
   }
 
   // ----- maillage : le MJ relaie les offres entre joueurs -------------------
@@ -743,5 +818,7 @@ export class Session {
       link.close();
     }
     this.links.clear();
+    this.rdv?.leave();
+    this.rdv = null;
   }
 }
