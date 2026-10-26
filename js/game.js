@@ -14,6 +14,8 @@
 // n'a pas de formule fermée : on l'intègre par petits pas (300 au plus par
 // calcul, même après une journée d'absence).
 
+import { techBonus, TECHS, SHIPS, techCost, techMissing, researchDuration, shipUnlocked, shipDuration } from './tech.js';
+
 /** Facteur de vitesse : 60 = une « heure » de jeu dure une minute. */
 export const SPEED = 60;
 export const RES = ['minerals', 'food', 'energy'];
@@ -59,6 +61,9 @@ const capsFor = (levels) => {
 // est juste à l'équilibre et presque rien ne tombe sans bâtiment. Chaque
 // chantier pèse donc : monter une production sans l'énergie, la nourriture ou
 // la place qui va avec provoque une pénurie, et les pénuries se propagent.
+
+/** Énergie consommée par le labo et le chantier naval (toutes races). */
+const space = (levels) => curve(5, lv(levels, 'lab')) + curve(5, lv(levels, 'yard'));
 
 export const RACES = {
   human: {
@@ -117,6 +122,22 @@ export const RACES = {
         base: { minerals: 150, energy: 0 },
         factor: 1.7,
       },
+      lab: {
+        name: 'Laboratoire de recherche',
+        short: 'Labo',
+        start: 0,
+        desc: 'Ouvre la recherche sur la planète mère. Chaque niveau l’accélère et ouvre des technologies.',
+        base: { minerals: 200, energy: 0 },
+        factor: 1.8,
+      },
+      yard: {
+        name: 'Chantier spatial',
+        short: 'Chantier',
+        start: 0,
+        desc: 'Construit les vaisseaux. Chaque niveau accélère la construction.',
+        base: { minerals: 250, energy: 0 },
+        factor: 1.8,
+      },
     },
     rates(levels, pop) {
       const jobs = 10 * lv(levels, 'mine') + 5 * lv(levels, 'farm');
@@ -126,7 +147,7 @@ export const RACES = {
         jobs,
         energyIn: curve(20, lv(levels, 'solar')),
         energyOut:
-          curve(10, lv(levels, 'mine')) + curve(6, lv(levels, 'farm')) + curve(3, lv(levels, 'habitat')) + curve(3, lv(levels, 'store')),
+          curve(10, lv(levels, 'mine')) + curve(6, lv(levels, 'farm')) + curve(3, lv(levels, 'habitat')) + curve(3, lv(levels, 'store')) + space(levels),
         food: (effE) => curve(18, lv(levels, 'farm')) * (0.3 + 0.7 * work) * effE,
         foodOut: 0.6 * pop,
         // Revenu de base + impôt (0,2 minéral par habitant), puis les mines.
@@ -193,12 +214,28 @@ export const RACES = {
         base: { minerals: 150, energy: 60 },
         factor: 1.8,
       },
+      lab: {
+        name: 'Matrice de recherche',
+        short: 'Matrice',
+        start: 0,
+        desc: 'Ouvre la recherche sur la planète mère. Chaque niveau l’accélère et ouvre des technologies.',
+        base: { minerals: 180, energy: 70 },
+        factor: 1.8,
+      },
+      yard: {
+        name: 'Usine orbitale',
+        short: 'Usine',
+        start: 0,
+        desc: 'Assemble les vaisseaux. Chaque niveau accélère l’assemblage.',
+        base: { minerals: 220, energy: 80 },
+        factor: 1.8,
+      },
     },
     rates(levels) {
       return {
         work: 1,
         energyIn: curve(24, lv(levels, 'reactor')),
-        energyOut: curve(16, lv(levels, 'drill')) * Math.pow(0.88, lv(levels, 'nexus')) + curve(2, lv(levels, 'store')),
+        energyOut: curve(16, lv(levels, 'drill')) * Math.pow(0.88, lv(levels, 'nexus')) + curve(2, lv(levels, 'store')) + space(levels),
         food: () => 0,
         foodOut: 0,
         mineralsBase: 10,
@@ -267,13 +304,29 @@ export const RACES = {
         base: { minerals: 150, energy: 0 },
         factor: 1.7,
       },
+      lab: {
+        name: 'Bassin de songe',
+        short: 'Bassin',
+        start: 0,
+        desc: 'Les psioniques y rêvent les technologies, sur la planète mère. Chaque niveau accélère la recherche.',
+        base: { minerals: 220, energy: 50 },
+        factor: 1.8,
+      },
+      yard: {
+        name: 'Couveuse astrale',
+        short: 'Couveuse',
+        start: 0,
+        desc: 'Fait éclore les vaisseaux vivants. Chaque niveau accélère l’éclosion.',
+        base: { minerals: 260, energy: 60 },
+        factor: 1.8,
+      },
     },
     rates(levels, pop) {
       const amp = 1 + 0.25 * lv(levels, 'amplifier');
       return {
         work: 1,
         energyIn: curve(22, lv(levels, 'prism')),
-        energyOut: 7 * pop + curve(3, lv(levels, 'hive')) + curve(6, lv(levels, 'amplifier')) + curve(3, lv(levels, 'store')),
+        energyOut: 7 * pop + curve(3, lv(levels, 'hive')) + curve(6, lv(levels, 'amplifier')) + curve(3, lv(levels, 'store')) + space(levels),
         food: (effE) => curve(18, lv(levels, 'hive')) * effE,
         foodOut: 7 * pop,
         // Extraction télékinésique : 25 minéraux par psionique, s'il est nourri et alimenté.
@@ -356,17 +409,19 @@ function extract(res, want, nature, reserve, h) {
  * pénurie, ils valent la part de la demande couverte. `nature` et `reserve`
  * sont les gisements de la planète (minéraux et nourriture du sol).
  */
-export function flows(race, levels, pop, stock, h, boost = 1, nature = null, reserve = null) {
+export function flows(race, levels, pop, stock, h, boost = 1, nature = null, reserve = null, tech = null) {
   const R = RACES[race];
   const r = R.rates(levels, pop);
+  const b = techBonus(race, tech);
+  r.energyIn *= b.energy;
   const needE = r.energyOut * h;
   const effE = needE > 0 ? Math.min(1, (stock.energy + r.energyIn * h) / needE) : 1;
-  const foodWant = r.food(effE);
+  const foodWant = r.food(effE) * b.food;
   const foodIn = extract('food', foodWant, nature, reserve, h);
   const needF = r.foodOut * h;
   const effF = needF > 0 ? Math.min(1, (stock.food + foodIn * h) / needF) : 1;
   // Tout ce qui entre dans le stock du joueur sort du sol de sa planète, revenu de base compris.
-  const minedWant = r.mineralsBase + r.minerals(effE, effF, boost);
+  const minedWant = r.mineralsBase + r.minerals(effE, effF, boost) * b.minerals;
   const mined = extract('minerals', minedWant, nature, reserve, h);
   const mineralsIn = mined;
   return {
@@ -395,7 +450,7 @@ const capOf = (res, f) => f.caps[res];
 function advance(race, s, ms, boost) {
   const h = (Math.max(0, ms) / 3_600_000) * SPEED;
   if (h <= 0) return s;
-  const f = flows(race, s.levels, s.pop, s.stock, h, boost, s.nature, s.reserve);
+  const f = flows(race, s.levels, s.pop, s.stock, h, boost, s.nature, s.reserve, s.tech);
   const stock = {};
   const lost = {}; // ce qui ne rentre pas dans l'entrepôt plein
   for (const r of RES) {
@@ -448,37 +503,64 @@ function simulate(race, s, from, to, trance = 0) {
 
 /**
  * État d'une planète à l'instant `now`, sans la modifier.
- * Applique une construction terminée entre-temps : ancien niveau jusqu'à la
- * fin du chantier, puis nouveau niveau.
+ * Trois files d'attente peuvent finir entre-temps, chacune à son heure : le
+ * chantier (bâtiment), la recherche (technologie) et le chantier naval (lot
+ * de vaisseaux). On calcule l'économie jusqu'à chaque fin, on applique son
+ * effet, puis on continue : un bâtiment ou une technologie terminés
+ * changent la production à partir de cet instant-là.
  */
 export function stateAt(planet, now) {
   const race = planet.race;
-  let s = { stock: planet.stock, pop: planet.pop || 0, levels: planet.levels, nature: planet.nature, reserve: planet.reserve };
+  let s = {
+    stock: planet.stock,
+    pop: planet.pop || 0,
+    levels: planet.levels,
+    nature: planet.nature,
+    reserve: planet.reserve,
+    tech: planet.tech || {},
+    ships: planet.ships || {},
+  };
   let at = planet.at;
-  let queue = planet.queue;
-  if (queue && queue.end <= now) {
-    s = simulate(race, s, at, queue.end, planet.trance);
-    at = queue.end;
-    s = { ...s, levels: { ...s.levels, [queue.key]: queue.level } };
-    queue = null;
+  const q = { queue: planet.queue || null, research: planet.research || null, yard: planet.yard || null };
+  const done = [];
+  for (;;) {
+    const next = Object.entries(q)
+      .filter(([, v]) => v && v.end <= now)
+      .sort((x, y) => x[1].end - y[1].end || (x[0] < y[0] ? -1 : 1))[0];
+    if (!next) break;
+    const [kind, job] = next;
+    s = simulate(race, s, at, job.end, planet.trance);
+    at = job.end;
+    if (kind === 'queue') s = { ...s, levels: { ...s.levels, [job.key]: job.level } };
+    else if (kind === 'research') s = { ...s, tech: { ...s.tech, [job.key]: job.level } };
+    else s = { ...s, ships: { ...s.ships, [job.type]: (s.ships[job.type] || 0) + job.count } };
+    done.push({ kind, ...job });
+    q[kind] = null;
   }
   s = simulate(race, s, at, now, planet.trance);
   // Rythme actuel, pour l'affichage (sur une seconde de jeu).
-  const prod = flows(race, s.levels, s.pop, s.stock, 1 / 3600, (planet.trance || 0) > now ? 2 : 1, s.nature, s.reserve);
-  return { stock: s.stock, pop: s.pop, levels: s.levels, reserve: s.reserve, queue, prod };
+  const prod = flows(race, s.levels, s.pop, s.stock, 1 / 3600, (planet.trance || 0) > now ? 2 : 1, s.nature, s.reserve, s.tech);
+  return { stock: s.stock, pop: s.pop, levels: s.levels, reserve: s.reserve, tech: s.tech, ships: s.ships, ...q, done, prod };
 }
 
-/** Version « solde » : écrit l'état courant dans la planète (par son propriétaire uniquement). */
+/**
+ * Version « solde » : écrit l'état courant dans la planète (par son
+ * propriétaire uniquement). Renvoie ce qui s'est terminé entre-temps :
+ * [{ kind: 'queue' | 'research' | 'yard', ... }].
+ */
 export function settle(planet, now) {
   const s = stateAt(planet, now);
-  const finished = planet.queue && !s.queue ? planet.queue : null;
   planet.stock = s.stock;
   planet.pop = s.pop;
   planet.at = now;
   planet.levels = s.levels;
   planet.queue = s.queue;
+  planet.research = s.research;
+  planet.yard = s.yard;
+  planet.tech = s.tech;
+  planet.ships = s.ships;
   if (s.reserve) planet.reserve = s.reserve;
-  return finished;
+  return s.done;
 }
 
 // ---------------------------------------------------------------------------
@@ -516,6 +598,47 @@ export function startBuild(planet, key, now) {
   if (!covers(planet.stock, cost)) return 'Ressources insuffisantes.';
   pay(planet, cost);
   planet.queue = { key, level: level + 1, start: now, end: now + buildDuration(planet.race, planet.levels, cost) };
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Recherche (planète mère) et chantier naval
+// ---------------------------------------------------------------------------
+
+/** Lance une recherche sur la planète mère. Renvoie une erreur lisible ou null. */
+export function startResearch(planet, key, now) {
+  const T = TECHS[planet.race]?.[key];
+  if (!T) return 'Technologie inconnue.';
+  settle(planet, now);
+  const lab = lv(planet.levels, 'lab');
+  if (!lab) return 'Construis d’abord un labo.';
+  if (planet.research) return 'Une recherche est déjà en cours.';
+  const level = planet.tech?.[key] || 0;
+  if (level >= T.max) return 'Niveau maximum atteint.';
+  const miss = techMissing(planet.race, key, planet.tech, lab);
+  if (miss) return `Il faut d’abord : ${miss}.`;
+  const cost = techCost(planet.race, key, level);
+  if (!covers(planet.stock, cost)) return 'Ressources insuffisantes.';
+  pay(planet, cost);
+  planet.research = { key, level: level + 1, start: now, end: now + researchDuration(cost, lab) };
+  return null;
+}
+
+/** Lance un lot de vaisseaux au chantier naval de cette planète. */
+export function startShips(planet, type, count, now) {
+  const S = SHIPS[planet.race]?.[type];
+  if (!S) return 'Vaisseau inconnu.';
+  count = Math.floor(count);
+  if (!(count >= 1 && count <= 50)) return 'Entre 1 et 50 vaisseaux par lot.';
+  settle(planet, now);
+  const yard = lv(planet.levels, 'yard');
+  if (!yard) return 'Construis d’abord un chantier naval.';
+  if (planet.yard) return 'Le chantier naval est déjà occupé.';
+  if (!shipUnlocked(planet.race, type, planet.tech)) return 'Ce vaisseau n’est pas encore recherché.';
+  const cost = Object.fromEntries(Object.entries(S.cost).map(([r, v]) => [r, v * count]));
+  if (!covers(planet.stock, cost)) return 'Ressources insuffisantes.';
+  pay(planet, cost);
+  planet.yard = { type, count, start: now, end: now + shipDuration(planet.race, type, count, yard) };
   return null;
 }
 

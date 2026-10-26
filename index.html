@@ -154,6 +154,33 @@
         <h3 class="section-title">Bâtiments</h3>
         <div id="buildings" class="buildings"></div>
       </section>
+
+      <section id="research-zone">
+        <h3 class="section-title">Recherche</h3>
+        <section id="research-queue" class="queue card" hidden>
+          <div class="queue-head"><span id="research-label"></span><span id="research-left" class="mono"></span></div>
+          <div class="bar"><div id="research-bar" class="bar-fill"></div></div>
+        </section>
+        <p id="research-hint" class="hint"></p>
+        <div id="techs" class="buildings"></div>
+      </section>
+
+      <section id="yard-zone">
+        <h3 class="section-title">Chantier naval</h3>
+        <section id="yard-queue" class="queue card" hidden>
+          <div class="queue-head"><span id="yard-label"></span><span id="yard-left" class="mono"></span></div>
+          <div class="bar"><div id="yard-bar" class="bar-fill"></div></div>
+        </section>
+        <p id="yard-hint" class="hint"></p>
+        <div id="ships" class="buildings"></div>
+      </section>
+
+      <section id="fleet-zone">
+        <h3 class="section-title">Flottes</h3>
+        <p id="docked" class="hint"></p>
+        <button id="btn-send-fleet" class="secondary">Envoyer une flotte</button>
+        <div id="fleets" class="players"></div>
+      </section>
     </main>
 
     <div class="fab-zone">
@@ -191,6 +218,31 @@
         <p id="invite-status" class="status"></p>
       </div>
       <p class="hint">Une invitation ne sert qu'une fois. Pour un autre joueur, rouvre cette fenêtre.</p>
+    </div>
+  </div>
+
+  <!-- Envoi d'une flotte -->
+  <div id="sheet-fleet" class="sheet" hidden>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="fleet-title">
+      <div class="sheet-head">
+        <h2 id="fleet-title">Envoyer une flotte</h2>
+        <button id="btn-fleet-close" class="ghost">Fermer</button>
+      </div>
+      <label class="field">Destination
+        <select id="fleet-dest"></select>
+      </label>
+      <p id="fleet-mission" class="hint"></p>
+      <div>
+        <h3 class="section-title">Vaisseaux</h3>
+        <div id="fleet-ships" class="fleet-grid"></div>
+      </div>
+      <div>
+        <h3 class="section-title">Cargaison</h3>
+        <div id="fleet-cargo" class="fleet-grid"></div>
+        <p id="fleet-room" class="hint"></p>
+      </div>
+      <p id="fleet-eta" class="hint mono"></p>
+      <button id="btn-fleet-go" class="primary">Partir</button>
     </div>
   </div>
 

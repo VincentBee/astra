@@ -4,8 +4,10 @@ import { inviteLink, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
 import {
   RACES, RACE_KEYS, RES_INFO, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
-  powerReadyAt, powerCost, fmt, UNIVERSE, SOIL, sameCell,
+  powerReadyAt, powerCost, fmt, UNIVERSE, SOIL, sameCell, distance,
 } from './game.js';
+import { TECHS, SHIPS, SHIP_KEYS, techCost, techMissing, researchDuration, shipUnlock, shipUnlocked, shipStats, shipDuration } from './tech.js';
+import { MISSIONS, countShips, fleetSpeed, fleetCargo, tripMs, fleetPos } from './fleet.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -442,6 +444,32 @@ function buildStatic() {
     )
     .join('');
 
+  $('techs').innerHTML = Object.entries(TECHS[race])
+    .map(
+      ([k, t]) => `<article class="building card" data-tcard="${k}">
+      <div class="b-head"><h4>${esc(t.name)}</h4><span class="level mono" data-tlevel="${k}"></span></div>
+      <p class="b-desc">${esc(t.desc)}</p>
+      <p class="req" data-treq="${k}" hidden></p>
+      <p class="cost mono" data-tcost="${k}"></p>
+      <button class="secondary small" data-research="${k}">Rechercher</button>
+    </article>`,
+    )
+    .join('');
+
+  $('ships').innerHTML = SHIP_KEYS.map((k) => {
+    const S = SHIPS[race][k];
+    return `<article class="building card" data-scard="${k}">
+      <div class="b-head"><h4>${esc(S.name)}</h4><span class="level mono" data-sdocked="${k}"></span></div>
+      <p class="ship-stats" data-sstats="${k}"></p>
+      <p class="req" data-sreq="${k}" hidden></p>
+      <p class="cost mono" data-scost="${k}"></p>
+      <div class="ship-actions">
+        <button class="secondary small" data-ship="${k}" data-n="1">×1</button>
+        <button class="secondary small" data-ship="${k}" data-n="5">×5</button>
+      </div>
+    </article>`;
+  }).join('');
+
   $('powers-zone').hidden = race !== 'alien';
   $('powers').innerHTML =
     race === 'alien'
@@ -497,7 +525,15 @@ function fillSoil(prefix, nature, reserve, soil) {
 
 $('powers').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-power]');
-  if (btn && !btn.disabled) session.power(btn.dataset.power);
+  if (btn && !btn.disabled) session.power(btn.dataset.power, openKey);
+});
+$('techs').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-research]');
+  if (btn && !btn.disabled) session.research(btn.dataset.research);
+});
+$('ships').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-ship]');
+  if (btn && !btn.disabled) session.buildShips(btn.dataset.ship, Number(btn.dataset.n), openKey);
 });
 
 // ---------------------------------------------------------------------------
@@ -507,55 +543,55 @@ $('powers').addEventListener('click', (e) => {
 // Chaque téléphone relève ses propres valeurs toutes les 5 s et garde les
 // 10 dernières minutes, pour la partie en cours (gardées au rechargement).
 
-const HISTORY_KEY = 'astra.history';
+const HISTORY_KEY = 'astra.hist';
 const SAMPLE_MS = 5000;
 const HISTORY_MS = 10 * 60_000;
-let history = null; // { id, t: [instants], v: { clé: [valeurs] } }
+let hist = null; // { id, t: [instants], v: { clé: [valeurs] } } (pas « history » : ce nom est celui du navigateur)
 
 const spark = (k) =>
   `<svg class="spark" data-spark="${k}" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><path class="spark-area"/><path class="spark-line"/></svg>`;
 
-function sampleHistory(now, values) {
-  const id = `${session.state.gid}|${session.me}`;
-  if (history?.id !== id) {
+function sampleHistory(now, values, key) {
+  const id = `${session.state.gid}|${session.me}|${key}`;
+  if (hist?.id !== id) {
     try {
-      history = JSON.parse(localStorage.getItem(HISTORY_KEY) || 'null');
+      hist = JSON.parse(localStorage.getItem(HISTORY_KEY) || 'null');
     } catch {
-      history = null;
+      hist = null;
     }
-    if (history?.id !== id) history = { id, t: [], v: {} };
+    if (hist?.id !== id) hist = { id, t: [], v: {} };
   }
-  if (history.t.length && now - history.t[history.t.length - 1] < SAMPLE_MS) return;
-  history.t.push(now);
-  for (const [k, v] of Object.entries(values)) (history.v[k] ||= []).push(Math.round(v * 10) / 10);
+  if (hist.t.length && now - hist.t[hist.t.length - 1] < SAMPLE_MS) return;
+  hist.t.push(now);
+  for (const [k, v] of Object.entries(values)) (hist.v[k] ||= []).push(Math.round(v * 10) / 10);
   // On oublie ce qui a plus de 10 minutes.
-  const drop = history.t.findIndex((t) => now - t <= HISTORY_MS);
+  const drop = hist.t.findIndex((t) => now - t <= HISTORY_MS);
   if (drop > 0) {
-    history.t.splice(0, drop);
-    for (const a of Object.values(history.v)) a.splice(0, a.length - history.t.length);
+    hist.t.splice(0, drop);
+    for (const a of Object.values(hist.v)) a.splice(0, a.length - hist.t.length);
   }
   try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(hist));
   } catch {}
   drawSparks();
 }
 
 /** Courbe de chaque tuile, à l'échelle de ses propres valeurs (de la plus basse à la plus haute). */
 function drawSparks() {
-  if (!history) return;
+  if (!hist) return;
   for (const svg of document.querySelectorAll('[data-spark]')) {
-    const vals = history.v[svg.dataset.spark] || [];
-    const n = Math.min(vals.length, history.t.length);
+    const vals = hist.v[svg.dataset.spark] || [];
+    const n = Math.min(vals.length, hist.t.length);
     if (n < 2) continue;
     // Axe du temps : du plus ancien relevé au plus récent (10 min au plus).
-    const t1 = history.t[history.t.length - 1];
-    const t0 = history.t[history.t.length - n];
+    const t1 = hist.t[hist.t.length - 1];
+    const t0 = hist.t[hist.t.length - n];
     const width = Math.max(1, t1 - t0);
     const lo = Math.min(...vals), hi = Math.max(...vals);
     const span = hi - lo || 1;
     const pts = [];
     for (let i = vals.length - n; i < vals.length; i++) {
-      const x = ((history.t[i - vals.length + history.t.length] - t0) / width) * 100;
+      const x = ((hist.t[i - vals.length + hist.t.length] - t0) / width) * 100;
       const y = hi === lo ? 15 : 28 - ((vals[i] - lo) / span) * 26;
       pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
     }
@@ -593,7 +629,7 @@ function popText(race, pop) {
 
 $('buildings').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-build]');
-  if (btn && !btn.disabled) session.build(btn.dataset.build);
+  if (btn && !btn.disabled) session.build(btn.dataset.build, openKey);
 });
 
 /** Rendu des parties qui changent avec l'état (joueurs, journal, demandes). */
@@ -685,23 +721,38 @@ function renderLive() {
     const R = RACES[p.race];
     const doing = s.queue ? `${R.buildings[s.queue.key].short} ${s.queue.level} dans ${Math.ceil((s.queue.end - now) / 1000)} s` : 'aucun chantier';
     const people = popText(p.race, s.pop);
-    sub.textContent = [`${fmt(s.stock.minerals)} min.`, people, doing, net].filter(Boolean).join(' · ');
+    const nPlanets = session.planetsOf(p).length;
+    const docked = session.planetsOf(p).reduce((t, x) => t + countShips(stateAt(x.planet, now).ships), 0);
+    const flying = (p.fleets || []).length;
+    const space = [
+      nPlanets > 1 ? `${nPlanets} planètes` : null,
+      docked ? `${docked} vaisseau${docked > 1 ? 'x' : ''}` : null,
+      flying ? `${flying} flotte${flying > 1 ? 's' : ''} en route` : null,
+    ];
+    sub.textContent = [`${fmt(s.stock.minerals)} min.`, people, doing, ...space, net].filter(Boolean).join(' · ');
     scoreEl.textContent = `${score(p.race, s.levels)} pts`;
   }
 }
 
-/** Ma planète : ressources, population, chantier, bâtiments, pouvoirs. */
+/** La planète ouverte (mère ou colonie) : ressources, population, chantiers, recherche, flottes. */
 function renderPlanet(me, now) {
   const R = RACES[me.race];
-  const s = stateAt(me.planet, now);
+  let pl = session.planetOf(me, openKey);
+  if (!pl) {
+    openKey = 'home';
+    pl = session.planetOf(me, 'home');
+  }
+  if (!pl) return;
+  const planet = pl.planet;
+  const s = stateAt(planet, now);
   const f = s.prod;
   const soil = s.reserve ? Object.fromEntries(SOIL.map((r) => [`soil-${r}`, s.reserve[r]])) : {};
-  sampleHistory(now, { ...s.stock, pop: s.pop, grid: f.effE * 100, ...soil });
+  sampleHistory(now, { ...s.stock, pop: s.pop, grid: f.effE * 100, ...soil }, openKey);
   const q = (sel) => document.querySelector(sel);
 
-  $('planet-title').textContent = session.myWorld?.name || 'Ta planète';
-  $('soil-zone').hidden = !me.planet.nature;
-  if (me.planet.nature) fillSoil('soil', me.planet.nature, s.reserve, f.soil);
+  $('planet-title').textContent = openKey === 'home' ? pl.name : `${pl.name} · colonie`;
+  $('soil-zone').hidden = !planet.nature;
+  if (planet.nature) fillSoil('soil', planet.nature, s.reserve, f.soil);
 
   for (const r of R.resources) {
     const cap = f.caps[r];
@@ -719,7 +770,7 @@ function renderPlanet(me, now) {
 
   if (R.pop) {
     const cap = f.popCap;
-    const later = stateAt(me.planet, now + 60_000).pop; // dans une minute
+    const later = stateAt(planet, now + 60_000).pop; // dans une minute
     const delta = later - s.pop;
     q('[data-popgauge]').style.width = `${Math.min(100, (s.pop / Math.max(cap, 1)) * 100)}%`;
     const rate = q('[data-poprate]');
@@ -776,10 +827,10 @@ function renderPlanet(me, now) {
   } else $('queue').hidden = true;
 
   if (me.race === 'alien') {
-    const trance = Math.max(0, (me.planet.trance || 0) - now);
+    const trance = Math.max(0, (planet.trance || 0) - now);
     for (const k of POWER_KEYS) {
-      const cost = powerCost(me.planet, k, s.pop);
-      const wait = Math.max(0, powerReadyAt(me.planet, k) - now);
+      const cost = powerCost(planet, k, s.pop);
+      const wait = Math.max(0, powerReadyAt(planet, k) - now);
       const ok = covers(s.stock, cost);
       q(`[data-pcost="${k}"]`).textContent = `${costText(cost)} · recharge ${POWERS[k].cooldown / 60000} min`;
       q(`[data-pready="${k}"]`).textContent = k === 'trance' && trance ? `En transe ${clock(trance)}` : wait ? clock(wait) : 'Prêt';
@@ -789,7 +840,168 @@ function renderPlanet(me, now) {
       btn.textContent = wait ? 'En recharge' : 'Déclencher';
     }
   }
+
+  renderResearch(me, pl, s, now);
+  renderYard(me, pl, s, now);
+  renderFleets(me, pl, s, now);
 }
+
+/** Barre de progression d'une file (chantier, recherche, chantier naval). */
+function progress(prefix, job, label, now) {
+  $(`${prefix}-queue`).hidden = !job;
+  if (!job) return;
+  const left = Math.max(0, job.end - now);
+  $(`${prefix}-label`).textContent = label;
+  $(`${prefix}-left`).textContent = clock(left);
+  $(`${prefix}-bar`).style.width = `${Math.min(100, (1 - left / Math.max(1, job.end - job.start)) * 100)}%`;
+}
+
+/** Arbre des technologies : sur la planète mère seulement, avec un labo. */
+function renderResearch(me, pl, s, now) {
+  const home = pl.key === 'home';
+  $('research-zone').hidden = !home;
+  if (!home) return;
+  const lab = s.levels.lab || 0;
+  const T = TECHS[me.race];
+  const labName = RACES[me.race].buildings.lab.name;
+  $('research-hint').textContent = lab ? '' : `Construis un ${labName} (bâtiments ci-dessus) pour commencer la recherche.`;
+  $('research-hint').hidden = !!lab;
+  progress('research', s.research, s.research ? `${T[s.research.key].name} → niv. ${s.research.level}` : '', now);
+  const q = (sel) => document.querySelector(sel);
+  for (const [k, t] of Object.entries(T)) {
+    const level = s.tech[k] || 0;
+    const maxed = level >= t.max;
+    const miss = techMissing(me.race, k, s.tech, lab);
+    const cost = techCost(me.race, k, level);
+    const ok = !maxed && !miss && covers(s.stock, cost);
+    q(`[data-tlevel="${k}"]`).textContent = `Niv. ${level} / ${t.max}`;
+    const req = q(`[data-treq="${k}"]`);
+    req.hidden = !miss || maxed;
+    req.textContent = miss ? `Il faut : ${miss}` : '';
+    q(`[data-tcost="${k}"]`).textContent = maxed ? 'Niveau maximum' : `${costText(cost)} · ${clock(researchDuration(cost, Math.max(1, lab)))}`;
+    q(`[data-tcard="${k}"]`).classList.toggle('locked', !!miss && !maxed);
+    q(`[data-tcard="${k}"]`).classList.toggle('affordable', ok && !s.research);
+    q(`[data-tcard="${k}"]`).classList.toggle('building-now', s.research?.key === k);
+    const btn = q(`[data-research="${k}"]`);
+    btn.disabled = !ok || !!s.research || session.status !== 'playing';
+    btn.textContent = s.research?.key === k ? 'En cours' : maxed ? 'Terminé' : `Niveau ${level + 1}`;
+  }
+}
+
+const statText = (st) =>
+  `⚔ ${fmt(st.attack)} · ◇ ${fmt(st.hull)} · soute ${fmt(st.cargo)} · ${st.speed.toFixed(1).replace('.', ',')} cases/min`;
+
+/** Chantier naval de la planète ouverte. */
+function renderYard(me, pl, s, now) {
+  const yard = s.levels.yard || 0;
+  const S = SHIPS[me.race];
+  const yardName = RACES[me.race].buildings.yard.name;
+  $('yard-hint').textContent = yard ? '' : `Construis un ${yardName} (bâtiments ci-dessus) pour construire des vaisseaux.`;
+  $('yard-hint').hidden = !!yard;
+  progress('yard', s.yard, s.yard ? `${s.yard.count} × ${S[s.yard.type].name}` : '', now);
+  const q = (sel) => document.querySelector(sel);
+  for (const k of SHIP_KEYS) {
+    const unlocked = shipUnlocked(me.race, k, s.tech);
+    const u = shipUnlock(me.race, k);
+    q(`[data-sdocked="${k}"]`).textContent = s.ships[k] ? `${s.ships[k]} à quai` : '';
+    q(`[data-sstats="${k}"]`).textContent = statText(shipStats(me.race, k, s.tech));
+    const req = q(`[data-sreq="${k}"]`);
+    req.hidden = unlocked;
+    req.textContent = unlocked ? '' : `Il faut : ${TECHS[me.race][u.key].name} ${u.level}`;
+    q(`[data-scost="${k}"]`).textContent = `${costText(S[k].cost)} · ${clock(shipDuration(me.race, k, 1, Math.max(1, yard)))} pièce`;
+    q(`[data-scard="${k}"]`).classList.toggle('locked', !unlocked);
+    for (const btn of document.querySelectorAll(`[data-ship="${k}"]`)) {
+      const n = Number(btn.dataset.n);
+      const cost = Object.fromEntries(Object.entries(S[k].cost).map(([r, v]) => [r, v * n]));
+      btn.disabled = !yard || !unlocked || !!s.yard || !covers(s.stock, cost) || session.status !== 'playing';
+    }
+  }
+}
+
+/** Vaisseaux à quai et flottes en route. */
+function renderFleets(me, pl, s, now) {
+  const docked = SHIP_KEYS.filter((k) => s.ships[k]).map((k) => `${s.ships[k]} × ${SHIPS[me.race][k].name}`);
+  $('docked').textContent = docked.length ? `À quai : ${docked.join(', ')}.` : 'Aucun vaisseau à quai sur cette planète.';
+  $('btn-send-fleet').hidden = !docked.length;
+  const name = (cell) => mapPlanets().find((w) => sameCell(w, cell))?.name || `[${cell.x}:${cell.y}]`;
+  const html = (me.fleets || [])
+    .map((f) => {
+      const what = f.mission === 'return' ? 'Retour' : MISSIONS[f.mission]?.name || f.mission;
+      return `<div class="player card"><div class="p-main"><div class="p-name">${esc(what)} → ${esc(name(f.to))}</div>
+        <div class="p-sub mono">${countShips(f.ships)} vaisseaux${f.cargo && f.cargo.minerals + f.cargo.food ? ` · ${costText(f.cargo)}` : ''}</div></div>
+        <div class="p-score mono">${clock(Math.max(0, f.arrive - now))}</div></div>`;
+    })
+    .join('');
+  if ($('fleets').dataset.html !== html) {
+    $('fleets').innerHTML = html;
+    $('fleets').dataset.html = html;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Envoi d'une flotte
+// ---------------------------------------------------------------------------
+
+function fleetChoice() {
+  const ships = {};
+  for (const el of document.querySelectorAll('[data-fship]')) ships[el.dataset.fship] = Math.max(0, Math.floor(Number(el.value) || 0));
+  const cargo = {};
+  for (const el of document.querySelectorAll('[data-fcargo]')) cargo[el.dataset.fcargo] = Math.max(0, Math.floor(Number(el.value) || 0));
+  return { ships, cargo };
+}
+
+function openFleetSheet() {
+  const me = session.state.players[session.me];
+  const pl = session.planetOf(me, openKey);
+  if (!pl) return;
+  const s = stateAt(pl.planet, session.now());
+  const dests = session.destinations(openKey);
+  const group = (m, label) => {
+    const opts = dests.filter((d) => d.mission === m);
+    if (!opts.length) return '';
+    return `<optgroup label="${label}">${opts
+      .map((d) => `<option value="${esc(d.id)}">${esc(d.name)}${d.owner && d.owner.id !== session.me ? ` (${esc(d.owner.name)})` : ''} · ${distance(pl.cell, d.cell)} cases</option>`)
+      .join('')}</optgroup>`;
+  };
+  $('fleet-dest').innerHTML = group('transport', 'Transport vers mes planètes') + group('colonize', 'Coloniser une planète libre') + group('attack', 'Attaquer');
+  $('fleet-ships').innerHTML = SHIP_KEYS.filter((k) => s.ships[k])
+    .map((k) => `<label>${esc(SHIPS[me.race][k].name)} (${s.ships[k]})<input type="number" inputmode="numeric" min="0" max="${s.ships[k]}" value="${s.ships[k]}" data-fship="${k}"></label>`)
+    .join('');
+  $('fleet-cargo').innerHTML = SOIL.map(
+    (r) => `<label>${RES_INFO[r].name} (${fmt(s.stock[r])})<input type="number" inputmode="numeric" min="0" value="0" data-fcargo="${r}"></label>`,
+  ).join('');
+  $('sheet-fleet').hidden = false;
+  updateFleetSheet();
+}
+
+function updateFleetSheet() {
+  const me = session.state.players[session.me];
+  const pl = session.planetOf(me, openKey);
+  const dest = session.destinations(openKey).find((d) => d.id === $('fleet-dest').value);
+  const { ships } = fleetChoice();
+  const room = fleetCargo(me.race, ships);
+  $('fleet-room').textContent = `Soutes : ${fmt(room)}`;
+  const mission = dest?.mission;
+  $('fleet-mission').textContent = !dest
+    ? 'Aucune destination possible.'
+    : mission === 'transport'
+      ? 'Les vaisseaux et la cargaison restent sur la planète d’arrivée.'
+      : mission === 'colonize'
+        ? `Il faut un vaisseau colonisateur (${SHIPS[me.race].colony.name}) : il fonde la colonie, et le premier arrivé l’emporte. La cargaison devient le stock de départ.`
+        : 'Combat contre les vaisseaux à quai. En cas de victoire, les soutes pillent jusqu’à la moitié des minéraux et de la nourriture, puis les survivants rentrent.';
+  const speed = fleetSpeed(me.race, ships, pl?.planet.tech);
+  $('fleet-eta').textContent = dest && speed ? `Trajet : ${clock(tripMs(pl.cell, dest.cell, speed))}` : '';
+  $('btn-fleet-go').disabled = !dest || !countShips(ships);
+}
+
+$('btn-send-fleet').onclick = openFleetSheet;
+$('btn-fleet-close').onclick = () => ($('sheet-fleet').hidden = true);
+$('sheet-fleet').addEventListener('input', updateFleetSheet);
+$('fleet-dest').addEventListener('change', updateFleetSheet);
+$('btn-fleet-go').onclick = () => {
+  const { ships, cargo } = fleetChoice();
+  if (session.sendFleet(openKey, $('fleet-dest').value, ships, cargo)) $('sheet-fleet').hidden = true;
+};
 
 /** « 2:05 » */
 function clock(ms) {
@@ -802,12 +1014,14 @@ function clock(ms) {
 // ---------------------------------------------------------------------------
 
 let currentView = 'map';
+let openKey = 'home'; // planète ouverte : « home » ou l'identifiant d'une colonie
 let mapFrame = null;
 let selected = null; // planète touchée sur la carte : { x, y }
 
-/** Carte (vue principale) ou bâtiments de ma planète. */
-function showView(view) {
+/** Carte (vue principale) ou bâtiments d'une de mes planètes. */
+function showView(view, key = openKey) {
   currentView = view;
+  openKey = key;
   $('view-universe').hidden = view !== 'map';
   $('view-planet').hidden = view !== 'planet';
   window.scrollTo(0, 0);
@@ -823,7 +1037,7 @@ function stopMap() {
 }
 
 $('btn-back-map').onclick = () => showView('map');
-$('btn-open-planet').onclick = () => showView('planet');
+$('btn-open-planet').onclick = (e) => showView('planet', e.currentTarget.dataset.key || 'home');
 
 /**
  * Toutes les planètes à afficher : celles de l'univers, avec leur
@@ -831,10 +1045,15 @@ $('btn-open-planet').onclick = () => showView('planet');
  * planète (placées hors de la liste).
  */
 function mapPlanets() {
-  const out = session.planets.map((w) => ({ ...w, owner: session.ownerAt(w) }));
+  const out = session.planets.map((w) => {
+    const owner = session.ownerAt(w);
+    // `pl` : la planète du propriétaire à cet endroit (mère ou colonie), avec sa clé.
+    const pl = owner && session.planetsOf(owner).find((x) => sameCell(x.cell, w));
+    return { ...w, owner: pl ? owner : null, pl: pl || null };
+  });
   for (const p of Object.values(session.state.players)) {
-    if (p.home && !out.some((w) => sameCell(w, p.home))) {
-      out.push({ id: `home-${p.id}`, name: `Planète ${de(p.name)}`, x: p.home.x, y: p.home.y, owner: p, nature: null });
+    if (p.home && p.planet && !out.some((w) => sameCell(w, p.home))) {
+      out.push({ id: `home-${p.id}`, name: `Planète ${de(p.name)}`, x: p.home.x, y: p.home.y, owner: p, nature: null, pl: session.planetOf(p, 'home') });
     }
   }
   return out;
@@ -930,6 +1149,39 @@ function drawMap() {
   }
   ctx.globalAlpha = 1;
 
+  // Flottes en route : un petit triangle qui glisse de la planète de départ à celle d'arrivée.
+  const now = session.now();
+  for (const p of Object.values(session.state.players)) {
+    for (const f of p.fleets || []) {
+      if (f.arrive <= now && p.id === session.me) continue;
+      const pos = fleetPos(f, Math.min(now, f.arrive));
+      const cx = (pos.x + 0.5) * cell;
+      const cy = (pos.y + 0.5) * cell;
+      const ang = Math.atan2(f.to.y - f.from.y, f.to.x - f.from.x);
+      ctx.strokeStyle = p.color;
+      ctx.globalAlpha = 0.25;
+      ctx.lineWidth = Math.max(1, dpr * 0.6);
+      ctx.setLineDash([cell * 0.15, cell * 0.15]);
+      ctx.beginPath();
+      ctx.moveTo((f.from.x + 0.5) * cell, (f.from.y + 0.5) * cell);
+      ctx.lineTo((f.to.x + 0.5) * cell, (f.to.y + 0.5) * cell);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(ang);
+      ctx.fillStyle = f.mission === 'attack' ? '#ff7a93' : p.color;
+      ctx.beginPath();
+      ctx.moveTo(cell * 0.28, 0);
+      ctx.lineTo(-cell * 0.18, cell * 0.16);
+      ctx.lineTo(-cell * 0.18, -cell * 0.16);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
   $('my-coords').textContent = me?.home ? `[${me.home.x}:${me.home.y}]` : 'à choisir';
 
   mapFrame = requestAnimationFrame(drawMap);
@@ -952,10 +1204,10 @@ $('map').addEventListener('click', (e) => {
     return renderPick();
   }
   const { w } = best;
-  if (w.owner?.id === session.me && session.state.players[session.me]?.planet) {
+  if (w.owner?.id === session.me && w.pl) {
     selected = null;
     renderPick();
-    return showView('planet');
+    return showView('planet', w.pl.key);
   }
   selected = { x: w.x, y: w.y };
   renderPick();
@@ -977,8 +1229,13 @@ function renderPick(me = session?.state?.players[session.me], now = session?.now
     ? `${o.id === session.me ? 'Ta planète' : `Planète ${de(o.name)}`}${o.race ? ` · ${RACES[o.race].icon} ${RACES[o.race].name}` : ''}`
     : 'Planète libre. Ses gisements se vident quand on les exploite, et se reconstituent d’eux-mêmes jusqu’à leur maximum.';
   // Gisements : pleins pour une planète libre, calculés chez son propriétaire sinon.
-  const s = o?.planet?.nature ? stateAt(o.planet, now) : null;
-  const nature = o ? o.planet?.nature : w.nature;
+  const planet = w.pl?.planet;
+  const s = planet ? stateAt(planet, now) : null;
+  const nature = o ? planet?.nature : w.nature;
+  if (o && s) {
+    const n = countShips(s.ships);
+    $('pi-owner').textContent += `${w.pl.key === 'home' ? '' : ' · colonie'} · ${n ? `${n} vaisseau${n > 1 ? 'x' : ''} à quai` : 'aucun vaisseau à quai'}`;
+  }
   const box = $('pi-soil');
   if (!nature) box.innerHTML = '';
   else {
@@ -987,7 +1244,8 @@ function renderPick(me = session?.state?.players[session.me], now = session?.now
   }
   $('btn-claim').hidden = !picking || !!o;
   $('btn-claim').textContent = `S'installer sur ${w.name} (définitif)`;
-  $('btn-open-planet').hidden = o?.id !== session.me || !me?.planet;
+  $('btn-open-planet').hidden = o?.id !== session.me || !w.pl;
+  $('btn-open-planet').dataset.key = w.pl?.key || 'home';
 }
 
 $('btn-claim').onclick = () => {

@@ -20,7 +20,22 @@
 import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates } from './save.js';
-import { newPlanet, settle, startBuild, usePower, RACES, POWERS, planetsFor, sameCell } from './game.js';
+import { newPlanet, settle, stateAt, startBuild, startResearch, startShips, usePower, RACES, RES_INFO, POWERS, planetsFor, sameCell } from './game.js';
+import { TECHS, SHIPS } from './tech.js';
+import { launch, battle, plunder, tripMs, fleetSpeed, countShips, MISSIONS, MAX_FLEETS } from './fleet.js';
+
+/** « de Beta », « d'Alpha ». */
+const de = (name) => (/^[aeiouyhàâéèêëîïôöûü]/i.test(name) ? `d’${name}` : `de ${name}`);
+
+const shipsText = (n) => `${n} vaisseau${n > 1 ? 'x' : ''}`;
+
+/** « 173 minéraux et 37 nourriture » (vide si rien). */
+function lootText(take) {
+  const parts = Object.entries(take)
+    .filter(([, v]) => v > 0)
+    .map(([r, v]) => `${v} ${RES_INFO[r].name.toLowerCase()}`);
+  return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} et ${parts[parts.length - 1]}` : parts[0] || '';
+}
 
 const COLORS = ['#7aa2ff', '#ff9f6b', '#7cf0b4', '#f7d06b', '#d38bff', '#6fd3ff', '#ff7a93', '#b7e36b'];
 const MAX_PLAYERS = 8;
@@ -65,6 +80,11 @@ function normalize(p) {
     p.race = null;
     p.planet = null;
   }
+  // Colonies, flottes en route, dégâts infligés aux autres (et reçus, déjà appliqués).
+  if (!p.colonies || typeof p.colonies !== 'object') p.colonies = {};
+  if (!Array.isArray(p.fleets)) p.fleets = [];
+  if (!Array.isArray(p.effects)) p.effects = [];
+  if (!Array.isArray(p.applied)) p.applied = [];
   return p;
 }
 
@@ -398,7 +418,10 @@ export class Session {
     if (ours && (rec.actAt || 0) <= (ours.actAt || 0)) return; // déjà vue
     if (!ours && Object.keys(this.state.players).length >= MAX_PLAYERS * 2) return;
     this.state.players[rec.id] = normalize({ ...JSON.parse(JSON.stringify(rec)), online: this.online(rec.id) });
-    if (log && typeof log.text === 'string' && Number.isFinite(log.at)) this.pushLog(log);
+    // Une ou plusieurs entrées de journal accompagnent la fiche.
+    for (const l of [].concat(log || []).slice(0, 10)) {
+      if (l && typeof l.text === 'string' && Number.isFinite(l.at)) this.pushLog(l);
+    }
     this.spread(rec, log, link);
     this.scheduleSave();
     this.onchange?.('state');
@@ -570,16 +593,45 @@ export class Session {
   }
 
   /**
-   * Propriétaire d'une case : le premier à s'y être installé. Deux joueurs
-   * peuvent choisir la même planète au même moment (ou coupés l'un de
-   * l'autre) ; c'est le plus ancien choix qui compte, partout pareil.
+   * Toutes les planètes d'un joueur : sa planète mère (clé « home ») et ses
+   * colonies (clé = identifiant de la planète de l'univers).
+   * [{ key, planet, cell, name }]
+   */
+  planetsOf(p) {
+    if (!p) return [];
+    const out = [];
+    if (p.planet && p.home) {
+      const w = this.planets.find((x) => sameCell(x, p.home));
+      out.push({ key: 'home', planet: p.planet, cell: p.home, name: w?.name || 'Planète mère' });
+    }
+    for (const [id, planet] of Object.entries(p.colonies || {})) {
+      const w = this.planets.find((x) => x.id === id);
+      if (w) out.push({ key: id, planet, cell: { x: w.x, y: w.y }, name: w.name });
+    }
+    return out;
+  }
+
+  planetOf(p, key) {
+    return this.planetsOf(p).find((x) => x.key === key) || null;
+  }
+
+  /**
+   * Propriétaire d'une case : le premier à s'y être installé (planète mère
+   * ou colonie). Deux joueurs peuvent s'installer au même endroit au même
+   * moment (ou coupés l'un de l'autre) ; c'est le plus ancien qui compte,
+   * partout pareil.
    */
   ownerAt(cell) {
     let best = null;
-    for (const p of Object.values(this.state?.players || {})) {
-      if (!sameCell(p.home, cell)) continue;
-      const k = [p.claimAt || p.rank || 0, p.id];
+    const consider = (p, t) => {
+      const k = [t, p.id];
       if (!best || k[0] < best.k[0] || (k[0] === best.k[0] && k[1] < best.k[1])) best = { p, k };
+    };
+    const w = this.planets.find((x) => sameCell(x, cell));
+    for (const p of Object.values(this.state?.players || {})) {
+      if (sameCell(p.home, cell)) consider(p, p.claimAt || p.rank || 0);
+      const col = w && p.colonies?.[w.id];
+      if (col) consider(p, col.claimAt || 0);
     }
     return best?.p || null;
   }
@@ -615,13 +667,22 @@ export class Session {
   }
 
   /**
-   * Quelqu'un s'est installé sur ma planète avant moi (choix simultanés) : je
-   * la lui laisse et je repars au choix. Je suis le seul à écrire ma fiche,
-   * c'est donc à mon téléphone de le faire.
+   * Quelqu'un s'est installé sur une de mes planètes avant moi (choix
+   * simultanés) : je la lui laisse. Je suis le seul à écrire ma fiche, c'est
+   * donc à mon téléphone de le faire.
    */
   checkClaim() {
     const p = this.state?.players[this.me];
-    if (!p?.home) return;
+    if (!p) return;
+    for (const id of Object.keys(p.colonies || {})) {
+      const w = this.planets.find((x) => x.id === id);
+      const owner = w && this.ownerAt(w);
+      if (!owner || owner.id === this.me) continue;
+      delete p.colonies[id];
+      this.touch(this.addLog(`${owner.name} a fondé sa colonie sur ${w.name} juste avant ${p.name}.`));
+      this.changed();
+    }
+    if (!p.home) return;
     const owner = this.ownerAt(p.home);
     if (!owner || owner.id === this.me) return;
     const w = this.myWorld;
@@ -633,44 +694,280 @@ export class Session {
     this.changed();
   }
 
-  build(key) {
+  /** Une de mes planètes, pour un ordre ; sinon un message. */
+  myPlanet(key) {
+    const p = this.state.players[this.me];
+    const found = this.planetOf(p, key);
+    if (!found) this.ontoast?.('Planète introuvable.');
+    return found;
+  }
+
+  build(key, where = 'home') {
     if (this.status !== 'playing') return;
     const p = this.state.players[this.me];
     if (!p?.planet) return this.ontoast?.('Choisis d’abord ta race.');
-    const err = startBuild(p.planet, key, this.now());
+    const pl = this.myPlanet(where);
+    if (!pl) return;
+    const err = startBuild(pl.planet, key, this.now());
     if (err) return this.ontoast?.(err);
     const b = RACES[p.race].buildings[key];
-    this.touch(this.addLog(`${p.name} lance ${b.name} niv. ${p.planet.queue.level}.`));
+    this.touch(this.addLog(`${p.name} lance ${b.name} niv. ${pl.planet.queue.level} sur ${pl.name}.`));
     this.changed();
   }
 
-  /** Pouvoir psychique (aliens). */
-  power(key) {
+  /** Recherche : sur la planète mère, là où est le labo. */
+  research(key) {
     if (this.status !== 'playing') return;
     const p = this.state.players[this.me];
     if (!p?.planet) return;
-    const res = usePower(p.planet, key, this.now());
+    const err = startResearch(p.planet, key, this.now());
+    if (err) return this.ontoast?.(err);
+    this.touch(this.addLog(`${p.name} lance la recherche ${TECHS[p.race][key].name} niv. ${p.planet.research.level}.`));
+    this.changed();
+  }
+
+  /** Lot de vaisseaux au chantier naval d'une de mes planètes. */
+  buildShips(type, count, where = 'home') {
+    if (this.status !== 'playing') return;
+    const p = this.state.players[this.me];
+    const pl = this.myPlanet(where);
+    if (!pl) return;
+    const err = startShips(pl.planet, type, count, this.now());
+    if (err) return this.ontoast?.(err);
+    this.touch(this.addLog(`${p.name} met en chantier ${count} × ${SHIPS[p.race][type].name} sur ${pl.name}.`));
+    this.changed();
+  }
+
+  /**
+   * Destinations possibles d'une flotte partie de `fromKey`, par mission :
+   * [{ id, mission, name, cell, owner, key }]. `id` est ce qu'on passe à sendFleet.
+   */
+  destinations(fromKey) {
+    const me = this.state.players[this.me];
+    const from = this.planetOf(me, fromKey);
+    if (!from) return [];
+    const out = [];
+    for (const pl of this.planetsOf(me)) {
+      if (pl.key !== fromKey) out.push({ id: `own:${pl.key}`, mission: 'transport', name: pl.name, cell: pl.cell, owner: me, key: pl.key });
+    }
+    for (const w of this.planets) {
+      const owner = this.ownerAt(w);
+      if (!owner) out.push({ id: `world:${w.id}`, mission: 'colonize', name: w.name, cell: { x: w.x, y: w.y } });
+    }
+    for (const p of Object.values(this.state.players)) {
+      if (p.id === this.me) continue;
+      for (const pl of this.planetsOf(p)) {
+        if (this.ownerAt(pl.cell)?.id !== p.id) continue;
+        out.push({ id: `enemy:${p.id}:${pl.key}`, mission: 'attack', name: pl.name, cell: pl.cell, owner: p, key: pl.key });
+      }
+    }
+    return out;
+  }
+
+  /** Envoie une flotte. `dest` vient de destinations(). */
+  sendFleet(fromKey, destId, ships, cargo) {
+    if (this.status !== 'playing') return false;
+    const p = this.state.players[this.me];
+    const from = this.planetOf(p, fromKey);
+    const dest = this.destinations(fromKey).find((d) => d.id === destId);
+    if (!from || !dest) {
+      this.ontoast?.('Destination introuvable.');
+      return false;
+    }
+    p.fleets ||= [];
+    if (p.fleets.length >= MAX_FLEETS) {
+      this.ontoast?.(`Pas plus de ${MAX_FLEETS} flottes en route.`);
+      return false;
+    }
+    const target = dest.mission === 'transport' ? { key: dest.key } : dest.mission === 'colonize' ? { world: destId.slice(6) } : { pid: dest.owner.id, key: dest.key };
+    const res = launch(
+      from.planet,
+      { ships, cargo, mission: dest.mission, from: from.cell, to: dest.cell, target, origin: fromKey, id: rid(6) },
+      this.now(),
+    );
+    if (res.error) {
+      this.ontoast?.(res.error);
+      return false;
+    }
+    p.fleets.push(res.fleet);
+    const who = dest.owner && dest.owner.id !== this.me ? ` (${dest.owner.name})` : '';
+    this.touch(this.addLog(`${p.name} ${MISSIONS[dest.mission].verb} ${dest.name}${who} : ${shipsText(countShips(res.fleet.ships))}.`));
+    this.changed();
+    return true;
+  }
+
+  /** Pouvoir psychique (aliens), sur une de mes planètes. */
+  power(key, where = 'home') {
+    if (this.status !== 'playing') return;
+    const p = this.state.players[this.me];
+    const pl = p?.planet && this.myPlanet(where);
+    if (!pl) return;
+    const res = usePower(pl.planet, key, this.now());
     if (res.error) return this.ontoast?.(res.error);
     this.touch(this.addLog(`${p.name} ${res.text}.`));
     this.ontoast?.(`${POWERS[key].name} !`);
     this.changed();
   }
 
-  /** Je termine moi-même mes chantiers (l'affichage des autres se calcule seul). */
+  /**
+   * Je fais avancer moi-même ce qui m'appartient (l'affichage des autres se
+   * calcule seul) : chantiers, recherches et vaisseaux terminés, arrivées de
+   * mes flottes, et dégâts que d'autres m'ont infligés.
+   */
   tick() {
     if (this.status !== 'playing' || !this.state) return;
     this.checkClaim();
     const p = this.state.players[this.me];
-    if (!p?.planet?.queue || p.planet.queue.end > this.now()) return;
-    const done = settle(p.planet, this.now());
-    if (!done) return;
-    this.touch(this.addLog(`${p.name} termine ${RACES[p.race].buildings[done.key].name} niv. ${done.level}.`));
+    if (!p?.planet) return;
+    const now = this.now();
+    let changed = false;
+    this.tickLogs = []; // entrées du journal de ce passage, envoyées avec ma fiche
+    for (const pl of this.planetsOf(p)) {
+      const due = ['queue', 'research', 'yard'].some((k) => pl.planet[k] && pl.planet[k].end <= now);
+      if (!due) continue;
+      for (const d of settle(pl.planet, now)) {
+        changed = true;
+        const R = RACES[p.race];
+        if (d.kind === 'queue') this.addLog(`${p.name} termine ${R.buildings[d.key].name} niv. ${d.level} sur ${pl.name}.`);
+        else if (d.kind === 'research') {
+          this.addLog(`${p.name} découvre ${TECHS[p.race][d.key].name} niv. ${d.level}.`);
+          this.ontoast?.(`Recherche terminée : ${TECHS[p.race][d.key].name} niv. ${d.level}.`);
+        } else this.addLog(`${p.name} reçoit ${d.count} × ${SHIPS[p.race][d.type].name} sur ${pl.name}.`);
+      }
+    }
+    // Les technologies valent pour toutes mes planètes : chaque colonie en garde une copie.
+    for (const pl of this.planetsOf(p)) {
+      if (pl.key === 'home' || JSON.stringify(pl.planet.tech || {}) === JSON.stringify(p.planet.tech || {})) continue;
+      settle(pl.planet, now);
+      pl.planet.tech = { ...(p.planet.tech || {}) };
+      changed = true;
+    }
+    for (const f of [...(p.fleets || [])]) if (f.arrive <= now && this.arrive(p, f)) changed = true;
+    if (this.applyEffects(p, now)) changed = true;
+    const logs = this.tickLogs;
+    this.tickLogs = null;
+    if (!changed) return;
+    this.touch(logs.length ? logs : null);
     this.changed();
+  }
+
+  /** Arrivée d'une de mes flottes. */
+  arrive(p, f) {
+    const R = RACES[p.race];
+    const drop = () => (p.fleets = p.fleets.filter((x) => x.id !== f.id));
+    const dock = (pl, ships, cargo, at) => {
+      settle(pl.planet, at);
+      pl.planet.ships ||= {};
+      for (const [k, n] of Object.entries(ships)) pl.planet.ships[k] = (pl.planet.ships[k] || 0) + n;
+      for (const [r, v] of Object.entries(cargo || {})) pl.planet.stock[r] = (pl.planet.stock[r] || 0) + v;
+    };
+    const home = () => this.planetOf(p, f.origin) || this.planetOf(p, 'home');
+    const goBack = (ships, cargo) => {
+      const back = home();
+      if (!back || !Object.keys(ships).length) return drop();
+      Object.assign(f, {
+        mission: 'return',
+        ships,
+        cargo,
+        from: f.to,
+        to: back.cell,
+        depart: f.arrive,
+        arrive: f.arrive + tripMs(f.to, back.cell, fleetSpeed(p.race, ships, p.planet.tech)),
+        target: { key: back.key },
+      });
+    };
+    const now = this.now();
+
+    if (f.mission === 'transport' || f.mission === 'return') {
+      const pl = this.planetOf(p, f.target?.key) || home();
+      if (pl) dock(pl, f.ships, f.cargo, now);
+      drop();
+      const loot = lootText(f.cargo || {});
+      if (pl) this.addLog(`La flotte ${de(p.name)} ${f.mission === 'return' ? 'rentre' : 'arrive'} sur ${pl.name}${loot ? ` avec ${loot}` : ''}.`);
+      return true;
+    }
+
+    if (f.mission === 'colonize') {
+      const w = this.planets.find((x) => x.id === f.target?.world);
+      if (!w || this.ownerAt(w)) {
+        this.addLog(`${w?.name || 'La planète'} est déjà prise : la flotte ${de(p.name)} fait demi-tour.`);
+        goBack(f.ships, f.cargo);
+        return true;
+      }
+      const colony = newPlanet(p.race, f.arrive, w);
+      colony.stock = { minerals: 0, food: 0, energy: 0, ...f.cargo };
+      colony.tech = { ...(p.planet.tech || {}) };
+      colony.claimAt = f.arrive;
+      const ships = { ...f.ships, colony: f.ships.colony - 1 };
+      if (!ships.colony) delete ships.colony;
+      colony.ships = ships;
+      p.colonies = { ...(p.colonies || {}), [w.id]: colony };
+      drop();
+      this.addLog(`${p.name} fonde une colonie sur ${w.name}.`);
+      this.ontoast?.(`Colonie fondée sur ${w.name} !`);
+      return true;
+    }
+
+    if (f.mission === 'attack') {
+      const enemy = this.state.players[f.target?.pid];
+      const pl = enemy && this.planetOf(enemy, f.target.key);
+      if (!pl) {
+        goBack(f.ships, f.cargo);
+        return true;
+      }
+      // Je calcule le combat avec ce que je sais du défenseur à l'heure de l'arrivée ;
+      // son téléphone appliquera ses pertes en lisant mon rapport.
+      const def = stateAt(pl.planet, f.arrive);
+      const res = battle({ race: p.race, ships: f.ships, tech: p.planet.tech }, { race: enemy.race, ships: def.ships, tech: def.tech });
+      const take = res.won ? plunder(p.race, res.attLeft, def.stock) : {};
+      p.effects = [...(p.effects || []), { id: f.id, to: enemy.id, key: pl.key, at: f.arrive, ships: res.defLost, take }].slice(-20);
+      const loot = lootText(take);
+      this.addLog(
+        res.won
+          ? `${p.name} remporte le combat sur ${pl.name} (${enemy.name})${loot ? ` et pille ${loot}` : ''}.`
+          : `${p.name} perd le combat sur ${pl.name} (${enemy.name}).`,
+      );
+      this.ontoast?.(res.won ? `Victoire sur ${pl.name} !` : `Défaite sur ${pl.name}.`);
+      goBack(res.attLeft, { ...Object.fromEntries(Object.entries(f.cargo || {}).map(([r, v]) => [r, v + (take[r] || 0)])) });
+      return true;
+    }
+    drop();
+    return true;
+  }
+
+  /**
+   * Dégâts qu'un autre joueur m'a infligés : il les a inscrits dans sa
+   * fiche (je suis le seul à écrire la mienne), je les applique une fois.
+   */
+  applyEffects(p, now) {
+    p.applied ||= [];
+    let any = false;
+    for (const other of Object.values(this.state.players)) {
+      if (other.id === this.me) continue;
+      for (const e of other.effects || []) {
+        if (e.to !== this.me || p.applied.includes(e.id)) continue;
+        p.applied = [...p.applied, e.id].slice(-60);
+        any = true;
+        const pl = this.planetOf(p, e.key);
+        if (!pl) continue;
+        settle(pl.planet, now);
+        pl.planet.ships ||= {};
+        for (const [k, n] of Object.entries(e.ships || {})) pl.planet.ships[k] = Math.max(0, (pl.planet.ships[k] || 0) - n);
+        for (const [r, v] of Object.entries(e.take || {})) pl.planet.stock[r] = Math.max(0, (pl.planet.stock[r] || 0) - v);
+        const lost = countShips(e.ships);
+        const loot = lootText(e.take || {});
+        const ships = lost ? `${lost} vaisseau${lost > 1 ? 'x' : ''} perdu${lost > 1 ? 's' : ''}` : 'aucun vaisseau perdu';
+        this.addLog(`${pl.name} (${p.name}) est attaquée par ${other.name} : ${ships}${loot ? `, ${loot} pillés` : ''}.`);
+        this.ontoast?.(`${other.name} attaque ${pl.name} !`);
+      }
+    }
+    return any;
   }
 
   addLog(text) {
     const entry = { at: this.now(), text };
     this.pushLog(entry);
+    this.tickLogs?.push(entry);
     return entry;
   }
 
