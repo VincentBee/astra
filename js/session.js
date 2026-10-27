@@ -21,8 +21,8 @@ import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates } from './save.js';
 import { newPlanet, settle, stateAt, startBuild, startResearch, startShips, usePower, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE } from './game.js';
-import { TECHS, SHIPS } from './tech.js';
-import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, setShips, together, transfer, split, merge, ORDERS, MAX_FLEETS } from './fleet.js';
+import { TECHS, SHIPS, shipStats } from './tech.js';
+import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, setShips, together, transfer, split, merge, intercept, inContact, salvage, applyLosses, ORDERS, MAX_FLEETS } from './fleet.js';
 
 /** « de Beta », « d'Alpha ». */
 const de = (name) => (/^[aeiouyhàâéèêëîïôöûü]/i.test(name) ? `d’${name}` : `de ${name}`);
@@ -33,8 +33,9 @@ const de = (name) => (/^[aeiouyhàâéèêëîïôöûü]/i.test(name) ? `d’${
  * 2 : flottes pilotées librement sur la carte.
  * 3 : carburant des flottes.
  * 4 : flottes fusionnées (`absorbed`).
+ * 5 : combats entre flottes (effets visant une flotte, `docked`).
  */
-export const FORMAT = 4;
+export const FORMAT = 5;
 
 const shipsText = (n) => `${n} vaisseau${n > 1 ? 'x' : ''}`;
 
@@ -95,6 +96,8 @@ function normalize(p) {
   p.fleets.forEach(upgradeFleet);
   if (!Array.isArray(p.effects)) p.effects = [];
   if (!Array.isArray(p.applied)) p.applied = [];
+  // Flottes posées : id -> planète, pour que les dégâts qui les visaient encore les trouvent.
+  if (!p.docked || typeof p.docked !== 'object') p.docked = {};
   return p;
 }
 
@@ -872,6 +875,94 @@ export class Session {
     return true;
   }
 
+  /** La flotte `id` d'un joueur, ou celle qui l'a absorbée en fusionnant. */
+  fleetOf(p, id) {
+    const all = p?.fleets || [];
+    return all.find((f) => f.id === id) || all.find((f) => f.absorbed?.includes(id)) || null;
+  }
+
+  /** Lance une de mes flottes à la poursuite d'une flotte d'un autre joueur, pour la combattre. */
+  chaseFleet(id, pid, targetId) {
+    if (this.status !== 'playing') return false;
+    const p = this.state.players[this.me];
+    const f = this.myFleet(id);
+    const enemy = this.state.players[pid];
+    const target = pid !== this.me && this.fleetOf(enemy, targetId);
+    if (!f || !target) return this.refuse('Flotte introuvable.');
+    const armed = Object.entries(f.ships).some(([k, n]) => n && shipStats(p.race, k, p.planet.tech).attack > 0);
+    if (!armed) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas attaquer.');
+    // Ma copie de sa flotte ne change qu'une fois mon rapport lu par son téléphone : d'ici là, ce
+    // que je vois est l'état d'avant le combat, et rejouer le combat compterait les pertes deux fois.
+    const pendingHit = (p.effects || []).some((e) => e.to === pid && [target.id, ...(target.absorbed || [])].includes(e.fleet) && !enemy.applied?.includes(e.id));
+    if (pendingHit) return this.refuse(`Combat déjà livré : en attente du rapport de ${enemy.name}.`);
+    f.order = { kind: 'chase', pid, fleet: target.id, seen: null };
+    this.tickLogs = []; // un combat immédiat écrit au journal : ses entrées partent avec ma fiche
+    this.pursue(p, f, this.now());
+    if (f.order) this.addLog(`La flotte ${de(p.name)} prend en chasse une flotte ${de(enemy.name)}.`);
+    const logs = this.tickLogs;
+    this.tickLogs = null;
+    this.touch(logs.length ? logs : null);
+    this.changed();
+    return true;
+  }
+
+  /**
+   * Poursuite, à chaque passage : combat au contact ; sinon, nouveau cap
+   * vers le point d'interception quand la cible a changé de trajet (ou
+   * quand j'y suis arrivé sans la trouver). Renvoie true si ma fiche a changé.
+   */
+  pursue(p, f, now) {
+    const enemy = this.state.players[f.order.pid];
+    const target = this.fleetOf(enemy, f.order.fleet);
+    if (!target) {
+      f.order = null;
+      this.addLog(`La flotte ${de(p.name)} perd sa cible de vue.`);
+      return true;
+    }
+    if (target.id !== f.order.fleet) f.order = { ...f.order, fleet: target.id }; // la cible a fusionné
+    if (inContact(f, target, now)) return this.fight(p, f, enemy, target, now);
+    // Appli en arrière-plan au moment de la rencontre : je regarde aussi l'instant de mon arrivée.
+    if (!moving(f, now) && f.arrive > f.depart && inContact(f, target, f.arrive)) return this.fight(p, f, enemy, target, f.arrive);
+    const seen = `${target.depart}:${target.arrive}:${target.to.x}:${target.to.y}`;
+    if (seen === f.order.seen && moving(f, now)) return false;
+    const aim = intercept(f, p.race, p.planet.tech, target, now);
+    if (seen === f.order.seen && !moving(f, now) && Math.abs(aim.x - f.to.x) + Math.abs(aim.y - f.to.y) < 1e-6) return false; // j'attends au point d'interception
+    const err = moveTo(f, p.race, p.planet.tech, aim, { ...f.order, seen }, now);
+    if (err || f.stranded) {
+      f.order = null;
+      this.ontoast?.(err || 'Pas assez de carburant pour rattraper la cible : la poursuite s’arrête au point de panne.');
+    }
+    return true;
+  }
+
+  /**
+   * Combat entre ma flotte et celle d'un autre joueur, au contact. Je
+   * calcule avec ce que je sais de la sienne ; son téléphone appliquera ses
+   * pertes en lisant mon rapport (un identifiant neuf par combat).
+   */
+  fight(p, f, enemy, target, now) {
+    const res = battle({ race: p.race, ships: f.ships, tech: p.planet.tech }, { race: enemy.race, ships: target.ships, tech: enemy.planet?.tech || {} });
+    const take = res.won ? salvage(p.race, res.attLeft, target.cargo, f.cargo) : {};
+    p.effects = [...(p.effects || []), { id: rid(8), to: enemy.id, fleet: target.id, at: now, ships: res.defLost, take }].slice(-60);
+    const loot = lootText(take);
+    this.addLog(
+      res.won
+        ? `${p.name} détruit une flotte ${de(enemy.name)}${loot ? ` et récupère ${loot}` : ''}.`
+        : countShips(res.attLeft)
+          ? `Combat indécis entre ${p.name} et ${enemy.name}.`
+          : `${p.name} perd une flotte contre ${enemy.name}.`,
+    );
+    this.ontoast?.(res.won ? 'Flotte ennemie détruite !' : countShips(res.attLeft) ? 'Combat indécis.' : 'Flotte perdue.');
+    f.order = null;
+    if (!applyLosses(f, p.race, p.planet.tech, res.attLost, null, now)) {
+      p.fleets = p.fleets.filter((x) => x.id !== f.id);
+      return true;
+    }
+    if (moving(f, now)) stopAt(f, p.race, p.planet.tech, now);
+    f.cargo = Object.fromEntries(SOIL.map((r) => [r, (f.cargo?.[r] || 0) + (take[r] || 0)]));
+    return true;
+  }
+
   /** Plein d'une de mes flottes, arrêtée sur une de mes planètes, avec l'énergie de celle-ci. */
   refuelFleet(id) {
     if (this.status !== 'playing') return false;
@@ -1009,7 +1100,11 @@ export class Session {
       pl.planet.tech = { ...(p.planet.tech || {}) };
       changed = true;
     }
-    for (const f of [...(p.fleets || [])]) if (f.order && !moving(f, now) && this.arrive(p, f)) changed = true;
+    for (const f of [...(p.fleets || [])]) {
+      if (f.order?.kind === 'chase') {
+        if (this.pursue(p, f, now)) changed = true;
+      } else if (f.order && !moving(f, now) && this.arrive(p, f)) changed = true;
+    }
     if (this.applyEffects(p, now)) changed = true;
     const logs = this.tickLogs;
     this.tickLogs = null;
@@ -1036,6 +1131,9 @@ export class Session {
       for (const [k, n] of Object.entries(f.ships)) pl.planet.ships[k] = (pl.planet.ships[k] || 0) + n;
       for (const [r, v] of Object.entries(f.cargo || {})) pl.planet.stock[r] = (pl.planet.stock[r] || 0) + v;
       pl.planet.stock.energy = (pl.planet.stock.energy || 0) + Math.floor(fuelAt(f, p.race, now)); // le carburant restant retourne au stock
+      const docked = { ...(p.docked || {}) };
+      for (const id of [f.id, ...(f.absorbed || [])]) docked[id] = pl.key;
+      p.docked = Object.fromEntries(Object.entries(docked).slice(-60));
       drop();
       const loot = lootText(f.cargo || {});
       this.addLog(`La flotte ${de(p.name)} se pose sur ${pl.name}${loot ? ` avec ${loot}` : ''}.`);
@@ -1101,7 +1199,8 @@ export class Session {
         if (e.to !== this.me || p.applied.includes(e.id)) continue;
         p.applied = [...p.applied, e.id].slice(-200);
         any = true;
-        const pl = this.planetOf(p, e.key);
+        if (e.fleet && this.fleetHit(p, other, e, now)) continue;
+        const pl = this.planetOf(p, e.fleet ? p.docked?.[e.fleet] : e.key); // flotte posée entre-temps : sa planète encaisse
         if (!pl) continue;
         settle(pl.planet, now);
         pl.planet.ships ||= {};
@@ -1115,6 +1214,26 @@ export class Session {
       }
     }
     return any;
+  }
+
+  /**
+   * Dégâts visant une de mes flottes : celle-ci, ou celle qui l'a absorbée.
+   * Renvoie false si elle n'est plus là (posée entre-temps : les pertes
+   * vont alors à la planète où elle s'est posée).
+   */
+  fleetHit(p, other, e, now) {
+    const f = this.fleetOf(p, e.fleet);
+    if (!f) return false;
+    const lost = countShips(e.ships);
+    if (!applyLosses(f, p.race, p.planet.tech, e.ships, e.take, now)) {
+      p.fleets = p.fleets.filter((x) => x.id !== f.id);
+      this.addLog(`Une flotte ${de(p.name)} est détruite par ${other.name}.`);
+      this.ontoast?.(`${other.name} a détruit une de tes flottes !`);
+      return true;
+    }
+    this.addLog(`Une flotte ${de(p.name)} est attaquée par ${other.name} : ${lost ? `${shipsText(lost)} perdu${lost > 1 ? 's' : ''}` : 'aucun vaisseau perdu'}.`);
+    this.ontoast?.(`${other.name} attaque une de tes flottes !`);
+    return true;
   }
 
   addLog(text) {

@@ -30,7 +30,11 @@ export const ORDERS = {
   dock: { name: 'Se poser', verb: 'va se poser sur' },
   colonize: { name: 'Colonisation', verb: 'part coloniser' },
   attack: { name: 'Attaque', verb: 'attaque' },
+  chase: { name: 'Poursuite', verb: 'prend en chasse' },
 };
+
+/** Distance (en cases) sous laquelle deux flottes se rencontrent. */
+export const CONTACT = 0.5;
 
 export const countShips = (ships) => Object.values(ships || {}).reduce((a, b) => a + (b || 0), 0);
 
@@ -274,6 +278,82 @@ export function merge(a, b, race, now) {
 export function stopAt(f, race, tech, now) {
   const pos = fleetPos(f, now);
   return moveTo(f, race, tech, { x: Math.round(pos.x), y: Math.round(pos.y) }, null, now);
+}
+
+// ----- Poursuite et combat entre flottes --------------------------------------
+//
+// Une flotte en poursuit une autre en visant le point d'interception : là
+// où sera la cible quand elle-même pourra y être, d'après le segment que
+// la cible suit (connu de tous). Viser sa position actuelle ne rattraperait
+// jamais une cible aussi rapide. Le contact se fait à moins de CONTACT
+// cases ; c'est le téléphone du poursuivant qui calcule le combat.
+
+/**
+ * Point d'interception de `target` par la flotte `f` partant de sa position
+ * à `now` : le premier instant où `f` peut être là où sera la cible. Si la
+ * cible va trop vite, son point d'arrivée (elle s'y arrête).
+ */
+export function intercept(f, race, tech, target, now) {
+  const speed = fleetSpeed(race, f.ships, tech);
+  const from = fleetPos(f, now);
+  const end = Math.max(now, target.arrive);
+  const steps = 240;
+  for (let i = 0; i <= steps; i++) {
+    const t = now + ((end - now) * i) / steps;
+    const p = fleetPos(target, t);
+    if (now + tripMs(from, p, speed) <= t + 1) return p;
+  }
+  return fleetPos(target, end);
+}
+
+/** Deux flottes au contact à `now`. */
+export const inContact = (a, b, now) => distance(fleetPos(a, now), fleetPos(b, now)) <= CONTACT;
+
+/**
+ * Butin sur une flotte vaincue : toute sa cargaison, dans la place qui
+ * reste dans les soutes des survivants.
+ */
+export function salvage(race, ships, cargo, carried = {}) {
+  let room = Math.max(0, fleetCargo(race, ships) - SOIL.reduce((t, r) => t + (carried[r] || 0), 0));
+  const take = {};
+  for (const r of SOIL) {
+    take[r] = Math.max(0, Math.floor(Math.min(room, cargo?.[r] || 0)));
+    room -= take[r];
+  }
+  return take;
+}
+
+/**
+ * Pertes subies par une flotte (combat), en route ou à l'arrêt :
+ * `lost` vaisseaux, `take` cargaison. Une flotte en route reprend son trajet
+ * depuis là où elle est, avec ce qui lui reste. Renvoie false si elle est
+ * détruite.
+ */
+export function applyLosses(f, race, tech, lost, take, now) {
+  const ships = {};
+  for (const k of SHIP_KEYS) {
+    const n = (f.ships[k] || 0) - (lost?.[k] || 0);
+    if (n > 0) ships[k] = n;
+  }
+  if (!countShips(ships)) return false;
+  const pos = fleetPos(f, now);
+  const fuel = Math.min(fuelAt(f, race, now), fleetTank(race, ships));
+  const to = f.to;
+  const order = f.order;
+  const go = moving(f, now);
+  // Segment immobile ici, avec les vaisseaux restants…
+  Object.assign(f, { ships, from: pos, to: { ...pos }, depart: now, arrive: now, fuel });
+  // … et la cargaison qui tient encore dans les soutes.
+  let room = fleetCargo(race, ships);
+  const cargo = {};
+  for (const r of SOIL) {
+    cargo[r] = Math.max(0, Math.min(room, (f.cargo?.[r] || 0) - (take?.[r] || 0)));
+    room -= cargo[r];
+  }
+  f.cargo = cargo;
+  if (go) moveTo(f, race, tech, to, order, now); // … puis la suite du trajet
+  else Object.assign(f, { to: { ...to }, from: { ...to } });
+  return true;
 }
 
 /**

@@ -969,6 +969,10 @@ function fleetStatus(race, f, now) {
   const where = cellName(f.to);
   if (moving(f, now) && f.stranded) return `Tombera en panne vers ${where}`;
   if (!moving(f, now) && fuelAt(f, race, now) < DRY) return `À sec vers ${where}`;
+  if (f.order?.kind === 'chase') {
+    const foe = session.state.players[f.order.pid];
+    return `Poursuite d’une flotte ${foe ? de(foe.name) : 'ennemie'}`;
+  }
   if (moving(f, now)) return `${f.order ? ORDERS[f.order.kind]?.name || 'Ordre' : 'Déplacement'} → ${where}`;
   return mapPlanets().some((w) => sameCell(w, f.to)) ? `En orbite de ${where}` : `Stationne en ${where}`;
 }
@@ -1060,6 +1064,7 @@ let mapFrame = null;
 let selected = null; // planète touchée sur la carte : { x, y }
 let selFleet = null; // id d'une de mes flottes, sélectionnée pour la piloter
 let pending = null; // case visée par la flotte sélectionnée, en attente d'un choix : { x, y }
+let prey = null; // flotte ennemie visée par la flotte sélectionnée, en attente d'un choix : { pid, id }
 
 /** Carte (vue principale) ou bâtiments d'une de mes planètes. */
 function showView(view, key = openKey) {
@@ -1210,6 +1215,13 @@ function drawMap() {
       ctx.setLineDash([]);
     }
     ctx.globalAlpha = 1;
+    if (prey && p.id === prey.pid && f.id === prey.id) {
+      ctx.strokeStyle = '#ff7a93';
+      ctx.lineWidth = Math.max(1.5, cell * 0.06);
+      ctx.beginPath();
+      ctx.arc(cx, cy, cell * 0.3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     if (p.id === session.me && f.id === selFleet) {
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = Math.max(1.5, cell * 0.06);
@@ -1244,7 +1256,7 @@ function drawMap() {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(spot.ang);
-    ctx.fillStyle = f.order?.kind === 'attack' || f.mission === 'attack' ? '#ff7a93' : p.color;
+    ctx.fillStyle = ['attack', 'chase'].includes(f.order?.kind) || f.mission === 'attack' ? '#ff7a93' : p.color;
     const k = spot.moving ? 1 : 0.8;
     ctx.beginPath();
     ctx.moveTo(cell * 0.28 * k, 0);
@@ -1324,12 +1336,24 @@ $('map').addEventListener('click', (e) => {
     const i = hits.findIndex((s) => s.f.id === selFleet);
     selFleet = hits[(i + 1) % hits.length].f.id;
     pending = null;
+    prey = null;
     selected = null;
     renderPick();
     renderFleetInfo();
     return;
   }
   if (selFleet && session.myFleet(selFleet)) {
+    // Une flotte ennemie sous le doigt (plus près qu'une planète) : proposer la poursuite.
+    const foe = fleetSpots(now)
+      .filter((s) => s.p.id !== session.me && dist(s) < 0.7)
+      .sort((a, b) => dist(a) - dist(b))[0];
+    if (foe && (!best || dist(foe) < best.d)) {
+      prey = { pid: foe.p.id, id: foe.f.id };
+      pending = null;
+      renderFleetInfo();
+      return;
+    }
+    prey = null;
     const cell = { x: Math.round(fx), y: Math.round(fy) };
     if (cell.x < 0 || cell.y < 0 || cell.x >= UNIVERSE.w || cell.y >= UNIVERSE.h) return;
     const opts = session.ordersAt(selFleet, cell);
@@ -1363,6 +1387,7 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
   if (!f) {
     selFleet = null;
     pending = null;
+    prey = null;
   }
   $('fleet-info').hidden = !f;
   if (!f) return;
@@ -1380,17 +1405,20 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
   $('fi-fuel-bar').style.width = `${Math.min(100, (fuel / Math.max(1, tank)) * 100)}%`;
   $('fi-fuel').parentElement.classList.toggle('low', fuel < tank * 0.25);
   const mine = here && here.owner.id === session.me;
-  $('btn-fi-stop').hidden = !go;
+  $('btn-fi-stop').hidden = !go && f.order?.kind !== 'chase';
   $('btn-fi-dock').hidden = !mine;
   $('btn-fi-refuel').hidden = !mine || fuel >= tank - 0.5;
   $('btn-fi-split').hidden = go || countShips(f.ships) < 2;
   renderBeside(me, f, now);
   const choice = pending ? session.ordersAt(selFleet, pending) : [];
   const warn = choice[0]?.short ? ' · panne en route' : '';
-  const html = choice
-    .map((o) => `<button class="${o.kind === 'move' ? 'secondary' : 'primary'} small" data-forder="${o.kind}">${esc(o.label + warn)}</button>`)
-    .join('');
-  $('fi-choice').hidden = !choice.length;
+  const foe = prey && session.state.players[prey.pid];
+  const html = foe
+    ? `<button class="primary small" data-fchase>Poursuivre et attaquer la flotte ${esc(de(foe.name))}</button>`
+    : choice
+        .map((o) => `<button class="${o.kind === 'move' ? 'secondary' : 'primary'} small" data-forder="${o.kind}">${esc(o.label + warn)}</button>`)
+        .join('');
+  $('fi-choice').hidden = !html;
   if ($('fi-choice').dataset.html !== html) {
     $('fi-choice').innerHTML = html;
     $('fi-choice').dataset.html = html;
@@ -1398,6 +1426,11 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
 }
 
 $('fi-choice').addEventListener('click', (e) => {
+  if (e.target.closest('[data-fchase]') && prey) {
+    session.chaseFleet(selFleet, prey.pid, prey.id);
+    prey = null;
+    return renderFleetInfo();
+  }
   const kind = e.target.closest('[data-forder]')?.dataset.forder;
   if (!kind || !pending) return;
   session.moveFleet(selFleet, pending, kind);
@@ -1415,6 +1448,7 @@ $('btn-fi-dock').onclick = () => {
 $('btn-fi-close').onclick = () => {
   selFleet = null;
   pending = null;
+  prey = null;
   renderFleetInfo();
 };
 
