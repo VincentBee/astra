@@ -119,7 +119,21 @@
         <button id="btn-open-planet" class="secondary" hidden>Voir mes bâtiments</button>
       </article>
 
-      <p class="hint">Touche une planète pour voir ses gisements, la tienne pour ouvrir ses bâtiments. Planètes en pointillés : libres.</p>
+      <article id="fleet-info" class="card planet-info" hidden>
+        <div class="b-head"><h4 id="fi-name">Flotte</h4><span id="fi-where" class="level mono"></span></div>
+        <p id="fi-ships" class="b-desc"></p>
+        <p id="fi-status" class="hint mono"></p>
+        <div id="fi-choice" class="fi-actions" hidden></div>
+        <div class="fi-actions">
+          <button id="btn-fi-stop" class="secondary small">Stop</button>
+          <button id="btn-fi-return" class="secondary small">Rentrer</button>
+          <button id="btn-fi-dock" class="secondary small">Se poser</button>
+          <button id="btn-fi-close" class="ghost small">Fermer</button>
+        </div>
+        <p class="hint">Touche une case de la carte pour y envoyer la flotte. Touche-la encore pour passer à la suivante sur la même case.</p>
+      </article>
+
+      <p class="hint">Touche une planète pour voir ses gisements, la tienne pour ouvrir ses bâtiments, une de tes flottes (triangle) pour la piloter. Planètes en pointillés : libres.</p>
 
       <section>
         <h3 class="section-title">Commandants</h3>
@@ -178,7 +192,7 @@
       <section id="fleet-zone">
         <h3 class="section-title">Flottes</h3>
         <p id="docked" class="hint"></p>
-        <button id="btn-send-fleet" class="secondary">Envoyer une flotte</button>
+        <button id="btn-send-fleet" class="secondary">Faire décoller une flotte</button>
         <div id="fleets" class="players"></div>
       </section>
     </main>
@@ -221,17 +235,14 @@
     </div>
   </div>
 
-  <!-- Envoi d'une flotte -->
+  <!-- Décollage d'une flotte -->
   <div id="sheet-fleet" class="sheet" hidden>
     <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="fleet-title">
       <div class="sheet-head">
-        <h2 id="fleet-title">Envoyer une flotte</h2>
+        <h2 id="fleet-title">Faire décoller une flotte</h2>
         <button id="btn-fleet-close" class="ghost">Fermer</button>
       </div>
-      <label class="field">Destination
-        <select id="fleet-dest"></select>
-      </label>
-      <p id="fleet-mission" class="hint"></p>
+      <p class="hint">La flotte attend en orbite. Touche-la ensuite sur la carte, puis touche une case pour l’y envoyer : s’y poser, coloniser, attaquer ou juste stationner.</p>
       <div>
         <h3 class="section-title">Vaisseaux</h3>
         <div id="fleet-ships" class="fleet-grid"></div>
@@ -241,8 +252,7 @@
         <div id="fleet-cargo" class="fleet-grid"></div>
         <p id="fleet-room" class="hint"></p>
       </div>
-      <p id="fleet-eta" class="hint mono"></p>
-      <button id="btn-fleet-go" class="primary">Partir</button>
+      <button id="btn-fleet-go" class="primary">Décoller</button>
     </div>
   </div>
 

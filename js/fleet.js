@@ -1,27 +1,29 @@
-// Flottes : vaisseaux en route d'une planète à une autre. Fonctions pures.
+// Flottes : des unités qu'on pilote sur la carte. Fonctions pures.
 //
-// Une flotte part d'une planète du joueur avec des vaisseaux et, s'il le
-// veut, une cargaison. Trois missions :
-//   transport : vers une de ses planètes, où vaisseaux et cargaison restent ;
-//   colonie   : vers une planète libre, où un vaisseau colonisateur fonde
-//               une colonie (le premier arrivé l'emporte) ;
-//   attaque   : vers la planète d'un autre joueur. Combat contre les
-//               vaisseaux à quai ; si l'attaquant gagne, il pille ce que ses
-//               soutes peuvent emporter, puis les survivants rentrent.
+// Une flotte décolle d'une planète du joueur avec des vaisseaux et, s'il le
+// veut, une cargaison. Elle reste ensuite sur la carte jusqu'à ce qu'elle se
+// pose sur une de ses planètes ou soit détruite. On peut l'envoyer sur
+// n'importe quelle case, l'arrêter, changer de cap, la faire rentrer.
 //
-// Le trajet est daté (départ, arrivée) : tous les téléphones voient la flotte
-// avancer sur la carte, et c'est le téléphone du propriétaire qui applique
-// l'arrivée.
+// Sa position tient dans un segment daté (from, to, depart, arrive) : tous
+// les téléphones la voient avancer de la même façon. À l'arrêt, from et to
+// sont la même case. Chaque nouvel ordre ouvre un segment depuis là où elle
+// est. Un ordre peut attendre l'arrivée :
+//   dock     : se poser sur une de ses planètes (vaisseaux et cargaison y restent) ;
+//   colonize : fonder une colonie sur une planète libre (le premier arrivé l'emporte) ;
+//   attack   : combattre les vaisseaux à quai d'une planète adverse et piller
+//              ce que les soutes peuvent emporter. Les survivants restent en orbite.
+// C'est le téléphone du propriétaire qui applique l'arrivée.
 
 import { distance, covers, settle, SOIL } from './game.js';
 import { SHIPS, SHIP_KEYS, shipStats } from './tech.js';
 
-export const MAX_FLEETS = 12;
-/** Un trajet dure au moins ce temps (ms), même vers la case voisine. */
-const MIN_TRIP = 20_000;
+export const MAX_FLEETS = 16;
+/** Un trajet dure au moins ce temps (ms), dès qu'il faut bouger. */
+const MIN_TRIP = 5_000;
 
-export const MISSIONS = {
-  transport: { name: 'Transport', verb: 'transporte vers' },
+export const ORDERS = {
+  dock: { name: 'Se poser', verb: 'va se poser sur' },
   colonize: { name: 'Colonisation', verb: 'part coloniser' },
   attack: { name: 'Attaque', verb: 'attaque' },
 };
@@ -44,16 +46,18 @@ export function fleetCargo(race, ships) {
 
 /** Durée du trajet en ms, à la vitesse de la flotte. */
 export function tripMs(from, to, speed) {
+  const d = distance(from, to);
+  if (!d) return 0;
   if (!speed) return Infinity;
-  return Math.max(MIN_TRIP, Math.round((distance(from, to) / speed) * 60_000));
+  return Math.max(MIN_TRIP, Math.round((d / speed) * 60_000));
 }
 
 /**
- * Prépare le départ d'une flotte depuis une planète du joueur : retire les
- * vaisseaux et la cargaison de la planète. Renvoie { error } ou { fleet }.
+ * Décollage depuis une planète du joueur : retire les vaisseaux et la
+ * cargaison de la planète. La flotte attend en orbite, sur la case de la
+ * planète. Renvoie { error } ou { fleet }.
  */
-export function launch(planet, { ships, cargo = {}, mission, from, to, target, origin, id }, now) {
-  if (!MISSIONS[mission]) return { error: 'Mission inconnue.' };
+export function launch(planet, { ships, cargo = {}, at, origin, id }, now) {
   settle(planet, now);
   const race = planet.race;
   const clean = {};
@@ -64,15 +68,14 @@ export function launch(planet, { ships, cargo = {}, mission, from, to, target, o
     if (n) clean[k] = n;
   }
   if (!countShips(clean)) return { error: 'Choisis au moins un vaisseau.' };
-  if (mission === 'colonize' && !clean.colony) return { error: `Il faut un vaisseau colonisateur (${SHIPS[race].colony.name}) pour coloniser.` };
   const load = {};
   for (const r of SOIL) load[r] = Math.max(0, Math.floor(cargo[r] || 0));
   if (load.minerals + load.food > fleetCargo(race, clean)) return { error: 'Les soutes sont trop petites pour cette cargaison.' };
   if (!covers(planet.stock, load)) return { error: 'Pas assez de ressources pour cette cargaison.' };
-  const speed = fleetSpeed(race, clean, planet.tech);
   for (const [k, n] of Object.entries(clean)) planet.ships[k] -= n;
   for (const [r, v] of Object.entries(load)) planet.stock[r] -= v;
-  const fleet = { id, mission, ships: clean, cargo: load, origin, from, to, target, depart: now, arrive: now + tripMs(from, to, speed) };
+  const cell = { x: at.x, y: at.y };
+  const fleet = { id, ships: clean, cargo: load, origin, from: cell, to: { ...cell }, depart: now, arrive: now, order: null };
   return { fleet };
 }
 
@@ -80,6 +83,29 @@ export function launch(planet, { ships, cargo = {}, mission, from, to, target, o
 export function fleetPos(f, now) {
   const k = Math.min(1, Math.max(0, (now - f.depart) / Math.max(1, f.arrive - f.depart)));
   return { x: f.from.x + (f.to.x - f.from.x) * k, y: f.from.y + (f.to.y - f.from.y) * k };
+}
+
+/** La flotte est-elle encore en route à `now` ? */
+export const moving = (f, now) => f.arrive > now;
+
+/**
+ * Nouvel ordre de déplacement : la flotte part de là où elle est à `now`
+ * vers la case `cell`, et `order` s'appliquera à l'arrivée (null : simple
+ * déplacement). Modifie la flotte ; renvoie un message d'erreur ou null.
+ */
+export function moveTo(f, race, tech, cell, order, now) {
+  const speed = fleetSpeed(race, f.ships, tech);
+  if (!speed) return 'Cette flotte ne peut pas bouger.';
+  const pos = fleetPos(f, now);
+  const to = { x: cell.x, y: cell.y };
+  Object.assign(f, { from: pos, to, depart: now, arrive: now + tripMs(pos, to, speed), order: order || null });
+  return null;
+}
+
+/** Arrêt : la flotte finit sa course sur la case la plus proche, et y attend. */
+export function stopAt(f, race, tech, now) {
+  const pos = fleetPos(f, now);
+  return moveTo(f, race, tech, { x: Math.round(pos.x), y: Math.round(pos.y) }, null, now);
 }
 
 /**
@@ -133,10 +159,11 @@ export function battle(a, d) {
 
 /**
  * Butin d'une attaque gagnée : jusqu'à la moitié des minéraux et de la
- * nourriture du défenseur, dans la limite des soutes des survivants.
+ * nourriture du défenseur, dans la place qui reste dans les soutes des
+ * survivants (`carried` : ce qu'elles contiennent déjà).
  */
-export function plunder(race, ships, stock) {
-  let room = fleetCargo(race, ships);
+export function plunder(race, ships, stock, carried = {}) {
+  let room = Math.max(0, fleetCargo(race, ships) - SOIL.reduce((t, r) => t + (carried[r] || 0), 0));
   const take = {};
   for (const r of SOIL) {
     const v = Math.floor(Math.min(room, (stock[r] || 0) / 2));

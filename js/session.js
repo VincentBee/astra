@@ -20,12 +20,19 @@
 import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates } from './save.js';
-import { newPlanet, settle, stateAt, startBuild, startResearch, startShips, usePower, RACES, RES_INFO, POWERS, planetsFor, sameCell } from './game.js';
+import { newPlanet, settle, stateAt, startBuild, startResearch, startShips, usePower, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE } from './game.js';
 import { TECHS, SHIPS } from './tech.js';
-import { launch, battle, plunder, tripMs, fleetSpeed, countShips, MISSIONS, MAX_FLEETS } from './fleet.js';
+import { launch, battle, plunder, moveTo, stopAt, moving, countShips, ORDERS, MAX_FLEETS } from './fleet.js';
 
 /** « de Beta », « d'Alpha ». */
 const de = (name) => (/^[aeiouyhàâéèêëîïôöûü]/i.test(name) ? `d’${name}` : `de ${name}`);
+
+/**
+ * Version du format des fiches. Chaque téléphone écrit la sienne dans sa
+ * fiche : un joueur qui voit une fiche plus récente doit recharger l'appli.
+ * 2 : flottes pilotées librement sur la carte.
+ */
+export const FORMAT = 2;
 
 const shipsText = (n) => `${n} vaisseau${n > 1 ? 'x' : ''}`;
 
@@ -83,9 +90,25 @@ function normalize(p) {
   // Colonies, flottes en route, dégâts infligés aux autres (et reçus, déjà appliqués).
   if (!p.colonies || typeof p.colonies !== 'object') p.colonies = {};
   if (!Array.isArray(p.fleets)) p.fleets = [];
+  p.fleets.forEach(upgradeFleet);
   if (!Array.isArray(p.effects)) p.effects = [];
   if (!Array.isArray(p.applied)) p.applied = [];
   return p;
+}
+
+/**
+ * Flotte d'avant le pilotage libre (un trajet à mission, qui disparaissait à
+ * l'arrivée) : sa mission devient l'ordre qui l'attend à l'arrivée.
+ */
+function upgradeFleet(f) {
+  if (!f.mission) return;
+  const t = f.target || {};
+  f.order =
+    f.mission === 'colonize' ? { kind: 'colonize', world: t.world }
+    : f.mission === 'attack' ? { kind: 'attack', pid: t.pid, key: t.key }
+    : { kind: 'dock', key: t.key || f.origin };
+  delete f.mission;
+  delete f.target;
 }
 
 /** Copie sans les champs des anciennes versions (maître du jeu, époques, ressources d'avant les races). */
@@ -439,6 +462,7 @@ export class Session {
   touch(log) {
     const p = this.state.players[this.me];
     p.actAt = Math.max(this.now(), (p.actAt || 0) + 1);
+    p.v = FORMAT;
     this.spread(p, log);
   }
 
@@ -738,62 +762,121 @@ export class Session {
     this.changed();
   }
 
-  /**
-   * Destinations possibles d'une flotte partie de `fromKey`, par mission :
-   * [{ id, mission, name, cell, owner, key }]. `id` est ce qu'on passe à sendFleet.
-   */
-  destinations(fromKey) {
-    const me = this.state.players[this.me];
-    const from = this.planetOf(me, fromKey);
-    if (!from) return [];
+  /** Une de mes flottes, par son identifiant. */
+  myFleet(id) {
+    return (this.state.players[this.me]?.fleets || []).find((f) => f.id === id) || null;
+  }
+
+  /** Mes planètes et celles des autres sur une case : [{ owner, key, name }]. */
+  planetsAt(cell) {
     const out = [];
-    for (const pl of this.planetsOf(me)) {
-      if (pl.key !== fromKey) out.push({ id: `own:${pl.key}`, mission: 'transport', name: pl.name, cell: pl.cell, owner: me, key: pl.key });
-    }
-    for (const w of this.planets) {
-      const owner = this.ownerAt(w);
-      if (!owner) out.push({ id: `world:${w.id}`, mission: 'colonize', name: w.name, cell: { x: w.x, y: w.y } });
-    }
     for (const p of Object.values(this.state.players)) {
-      if (p.id === this.me) continue;
-      for (const pl of this.planetsOf(p)) {
-        if (this.ownerAt(pl.cell)?.id !== p.id) continue;
-        out.push({ id: `enemy:${p.id}:${pl.key}`, mission: 'attack', name: pl.name, cell: pl.cell, owner: p, key: pl.key });
-      }
+      for (const pl of this.planetsOf(p)) if (sameCell(pl.cell, cell) && this.ownerAt(pl.cell)?.id === p.id) out.push({ owner: p, key: pl.key, name: pl.name });
     }
     return out;
   }
 
-  /** Envoie une flotte. `dest` vient de destinations(). */
-  sendFleet(fromKey, destId, ships, cargo) {
+  /**
+   * Ce qu'une de mes flottes peut faire en arrivant sur `cell` :
+   * [{ kind, label }]. `kind` est ce qu'on passe à moveFleet ; « move » y
+   * va simplement et attend en orbite.
+   */
+  ordersAt(id, cell) {
+    const f = this.myFleet(id);
+    if (!f) return [];
+    const w = this.planets.find((x) => sameCell(x, cell));
+    const here = this.planetsAt(cell)[0];
+    const out = [];
+    if (here?.owner.id === this.me) out.push({ kind: 'dock', label: `Se poser sur ${here.name}` });
+    else if (here) out.push({ kind: 'attack', label: `Attaquer ${here.name} (${here.owner.name})` });
+    else if (w && f.ships.colony) out.push({ kind: 'colonize', label: `Coloniser ${w.name}` });
+    out.push({ kind: 'move', label: w || here ? 'Juste y aller (orbite)' : 'Y aller' });
+    return out;
+  }
+
+  /** Faire décoller des vaisseaux (et une cargaison) d'une de mes planètes. */
+  takeOff(fromKey, ships, cargo) {
     if (this.status !== 'playing') return false;
     const p = this.state.players[this.me];
     const from = this.planetOf(p, fromKey);
-    const dest = this.destinations(fromKey).find((d) => d.id === destId);
-    if (!from || !dest) {
-      this.ontoast?.('Destination introuvable.');
+    if (!from) {
+      this.ontoast?.('Planète introuvable.');
       return false;
     }
     p.fleets ||= [];
     if (p.fleets.length >= MAX_FLEETS) {
-      this.ontoast?.(`Pas plus de ${MAX_FLEETS} flottes en route.`);
+      this.ontoast?.(`Pas plus de ${MAX_FLEETS} flottes.`);
       return false;
     }
-    const target = dest.mission === 'transport' ? { key: dest.key } : dest.mission === 'colonize' ? { world: destId.slice(6) } : { pid: dest.owner.id, key: dest.key };
-    const res = launch(
-      from.planet,
-      { ships, cargo, mission: dest.mission, from: from.cell, to: dest.cell, target, origin: fromKey, id: rid(6) },
-      this.now(),
-    );
+    const res = launch(from.planet, { ships, cargo, at: from.cell, origin: fromKey, id: rid(6) }, this.now());
     if (res.error) {
       this.ontoast?.(res.error);
       return false;
     }
     p.fleets.push(res.fleet);
-    const who = dest.owner && dest.owner.id !== this.me ? ` (${dest.owner.name})` : '';
-    this.touch(this.addLog(`${p.name} ${MISSIONS[dest.mission].verb} ${dest.name}${who} : ${shipsText(countShips(res.fleet.ships))}.`));
+    this.touch(this.addLog(`Une flotte ${de(p.name)} décolle de ${from.name} : ${shipsText(countShips(res.fleet.ships))}.`));
+    this.changed();
+    return res.fleet.id;
+  }
+
+  /**
+   * Envoie une de mes flottes sur une case. `kind` vient de ordersAt :
+   * move, dock, colonize ou attack.
+   */
+  moveFleet(id, cell, kind = 'move') {
+    if (this.status !== 'playing') return false;
+    const p = this.state.players[this.me];
+    const f = this.myFleet(id);
+    if (!f) return false;
+    if (cell.x < 0 || cell.y < 0 || cell.x >= UNIVERSE.w || cell.y >= UNIVERSE.h) return false;
+    const here = this.planetsAt(cell)[0];
+    const w = this.planets.find((x) => sameCell(x, cell));
+    let order = null;
+    if (kind === 'dock') {
+      if (here?.owner.id !== this.me) return this.refuse('Ce n’est pas une de tes planètes.');
+      order = { kind, key: here.key };
+    } else if (kind === 'attack') {
+      if (!here || here.owner.id === this.me) return this.refuse('Aucune planète adverse ici.');
+      order = { kind, pid: here.owner.id, key: here.key };
+    } else if (kind === 'colonize') {
+      if (!w || here) return this.refuse('Cette planète n’est pas libre.');
+      if (!f.ships.colony) return this.refuse(`Il faut un vaisseau colonisateur (${SHIPS[p.race].colony.name}) pour coloniser.`);
+      order = { kind, world: w.id };
+    }
+    const err = moveTo(f, p.race, p.planet.tech, cell, order, this.now());
+    if (err) return this.refuse(err);
+    // Au journal, seulement les ordres qui comptent : les simples déplacements le noieraient.
+    const who = here && here.owner.id !== this.me ? ` (${here.owner.name})` : '';
+    this.touch(order ? this.addLog(`La flotte ${de(p.name)} ${ORDERS[order.kind].verb} ${here ? here.name : w.name}${who}.`) : null);
     this.changed();
     return true;
+  }
+
+  /** Arrête une de mes flottes sur la case la plus proche. */
+  stopFleet(id) {
+    if (this.status !== 'playing') return false;
+    const p = this.state.players[this.me];
+    const f = this.myFleet(id);
+    if (!f) return false;
+    const err = stopAt(f, p.race, p.planet.tech, this.now());
+    if (err) return this.refuse(err);
+    this.touch();
+    this.changed();
+    return true;
+  }
+
+  /** Renvoie une de mes flottes se poser sur sa planète de départ (ou la planète mère). */
+  returnFleet(id) {
+    const p = this.state.players[this.me];
+    const f = this.myFleet(id);
+    const back = f && (this.planetOf(p, f.origin) || this.planetOf(p, 'home'));
+    if (!back) return this.refuse('Aucune planète où rentrer.');
+    return this.moveFleet(id, back.cell, 'dock');
+  }
+
+  refuse(text) {
+    this.ontoast?.(text);
+    return false;
   }
 
   /** Pouvoir psychique (aliens), sur une de mes planètes. */
@@ -842,7 +925,7 @@ export class Session {
       pl.planet.tech = { ...(p.planet.tech || {}) };
       changed = true;
     }
-    for (const f of [...(p.fleets || [])]) if (f.arrive <= now && this.arrive(p, f)) changed = true;
+    for (const f of [...(p.fleets || [])]) if (f.order && !moving(f, now) && this.arrive(p, f)) changed = true;
     if (this.applyEffects(p, now)) changed = true;
     const logs = this.tickLogs;
     this.tickLogs = null;
@@ -851,47 +934,33 @@ export class Session {
     this.changed();
   }
 
-  /** Arrivée d'une de mes flottes. */
+  /** Arrivée d'une de mes flottes qui avait un ordre à exécuter. */
   arrive(p, f) {
-    const R = RACES[p.race];
+    const order = f.order;
+    f.order = null; // quoi qu'il arrive, la flotte attend ensuite en orbite
     const drop = () => (p.fleets = p.fleets.filter((x) => x.id !== f.id));
-    const dock = (pl, ships, cargo, at) => {
-      settle(pl.planet, at);
-      pl.planet.ships ||= {};
-      for (const [k, n] of Object.entries(ships)) pl.planet.ships[k] = (pl.planet.ships[k] || 0) + n;
-      for (const [r, v] of Object.entries(cargo || {})) pl.planet.stock[r] = (pl.planet.stock[r] || 0) + v;
-    };
-    const home = () => this.planetOf(p, f.origin) || this.planetOf(p, 'home');
-    const goBack = (ships, cargo) => {
-      const back = home();
-      if (!back || !Object.keys(ships).length) return drop();
-      Object.assign(f, {
-        mission: 'return',
-        ships,
-        cargo,
-        from: f.to,
-        to: back.cell,
-        depart: f.arrive,
-        arrive: f.arrive + tripMs(f.to, back.cell, fleetSpeed(p.race, ships, p.planet.tech)),
-        target: { key: back.key },
-      });
-    };
     const now = this.now();
 
-    if (f.mission === 'transport' || f.mission === 'return') {
-      const pl = this.planetOf(p, f.target?.key) || home();
-      if (pl) dock(pl, f.ships, f.cargo, now);
+    if (order.kind === 'dock') {
+      const pl = this.planetOf(p, order.key);
+      if (!pl || !sameCell(pl.cell, f.to) || this.ownerAt(pl.cell)?.id !== this.me) {
+        this.addLog(`La flotte ${de(p.name)} ne trouve pas où se poser : elle reste en orbite.`);
+        return true;
+      }
+      settle(pl.planet, now);
+      pl.planet.ships ||= {};
+      for (const [k, n] of Object.entries(f.ships)) pl.planet.ships[k] = (pl.planet.ships[k] || 0) + n;
+      for (const [r, v] of Object.entries(f.cargo || {})) pl.planet.stock[r] = (pl.planet.stock[r] || 0) + v;
       drop();
       const loot = lootText(f.cargo || {});
-      if (pl) this.addLog(`La flotte ${de(p.name)} ${f.mission === 'return' ? 'rentre' : 'arrive'} sur ${pl.name}${loot ? ` avec ${loot}` : ''}.`);
+      this.addLog(`La flotte ${de(p.name)} se pose sur ${pl.name}${loot ? ` avec ${loot}` : ''}.`);
       return true;
     }
 
-    if (f.mission === 'colonize') {
-      const w = this.planets.find((x) => x.id === f.target?.world);
-      if (!w || this.ownerAt(w)) {
-        this.addLog(`${w?.name || 'La planète'} est déjà prise : la flotte ${de(p.name)} fait demi-tour.`);
-        goBack(f.ships, f.cargo);
+    if (order.kind === 'colonize') {
+      const w = this.planets.find((x) => x.id === order.world);
+      if (!w || this.ownerAt(w) || !f.ships.colony) {
+        this.addLog(`${w?.name || 'La planète'} est déjà prise : la flotte ${de(p.name)} reste en orbite.`);
         return true;
       }
       const colony = newPlanet(p.race, f.arrive, w);
@@ -908,19 +977,17 @@ export class Session {
       return true;
     }
 
-    if (f.mission === 'attack') {
-      const enemy = this.state.players[f.target?.pid];
-      const pl = enemy && this.planetOf(enemy, f.target.key);
-      if (!pl) {
-        goBack(f.ships, f.cargo);
-        return true;
-      }
+    if (order.kind === 'attack') {
+      const enemy = this.state.players[order.pid];
+      const pl = enemy && this.planetOf(enemy, order.key);
+      if (!pl || !sameCell(pl.cell, f.to)) return true;
       // Je calcule le combat avec ce que je sais du défenseur à l'heure de l'arrivée ;
       // son téléphone appliquera ses pertes en lisant mon rapport.
       const def = stateAt(pl.planet, f.arrive);
       const res = battle({ race: p.race, ships: f.ships, tech: p.planet.tech }, { race: enemy.race, ships: def.ships, tech: def.tech });
-      const take = res.won ? plunder(p.race, res.attLeft, def.stock) : {};
-      p.effects = [...(p.effects || []), { id: f.id, to: enemy.id, key: pl.key, at: f.arrive, ships: res.defLost, take }].slice(-20);
+      const take = res.won ? plunder(p.race, res.attLeft, def.stock, f.cargo) : {};
+      // Un identifiant par combat : une même flotte peut attaquer plusieurs fois.
+      p.effects = [...(p.effects || []), { id: rid(8), to: enemy.id, key: pl.key, at: f.arrive, ships: res.defLost, take }].slice(-60);
       const loot = lootText(take);
       this.addLog(
         res.won
@@ -928,10 +995,11 @@ export class Session {
           : `${p.name} perd le combat sur ${pl.name} (${enemy.name}).`,
       );
       this.ontoast?.(res.won ? `Victoire sur ${pl.name} !` : `Défaite sur ${pl.name}.`);
-      goBack(res.attLeft, { ...Object.fromEntries(Object.entries(f.cargo || {}).map(([r, v]) => [r, v + (take[r] || 0)])) });
+      if (!countShips(res.attLeft)) return drop(), true;
+      f.ships = res.attLeft;
+      f.cargo = Object.fromEntries(SOIL.map((r) => [r, (f.cargo?.[r] || 0) + (take[r] || 0)]));
       return true;
     }
-    drop();
     return true;
   }
 
@@ -946,7 +1014,7 @@ export class Session {
       if (other.id === this.me) continue;
       for (const e of other.effects || []) {
         if (e.to !== this.me || p.applied.includes(e.id)) continue;
-        p.applied = [...p.applied, e.id].slice(-60);
+        p.applied = [...p.applied, e.id].slice(-200);
         any = true;
         const pl = this.planetOf(p, e.key);
         if (!pl) continue;
@@ -1001,6 +1069,11 @@ export class Session {
 
   save() {
     if (this.state && this.me && this.status === 'playing') saveGame(this.me, this.state);
+  }
+
+  /** Un autre joueur a une version plus récente de l'appli. */
+  get outdated() {
+    return Object.values(this.state?.players || {}).some((p) => (p.v || 0) > FORMAT);
   }
 
   /** Nombre de joueurs connectés à ce téléphone (hors lui-même). */

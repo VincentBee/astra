@@ -4,10 +4,10 @@ import { inviteLink, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
 import {
   RACES, RACE_KEYS, RES_INFO, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
-  powerReadyAt, powerCost, fmt, UNIVERSE, SOIL, sameCell, distance,
+  powerReadyAt, powerCost, fmt, UNIVERSE, SOIL, sameCell,
 } from './game.js';
 import { TECHS, SHIPS, SHIP_KEYS, techCost, techMissing, researchDuration, shipUnlock, shipUnlocked, shipStats, shipDuration } from './tech.js';
-import { MISSIONS, countShips, fleetSpeed, fleetCargo, tripMs, fleetPos } from './fleet.js';
+import { ORDERS, countShips, fleetCargo, fleetPos, moving } from './fleet.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -16,6 +16,7 @@ let session = null;
 // Accès depuis la console du navigateur, pour déboguer : astra.session
 window.astra = { get session() { return session; } };
 let liveTimer = null;
+let warnedOutdated = false;
 let wakeLock = null;
 
 // ---------------------------------------------------------------------------
@@ -705,6 +706,11 @@ function renderLive() {
     renderPlanet(me, now);
   } else if (currentView === 'planet') showView('map');
   renderPick(me, now);
+  renderFleetInfo(me, now);
+  if (session.outdated && !warnedOutdated) {
+    warnedOutdated = true;
+    toast('Un autre joueur a une version plus récente du jeu : recharge l’appli.');
+  }
 
   for (const p of Object.values(st.players)) {
     const sub = document.querySelector(`[data-psub="${p.id}"]`);
@@ -727,7 +733,7 @@ function renderLive() {
     const space = [
       nPlanets > 1 ? `${nPlanets} planètes` : null,
       docked ? `${docked} vaisseau${docked > 1 ? 'x' : ''}` : null,
-      flying ? `${flying} flotte${flying > 1 ? 's' : ''} en route` : null,
+      flying ? `${flying} flotte${flying > 1 ? 's' : ''}` : null,
     ];
     sub.textContent = [`${fmt(s.stock.minerals)} min.`, people, doing, ...space, net].filter(Boolean).join(' · ');
     scoreEl.textContent = `${score(p.race, s.levels)} pts`;
@@ -918,18 +924,17 @@ function renderYard(me, pl, s, now) {
   }
 }
 
-/** Vaisseaux à quai et flottes en route. */
+/** Vaisseaux à quai et flottes. */
 function renderFleets(me, pl, s, now) {
   const docked = SHIP_KEYS.filter((k) => s.ships[k]).map((k) => `${s.ships[k]} × ${SHIPS[me.race][k].name}`);
   $('docked').textContent = docked.length ? `À quai : ${docked.join(', ')}.` : 'Aucun vaisseau à quai sur cette planète.';
   $('btn-send-fleet').hidden = !docked.length;
-  const name = (cell) => mapPlanets().find((w) => sameCell(w, cell))?.name || `[${cell.x}:${cell.y}]`;
   const html = (me.fleets || [])
     .map((f) => {
-      const what = f.mission === 'return' ? 'Retour' : MISSIONS[f.mission]?.name || f.mission;
-      return `<div class="player card"><div class="p-main"><div class="p-name">${esc(what)} → ${esc(name(f.to))}</div>
-        <div class="p-sub mono">${countShips(f.ships)} vaisseaux${f.cargo && f.cargo.minerals + f.cargo.food ? ` · ${costText(f.cargo)}` : ''}</div></div>
-        <div class="p-score mono">${clock(Math.max(0, f.arrive - now))}</div></div>`;
+      const left = moving(f, now) ? clock(f.arrive - now) : '';
+      return `<div class="player card" data-fleet="${esc(f.id)}"><div class="p-main"><div class="p-name">${esc(fleetStatus(f, now))}</div>
+        <div class="p-sub mono">${shipsLine(me.race, f)}</div></div>
+        <div class="p-score mono">${left}</div></div>`;
     })
     .join('');
   if ($('fleets').dataset.html !== html) {
@@ -938,8 +943,33 @@ function renderFleets(me, pl, s, now) {
   }
 }
 
+/** Nom d'une case : la planète qui s'y trouve, sinon ses coordonnées. */
+const cellName = (cell) => mapPlanets().find((w) => sameCell(w, cell))?.name || `[${cell.x}:${cell.y}]`;
+
+/** « 3 × Frégate, 1 × Cargo · 200 min. » */
+function shipsLine(race, f) {
+  const ships = SHIP_KEYS.filter((k) => f.ships[k]).map((k) => `${f.ships[k]} × ${SHIPS[race][k].name}`).join(', ');
+  const cargo = f.cargo && f.cargo.minerals + f.cargo.food ? ` · ${costText(f.cargo)}` : '';
+  return `${ships}${cargo}`;
+}
+
+/** Ce que fait une flotte : « Attaque → Kepler », « En orbite de Kepler », « Stationne en [4:7] ». */
+function fleetStatus(f, now) {
+  const where = cellName(f.to);
+  if (moving(f, now)) return `${f.order ? ORDERS[f.order.kind]?.name || 'Ordre' : 'Déplacement'} → ${where}`;
+  return mapPlanets().some((w) => sameCell(w, f.to)) ? `En orbite de ${where}` : `Stationne en ${where}`;
+}
+
+$('fleets').addEventListener('click', (e) => {
+  const id = e.target.closest('[data-fleet]')?.dataset.fleet;
+  if (!id) return;
+  selFleet = id;
+  showView('map');
+  renderFleetInfo();
+});
+
 // ---------------------------------------------------------------------------
-// Envoi d'une flotte
+// Décollage d'une flotte
 // ---------------------------------------------------------------------------
 
 function fleetChoice() {
@@ -955,15 +985,6 @@ function openFleetSheet() {
   const pl = session.planetOf(me, openKey);
   if (!pl) return;
   const s = stateAt(pl.planet, session.now());
-  const dests = session.destinations(openKey);
-  const group = (m, label) => {
-    const opts = dests.filter((d) => d.mission === m);
-    if (!opts.length) return '';
-    return `<optgroup label="${label}">${opts
-      .map((d) => `<option value="${esc(d.id)}">${esc(d.name)}${d.owner && d.owner.id !== session.me ? ` (${esc(d.owner.name)})` : ''} · ${distance(pl.cell, d.cell)} cases</option>`)
-      .join('')}</optgroup>`;
-  };
-  $('fleet-dest').innerHTML = group('transport', 'Transport vers mes planètes') + group('colonize', 'Coloniser une planète libre') + group('attack', 'Attaquer');
   $('fleet-ships').innerHTML = SHIP_KEYS.filter((k) => s.ships[k])
     .map((k) => `<label>${esc(SHIPS[me.race][k].name)} (${s.ships[k]})<input type="number" inputmode="numeric" min="0" max="${s.ships[k]}" value="${s.ships[k]}" data-fship="${k}"></label>`)
     .join('');
@@ -976,31 +997,25 @@ function openFleetSheet() {
 
 function updateFleetSheet() {
   const me = session.state.players[session.me];
-  const pl = session.planetOf(me, openKey);
-  const dest = session.destinations(openKey).find((d) => d.id === $('fleet-dest').value);
   const { ships } = fleetChoice();
-  const room = fleetCargo(me.race, ships);
-  $('fleet-room').textContent = `Soutes : ${fmt(room)}`;
-  const mission = dest?.mission;
-  $('fleet-mission').textContent = !dest
-    ? 'Aucune destination possible.'
-    : mission === 'transport'
-      ? 'Les vaisseaux et la cargaison restent sur la planète d’arrivée.'
-      : mission === 'colonize'
-        ? `Il faut un vaisseau colonisateur (${SHIPS[me.race].colony.name}) : il fonde la colonie, et le premier arrivé l’emporte. La cargaison devient le stock de départ.`
-        : 'Combat contre les vaisseaux à quai. En cas de victoire, les soutes pillent jusqu’à la moitié des minéraux et de la nourriture, puis les survivants rentrent.';
-  const speed = fleetSpeed(me.race, ships, pl?.planet.tech);
-  $('fleet-eta').textContent = dest && speed ? `Trajet : ${clock(tripMs(pl.cell, dest.cell, speed))}` : '';
-  $('btn-fleet-go').disabled = !dest || !countShips(ships);
+  $('fleet-room').textContent = `Soutes : ${fmt(fleetCargo(me.race, ships))}`;
+  $('btn-fleet-go').disabled = !countShips(ships);
 }
 
 $('btn-send-fleet').onclick = openFleetSheet;
 $('btn-fleet-close').onclick = () => ($('sheet-fleet').hidden = true);
 $('sheet-fleet').addEventListener('input', updateFleetSheet);
-$('fleet-dest').addEventListener('change', updateFleetSheet);
 $('btn-fleet-go').onclick = () => {
   const { ships, cargo } = fleetChoice();
-  if (session.sendFleet(openKey, $('fleet-dest').value, ships, cargo)) $('sheet-fleet').hidden = true;
+  const id = session.takeOff(openKey, ships, cargo);
+  if (!id) return;
+  $('sheet-fleet').hidden = true;
+  // Direction la carte, flotte sélectionnée : il ne reste qu'à toucher une case.
+  selFleet = id;
+  selected = null;
+  showView('map');
+  renderPick();
+  renderFleetInfo();
 };
 
 /** « 2:05 » */
@@ -1017,6 +1032,8 @@ let currentView = 'map';
 let openKey = 'home'; // planète ouverte : « home » ou l'identifiant d'une colonie
 let mapFrame = null;
 let selected = null; // planète touchée sur la carte : { x, y }
+let selFleet = null; // id d'une de mes flottes, sélectionnée pour la piloter
+let pending = null; // case visée par la flotte sélectionnée, en attente d'un choix : { x, y }
 
 /** Carte (vue principale) ou bâtiments d'une de mes planètes. */
 function showView(view, key = openKey) {
@@ -1149,37 +1166,51 @@ function drawMap() {
   }
   ctx.globalAlpha = 1;
 
-  // Flottes en route : un petit triangle qui glisse de la planète de départ à celle d'arrivée.
+  // Flottes : un petit triangle qui glisse le long de son trajet, ou qui attend en orbite.
   const now = session.now();
-  for (const p of Object.values(session.state.players)) {
-    for (const f of p.fleets || []) {
-      if (f.arrive <= now && p.id === session.me) continue;
-      const pos = fleetPos(f, Math.min(now, f.arrive));
-      const cx = (pos.x + 0.5) * cell;
-      const cy = (pos.y + 0.5) * cell;
-      const ang = Math.atan2(f.to.y - f.from.y, f.to.x - f.from.x);
+  for (const spot of fleetSpots(now)) {
+    const { p, f, x, y } = spot;
+    const cx = (x + 0.5) * cell;
+    const cy = (y + 0.5) * cell;
+    if (spot.moving) {
       ctx.strokeStyle = p.color;
-      ctx.globalAlpha = 0.25;
+      ctx.globalAlpha = 0.35;
       ctx.lineWidth = Math.max(1, dpr * 0.6);
       ctx.setLineDash([cell * 0.15, cell * 0.15]);
       ctx.beginPath();
-      ctx.moveTo((f.from.x + 0.5) * cell, (f.from.y + 0.5) * cell);
+      ctx.moveTo(cx, cy);
       ctx.lineTo((f.to.x + 0.5) * cell, (f.to.y + 0.5) * cell);
       ctx.stroke();
       ctx.setLineDash([]);
-      ctx.globalAlpha = 1;
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(ang);
-      ctx.fillStyle = f.mission === 'attack' ? '#ff7a93' : p.color;
-      ctx.beginPath();
-      ctx.moveTo(cell * 0.28, 0);
-      ctx.lineTo(-cell * 0.18, cell * 0.16);
-      ctx.lineTo(-cell * 0.18, -cell * 0.16);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
     }
+    ctx.globalAlpha = 1;
+    if (p.id === session.me && f.id === selFleet) {
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = Math.max(1.5, cell * 0.06);
+      ctx.beginPath();
+      ctx.arc(cx, cy, cell * 0.3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(spot.ang);
+    ctx.fillStyle = f.order?.kind === 'attack' || f.mission === 'attack' ? '#ff7a93' : p.color;
+    const k = spot.moving ? 1 : 0.8;
+    ctx.beginPath();
+    ctx.moveTo(cell * 0.28 * k, 0);
+    ctx.lineTo(-cell * 0.18 * k, cell * 0.16 * k);
+    ctx.lineTo(-cell * 0.18 * k, -cell * 0.16 * k);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+  // Case visée, en attente d'un choix (se poser, coloniser, attaquer…).
+  if (pending) {
+    ctx.strokeStyle = '#ffffff';
+    ctx.globalAlpha = 0.6 + 0.4 * pulse;
+    ctx.lineWidth = Math.max(1, cell * 0.05);
+    ctx.strokeRect(pending.x * cell + 1, pending.y * cell + 1, cell - 2, cell - 2);
+    ctx.globalAlpha = 1;
   }
 
   $('my-coords').textContent = me?.home ? `[${me.home.x}:${me.home.y}]` : 'à choisir';
@@ -1187,18 +1218,78 @@ function drawMap() {
   mapFrame = requestAnimationFrame(drawMap);
 }
 
-/** Toucher la carte : ma planète ouvre ses bâtiments, une autre montre ses gisements. */
+/**
+ * Où dessiner chaque flotte (en cases) : sur son trajet si elle roule ;
+ * à l'arrêt, posée en couronne autour du centre de sa case pour ne cacher
+ * ni la planète ni les autres flottes. Le toucher utilise les mêmes places.
+ * [{ p, f, x, y, ang, moving }]
+ */
+function fleetSpots(now) {
+  const out = [];
+  const parked = new Map(); // « x:y » -> nombre de flottes déjà placées sur la case
+  for (const p of Object.values(session.state.players)) {
+    for (const f of p.fleets || []) {
+      if (moving(f, now)) {
+        const pos = fleetPos(f, now);
+        out.push({ p, f, x: pos.x, y: pos.y, ang: Math.atan2(f.to.y - f.from.y, f.to.x - f.from.x), moving: true });
+        continue;
+      }
+      const key = `${f.to.x}:${f.to.y}`;
+      const i = parked.get(key) || 0;
+      parked.set(key, i + 1);
+      const a = -Math.PI / 4 + i * 1.1;
+      out.push({ p, f, x: f.to.x + 0.36 * Math.cos(a), y: f.to.y + 0.36 * Math.sin(a), ang: -Math.PI / 2, moving: false });
+    }
+  }
+  return out;
+}
+
+/**
+ * Toucher la carte : une de mes flottes la sélectionne ; flotte
+ * sélectionnée, une case l'y envoie ; sinon ma planète ouvre ses bâtiments,
+ * une autre montre ses gisements.
+ */
 $('map').addEventListener('click', (e) => {
   if (!session?.state) return;
   const rect = e.currentTarget.getBoundingClientRect();
   const size = rect.width / UNIVERSE.w; // en pixels CSS (le canvas, lui, est à l'échelle de l'écran)
   const fx = (e.clientX - rect.left) / size - 0.5;
   const fy = (e.clientY - rect.top) / size - 0.5;
+
+  // Planète et flotte les plus proches du doigt : la plus proche gagne (une
+  // flotte en orbite est à côté du centre de sa planète, pas dessus).
   let best = null;
   for (const w of mapPlanets()) {
     const d = Math.hypot(w.x - fx, w.y - fy);
     if (d < 1.2 && (!best || d < best.d)) best = { w, d };
   }
+  const now = session.now();
+  const dist = (s) => Math.hypot(s.x - fx, s.y - fy);
+  // Toucher large : une case fait ~16 px sur un téléphone. Plusieurs flottes sous le doigt : chaque toucher passe à la suivante.
+  const hits = fleetSpots(now)
+    .filter((s) => s.p.id === session.me && dist(s) < 0.7)
+    .sort((a, b) => dist(a) - dist(b));
+  if (hits.length && (!best || dist(hits[0]) < best.d)) {
+    const i = hits.findIndex((s) => s.f.id === selFleet);
+    selFleet = hits[(i + 1) % hits.length].f.id;
+    pending = null;
+    selected = null;
+    renderPick();
+    renderFleetInfo();
+    return;
+  }
+  if (selFleet && session.myFleet(selFleet)) {
+    const cell = { x: Math.round(fx), y: Math.round(fy) };
+    if (cell.x < 0 || cell.y < 0 || cell.x >= UNIVERSE.w || cell.y >= UNIVERSE.h) return;
+    const opts = session.ordersAt(selFleet, cell);
+    if (opts.length === 1) {
+      pending = null;
+      session.moveFleet(selFleet, cell, opts[0].kind);
+    } else pending = cell;
+    renderFleetInfo();
+    return;
+  }
+
   if (!best) {
     selected = null;
     return renderPick();
@@ -1213,6 +1304,53 @@ $('map').addEventListener('click', (e) => {
   renderPick();
   $('planet-info').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 });
+
+/** Fiche de la flotte sélectionnée : son état, ses ordres, et le choix en attente sur une planète. */
+function renderFleetInfo(me = session?.state?.players[session.me], now = session?.now()) {
+  if (!session?.state) return;
+  const f = selFleet && session.myFleet(selFleet);
+  if (!f) {
+    selFleet = null;
+    pending = null;
+  }
+  $('fleet-info').hidden = !f;
+  if (!f) return;
+  const go = moving(f, now);
+  const pos = fleetPos(f, now);
+  $('fi-where').textContent = `[${Math.round(pos.x)}:${Math.round(pos.y)}]`;
+  $('fi-ships').textContent = shipsLine(me.race, f);
+  $('fi-status').textContent = `${fleetStatus(f, now)}${go ? ` · ${clock(f.arrive - now)}` : ''}`;
+  const here = !go && session.planetsAt(f.to)[0];
+  $('btn-fi-stop').hidden = !go;
+  $('btn-fi-dock').hidden = !(here && here.owner.id === session.me);
+  const choice = pending ? session.ordersAt(selFleet, pending) : [];
+  const html = choice.map((o) => `<button class="${o.kind === 'move' ? 'secondary' : 'primary'} small" data-forder="${o.kind}">${esc(o.label)}</button>`).join('');
+  $('fi-choice').hidden = !choice.length;
+  if ($('fi-choice').dataset.html !== html) {
+    $('fi-choice').innerHTML = html;
+    $('fi-choice').dataset.html = html;
+  }
+}
+
+$('fi-choice').addEventListener('click', (e) => {
+  const kind = e.target.closest('[data-forder]')?.dataset.forder;
+  if (!kind || !pending) return;
+  session.moveFleet(selFleet, pending, kind);
+  pending = null;
+  renderFleetInfo();
+});
+$('btn-fi-stop').onclick = () => session.stopFleet(selFleet) && renderFleetInfo();
+$('btn-fi-return').onclick = () => session.returnFleet(selFleet) && renderFleetInfo();
+$('btn-fi-dock').onclick = () => {
+  const f = session.myFleet(selFleet);
+  if (f) session.moveFleet(selFleet, f.to, 'dock');
+  renderFleetInfo();
+};
+$('btn-fi-close').onclick = () => {
+  selFleet = null;
+  pending = null;
+  renderFleetInfo();
+};
 
 /** Bandeau de choix de la planète de départ et fiche de la planète touchée. */
 function renderPick(me = session?.state?.players[session.me], now = session?.now()) {
