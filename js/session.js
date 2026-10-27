@@ -22,7 +22,7 @@ import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates } from './save.js';
 import { newPlanet, settle, stateAt, startBuild, startResearch, startShips, usePower, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE } from './game.js';
 import { TECHS, SHIPS } from './tech.js';
-import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, setShips, ORDERS, MAX_FLEETS } from './fleet.js';
+import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, setShips, together, transfer, split, merge, ORDERS, MAX_FLEETS } from './fleet.js';
 
 /** « de Beta », « d'Alpha ». */
 const de = (name) => (/^[aeiouyhàâéèêëîïôöûü]/i.test(name) ? `d’${name}` : `de ${name}`);
@@ -32,8 +32,9 @@ const de = (name) => (/^[aeiouyhàâéèêëîïôöûü]/i.test(name) ? `d’${
  * fiche : un joueur qui voit une fiche plus récente doit recharger l'appli.
  * 2 : flottes pilotées librement sur la carte.
  * 3 : carburant des flottes.
+ * 4 : flottes fusionnées (`absorbed`).
  */
-export const FORMAT = 3;
+export const FORMAT = 4;
 
 const shipsText = (n) => `${n} vaisseau${n > 1 ? 'x' : ''}`;
 
@@ -887,6 +888,65 @@ export class Session {
     this.touch();
     this.changed();
     return true;
+  }
+
+  /** Mes autres flottes arrêtées sur la même case que celle-ci. */
+  fleetsBeside(id) {
+    const f = this.myFleet(id);
+    const now = this.now();
+    if (!f) return [];
+    return (this.state.players[this.me].fleets || []).filter((g) => g.id !== id && together(f, g, now));
+  }
+
+  /** Deux de mes flottes arrêtées ensemble, pour une opération entre elles ; sinon un message. */
+  pairOf(fromId, toId) {
+    const a = this.myFleet(fromId);
+    const b = this.myFleet(toId);
+    if (!a || !b || a === b) return this.refuse('Flotte introuvable.');
+    if (!together(a, b, this.now())) return this.refuse('Les deux flottes doivent être arrêtées sur la même case.');
+    return [a, b];
+  }
+
+  /** Fait passer vaisseaux, cargaison et carburant d'une de mes flottes à une autre. */
+  transferFleet(fromId, toId, part) {
+    if (this.status !== 'playing') return false;
+    const pair = this.pairOf(fromId, toId);
+    if (!pair) return false;
+    const err = transfer(pair[0], pair[1], this.state.players[this.me].race, part, this.now());
+    if (err) return this.refuse(err);
+    this.touch();
+    this.changed();
+    return true;
+  }
+
+  /** Fusionne une de mes flottes dans une autre, sur la même case. */
+  mergeFleets(fromId, intoId) {
+    if (this.status !== 'playing') return false;
+    const pair = this.pairOf(fromId, intoId);
+    if (!pair) return false;
+    const p = this.state.players[this.me];
+    merge(pair[0], pair[1], p.race, this.now());
+    p.fleets = p.fleets.filter((f) => f.id !== fromId);
+    this.touch();
+    this.changed();
+    return true;
+  }
+
+  /** Scinde une de mes flottes arrêtées : `part` forme une nouvelle flotte, au même endroit. */
+  splitFleet(id, part) {
+    if (this.status !== 'playing') return false;
+    const p = this.state.players[this.me];
+    const f = this.myFleet(id);
+    const now = this.now();
+    if (!f) return false;
+    if (moving(f, now)) return this.refuse('La flotte doit être arrêtée pour se scinder.');
+    if (p.fleets.length >= MAX_FLEETS) return this.refuse(`Pas plus de ${MAX_FLEETS} flottes.`);
+    const res = split(f, p.race, part, rid(6), now);
+    if (res.error) return this.refuse(res.error);
+    p.fleets.push(res.fleet);
+    this.touch();
+    this.changed();
+    return res.fleet.id;
   }
 
   /** Renvoie une de mes flottes se poser sur sa planète de départ (ou la planète mère). */

@@ -125,11 +125,13 @@
         <p id="fi-status" class="hint mono"></p>
         <div class="fi-fuel"><span id="fi-fuel" class="hint mono"></span><div class="bar"><div id="fi-fuel-bar" class="bar-fill"></div></div></div>
         <div id="fi-choice" class="fi-actions" hidden></div>
+        <div id="fi-beside" class="fi-beside" hidden></div>
         <div class="fi-actions">
           <button id="btn-fi-stop" class="secondary small">Stop</button>
           <button id="btn-fi-return" class="secondary small">Rentrer</button>
           <button id="btn-fi-dock" class="secondary small">Se poser</button>
           <button id="btn-fi-refuel" class="secondary small">Faire le plein</button>
+          <button id="btn-fi-split" class="secondary small">Scinder…</button>
           <button id="btn-fi-close" class="ghost small">Fermer</button>
         </div>
         <p class="hint">Touche une case de la carte pour y envoyer la flotte. Touche-la encore pour passer à la suivante sur la même case.</p>
@@ -262,6 +264,26 @@
         <p id="fleet-tank" class="hint"></p>
       </div>
       <button id="btn-fleet-go" class="primary">Décoller</button>
+    </div>
+  </div>
+
+  <!-- Entre deux de mes flottes : donner, ou scinder -->
+  <div id="sheet-move" class="sheet" hidden>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="move-title">
+      <div class="sheet-head">
+        <h2 id="move-title"></h2>
+        <button id="btn-move-close" class="ghost">Fermer</button>
+      </div>
+      <p id="move-hint" class="hint"></p>
+      <div>
+        <h3 class="section-title">Vaisseaux</h3>
+        <div id="move-ships" class="fleet-grid"></div>
+      </div>
+      <div>
+        <h3 class="section-title">Cargaison et carburant</h3>
+        <div id="move-load" class="fleet-grid"></div>
+      </div>
+      <button id="btn-move-go" class="primary"></button>
     </div>
   </div>
 

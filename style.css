@@ -315,6 +315,10 @@ details > button { width: 100%; }
 .planet-info .b-desc { margin: 0; }
 .fi-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .fi-fuel { display: grid; gap: 4px; }
+.fi-beside { display: grid; gap: 8px; }
+.fi-beside .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fi-beside .row span { flex: 1 1 140px; font-size: 0.85rem; color: var(--muted); }
+#sheet-move .sheet-panel { display: grid; gap: 14px; }
 .fi-fuel .bar-fill { background: var(--energy, #f5c96a); }
 .fi-fuel.low .hint { color: var(--warn); }
 #fleet-info .hint { margin: 0; }

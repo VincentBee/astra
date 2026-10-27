@@ -175,6 +175,101 @@ export function refuel(planet, f, race, now) {
   return give;
 }
 
+// ----- Entre mes flottes ----------------------------------------------------
+//
+// Deux de mes flottes arrêtées sur la même case peuvent s'échanger
+// vaisseaux, cargaison et carburant, fusionner, ou une flotte se scinder en
+// deux. Tout se passe dans la fiche du joueur, tout de suite.
+
+/** Case où attend une flotte arrêtée (une flotte en panne peut être entre deux cases). */
+export const parkedCell = (f) => ({ x: Math.round(f.to.x), y: Math.round(f.to.y) });
+
+/** Deux flottes arrêtées sur la même case. */
+export function together(a, b, now) {
+  if (moving(a, now) || moving(b, now)) return false;
+  const ca = parkedCell(a);
+  const cb = parkedCell(b);
+  return ca.x === cb.x && ca.y === cb.y;
+}
+
+/** Fige le carburant d'une flotte arrêtée : son segment devient immobile, à `now`. */
+function freeze(f, race, now) {
+  Object.assign(f, { fuel: fuelAt(f, race, now), from: { ...f.to }, depart: now, arrive: now });
+}
+
+/**
+ * Fait passer une partie de la flotte `a` dans la flotte `b` :
+ * part = { ships, cargo, fuel }. `b` peut être une flotte neuve, vide (pour
+ * scinder). Chacune doit garder au moins un vaisseau, et ses soutes et
+ * réservoirs doivent suffire. Modifie les deux ; renvoie une erreur ou null.
+ */
+export function transfer(a, b, race, part, now) {
+  const fuelA = fuelAt(a, race, now);
+  const fuelB = b.ships && countShips(b.ships) ? fuelAt(b, race, now) : b.fuel || 0;
+  const ships = {};
+  for (const k of SHIP_KEYS) {
+    const n = Math.floor(part.ships?.[k] || 0);
+    if (n < 0 || n > (a.ships[k] || 0)) return `Pas assez de ${SHIPS[race][k].name}.`;
+    if (n) ships[k] = n;
+  }
+  const cargo = {};
+  for (const r of SOIL) {
+    const v = Math.floor(part.cargo?.[r] || 0);
+    if (v < 0 || v > (a.cargo?.[r] || 0)) return 'Pas autant dans les soutes.';
+    cargo[r] = v;
+  }
+  const fuel = Math.max(0, Number(part.fuel) || 0);
+  if (fuel > fuelA + 1e-6) return 'Pas autant de carburant.';
+  const give = Math.min(fuel, fuelA);
+
+  const aShips = Object.fromEntries(SHIP_KEYS.map((k) => [k, (a.ships[k] || 0) - (ships[k] || 0)]).filter(([, n]) => n > 0));
+  const bShips = Object.fromEntries(SHIP_KEYS.map((k) => [k, (b.ships?.[k] || 0) + (ships[k] || 0)]).filter(([, n]) => n > 0));
+  if (!countShips(aShips)) return 'Il doit rester au moins un vaisseau (sinon, fusionne les flottes).';
+  if (!countShips(bShips)) return 'Choisis au moins un vaisseau.';
+  const aCargo = Object.fromEntries(SOIL.map((r) => [r, (a.cargo?.[r] || 0) - cargo[r]]));
+  const bCargo = Object.fromEntries(SOIL.map((r) => [r, (b.cargo?.[r] || 0) + cargo[r]]));
+  const load = (c) => SOIL.reduce((t, r) => t + c[r], 0);
+  if (load(aCargo) > fleetCargo(race, aShips)) return 'Les soutes de la flotte qui donne seraient trop petites : déplace aussi de la cargaison.';
+  if (load(bCargo) > fleetCargo(race, bShips)) return 'Les soutes de la flotte qui reçoit sont trop petites.';
+  if (fuelA - give > fleetTank(race, aShips) + 1e-6) return 'Les réservoirs de la flotte qui donne seraient trop petits : déplace aussi du carburant.';
+  if (fuelB + give > fleetTank(race, bShips) + 1e-6) return 'Les réservoirs de la flotte qui reçoit sont trop petits.';
+
+  freeze(a, race, now);
+  if (b.ships && countShips(b.ships)) freeze(b, race, now);
+  Object.assign(a, { ships: aShips, cargo: aCargo, fuel: fuelA - give, order: null });
+  Object.assign(b, { ships: bShips, cargo: bCargo, fuel: fuelB + give, order: null });
+  return null;
+}
+
+/**
+ * Scinde la flotte `a` : `part` part dans une nouvelle flotte, sur la même
+ * case. Renvoie { error } ou { fleet }.
+ */
+export function split(a, race, part, id, now) {
+  const b = { id, ships: {}, cargo: {}, fuel: 0, origin: a.origin, from: { ...a.to }, to: { ...a.to }, depart: now, arrive: now, order: null };
+  const error = transfer(a, b, race, part, now);
+  return error ? { error } : { fleet: b };
+}
+
+/**
+ * Fusionne la flotte `a` dans `b` : tout passe dans `b`, qui se souvient
+ * des flottes absorbées (`absorbed`), pour que les dégâts visant `a`
+ * l'atteignent quand même. `a` est à retirer par l'appelant.
+ */
+export function merge(a, b, race, now) {
+  const fuel = fuelAt(a, race, now) + fuelAt(b, race, now);
+  freeze(b, race, now);
+  const ships = {};
+  for (const k of SHIP_KEYS) if ((a.ships[k] || 0) + (b.ships[k] || 0)) ships[k] = (a.ships[k] || 0) + (b.ships[k] || 0);
+  Object.assign(b, {
+    ships,
+    cargo: Object.fromEntries(SOIL.map((r) => [r, (a.cargo?.[r] || 0) + (b.cargo?.[r] || 0)])),
+    fuel,
+    order: null,
+    absorbed: [...new Set([...(b.absorbed || []), a.id, ...(a.absorbed || [])])].slice(-40),
+  });
+}
+
 /** Arrêt : la flotte finit sa course sur la case la plus proche, et y attend. */
 export function stopAt(f, race, tech, now) {
   const pos = fleetPos(f, now);

@@ -9,6 +9,8 @@ import {
 import { TECHS, SHIPS, SHIP_KEYS, techCost, techMissing, researchDuration, shipUnlock, shipUnlocked, shipStats, shipDuration } from './tech.js';
 import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fuelAt, moving } from './fleet.js';
 
+const DRY = 1e-6; // en dessous, un réservoir est vide
+
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
@@ -932,7 +934,7 @@ function renderFleets(me, pl, s, now) {
   const html = (me.fleets || [])
     .map((f) => {
       const left = moving(f, now) ? clock(f.arrive - now) : '';
-      return `<div class="player card" data-fleet="${esc(f.id)}"><div class="p-main"><div class="p-name">${esc(fleetStatus(f, now))}</div>
+      return `<div class="player card" data-fleet="${esc(f.id)}"><div class="p-main"><div class="p-name">${esc(`${fleetName(f)} · ${fleetStatus(me.race, f, now)}`)}</div>
         <div class="p-sub mono">${shipsLine(me.race, f)} · ${fuelText(me.race, f, now)}</div></div>
         <div class="p-score mono">${left}</div></div>`;
     })
@@ -956,10 +958,17 @@ function shipsLine(race, f) {
   return `${ships}${cargo}`;
 }
 
+/** « Flotte 2 » : son rang parmi mes flottes. */
+function fleetName(f) {
+  const i = (session.state.players[session.me]?.fleets || []).indexOf(f);
+  return `Flotte ${i + 1}`;
+}
+
 /** Ce que fait une flotte : « Attaque → Kepler », « En orbite de Kepler », « Stationne en [4:7] ». */
-function fleetStatus(f, now) {
+function fleetStatus(race, f, now) {
   const where = cellName(f.to);
-  if (f.stranded) return moving(f, now) ? `Tombera en panne vers ${where}` : `En panne vers ${where}`;
+  if (moving(f, now) && f.stranded) return `Tombera en panne vers ${where}`;
+  if (!moving(f, now) && fuelAt(f, race, now) < DRY) return `À sec vers ${where}`;
   if (moving(f, now)) return `${f.order ? ORDERS[f.order.kind]?.name || 'Ordre' : 'Déplacement'} → ${where}`;
   return mapPlanets().some((w) => sameCell(w, f.to)) ? `En orbite de ${where}` : `Stationne en ${where}`;
 }
@@ -1231,7 +1240,7 @@ function drawMap() {
       ctx.fillStyle = k < 0.25 ? '#ff7a93' : '#f5c96a';
       ctx.fillRect(cx - w / 2, cy + cell * 0.24, w * k, Math.max(1.5, cell * 0.06));
     }
-    ctx.globalAlpha = f.stranded && !spot.moving ? 0.5 : 1; // en panne : grisée
+    ctx.globalAlpha = !spot.moving && fuelAt(f, p.race, now) < DRY ? 0.5 : 1; // à sec : grisée
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(spot.ang);
@@ -1361,7 +1370,8 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
   const pos = fleetPos(f, now);
   $('fi-where').textContent = `[${Math.round(pos.x)}:${Math.round(pos.y)}]`;
   $('fi-ships').textContent = shipsLine(me.race, f);
-  $('fi-status').textContent = `${fleetStatus(f, now)}${go ? ` · ${clock(f.arrive - now)}` : ''}`;
+  $('fi-name').textContent = fleetName(f);
+  $('fi-status').textContent = `${fleetStatus(me.race, f, now)}${go ? ` · ${clock(f.arrive - now)}` : ''}`;
   const here = !go && session.planetsAt(f.to)[0];
   const fuel = fuelAt(f, me.race, now);
   const tank = fleetTank(me.race, f.ships);
@@ -1373,6 +1383,8 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
   $('btn-fi-stop').hidden = !go;
   $('btn-fi-dock').hidden = !mine;
   $('btn-fi-refuel').hidden = !mine || fuel >= tank - 0.5;
+  $('btn-fi-split').hidden = go || countShips(f.ships) < 2;
+  renderBeside(me, f, now);
   const choice = pending ? session.ordersAt(selFleet, pending) : [];
   const warn = choice[0]?.short ? ' · panne en route' : '';
   const html = choice
@@ -1403,6 +1415,72 @@ $('btn-fi-dock').onclick = () => {
 $('btn-fi-close').onclick = () => {
   selFleet = null;
   pending = null;
+  renderFleetInfo();
+};
+
+/** Mes autres flottes arrêtées sur la même case : leur donner une partie de la mienne, ou les fusionner. */
+function renderBeside(me, f, now) {
+  const others = session.fleetsBeside(f.id);
+  const html = others
+    .map(
+      (g) => `<div class="row"><span>${esc(fleetName(g))} · ${countShips(g.ships)} vaisseau${countShips(g.ships) > 1 ? 'x' : ''} · ${esc(fuelText(me.race, g, now))}</span>
+        <button class="secondary small" data-give="${esc(g.id)}">Donner…</button>
+        <button class="secondary small" data-merge="${esc(g.id)}">Fusionner ici</button></div>`,
+    )
+    .join('');
+  $('fi-beside').hidden = !others.length;
+  const full = others.length ? `<p class="hint">Sur la même case :</p>${html}` : '';
+  if ($('fi-beside').dataset.html !== full) {
+    $('fi-beside').innerHTML = full;
+    $('fi-beside').dataset.html = full;
+  }
+}
+
+$('fi-beside').addEventListener('click', (e) => {
+  const give = e.target.closest('[data-give]')?.dataset.give;
+  const into = e.target.closest('[data-merge]')?.dataset.merge;
+  if (give) openMoveSheet('give', give);
+  // « Fusionner ici » : l'autre flotte rejoint celle qui est sélectionnée.
+  if (into && session.mergeFleets(into, selFleet)) renderFleetInfo();
+});
+
+let moveSheet = null; // { kind: 'give' | 'split', to }
+
+/** Fenêtre « Donner » (vers une autre de mes flottes) ou « Scinder » (vers une nouvelle). */
+function openMoveSheet(kind, to = null) {
+  const me = session.state.players[session.me];
+  const f = session.myFleet(selFleet);
+  const target = to && session.myFleet(to);
+  if (!f || (kind === 'give' && !target)) return;
+  moveSheet = { kind, to };
+  const now = session.now();
+  $('move-title').textContent = kind === 'give' ? `${fleetName(f)} → ${fleetName(target)}` : `Scinder la ${fleetName(f).toLowerCase()}`;
+  $('move-hint').textContent =
+    kind === 'give'
+      ? 'Ce que la flotte sélectionnée donne à l’autre. Il doit lui rester au moins un vaisseau, et les soutes et réservoirs de chacune doivent suffire.'
+      : 'Ce qui part former une nouvelle flotte, au même endroit. Chacune garde au moins un vaisseau.';
+  $('move-ships').innerHTML = SHIP_KEYS.filter((k) => f.ships[k])
+    .map((k) => `<label>${esc(SHIPS[me.race][k].name)} (${f.ships[k]})<input type="number" inputmode="numeric" min="0" max="${f.ships[k]}" value="0" data-mship="${k}"></label>`)
+    .join('');
+  const fuel = Math.floor(fuelAt(f, me.race, now));
+  $('move-load').innerHTML =
+    SOIL.map(
+      (r) => `<label>${RES_INFO[r].name} (${fmt(f.cargo?.[r] || 0)})<input type="number" inputmode="numeric" min="0" max="${f.cargo?.[r] || 0}" value="0" data-mcargo="${r}"></label>`,
+    ).join('') + `<label>Carburant (${fuel})<input type="number" inputmode="numeric" min="0" max="${fuel}" value="0" data-mfuel></label>`;
+  $('btn-move-go').textContent = kind === 'give' ? 'Donner' : 'Scinder';
+  $('sheet-move').hidden = false;
+}
+
+$('btn-fi-split').onclick = () => openMoveSheet('split');
+$('btn-move-close').onclick = () => ($('sheet-move').hidden = true);
+$('btn-move-go').onclick = () => {
+  const part = { ships: {}, cargo: {}, fuel: 0 };
+  for (const el of document.querySelectorAll('[data-mship]')) part.ships[el.dataset.mship] = Math.max(0, Math.floor(Number(el.value) || 0));
+  for (const el of document.querySelectorAll('[data-mcargo]')) part.cargo[el.dataset.mcargo] = Math.max(0, Math.floor(Number(el.value) || 0));
+  part.fuel = Math.max(0, Math.floor(Number(document.querySelector('[data-mfuel]')?.value) || 0));
+  const ok = moveSheet?.kind === 'give' ? session.transferFleet(selFleet, moveSheet.to, part) : session.splitFleet(selFleet, part);
+  if (!ok) return;
+  $('sheet-move').hidden = true;
   renderFleetInfo();
 };
 
