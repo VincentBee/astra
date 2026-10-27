@@ -140,7 +140,7 @@ Chaque lot se livre seul (une PR chacun) et laisse le jeu jouable.
 4. **Combat de flottes** ✅ : poursuite, contact, effets par flotte, plafonds relevés (déjà fait au lot 1). Contact vérifié aussi à l'instant de mon arrivée (appli en arrière-plan). Une flotte sans armes ne peut pas poursuivre. La poursuite ne s'arrête pas encore quand la cible sort de la portée de détection : à brancher au lot 6.
 5. **Échanges** ✅ : offres, séquestre, réponses, notifications. Fonctions pures dans `js/trade.js`. La place en soute de qui reçoit compte ce qu'il donne dans le même échange. Si la flotte qui propose est détruite avant la réponse, son séquestre est perdu ; si elle s'est posée, ce qu'elle reçoit va à sa planète. Au plus 10 offres en attente par joueur. Retour du séquestre sans réponse : seulement quand la fiche de l'autre a bougé après `expires + 60 s` sans accepter, ou au bout de 30 min (l'autre refuse tout seul une offre expirée). `moving()` ignore les segments immobiles figés dans le futur proche par un téléphone en avance.
 6. **Détection** ✅ : technologie et filtrage. Portée en cases à vol d'oiseau, halo dessiné sur la carte (un seul tracé : les zones qui se recouvrent ne s'assombrissent pas). La poursuite s'arrête hors de portée (reste du lot 4). La liste des commandants ne compte que les flottes adverses visibles. Pas de changement de format des fiches.
-7. **Documentation et équilibrage** : README (règles et limites), GUIDE.md (le coût du carburant change l'équilibrage, les ordres de construction sont à refaire).
+7. **Documentation et équilibrage** ✅ : README (règles et limites), GUIDE.md (partie « Flottes et voyage »). Simulation de l'énergie par race (le moins cher d'abord, une centrale dès que le solde passe sous +10/min) : un plein de 5 chasseurs coûtait ≈ 6 min de production chez les humains, ≈ 7 chez les aliens, mais ≈ 1,4 chez les machines. Consommation des machines doublée (portée de 30 cases inchangée) : ≈ 3 min. Les ordres de construction du guide restent valables : le carburant ne coûte qu'au plein, pas pendant la construction.
 
 ## 10. Versions mélangées
 
@@ -157,3 +157,12 @@ Un téléphone pas à jour ne connaît pas les nouveaux champs, et le service wo
 - **Poursuite imprécise** entre téléphones : acceptée, même règle que les attaques actuelles.
 - **Équilibrage** du carburant : à régler en jouant, probablement plusieurs passes.
 - **Taille de `js/app.js`** (1 300 lignes) : sortir la carte et le panneau de flotte dans `js/map.js` pendant le lot 1.
+
+## Bilan
+
+Les 7 lots sont livrés. Restent ouverts :
+
+- **Test à deux vrais téléphones** : tout a été vérifié sur un seul téléphone, avec un deuxième joueur simulé. Combats entre flottes et échanges dépendent le plus du réseau.
+- **Carburant par défaut au décollage** : toute l'énergie disponible (jusqu'au plein). Option envisagée : plafonner à la moitié du stock, pour ne pas affamer les bâtiments (surtout chez les machines).
+- **Plusieurs flottes sur une case** : on touche plusieurs fois pour passer de l'une à l'autre, pas de liste.
+- **`js/app.js`** reste un gros fichier : la carte n'a pas été sortie dans `js/map.js`.

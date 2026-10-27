@@ -214,8 +214,11 @@ export function sightRange(race, tech, kind) {
  * Vaisseaux, par race. `attack` et `hull` (points de coque) servent au
  * combat, `cargo` à transporter des ressources, `speed` en cases par minute.
  * Carburant (de l'énergie) : `burn` par case parcourue, `tank` la contenance
- * du réservoir. Un plein mène à 40 cases (humains), 30 (machines, sobres
- * mais à courte portée) ou 50 (aliens, gourmands mais endurants).
+ * du réservoir. Un plein mène à 40 cases (humains), 30 (machines, à courte
+ * portée) ou 50 (aliens, endurants). Réglé pour qu'un plein de 5 chasseurs
+ * coûte quelques minutes de production d'énergie vers 20 min de jeu (de 3 à
+ * 7 selon la race) : les machines, riches en énergie, consomment autant par
+ * case que les humains.
  */
 export const SHIPS = {
   human: {
@@ -225,10 +228,10 @@ export const SHIPS = {
     heavy: { name: 'Croiseur', attack: 40, hull: 120, cargo: 150, speed: 5, burn: 3, tank: 120, cost: { minerals: 700 } },
   },
   machine: {
-    cargo: { name: 'Drone-cargo', attack: 0, hull: 12, cargo: 400, speed: 8, burn: 0.5, tank: 15, cost: { minerals: 100, energy: 40 } },
-    colony: { name: 'Sonde réplicatrice', attack: 0, hull: 25, cargo: 200, speed: 6, burn: 1.5, tank: 45, cost: { minerals: 450, energy: 150 } },
-    fighter: { name: 'Drone d’assaut', attack: 9, hull: 15, cargo: 20, speed: 9, burn: 0.5, tank: 15, cost: { minerals: 110, energy: 50 } },
-    heavy: { name: 'Destroyer', attack: 35, hull: 90, cargo: 100, speed: 6, burn: 1.5, tank: 45, cost: { minerals: 550, energy: 200 } },
+    cargo: { name: 'Drone-cargo', attack: 0, hull: 12, cargo: 400, speed: 8, burn: 1, tank: 30, cost: { minerals: 100, energy: 40 } },
+    colony: { name: 'Sonde réplicatrice', attack: 0, hull: 25, cargo: 200, speed: 6, burn: 3, tank: 90, cost: { minerals: 450, energy: 150 } },
+    fighter: { name: 'Drone d’assaut', attack: 9, hull: 15, cargo: 20, speed: 9, burn: 1, tank: 30, cost: { minerals: 110, energy: 50 } },
+    heavy: { name: 'Destroyer', attack: 35, hull: 90, cargo: 100, speed: 6, burn: 3, tank: 90, cost: { minerals: 550, energy: 200 } },
   },
   alien: {
     cargo: { name: 'Méduse porteuse', attack: 0, hull: 35, cargo: 450, speed: 5, burn: 1.5, tank: 75, cost: { minerals: 180, food: 60 } },

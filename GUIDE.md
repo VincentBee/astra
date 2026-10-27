@@ -1,10 +1,12 @@
 # Guide des races
 
-Principes, ordres de construction et pièges pour chaque race.
+Principes, ordres de construction et pièges pour chaque race, puis les flottes et le voyage spatial (en fin de guide).
 
 Les ordres viennent d’une recherche par simulation (règles de `js/game.js`) : on joue des milliers d’ordres possibles et on garde les meilleurs à un horizon donné, en écartant ceux qui provoquent une famine ou une panne juste après. Les heures sont approximatives : elles supposent qu’on lance chaque chantier dès qu’il est payable. « Le moins cher d’abord » sert de repère. **À refaire si l’équilibrage change.**
 
 > Ces ordres datent d’avant les gisements, la recherche et les vaisseaux : ils supposent une extraction sans limite et ne comptent ni labo ni chantier naval. Sur une planète au gisement maigre, l’extraction plafonne plus tôt.
+>
+> Le carburant des flottes ne change pas ces ordres : il ne coûte de l’énergie qu’au moment où l’on fait le plein. Si tu comptes faire voler des flottes, prévois une ou deux centrales de plus (voir « Flottes et voyage »).
 
 ## ◆ Humains
 
@@ -269,3 +271,38 @@ Avec les deux pouvoirs à chaque recharge.
 
 - Amplificateur en premier : il coûte et consomme de l’énergie, et sans sanctuaire il n’amplifie que deux psioniques.
 - Laisser naître sans nourriture ni énergie : les psioniques dépérissent et l’extraction s’arrête avec eux.
+
+## Flottes et voyage
+
+Une flotte se pilote comme une unité : on la fait décoller, on touche une case pour l’y envoyer, on peut l’arrêter, la faire rentrer, la poser. Elle brûle son carburant (de l’énergie) à chaque case.
+
+### Par race
+
+Chiffres sans technologie. « Coût du plein » : en minutes de production d’énergie vers 20 min de jeu, en construisant le moins cher d’abord avec une centrale dès que le solde d’énergie passe sous +10/min (simulation sur les règles de `js/game.js`).
+
+| Race | Portée d’un plein | Vitesse (chasseur · lourd) | Plein de 5 chasseurs | Coût du plein |
+|---|---|---|---|---|
+| ◆ Humains | 40 cases | 7 · 5 cases/min | 200 | ≈ 6 min |
+| ⬢ Machines | 30 cases | 9 · 6 cases/min | 150 | ≈ 3 min |
+| ✦ Aliens | 50 cases | 7 · 4 cases/min | 500 | ≈ 7 min |
+
+- **Humains** : l’énergie est rare au début (+30/min vers 20 min). Un plein se prépare : une centrale solaire de plus avant la première expédition.
+- **Machines** : rapides et peu chères à faire voler, mais à courte portée. Attention : l’énergie fait aussi tourner les foreuses et paie les chantiers. Un plein qui vide le stock arrête tout jusqu’au prochain réacteur.
+- **Aliens** : lents et gourmands, mais une flotte pleine traverse la carte deux fois. Le stock d’énergie monte vite chez eux : on peut voyager loin.
+
+### Principes
+
+- **Plein partiel** : au décollage, on choisit combien d’énergie mettre. Le panneau de la flotte affiche son autonomie en cases.
+- **Panne** : si le réservoir ne suffit pas, le jeu prévient (« panne en route ») avant le départ, et une croix marque l’endroit où la flotte s’arrêtera. Une flotte à sec ne bouge plus.
+- **Secours** : amène une autre de tes flottes sur sa case, puis « Donner… » du carburant. Un cargo plein sert de ravitailleur.
+- **Rentrer** rend le carburant restant au stock de la planète : rien n’est perdu.
+- **Poursuite** : une flotte vise là où sera la cible, pas là où elle est. Une cible plus rapide qui s’éloigne n’est rattrapée qu’à son arrivée, et la poursuite s’arrête si elle sort de ta vue.
+- **Détection** : tu ne vois les flottes adverses qu’à 3 cases de tes planètes et 2 de tes flottes. La 7ᵉ technologie ajoute 1 case par niveau, et elle est peu chère : un niveau ou deux tôt évitent les surprises.
+- **Échanges** : une flotte arrêtée à côté d’une flotte (ou de la planète) d’un autre joueur peut lui proposer un échange de minéraux, nourriture ou carburant. Ta part et ta flotte restent bloquées jusqu’à la réponse : l’offre expire au bout de 5 min, mais sans nouvelles de l’autre téléphone, elles peuvent attendre jusqu’à 30 min.
+
+### Pièges
+
+- Décoller avec tout le stock d’énergie dans les réservoirs : les bâtiments manquent de courant juste après (surtout les machines).
+- Poursuivre avec un croiseur ou un léviathan : trop lents pour rattraper des chasseurs.
+- Garer une flotte loin de tes planètes sans détection : tu ne verras pas venir l’attaque.
+- Proposer un échange depuis ta seule flotte armée : elle reste bloquée jusqu’à la réponse.
