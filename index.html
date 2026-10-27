@@ -105,6 +105,7 @@
       <div id="pick" class="banner" hidden>
         <p><strong>Choisis ta planète de départ.</strong> Touche une planète libre sur la carte pour voir ses gisements, puis installe-toi. Ce choix est définitif.</p>
       </div>
+      <div id="trades" class="trades" hidden></div>
       <div class="map-head">
         <span>Ta planète <strong id="my-coords" class="mono"></strong></span>
         <span id="map-size" class="hint mono"></span>
@@ -126,6 +127,7 @@
         <div class="fi-fuel"><span id="fi-fuel" class="hint mono"></span><div class="bar"><div id="fi-fuel-bar" class="bar-fill"></div></div></div>
         <div id="fi-choice" class="fi-actions" hidden></div>
         <div id="fi-beside" class="fi-beside" hidden></div>
+        <div id="fi-partners" class="fi-beside" hidden></div>
         <div class="fi-actions">
           <button id="btn-fi-stop" class="secondary small">Stop</button>
           <button id="btn-fi-return" class="secondary small">Rentrer</button>
@@ -198,6 +200,7 @@
         <p id="docked" class="hint"></p>
         <button id="btn-send-fleet" class="secondary">Faire décoller une flotte</button>
         <div id="fleets" class="players"></div>
+        <div id="planet-partners" class="fi-beside" hidden></div>
       </section>
     </main>
 
@@ -284,6 +287,26 @@
         <div id="move-load" class="fleet-grid"></div>
       </div>
       <button id="btn-move-go" class="primary"></button>
+    </div>
+  </div>
+
+  <!-- Proposer un échange à un autre joueur -->
+  <div id="sheet-trade" class="sheet" hidden>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="trade-title">
+      <div class="sheet-head">
+        <h2 id="trade-title"></h2>
+        <button id="btn-trade-close" class="ghost">Fermer</button>
+      </div>
+      <p class="hint">Ce que tu donnes part tout de suite sous séquestre. L’offre vaut 5 minutes et ne s’annule pas ; ta flotte reste bloquée jusqu’à la réponse. Refusée ou sans réponse, tu récupères ta part. Ne rien demander, c’est faire un don.</p>
+      <div>
+        <h3 class="section-title">Je donne</h3>
+        <div id="trade-give" class="fleet-grid"></div>
+      </div>
+      <div>
+        <h3 class="section-title">Je demande</h3>
+        <div id="trade-want" class="fleet-grid"></div>
+      </div>
+      <button id="btn-trade-go" class="primary">Proposer</button>
     </div>
   </div>
 

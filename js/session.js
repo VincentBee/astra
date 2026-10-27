@@ -22,7 +22,8 @@ import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates } from './save.js';
 import { newPlanet, settle, stateAt, startBuild, startResearch, startShips, usePower, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE } from './game.js';
 import { TECHS, SHIPS, shipStats } from './tech.js';
-import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, setShips, together, transfer, split, merge, intercept, inContact, salvage, applyLosses, ORDERS, MAX_FLEETS } from './fleet.js';
+import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, setShips, together, transfer, split, merge, intercept, inContact, salvage, applyLosses, parkedCell, ORDERS, MAX_FLEETS } from './fleet.js';
+import { amounts, isEmpty, holdings, lacks, noRoom, take, put, outcome, OFFER_MS, MAX_OFFERS } from './trade.js';
 
 /** « de Beta », « d'Alpha ». */
 const de = (name) => (/^[aeiouyhàâéèêëîïôöûü]/i.test(name) ? `d’${name}` : `de ${name}`);
@@ -34,8 +35,9 @@ const de = (name) => (/^[aeiouyhàâéèêëîïôöûü]/i.test(name) ? `d’${
  * 3 : carburant des flottes.
  * 4 : flottes fusionnées (`absorbed`).
  * 5 : combats entre flottes (effets visant une flotte, `docked`).
+ * 6 : échanges entre joueurs (`offers`, `answers`).
  */
-export const FORMAT = 5;
+export const FORMAT = 6;
 
 const shipsText = (n) => `${n} vaisseau${n > 1 ? 'x' : ''}`;
 
@@ -98,6 +100,9 @@ function normalize(p) {
   if (!Array.isArray(p.applied)) p.applied = [];
   // Flottes posées : id -> planète, pour que les dégâts qui les visaient encore les trouvent.
   if (!p.docked || typeof p.docked !== 'object') p.docked = {};
+  // Échanges : mes offres en cours (avec leur séquestre), mes réponses à celles des autres.
+  if (!Array.isArray(p.offers)) p.offers = [];
+  if (!Array.isArray(p.answers)) p.answers = [];
   return p;
 }
 
@@ -836,7 +841,7 @@ export class Session {
     if (this.status !== 'playing') return false;
     const p = this.state.players[this.me];
     const f = this.myFleet(id);
-    if (!f) return false;
+    if (!f || this.locked(id)) return false;
     if (cell.x < 0 || cell.y < 0 || cell.x >= UNIVERSE.w || cell.y >= UNIVERSE.h) return false;
     const here = this.planetsAt(cell)[0];
     const w = this.planets.find((x) => sameCell(x, cell));
@@ -867,7 +872,7 @@ export class Session {
     if (this.status !== 'playing') return false;
     const p = this.state.players[this.me];
     const f = this.myFleet(id);
-    if (!f) return false;
+    if (!f || this.locked(id)) return false;
     const err = stopAt(f, p.race, p.planet.tech, this.now());
     if (err) return this.refuse(err);
     this.touch();
@@ -889,6 +894,7 @@ export class Session {
     const enemy = this.state.players[pid];
     const target = pid !== this.me && this.fleetOf(enemy, targetId);
     if (!f || !target) return this.refuse('Flotte introuvable.');
+    if (this.locked(id)) return false;
     const armed = Object.entries(f.ships).some(([k, n]) => n && shipStats(p.race, k, p.planet.tech).attack > 0);
     if (!armed) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas attaquer.');
     // Ma copie de sa flotte ne change qu'une fois mon rapport lu par son téléphone : d'ici là, ce
@@ -963,6 +969,200 @@ export class Session {
     return true;
   }
 
+  // ----- échanges entre joueurs ---------------------------------------------
+
+  /** Une de mes flottes attend la réponse à un échange : elle ne bouge pas (message, et true). */
+  locked(id) {
+    const busy = (this.state.players[this.me]?.offers || []).some((o) => o.from.fleet === id);
+    if (busy) this.ontoast?.('Cette flotte attend la réponse à un échange : elle ne peut rien faire d’autre d’ici là.');
+    return busy;
+  }
+
+  /**
+   * Partie d'un échange chez le joueur `p` : `ref` = { fleet: id } (arrêtée)
+   * ou { planet: key }. { side, cell, name } ou null.
+   */
+  tradeSide(p, ref, now) {
+    if (!p) return null;
+    if (ref?.fleet) {
+      const f = this.fleetOf(p, ref.fleet);
+      if (!f || moving(f, now)) return null;
+      return { side: { fleet: f }, cell: parkedCell(f), name: `une flotte ${de(p.name)}` };
+    }
+    const pl = ref?.planet && this.planetOf(p, ref.planet);
+    if (!pl || this.ownerAt(pl.cell)?.id !== p.id) return null;
+    return { side: { planet: pl.planet }, cell: pl.cell, name: `${pl.name} (${p.name})` };
+  }
+
+  /**
+   * Avec qui échanger depuis `fromRef` (une de mes flottes ou planètes) :
+   * les flottes arrêtées et la planète des autres joueurs sur la même case.
+   * [{ pid, ref, name }]
+   */
+  tradePartners(fromRef) {
+    const now = this.now();
+    const mine = this.tradeSide(this.state.players[this.me], fromRef, now);
+    if (!mine) return [];
+    const out = [];
+    for (const p of Object.values(this.state.players)) {
+      if (p.id === this.me) continue;
+      for (const f of p.fleets || []) {
+        if (moving(f, now) || !sameCell(parkedCell(f), mine.cell)) continue;
+        out.push({ pid: p.id, ref: { fleet: f.id }, name: `Flotte ${de(p.name)}` });
+      }
+      if (mine.side.fleet) {
+        const pl = this.planetsOf(p).find((x) => sameCell(x.cell, mine.cell) && this.ownerAt(x.cell)?.id === p.id);
+        if (pl) out.push({ pid: p.id, ref: { planet: pl.key }, name: `${pl.name} (${p.name})` });
+      }
+    }
+    return out;
+  }
+
+  /** Ce que possède une partie, vu de mon téléphone (pour remplir la fenêtre d'échange). */
+  tradeHoldings(pid, ref) {
+    const p = this.state.players[pid];
+    const now = this.now();
+    const s = this.tradeSide(p, ref, now);
+    if (!s) return null;
+    if (s.side.planet) {
+      const st = stateAt(s.side.planet, now).stock;
+      return { minerals: Math.floor(st.minerals || 0), food: Math.floor(st.food || 0), fuel: Math.floor(st.energy || 0) };
+    }
+    return holdings(s.side, p.race, now);
+  }
+
+  /**
+   * Propose un échange : ce que je donne part sous séquestre tout de suite,
+   * l'offre vaut OFFER_MS et ne s'annule pas. La flotte qui propose est
+   * bloquée jusqu'à la réponse.
+   */
+  proposeTrade(fromRef, toRef, giveIn, wantIn) {
+    if (this.status !== 'playing') return false;
+    const p = this.state.players[this.me];
+    const other = this.state.players[toRef?.pid];
+    const now = this.now();
+    const give = amounts(giveIn);
+    const want = amounts(wantIn);
+    if (!other || other.id === this.me) return this.refuse('Joueur introuvable.');
+    if (isEmpty(give) && isEmpty(want)) return this.refuse('Choisis ce que tu donnes ou ce que tu demandes.');
+    if (fromRef.fleet && this.locked(fromRef.fleet)) return false;
+    if ((p.offers || []).length >= MAX_OFFERS) return this.refuse(`Pas plus de ${MAX_OFFERS} échanges en attente.`);
+    const mine = this.tradeSide(p, fromRef, now);
+    const theirs = this.tradeSide(other, toRef, now);
+    if (!mine || !theirs || !sameCell(mine.cell, theirs.cell)) return this.refuse('Les deux parties doivent être arrêtées sur la même case.');
+    const err = lacks(mine.side, p.race, give, now) || noRoom(mine.side, p.race, want, now, give);
+    if (err) return this.refuse(err);
+    take(mine.side, p.race, give, now);
+    const offer = { id: rid(8), from: fromRef, to: toRef, give, want, at: now, expires: now + OFFER_MS };
+    p.offers = [...(p.offers || []), offer];
+    this.touch(this.addLog(`${p.name} propose un échange à ${other.name}.`));
+    this.changed();
+    return offer.id;
+  }
+
+  /** Offres des autres qui m'attendent : [{ from: joueur, offer }]. */
+  incomingOffers() {
+    const me = this.state.players[this.me];
+    const now = this.now();
+    const out = [];
+    for (const p of Object.values(this.state.players)) {
+      if (p.id === this.me) continue;
+      for (const o of p.offers || []) {
+        if (o.to.pid !== this.me || now >= o.expires) continue;
+        if ((me.answers || []).some((a) => a.offer === o.id && a.pid === p.id)) continue;
+        out.push({ from: p, offer: o });
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Réponse à une offre. Accepter : je donne ce qu'on me demande et je
+   * reçois ce qu'on m'offre, tout de suite (l'autre a déjà mis sa part sous
+   * séquestre). Mon téléphone vérifie l'expiration, la case et les places.
+   */
+  answerTrade(pid, offerId, ok) {
+    if (this.status !== 'playing') return false;
+    const me = this.state.players[this.me];
+    const other = this.state.players[pid];
+    const offer = other?.offers?.find((o) => o.id === offerId);
+    const now = this.now();
+    if (!offer || offer.to.pid !== this.me) return this.refuse('Offre introuvable.');
+    if ((me.answers || []).some((a) => a.offer === offerId && a.pid === pid)) return this.refuse('Déjà répondu.');
+    if (ok) {
+      if (now >= offer.expires) return this.refuse('Offre expirée.');
+      const mine = this.tradeSide(me, offer.to, now);
+      const theirs = this.tradeSide(other, offer.from, now);
+      if (!mine || !theirs || !sameCell(mine.cell, theirs.cell)) return this.refuse('Les deux parties doivent être arrêtées sur la même case.');
+      const want = amounts(offer.want);
+      const give = amounts(offer.give);
+      const err = lacks(mine.side, me.race, want, now) || noRoom(mine.side, me.race, give, now, want);
+      if (err) return this.refuse(err);
+      take(mine.side, me.race, want, now);
+      put(mine.side, me.race, give, now);
+    }
+    me.answers = [...(me.answers || []), { offer: offerId, pid, ok: !!ok, at: now }].slice(-60);
+    this.touch(this.addLog(`${me.name} ${ok ? 'accepte' : 'refuse'} l’échange ${de(other.name)}.`));
+    this.changed();
+    return true;
+  }
+
+  /**
+   * Mes offres : l'autre a répondu (ou l'offre a expiré) → je reçois ce que
+   * j'ai demandé, ou mon séquestre me revient. Renvoie true si ma fiche a changé.
+   */
+  settleOffers(p, now) {
+    let any = false;
+    for (const o of [...(p.offers || [])]) {
+      const other = this.state.players[o.to.pid];
+      const answer = other?.answers?.find((a) => a.offer === o.id && a.pid === this.me) || null;
+      const end = outcome(o, answer, now, other?.actAt || 0);
+      if (!end) continue;
+      any = true;
+      p.offers = p.offers.filter((x) => x.id !== o.id);
+      // Ma partie : la flotte (ou celle qui l'a absorbée), sinon la planète où elle s'est posée.
+      let mine = this.tradeSide(p, o.from, now) || (o.from.fleet && this.tradeSide(p, { planet: p.docked?.[o.from.fleet] }, now));
+      if (!mine && o.from.fleet) {
+        const f = this.fleetOf(p, o.from.fleet);
+        if (f) mine = { side: { fleet: f } };
+      }
+      if (!mine) continue; // flotte détruite : le séquestre est perdu avec elle
+      put(mine.side, p.race, end === 'accepted' ? amounts(o.want) : amounts(o.give), now);
+      const who = other?.name || 'l’autre joueur';
+      this.addLog(end === 'accepted' ? `Échange conclu entre ${p.name} et ${who}.` : `Échange avec ${who} sans suite : ${p.name} récupère sa part.`);
+      this.ontoast?.(end === 'accepted' ? `${who} a accepté ton échange.` : answer ? `${who} a refusé ton échange.` : `Ton échange avec ${who} a expiré.`);
+    }
+    return any;
+  }
+
+  /**
+   * Offres pour moi expirées sans réponse : je les refuse, pour que celui
+   * qui propose récupère sa part dès qu'il reçoit ma fiche.
+   */
+  refuseExpired(p, now) {
+    let any = false;
+    for (const other of Object.values(this.state.players)) {
+      if (other.id === this.me) continue;
+      for (const o of other.offers || []) {
+        if (o.to.pid !== this.me || now < o.expires) continue;
+        if ((p.answers || []).some((a) => a.offer === o.id && a.pid === other.id)) continue;
+        p.answers = [...(p.answers || []), { offer: o.id, pid: other.id, ok: false, at: now }].slice(-60);
+        any = true;
+      }
+    }
+    return any;
+  }
+
+  /** Nouvelle offre pour moi : un message, une fois. */
+  noticeOffers(now) {
+    this.seenOffers ||= new Set();
+    for (const { from, offer } of this.incomingOffers()) {
+      if (this.seenOffers.has(offer.id)) continue;
+      this.seenOffers.add(offer.id);
+      if (now < offer.expires) this.ontoast?.(`${from.name} te propose un échange (carte).`);
+    }
+  }
+
   /** Plein d'une de mes flottes, arrêtée sur une de mes planètes, avec l'énergie de celle-ci. */
   refuelFleet(id) {
     if (this.status !== 'playing') return false;
@@ -994,6 +1194,7 @@ export class Session {
     const a = this.myFleet(fromId);
     const b = this.myFleet(toId);
     if (!a || !b || a === b) return this.refuse('Flotte introuvable.');
+    if (this.locked(fromId) || this.locked(toId)) return false;
     if (!together(a, b, this.now())) return this.refuse('Les deux flottes doivent être arrêtées sur la même case.');
     return [a, b];
   }
@@ -1029,7 +1230,7 @@ export class Session {
     const p = this.state.players[this.me];
     const f = this.myFleet(id);
     const now = this.now();
-    if (!f) return false;
+    if (!f || this.locked(id)) return false;
     if (moving(f, now)) return this.refuse('La flotte doit être arrêtée pour se scinder.');
     if (p.fleets.length >= MAX_FLEETS) return this.refuse(`Pas plus de ${MAX_FLEETS} flottes.`);
     const res = split(f, p.race, part, rid(6), now);
@@ -1106,6 +1307,9 @@ export class Session {
       } else if (f.order && !moving(f, now) && this.arrive(p, f)) changed = true;
     }
     if (this.applyEffects(p, now)) changed = true;
+    if (this.settleOffers(p, now)) changed = true;
+    if (this.refuseExpired(p, now)) changed = true;
+    this.noticeOffers(now);
     const logs = this.tickLogs;
     this.tickLogs = null;
     if (!changed) return;

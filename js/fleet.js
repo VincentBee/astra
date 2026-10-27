@@ -122,7 +122,9 @@ export function fleetPos(f, now) {
 }
 
 /** La flotte est-elle encore en route à `now` ? */
-export const moving = (f, now) => f.arrive > now;
+// Un segment immobile (from = to) n'est jamais « en route », même si un autre
+// téléphone, à l'heure un peu différente, l'a figé dans son futur proche.
+export const moving = (f, now) => f.arrive > now && (f.from.x !== f.to.x || f.from.y !== f.to.y);
 
 /**
  * Nouvel ordre de déplacement : la flotte part de là où elle est à `now`
@@ -197,7 +199,7 @@ export function together(a, b, now) {
 }
 
 /** Fige le carburant d'une flotte arrêtée : son segment devient immobile, à `now`. */
-function freeze(f, race, now) {
+export function freeze(f, race, now) {
   Object.assign(f, { fuel: fuelAt(f, race, now), from: { ...f.to }, depart: now, arrive: now });
 }
 

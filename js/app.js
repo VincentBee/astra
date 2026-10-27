@@ -7,6 +7,7 @@ import {
   powerReadyAt, powerCost, fmt, UNIVERSE, SOIL, sameCell,
 } from './game.js';
 import { TECHS, SHIPS, SHIP_KEYS, techCost, techMissing, researchDuration, shipUnlock, shipUnlocked, shipStats, shipDuration } from './tech.js';
+import { TRADE_RES, TRADE_NAMES } from './trade.js';
 import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fuelAt, moving } from './fleet.js';
 
 const DRY = 1e-6; // en dessous, un réservoir est vide
@@ -709,6 +710,7 @@ function renderLive() {
   } else if (currentView === 'planet') showView('map');
   renderPick(me, now);
   renderFleetInfo(me, now);
+  renderTrades(me, now);
   if (session.outdated && !warnedOutdated) {
     warnedOutdated = true;
     toast('Un autre joueur a une version plus récente du jeu : recharge l’appli.');
@@ -852,6 +854,7 @@ function renderPlanet(me, now) {
   renderResearch(me, pl, s, now);
   renderYard(me, pl, s, now);
   renderFleets(me, pl, s, now);
+  renderPartners($('planet-partners'), { planet: pl.key });
 }
 
 /** Barre de progression d'une file (chantier, recherche, chantier naval). */
@@ -969,6 +972,8 @@ function fleetStatus(race, f, now) {
   const where = cellName(f.to);
   if (moving(f, now) && f.stranded) return `Tombera en panne vers ${where}`;
   if (!moving(f, now) && fuelAt(f, race, now) < DRY) return `À sec vers ${where}`;
+  const offer = (session.state.players[session.me]?.offers || []).find((o) => o.from.fleet === f.id);
+  if (offer) return `Attend la réponse de ${session.state.players[offer.to.pid]?.name || '?'} (échange)`;
   if (f.order?.kind === 'chase') {
     const foe = session.state.players[f.order.pid];
     return `Poursuite d’une flotte ${foe ? de(foe.name) : 'ennemie'}`;
@@ -1410,6 +1415,7 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
   $('btn-fi-refuel').hidden = !mine || fuel >= tank - 0.5;
   $('btn-fi-split').hidden = go || countShips(f.ships) < 2;
   renderBeside(me, f, now);
+  renderPartners($('fi-partners'), go ? null : { fleet: f.id });
   const choice = pending ? session.ordersAt(selFleet, pending) : [];
   const warn = choice[0]?.short ? ' · panne en route' : '';
   const foe = prey && session.state.players[prey.pid];
@@ -1451,6 +1457,99 @@ $('btn-fi-close').onclick = () => {
   prey = null;
   renderFleetInfo();
 };
+
+// ---------------------------------------------------------------------------
+// Échanges entre joueurs
+// ---------------------------------------------------------------------------
+
+/** « 100 minéraux, 20 carburant », ou « rien ». */
+function tradeText(a) {
+  const parts = TRADE_RES.filter((r) => a?.[r]).map((r) => `${fmt(a[r])} ${TRADE_NAMES[r].toLowerCase()}`);
+  return parts.length ? parts.join(', ') : 'rien';
+}
+
+/** Les autres joueurs sur la même case que `fromRef` : un bouton « Proposer un échange » pour chacun. */
+function renderPartners(box, fromRef) {
+  const list = fromRef ? session.tradePartners(fromRef) : [];
+  const html = list.length
+    ? `<p class="hint">Autres joueurs ici :</p>${list
+        .map(
+          (x) => `<div class="row"><span>${esc(x.name)}</span>
+            <button class="secondary small" data-trade='${esc(JSON.stringify({ from: fromRef, pid: x.pid, ref: x.ref, name: x.name }))}'>Proposer un échange…</button></div>`,
+        )
+        .join('')}`
+    : '';
+  box.hidden = !html;
+  if (box.dataset.html !== html) {
+    box.innerHTML = html;
+    box.dataset.html = html;
+  }
+}
+
+let tradeSheet = null; // { from, pid, ref, name }
+
+function openTradeSheet(t) {
+  const mine = session.tradeHoldings(session.me, t.from);
+  const theirs = session.tradeHoldings(t.pid, t.ref);
+  if (!mine || !theirs) return toast('Les deux parties doivent être arrêtées sur la même case.');
+  tradeSheet = t;
+  $('trade-title').textContent = `Échange avec ${t.name}`;
+  const grid = (key, have) =>
+    TRADE_RES.map((r) => `<label>${TRADE_NAMES[r]} (${fmt(have[r])})<input type="number" inputmode="numeric" min="0" value="0" data-${key}="${r}"></label>`).join('');
+  $('trade-give').innerHTML = grid('tgive', mine);
+  $('trade-want').innerHTML = grid('twant', theirs);
+  $('sheet-trade').hidden = false;
+}
+
+const readTrade = (key) => Object.fromEntries([...document.querySelectorAll(`[data-${key}]`)].map((el) => [el.dataset[key], Math.max(0, Math.floor(Number(el.value) || 0))]));
+
+for (const box of ['fi-partners', 'planet-partners']) {
+  $(box).addEventListener('click', (e) => {
+    const raw = e.target.closest('[data-trade]')?.dataset.trade;
+    if (raw) openTradeSheet(JSON.parse(raw));
+  });
+}
+$('btn-trade-close').onclick = () => ($('sheet-trade').hidden = true);
+$('btn-trade-go').onclick = () => {
+  if (!tradeSheet) return;
+  const ok = session.proposeTrade(tradeSheet.from, { pid: tradeSheet.pid, ...tradeSheet.ref }, readTrade('tgive'), readTrade('twant'));
+  if (!ok) return;
+  $('sheet-trade').hidden = true;
+  toast('Échange proposé : réponse sous 5 minutes.');
+};
+
+/** Sur la carte : les offres qu'on me fait (accepter / refuser) et celles que j'attends. */
+function renderTrades(me, now) {
+  if (!me) return;
+  const incoming = session.incomingOffers().map(
+    ({ from, offer }) => `<div class="card trade"><p><strong>${esc(from.name)}</strong> te propose : il donne ${esc(tradeText(offer.give))}, il demande ${esc(tradeText(offer.want))}. <span class="mono" data-left="${offer.expires}"></span></p>
+      <div class="fi-actions"><button class="primary small" data-accept="${esc(from.id)}:${esc(offer.id)}">Accepter</button>
+      <button class="secondary small" data-refuse="${esc(from.id)}:${esc(offer.id)}">Refuser</button></div></div>`,
+  );
+  const mine = (me.offers || []).map((o) => {
+    const to = session.state.players[o.to.pid];
+    return `<div class="card trade mine"><p>Échange proposé à ${esc(to?.name || '?')} : tu donnes ${esc(tradeText(o.give))}, tu demandes ${esc(tradeText(o.want))}. <span class="mono" data-left="${o.expires}"></span></p></div>`;
+  });
+  // HTML stable (redessiner sous le doigt ferait rater le toucher sur « Accepter ») ;
+  // seuls les comptes à rebours changent.
+  const html = [...incoming, ...mine].join('');
+  $('trades').hidden = !html;
+  if ($('trades').dataset.html !== html) {
+    $('trades').innerHTML = html;
+    $('trades').dataset.html = html;
+  }
+  for (const el of $('trades').querySelectorAll('[data-left]')) {
+    const left = Number(el.dataset.left) - now;
+    el.textContent = left > 0 ? clock(left) : 'expiré, en attente de réponse';
+  }
+}
+
+$('trades').addEventListener('click', (e) => {
+  const acc = e.target.closest('[data-accept]')?.dataset.accept;
+  const ref = e.target.closest('[data-refuse]')?.dataset.refuse;
+  const [pid, id] = (acc || ref || '').split(':');
+  if (pid && id) session.answerTrade(pid, id, !!acc);
+});
 
 /** Mes autres flottes arrêtées sur la même case : leur donner une partie de la mienne, ou les fusionner. */
 function renderBeside(me, f, now) {

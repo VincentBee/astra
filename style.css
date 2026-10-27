@@ -318,7 +318,11 @@ details > button { width: 100%; }
 .fi-beside { display: grid; gap: 8px; }
 .fi-beside .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .fi-beside .row span { flex: 1 1 140px; font-size: 0.85rem; color: var(--muted); }
-#sheet-move .sheet-panel { display: grid; gap: 14px; }
+#sheet-move .sheet-panel, #sheet-trade .sheet-panel { display: grid; gap: 14px; }
+.trades { display: grid; gap: 8px; }
+.trade { padding: 10px 12px; display: grid; gap: 8px; border-left: 3px solid var(--energy); }
+.trade p { margin: 0; font-size: 0.88rem; }
+.trade.mine { border-left-color: var(--muted); opacity: 0.85; }
 .fi-fuel .bar-fill { background: var(--energy, #f5c96a); }
 .fi-fuel.low .hint { color: var(--warn); }
 #fleet-info .hint { margin: 0; }
