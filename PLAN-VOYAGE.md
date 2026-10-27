@@ -135,7 +135,7 @@ answers: [{ offer, pid, ok, at }]
 Chaque lot se livre seul (une PR chacun) et laisse le jeu jouable.
 
 1. **Mouvement libre** ✅ : modèle de flotte, migration, décoller / aller / stop / rentrer / se poser, sélection et ordres sur la carte. Sans carburant. Fait aussi en avance : un id neuf par combat, plafonds `effects` / `applied` relevés, version par fiche (§ 10). Pas fait : sortir la carte dans `js/map.js` (le code ajouté reste lisible dans `js/app.js`), choix dans une liste quand plusieurs flottes sont sur la même case (on touche plusieurs fois pour passer de l'une à l'autre).
-2. **Carburant** : `tank` et `burn`, panne au moment de l'ordre, plein sur planète, affichage.
+2. **Carburant** ✅ : `tank` et `burn`, panne au moment de l'ordre, plein sur planète, affichage. En plus : choix forcé avec avertissement « panne en route » quand le réservoir ne suffit pas, carburant rendu au stock en se posant (ou donné à la colonie fondée), carburant figé et borné après des pertes au combat (`setShips`). Une flotte en panne ne peut pas encore être secourue : il faut le lot 3 (transfert entre mes flottes) ou le lot 5 (échange).
 3. **Mes flottes** : transférer, fusionner (avec `absorbed`), scinder.
 4. **Combat de flottes** : poursuite, contact, effets par flotte, plafonds relevés.
 5. **Échanges** : offres, séquestre, réponses, notifications.

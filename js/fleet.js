@@ -8,7 +8,11 @@
 // Sa position tient dans un segment daté (from, to, depart, arrive) : tous
 // les téléphones la voient avancer de la même façon. À l'arrêt, from et to
 // sont la même case. Chaque nouvel ordre ouvre un segment depuis là où elle
-// est. Un ordre peut attendre l'arrivée :
+// est. Elle brûle du carburant (de l'énergie) à chaque case parcourue :
+// si son réservoir ne suffit pas, le segment s'arrête dès l'ordre donné au
+// point de panne (`stranded`). Tous les téléphones voient donc la même
+// panne, sans rien calculer en route. À sec, la flotte attend qu'on la
+// ravitaille. Un ordre peut attendre l'arrivée :
 //   dock     : se poser sur une de ses planètes (vaisseaux et cargaison y restent) ;
 //   colonize : fonder une colonie sur une planète libre (le premier arrivé l'emporte) ;
 //   attack   : combattre les vaisseaux à quai d'une planète adverse et piller
@@ -44,6 +48,30 @@ export function fleetCargo(race, ships) {
   return c;
 }
 
+/** Contenance totale des réservoirs. */
+export function fleetTank(race, ships) {
+  let t = 0;
+  for (const [k, n] of Object.entries(ships)) t += (n || 0) * SHIPS[race][k].tank;
+  return t;
+}
+
+/** Carburant brûlé par case parcourue. */
+export function fleetBurn(race, ships) {
+  let b = 0;
+  for (const [k, n] of Object.entries(ships)) b += (n || 0) * SHIPS[race][k].burn;
+  return b;
+}
+
+/**
+ * Carburant restant à `now`. `fuel` est celui du départ du segment ; une
+ * flotte d'avant le carburant a le plein.
+ */
+export function fuelAt(f, race, now) {
+  if (f.fuel == null) return fleetTank(race, f.ships);
+  const k = Math.min(1, Math.max(0, (now - f.depart) / Math.max(1, f.arrive - f.depart)));
+  return Math.max(0, f.fuel - fleetBurn(race, f.ships) * distance(f.from, f.to) * k);
+}
+
 /** Durée du trajet en ms, à la vitesse de la flotte. */
 export function tripMs(from, to, speed) {
   const d = distance(from, to);
@@ -57,7 +85,7 @@ export function tripMs(from, to, speed) {
  * cargaison de la planète. La flotte attend en orbite, sur la case de la
  * planète. Renvoie { error } ou { fleet }.
  */
-export function launch(planet, { ships, cargo = {}, at, origin, id }, now) {
+export function launch(planet, { ships, cargo = {}, fuel = 0, at, origin, id }, now) {
   settle(planet, now);
   const race = planet.race;
   const clean = {};
@@ -72,10 +100,14 @@ export function launch(planet, { ships, cargo = {}, at, origin, id }, now) {
   for (const r of SOIL) load[r] = Math.max(0, Math.floor(cargo[r] || 0));
   if (load.minerals + load.food > fleetCargo(race, clean)) return { error: 'Les soutes sont trop petites pour cette cargaison.' };
   if (!covers(planet.stock, load)) return { error: 'Pas assez de ressources pour cette cargaison.' };
+  const gas = Math.max(0, Math.floor(fuel || 0));
+  if (gas > fleetTank(race, clean)) return { error: 'Les réservoirs sont trop petits pour ce carburant.' };
+  if (!covers(planet.stock, { energy: gas })) return { error: 'Pas assez d’énergie pour ce carburant.' };
   for (const [k, n] of Object.entries(clean)) planet.ships[k] -= n;
   for (const [r, v] of Object.entries(load)) planet.stock[r] -= v;
+  planet.stock.energy -= gas;
   const cell = { x: at.x, y: at.y };
-  const fleet = { id, ships: clean, cargo: load, origin, from: cell, to: { ...cell }, depart: now, arrive: now, order: null };
+  const fleet = { id, ships: clean, cargo: load, fuel: gas, origin, from: cell, to: { ...cell }, depart: now, arrive: now, order: null };
   return { fleet };
 }
 
@@ -97,9 +129,50 @@ export function moveTo(f, race, tech, cell, order, now) {
   const speed = fleetSpeed(race, f.ships, tech);
   if (!speed) return 'Cette flotte ne peut pas bouger.';
   const pos = fleetPos(f, now);
-  const to = { x: cell.x, y: cell.y };
-  Object.assign(f, { from: pos, to, depart: now, arrive: now + tripMs(pos, to, speed), order: order || null });
+  const fuel = fuelAt(f, race, now);
+  let to = { x: cell.x, y: cell.y };
+  let stranded = false;
+  const need = fleetBurn(race, f.ships) * distance(pos, to);
+  if (need > fuel + 1e-9) {
+    if (fuel < 1e-6) return 'Plus de carburant : fais le plein, ou attends qu’on te ravitaille.';
+    // Panne en route : le trajet s'arrête là où le réservoir se vide, et l'ordre tombe.
+    const k = fuel / need;
+    to = { x: pos.x + (to.x - pos.x) * k, y: pos.y + (to.y - pos.y) * k };
+    stranded = true;
+    order = null;
+  }
+  Object.assign(f, { from: pos, to, depart: now, arrive: now + tripMs(pos, to, speed), order: order || null, fuel, stranded });
   return null;
+}
+
+/**
+ * Change les vaisseaux d'une flotte arrêtée (pertes d'un combat) : la
+ * consommation change, donc on fige d'abord le carburant, sans dépasser
+ * les nouveaux réservoirs.
+ */
+export function setShips(f, race, ships, now) {
+  const fuel = Math.min(fuelAt(f, race, now), fleetTank(race, ships));
+  Object.assign(f, { ships, from: { ...f.to }, depart: Math.min(now, f.arrive), arrive: Math.min(now, f.arrive), fuel });
+}
+
+/** Ce qu'il faut de carburant pour aller de la position actuelle à `cell`. */
+export function fuelNeed(f, race, cell, now) {
+  return fleetBurn(race, f.ships) * distance(fleetPos(f, now), cell);
+}
+
+/**
+ * Plein sur une planète du joueur, avec l'énergie de son stock (plein
+ * partiel s'il n'y en a pas assez). La flotte doit être arrêtée. Renvoie
+ * la quantité versée.
+ */
+export function refuel(planet, f, race, now) {
+  settle(planet, now);
+  const fuel = fuelAt(f, race, now);
+  const give = Math.max(0, Math.floor(Math.min(fleetTank(race, f.ships) - fuel, planet.stock.energy || 0)));
+  // Nouveau segment immobile : le carburant d'un segment est celui de son départ.
+  Object.assign(f, { from: { ...f.to }, depart: now, arrive: now, fuel: fuel + give, stranded: false });
+  planet.stock.energy -= give;
+  return give;
 }
 
 /** Arrêt : la flotte finit sa course sur la case la plus proche, et y attend. */

@@ -22,7 +22,7 @@ import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates } from './save.js';
 import { newPlanet, settle, stateAt, startBuild, startResearch, startShips, usePower, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE } from './game.js';
 import { TECHS, SHIPS } from './tech.js';
-import { launch, battle, plunder, moveTo, stopAt, moving, countShips, ORDERS, MAX_FLEETS } from './fleet.js';
+import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, setShips, ORDERS, MAX_FLEETS } from './fleet.js';
 
 /** « de Beta », « d'Alpha ». */
 const de = (name) => (/^[aeiouyhàâéèêëîïôöûü]/i.test(name) ? `d’${name}` : `de ${name}`);
@@ -31,8 +31,9 @@ const de = (name) => (/^[aeiouyhàâéèêëîïôöûü]/i.test(name) ? `d’${
  * Version du format des fiches. Chaque téléphone écrit la sienne dans sa
  * fiche : un joueur qui voit une fiche plus récente doit recharger l'appli.
  * 2 : flottes pilotées librement sur la carte.
+ * 3 : carburant des flottes.
  */
-export const FORMAT = 2;
+export const FORMAT = 3;
 
 const shipsText = (n) => `${n} vaisseau${n > 1 ? 'x' : ''}`;
 
@@ -778,8 +779,9 @@ export class Session {
 
   /**
    * Ce qu'une de mes flottes peut faire en arrivant sur `cell` :
-   * [{ kind, label }]. `kind` est ce qu'on passe à moveFleet ; « move » y
-   * va simplement et attend en orbite.
+   * [{ kind, label, short }]. `kind` est ce qu'on passe à moveFleet ;
+   * « move » y va simplement et attend en orbite. `short` : le carburant ne
+   * suffit pas, la flotte tombera en panne avant d'arriver.
    */
   ordersAt(id, cell) {
     const f = this.myFleet(id);
@@ -791,11 +793,14 @@ export class Session {
     else if (here) out.push({ kind: 'attack', label: `Attaquer ${here.name} (${here.owner.name})` });
     else if (w && f.ships.colony) out.push({ kind: 'colonize', label: `Coloniser ${w.name}` });
     out.push({ kind: 'move', label: w || here ? 'Juste y aller (orbite)' : 'Y aller' });
-    return out;
+    const me = this.state.players[this.me];
+    const now = this.now();
+    const short = fuelNeed(f, me.race, cell, now) > fuelAt(f, me.race, now) + 1e-9;
+    return out.map((o) => ({ ...o, short }));
   }
 
-  /** Faire décoller des vaisseaux (et une cargaison) d'une de mes planètes. */
-  takeOff(fromKey, ships, cargo) {
+  /** Faire décoller des vaisseaux (avec cargaison et carburant) d'une de mes planètes. */
+  takeOff(fromKey, ships, cargo, fuel) {
     if (this.status !== 'playing') return false;
     const p = this.state.players[this.me];
     const from = this.planetOf(p, fromKey);
@@ -808,7 +813,7 @@ export class Session {
       this.ontoast?.(`Pas plus de ${MAX_FLEETS} flottes.`);
       return false;
     }
-    const res = launch(from.planet, { ships, cargo, at: from.cell, origin: fromKey, id: rid(6) }, this.now());
+    const res = launch(from.planet, { ships, cargo, fuel, at: from.cell, origin: fromKey, id: rid(6) }, this.now());
     if (res.error) {
       this.ontoast?.(res.error);
       return false;
@@ -845,6 +850,7 @@ export class Session {
     }
     const err = moveTo(f, p.race, p.planet.tech, cell, order, this.now());
     if (err) return this.refuse(err);
+    if (f.stranded) this.ontoast?.('Pas assez de carburant : la flotte tombera en panne en route.');
     // Au journal, seulement les ordres qui comptent : les simples déplacements le noieraient.
     const who = here && here.owner.id !== this.me ? ` (${here.owner.name})` : '';
     this.touch(order ? this.addLog(`La flotte ${de(p.name)} ${ORDERS[order.kind].verb} ${here ? here.name : w.name}${who}.`) : null);
@@ -860,6 +866,24 @@ export class Session {
     if (!f) return false;
     const err = stopAt(f, p.race, p.planet.tech, this.now());
     if (err) return this.refuse(err);
+    this.touch();
+    this.changed();
+    return true;
+  }
+
+  /** Plein d'une de mes flottes, arrêtée sur une de mes planètes, avec l'énergie de celle-ci. */
+  refuelFleet(id) {
+    if (this.status !== 'playing') return false;
+    const p = this.state.players[this.me];
+    const f = this.myFleet(id);
+    const now = this.now();
+    if (!f || moving(f, now)) return this.refuse('La flotte doit être arrêtée pour faire le plein.');
+    const here = this.planetsAt(f.to)[0];
+    const pl = here?.owner.id === this.me && this.planetOf(p, here.key);
+    if (!pl) return this.refuse('Le plein se fait en orbite d’une de tes planètes.');
+    const give = refuel(pl.planet, f, p.race, now);
+    if (!give) return this.refuse('Pas d’énergie à verser, ou réservoirs déjà pleins.');
+    this.ontoast?.(`Plein : ${give} d’énergie.`);
     this.touch();
     this.changed();
     return true;
@@ -951,6 +975,7 @@ export class Session {
       pl.planet.ships ||= {};
       for (const [k, n] of Object.entries(f.ships)) pl.planet.ships[k] = (pl.planet.ships[k] || 0) + n;
       for (const [r, v] of Object.entries(f.cargo || {})) pl.planet.stock[r] = (pl.planet.stock[r] || 0) + v;
+      pl.planet.stock.energy = (pl.planet.stock.energy || 0) + Math.floor(fuelAt(f, p.race, now)); // le carburant restant retourne au stock
       drop();
       const loot = lootText(f.cargo || {});
       this.addLog(`La flotte ${de(p.name)} se pose sur ${pl.name}${loot ? ` avec ${loot}` : ''}.`);
@@ -964,7 +989,7 @@ export class Session {
         return true;
       }
       const colony = newPlanet(p.race, f.arrive, w);
-      colony.stock = { minerals: 0, food: 0, energy: 0, ...f.cargo };
+      colony.stock = { minerals: 0, food: 0, ...f.cargo, energy: Math.floor(fuelAt(f, p.race, now)) };
       colony.tech = { ...(p.planet.tech || {}) };
       colony.claimAt = f.arrive;
       const ships = { ...f.ships, colony: f.ships.colony - 1 };
@@ -996,7 +1021,7 @@ export class Session {
       );
       this.ontoast?.(res.won ? `Victoire sur ${pl.name} !` : `Défaite sur ${pl.name}.`);
       if (!countShips(res.attLeft)) return drop(), true;
-      f.ships = res.attLeft;
+      setShips(f, p.race, res.attLeft, now);
       f.cargo = Object.fromEntries(SOIL.map((r) => [r, (f.cargo?.[r] || 0) + (take[r] || 0)]));
       return true;
     }

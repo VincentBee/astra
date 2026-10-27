@@ -123,11 +123,13 @@
         <div class="b-head"><h4 id="fi-name">Flotte</h4><span id="fi-where" class="level mono"></span></div>
         <p id="fi-ships" class="b-desc"></p>
         <p id="fi-status" class="hint mono"></p>
+        <div class="fi-fuel"><span id="fi-fuel" class="hint mono"></span><div class="bar"><div id="fi-fuel-bar" class="bar-fill"></div></div></div>
         <div id="fi-choice" class="fi-actions" hidden></div>
         <div class="fi-actions">
           <button id="btn-fi-stop" class="secondary small">Stop</button>
           <button id="btn-fi-return" class="secondary small">Rentrer</button>
           <button id="btn-fi-dock" class="secondary small">Se poser</button>
+          <button id="btn-fi-refuel" class="secondary small">Faire le plein</button>
           <button id="btn-fi-close" class="ghost small">Fermer</button>
         </div>
         <p class="hint">Touche une case de la carte pour y envoyer la flotte. Touche-la encore pour passer à la suivante sur la même case.</p>
@@ -242,7 +244,7 @@
         <h2 id="fleet-title">Faire décoller une flotte</h2>
         <button id="btn-fleet-close" class="ghost">Fermer</button>
       </div>
-      <p class="hint">La flotte attend en orbite. Touche-la ensuite sur la carte, puis touche une case pour l’y envoyer : s’y poser, coloniser, attaquer ou juste stationner.</p>
+      <p class="hint">La flotte attend en orbite. Touche-la ensuite sur la carte, puis touche une case pour l’y envoyer : s’y poser, coloniser, attaquer ou juste stationner. Elle brûle son carburant (de l’énergie) à chaque case ; à sec, elle reste en panne là où elle est.</p>
       <div>
         <h3 class="section-title">Vaisseaux</h3>
         <div id="fleet-ships" class="fleet-grid"></div>
@@ -251,6 +253,13 @@
         <h3 class="section-title">Cargaison</h3>
         <div id="fleet-cargo" class="fleet-grid"></div>
         <p id="fleet-room" class="hint"></p>
+      </div>
+      <div>
+        <h3 class="section-title">Carburant</h3>
+        <div class="fleet-grid">
+          <label id="fleet-fuel-label">Énergie<input id="fleet-fuel" type="number" inputmode="numeric" min="0" value="0"></label>
+        </div>
+        <p id="fleet-tank" class="hint"></p>
       </div>
       <button id="btn-fleet-go" class="primary">Décoller</button>
     </div>

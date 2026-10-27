@@ -314,6 +314,9 @@ details > button { width: 100%; }
 .planet-info { padding: 12px 14px; display: grid; gap: 10px; }
 .planet-info .b-desc { margin: 0; }
 .fi-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.fi-fuel { display: grid; gap: 4px; }
+.fi-fuel .bar-fill { background: var(--energy, #f5c96a); }
+.fi-fuel.low .hint { color: var(--warn); }
 #fleet-info .hint { margin: 0; }
 #fleets .player { cursor: pointer; }
 

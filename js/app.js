@@ -7,7 +7,7 @@ import {
   powerReadyAt, powerCost, fmt, UNIVERSE, SOIL, sameCell,
 } from './game.js';
 import { TECHS, SHIPS, SHIP_KEYS, techCost, techMissing, researchDuration, shipUnlock, shipUnlocked, shipStats, shipDuration } from './tech.js';
-import { ORDERS, countShips, fleetCargo, fleetPos, moving } from './fleet.js';
+import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fuelAt, moving } from './fleet.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -933,7 +933,7 @@ function renderFleets(me, pl, s, now) {
     .map((f) => {
       const left = moving(f, now) ? clock(f.arrive - now) : '';
       return `<div class="player card" data-fleet="${esc(f.id)}"><div class="p-main"><div class="p-name">${esc(fleetStatus(f, now))}</div>
-        <div class="p-sub mono">${shipsLine(me.race, f)}</div></div>
+        <div class="p-sub mono">${shipsLine(me.race, f)} · ${fuelText(me.race, f, now)}</div></div>
         <div class="p-score mono">${left}</div></div>`;
     })
     .join('');
@@ -944,7 +944,10 @@ function renderFleets(me, pl, s, now) {
 }
 
 /** Nom d'une case : la planète qui s'y trouve, sinon ses coordonnées. */
-const cellName = (cell) => mapPlanets().find((w) => sameCell(w, cell))?.name || `[${cell.x}:${cell.y}]`;
+const cellName = (cell) => mapPlanets().find((w) => sameCell(w, cell))?.name || `[${Math.round(cell.x)}:${Math.round(cell.y)}]`;
+
+/** « carburant 34 / 40 » */
+const fuelText = (race, f, now) => `carburant ${Math.floor(fuelAt(f, race, now))} / ${fleetTank(race, f.ships)}`;
 
 /** « 3 × Frégate, 1 × Cargo · 200 min. » */
 function shipsLine(race, f) {
@@ -956,6 +959,7 @@ function shipsLine(race, f) {
 /** Ce que fait une flotte : « Attaque → Kepler », « En orbite de Kepler », « Stationne en [4:7] ». */
 function fleetStatus(f, now) {
   const where = cellName(f.to);
+  if (f.stranded) return moving(f, now) ? `Tombera en panne vers ${where}` : `En panne vers ${where}`;
   if (moving(f, now)) return `${f.order ? ORDERS[f.order.kind]?.name || 'Ordre' : 'Déplacement'} → ${where}`;
   return mapPlanets().some((w) => sameCell(w, f.to)) ? `En orbite de ${where}` : `Stationne en ${where}`;
 }
@@ -991,6 +995,11 @@ function openFleetSheet() {
   $('fleet-cargo').innerHTML = SOIL.map(
     (r) => `<label>${RES_INFO[r].name} (${fmt(s.stock[r])})<input type="number" inputmode="numeric" min="0" value="0" data-fcargo="${r}"></label>`,
   ).join('');
+  // Par défaut, le plein (ou toute l'énergie disponible, s'il en manque).
+  const energy = Math.floor(s.stock.energy || 0);
+  $('fleet-fuel-label').firstChild.textContent = `Énergie (${fmt(energy)})`;
+  $('fleet-fuel').dataset.max = energy;
+  $('fleet-fuel').value = Math.min(energy, fleetTank(me.race, s.ships));
   $('sheet-fleet').hidden = false;
   updateFleetSheet();
 }
@@ -999,6 +1008,14 @@ function updateFleetSheet() {
   const me = session.state.players[session.me];
   const { ships } = fleetChoice();
   $('fleet-room').textContent = `Soutes : ${fmt(fleetCargo(me.race, ships))}`;
+  const tank = fleetTank(me.race, ships);
+  const burn = fleetBurn(me.race, ships);
+  const input = $('fleet-fuel');
+  const fuel = Math.min(Math.max(0, Math.floor(Number(input.value) || 0)), tank, Number(input.dataset.max) || 0);
+  if (Number(input.value) !== fuel) input.value = fuel;
+  $('fleet-tank').textContent = burn
+    ? `Réservoirs : ${fmt(tank)} · ${String(burn).replace('.', ',')} par case · ${Math.floor(fuel / burn)} cases avec ce carburant`
+    : '';
   $('btn-fleet-go').disabled = !countShips(ships);
 }
 
@@ -1007,7 +1024,7 @@ $('btn-fleet-close').onclick = () => ($('sheet-fleet').hidden = true);
 $('sheet-fleet').addEventListener('input', updateFleetSheet);
 $('btn-fleet-go').onclick = () => {
   const { ships, cargo } = fleetChoice();
-  const id = session.takeOff(openKey, ships, cargo);
+  const id = session.takeOff(openKey, ships, cargo, Math.floor(Number($('fleet-fuel').value) || 0));
   if (!id) return;
   $('sheet-fleet').hidden = true;
   // Direction la carte, flotte sélectionnée : il ne reste qu'à toucher une case.
@@ -1191,6 +1208,30 @@ function drawMap() {
       ctx.arc(cx, cy, cell * 0.3, 0, Math.PI * 2);
       ctx.stroke();
     }
+    if (f.stranded && spot.moving) {
+      // Point de panne : une croix au bout du trajet.
+      const px = (f.to.x + 0.5) * cell;
+      const py = (f.to.y + 0.5) * cell;
+      const r = cell * 0.18;
+      ctx.strokeStyle = '#ff7a93';
+      ctx.lineWidth = Math.max(1, cell * 0.06);
+      ctx.beginPath();
+      ctx.moveTo(px - r, py - r);
+      ctx.lineTo(px + r, py + r);
+      ctx.moveTo(px + r, py - r);
+      ctx.lineTo(px - r, py + r);
+      ctx.stroke();
+    }
+    if (p.id === session.me) {
+      // Jauge de carburant sous mes flottes.
+      const k = Math.min(1, fuelAt(f, p.race, now) / Math.max(1, fleetTank(p.race, f.ships)));
+      const w = cell * 0.5;
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      ctx.fillRect(cx - w / 2, cy + cell * 0.24, w, Math.max(1.5, cell * 0.06));
+      ctx.fillStyle = k < 0.25 ? '#ff7a93' : '#f5c96a';
+      ctx.fillRect(cx - w / 2, cy + cell * 0.24, w * k, Math.max(1.5, cell * 0.06));
+    }
+    ctx.globalAlpha = f.stranded && !spot.moving ? 0.5 : 1; // en panne : grisée
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(spot.ang);
@@ -1203,6 +1244,7 @@ function drawMap() {
     ctx.closePath();
     ctx.fill();
     ctx.restore();
+    ctx.globalAlpha = 1;
   }
   // Case visée, en attente d'un choix (se poser, coloniser, attaquer…).
   if (pending) {
@@ -1282,7 +1324,7 @@ $('map').addEventListener('click', (e) => {
     const cell = { x: Math.round(fx), y: Math.round(fy) };
     if (cell.x < 0 || cell.y < 0 || cell.x >= UNIVERSE.w || cell.y >= UNIVERSE.h) return;
     const opts = session.ordersAt(selFleet, cell);
-    if (opts.length === 1) {
+    if (opts.length === 1 && !opts[0].short) {
       pending = null;
       session.moveFleet(selFleet, cell, opts[0].kind);
     } else pending = cell;
@@ -1321,10 +1363,21 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
   $('fi-ships').textContent = shipsLine(me.race, f);
   $('fi-status').textContent = `${fleetStatus(f, now)}${go ? ` · ${clock(f.arrive - now)}` : ''}`;
   const here = !go && session.planetsAt(f.to)[0];
+  const fuel = fuelAt(f, me.race, now);
+  const tank = fleetTank(me.race, f.ships);
+  const range = Math.floor(fuel / Math.max(1e-9, fleetBurn(me.race, f.ships)));
+  $('fi-fuel').textContent = `${fuelText(me.race, f, now)} · ${range} case${range > 1 ? 's' : ''} d’autonomie`;
+  $('fi-fuel-bar').style.width = `${Math.min(100, (fuel / Math.max(1, tank)) * 100)}%`;
+  $('fi-fuel').parentElement.classList.toggle('low', fuel < tank * 0.25);
+  const mine = here && here.owner.id === session.me;
   $('btn-fi-stop').hidden = !go;
-  $('btn-fi-dock').hidden = !(here && here.owner.id === session.me);
+  $('btn-fi-dock').hidden = !mine;
+  $('btn-fi-refuel').hidden = !mine || fuel >= tank - 0.5;
   const choice = pending ? session.ordersAt(selFleet, pending) : [];
-  const html = choice.map((o) => `<button class="${o.kind === 'move' ? 'secondary' : 'primary'} small" data-forder="${o.kind}">${esc(o.label)}</button>`).join('');
+  const warn = choice[0]?.short ? ' · panne en route' : '';
+  const html = choice
+    .map((o) => `<button class="${o.kind === 'move' ? 'secondary' : 'primary'} small" data-forder="${o.kind}">${esc(o.label + warn)}</button>`)
+    .join('');
   $('fi-choice').hidden = !choice.length;
   if ($('fi-choice').dataset.html !== html) {
     $('fi-choice').innerHTML = html;
@@ -1340,6 +1393,7 @@ $('fi-choice').addEventListener('click', (e) => {
   renderFleetInfo();
 });
 $('btn-fi-stop').onclick = () => session.stopFleet(selFleet) && renderFleetInfo();
+$('btn-fi-refuel').onclick = () => session.refuelFleet(selFleet) && renderFleetInfo();
 $('btn-fi-return').onclick = () => session.returnFleet(selFleet) && renderFleetInfo();
 $('btn-fi-dock').onclick = () => {
   const f = session.myFleet(selFleet);
