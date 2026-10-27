@@ -9,7 +9,8 @@
 // Effets des technologies, par niveau : `bonus` ajoute une part (0,1 = +10 %)
 // à l'extraction de minéraux, à la nourriture, à l'énergie produite, ou aux
 // vaisseaux (vitesse, attaque, coque). `unlock` débloque un vaisseau à partir
-// d'un niveau.
+// d'un niveau. `range` ajoute des cases à la portée de détection (voir
+// sightRange), autour des planètes et des flottes du joueur.
 
 export const TECHS = {
   human: {
@@ -63,6 +64,14 @@ export const TECHS = {
       req: { lab: 3, propulsion: 2 },
       base: { minerals: 800 },
       unlock: { colony: 1 },
+    },
+    radar: {
+      name: 'Radar profond',
+      desc: '+1 case de portée de détection par niveau, autour de tes planètes et de tes flottes.',
+      max: 5,
+      req: { lab: 1 },
+      base: { minerals: 140 },
+      range: 1,
     },
   },
 
@@ -118,6 +127,14 @@ export const TECHS = {
       base: { minerals: 700, energy: 250 },
       unlock: { colony: 1 },
     },
+    capteurs: {
+      name: 'Réseau de capteurs',
+      desc: '+1 case de portée de détection par niveau, autour de tes planètes et de tes flottes.',
+      max: 5,
+      req: { lab: 1 },
+      base: { minerals: 120, energy: 60 },
+      range: 1,
+    },
   },
 
   alien: {
@@ -172,8 +189,26 @@ export const TECHS = {
       base: { minerals: 750, food: 220 },
       unlock: { colony: 1 },
     },
+    clairvoyance: {
+      name: 'Clairvoyance',
+      desc: '+1 case de portée de détection par niveau, autour de tes planètes et de tes flottes.',
+      max: 5,
+      req: { lab: 1 },
+      base: { minerals: 150, food: 50 },
+      range: 1,
+    },
   },
 };
+
+/** Portée de détection de base, en cases : autour d'une planète, autour d'une flotte. */
+export const SIGHT = { planet: 3, fleet: 2 };
+
+/** Portée de détection (en cases) autour d'une planète ou d'une flotte, technologies comprises. */
+export function sightRange(race, tech, kind) {
+  let extra = 0;
+  for (const [k, t] of Object.entries(TECHS[race] || {})) extra += (t.range || 0) * lvOf(tech, k);
+  return SIGHT[kind] + extra;
+}
 
 /**
  * Vaisseaux, par race. `attack` et `hull` (points de coque) servent au

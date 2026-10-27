@@ -21,8 +21,8 @@ import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates } from './save.js';
 import { newPlanet, settle, stateAt, startBuild, startResearch, startShips, usePower, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE } from './game.js';
-import { TECHS, SHIPS, shipStats } from './tech.js';
-import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, setShips, together, transfer, split, merge, intercept, inContact, salvage, applyLosses, parkedCell, ORDERS, MAX_FLEETS } from './fleet.js';
+import { TECHS, SHIPS, shipStats, sightRange } from './tech.js';
+import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, setShips, together, transfer, split, merge, intercept, inContact, salvage, applyLosses, parkedCell, fleetPos, ORDERS, MAX_FLEETS } from './fleet.js';
 import { amounts, isEmpty, holdings, lacks, noRoom, take, put, outcome, OFFER_MS, MAX_OFFERS } from './trade.js';
 
 /** « de Beta », « d'Alpha ». */
@@ -880,6 +880,30 @@ export class Session {
     return true;
   }
 
+  // ----- détection ---------------------------------------------------------
+
+  /**
+   * Ce que je vois : un disque autour de chacune de mes planètes et de mes
+   * flottes, plus grand avec la technologie de détection. [{ x, y, r }]
+   * La carte cache ce qui est hors de ces disques ; c'est un filtre
+   * d'affichage, pas un secret : la copie de la partie, elle, contient tout.
+   */
+  eyes(now) {
+    const me = this.state.players[this.me];
+    if (!me?.planet) return [];
+    const tech = me.planet.tech || {};
+    const out = this.planetsOf(me).map((pl) => ({ x: pl.cell.x, y: pl.cell.y, r: sightRange(me.race, tech, 'planet') }));
+    for (const f of me.fleets || []) out.push({ ...fleetPos(f, now), r: sightRange(me.race, tech, 'fleet') });
+    return out;
+  }
+
+  /** Une flotte est-elle visible de mon téléphone ? (les miennes, toujours) */
+  sees(owner, f, now, eyes = this.eyes(now)) {
+    if (owner?.id === this.me) return true;
+    const pos = fleetPos(f, now);
+    return eyes.some((e) => Math.hypot(pos.x - e.x, pos.y - e.y) <= e.r + 1e-9);
+  }
+
   /** La flotte `id` d'un joueur, ou celle qui l'a absorbée en fusionnant. */
   fleetOf(p, id) {
     const all = p?.fleets || [];
@@ -895,6 +919,7 @@ export class Session {
     const target = pid !== this.me && this.fleetOf(enemy, targetId);
     if (!f || !target) return this.refuse('Flotte introuvable.');
     if (this.locked(id)) return false;
+    if (!this.sees(enemy, target, this.now())) return this.refuse('Cette flotte est hors de ta portée de détection.');
     const armed = Object.entries(f.ships).some(([k, n]) => n && shipStats(p.race, k, p.planet.tech).attack > 0);
     if (!armed) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas attaquer.');
     // Ma copie de sa flotte ne change qu'une fois mon rapport lu par son téléphone : d'ici là, ce
@@ -920,9 +945,11 @@ export class Session {
   pursue(p, f, now) {
     const enemy = this.state.players[f.order.pid];
     const target = this.fleetOf(enemy, f.order.fleet);
-    if (!target) {
+    if (!target || !this.sees(enemy, target, now)) {
+      // Disparue (posée, détruite) ou sortie de ma portée de détection.
       f.order = null;
       this.addLog(`La flotte ${de(p.name)} perd sa cible de vue.`);
+      this.ontoast?.('Cible perdue de vue : la poursuite s’arrête.');
       return true;
     }
     if (target.id !== f.order.fleet) f.order = { ...f.order, fleet: target.id }; // la cible a fusionné
@@ -1007,7 +1034,7 @@ export class Session {
     for (const p of Object.values(this.state.players)) {
       if (p.id === this.me) continue;
       for (const f of p.fleets || []) {
-        if (moving(f, now) || !sameCell(parkedCell(f), mine.cell)) continue;
+        if (moving(f, now) || !sameCell(parkedCell(f), mine.cell) || !this.sees(p, f, now)) continue;
         out.push({ pid: p.id, ref: { fleet: f.id }, name: `Flotte ${de(p.name)}` });
       }
       if (mine.side.fleet) {

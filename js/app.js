@@ -733,7 +733,8 @@ function renderLive() {
     const people = popText(p.race, s.pop);
     const nPlanets = session.planetsOf(p).length;
     const docked = session.planetsOf(p).reduce((t, x) => t + countShips(stateAt(x.planet, now).ships), 0);
-    const flying = (p.fleets || []).length;
+    const eyes = session.eyes(now);
+    const flying = (p.fleets || []).filter((f) => session.sees(p, f, now, eyes)).length; // les autres : seulement celles que je vois
     const space = [
       nPlanets > 1 ? `${nPlanets} planètes` : null,
       docked ? `${docked} vaisseau${docked > 1 ? 'x' : ''}` : null,
@@ -1163,6 +1164,19 @@ function drawMap() {
   const picking = !me?.home;
   const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 300);
 
+  // Portée de détection : ce que je vois, en léger halo (hors du halo, les flottes adverses sont cachées).
+  if (me?.planet) {
+    ctx.fillStyle = me.color || '#8d95b3';
+    ctx.globalAlpha = 0.07;
+    ctx.beginPath();
+    for (const e of session.eyes(session.now())) {
+      ctx.moveTo((e.x + 0.5 + e.r) * cell, (e.y + 0.5) * cell);
+      ctx.arc((e.x + 0.5) * cell, (e.y + 0.5) * cell, e.r * cell, 0, Math.PI * 2);
+    }
+    ctx.fill(); // un seul tracé : les zones qui se recouvrent ne s'assombrissent pas
+    ctx.globalAlpha = 1;
+  }
+
   for (const w of mapPlanets()) {
     const cx = (w.x + 0.5) * cell;
     const cy = (w.y + 0.5) * cell;
@@ -1295,8 +1309,10 @@ function drawMap() {
 function fleetSpots(now) {
   const out = [];
   const parked = new Map(); // « x:y » -> nombre de flottes déjà placées sur la case
+  const eyes = session.eyes(now);
   for (const p of Object.values(session.state.players)) {
     for (const f of p.fleets || []) {
+      if (!session.sees(p, f, now, eyes)) continue; // hors de ma portée de détection
       if (moving(f, now)) {
         const pos = fleetPos(f, now);
         out.push({ p, f, x: pos.x, y: pos.y, ang: Math.atan2(f.to.y - f.from.y, f.to.x - f.from.x), moving: true });
