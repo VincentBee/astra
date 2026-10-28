@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#070a14">
+  <title>Astra · Technologies</title>
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <style>
+    /* Même ambiance que le jeu (style.css), mais page autonome : elle ne
+       charge ni le jeu ni ses écrans. */
+    :root {
+      --bg: #070a14;
+      --panel: #111729;
+      --panel-2: #182039;
+      --line: rgba(150, 170, 230, 0.16);
+      --text: #e8ebf7;
+      --muted: #8d95b3;
+      --accent: #7aa2ff;
+      --minerals: #b9c2d6;
+      --food: #7cf0b4;
+      --energy: #ffd166;
+      --radius: 14px;
+      --mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', Menlo, monospace;
+      --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      --race: var(--accent);
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      background: radial-gradient(ellipse at top, #121a33 0%, var(--bg) 60%) fixed, var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.45;
+      min-height: 100vh;
+    }
+    main { max-width: 1120px; margin: 0 auto; padding: 28px 16px 64px; }
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 8vw, 3rem);
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      background: linear-gradient(180deg, #fff, #9db8ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    h2 { font-size: 1.1rem; margin: 36px 0 12px; letter-spacing: 0.04em; }
+    a { color: var(--accent); }
+    .lead { color: var(--muted); margin: 8px 0 0; max-width: 60ch; }
+
+    /* Onglets des races */
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 24px 0 8px; }
+    .tabs button {
+      font: inherit; font-weight: 600; cursor: pointer;
+      min-height: 44px; padding: 0 16px; border-radius: 12px;
+      color: var(--text); background: var(--panel); border: 1px solid var(--line);
+    }
+    .tabs button[aria-selected="true"] { border-color: var(--c); background: color-mix(in srgb, var(--c) 18%, var(--panel)); }
+    .tabs button span { color: var(--c); margin-right: 6px; }
+    .pitch { color: var(--muted); margin: 8px 0 0; }
+
+    /* Arbre : une colonne par niveau de labo, les liens dessinés en SVG par-dessus. */
+    .tree { position: relative; margin-top: 18px; }
+    .tree svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+    .cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 48px; position: relative; }
+    .col { display: grid; gap: 14px; align-content: start; }
+    .col-head {
+      font-family: var(--mono); font-size: 0.78rem; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.08em;
+      border-bottom: 1px solid var(--line); padding-bottom: 6px;
+    }
+    .node {
+      position: relative; z-index: 1;
+      background: var(--panel); border: 1px solid var(--line);
+      border-left: 3px solid var(--race); border-radius: var(--radius);
+      padding: 12px 14px;
+    }
+    .node h3 { margin: 0; font-size: 1rem; }
+    .node .max { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); float: right; margin-left: 8px; }
+    .node p { margin: 6px 0 0; font-size: 0.9rem; color: var(--muted); }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .tag {
+      font-family: var(--mono); font-size: 0.72rem; padding: 2px 8px; border-radius: 999px;
+      background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+    }
+    .tag.unlock { border-color: var(--race); color: var(--race); }
+    .tag.req { color: var(--muted); }
+    .node.hl { box-shadow: 0 0 0 2px var(--race); }
+    .node.dim { opacity: 0.4; }
+    details { margin-top: 8px; }
+    summary { cursor: pointer; color: var(--muted); font-size: 0.82rem; }
+    table { border-collapse: collapse; width: 100%; margin-top: 6px; font-family: var(--mono); font-size: 0.75rem; }
+    th, td { text-align: right; padding: 3px 4px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    th:first-child, td:first-child { text-align: left; }
+    th { color: var(--muted); font-weight: 500; }
+    .r-minerals { color: var(--minerals); }
+    .r-food { color: var(--food); }
+    .r-energy { color: var(--energy); }
+    .edge { fill: none; stroke: var(--race); stroke-opacity: 0.45; stroke-width: 2; }
+    .edge.hl { stroke-opacity: 1; stroke-width: 3; }
+    .edge-label { fill: var(--muted); font-family: var(--mono); font-size: 11px; }
+
+    /* Vaisseaux */
+    .ships { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+    .ship { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+    .ship h3 { margin: 0; font-size: 1rem; }
+    .ship .role { color: var(--muted); font-size: 0.82rem; }
+    .ship dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 8px 0 0; font-size: 0.86rem; }
+    .ship dt { color: var(--muted); }
+    .ship dd { margin: 0; font-family: var(--mono); text-align: right; }
+    .foot { color: var(--muted); font-size: 0.85rem; margin-top: 40px; }
+
+    @media (max-width: 760px) {
+      /* Colonnes empilées : pas de liens, les prérequis sont écrits sur chaque carte. */
+      .cols { grid-template-columns: 1fr; gap: 28px; }
+      .tree svg { display: none; }
+    }
+  </style>
+  <script type="module" src="js/techtree.js"></script>
+</head>
+<body>
+  <main>
+    <h1>Technologies</h1>
+    <p class="lead">L’arbre de recherche et les vaisseaux de chaque race d’Astra. Touche une technologie pour voir ce qu’elle demande et ce qu’elle ouvre.</p>
+    <nav class="tabs" role="tablist" id="tabs"></nav>
+    <p class="pitch" id="pitch"></p>
+    <section class="tree" id="tree" aria-label="Arbre des technologies"></section>
+    <h2 id="ships-title">Vaisseaux</h2>
+    <section class="ships" id="ships"></section>
+    <p class="foot">Le coût de chaque niveau est multiplié par 1,7. La durée est donnée pour le labo minimal demandé ; un labo plus grand va plus vite (+50 % par niveau au-dessus de 1). <a href="./">Retour au jeu</a></p>
+  </main>
+</body>
+</html>
