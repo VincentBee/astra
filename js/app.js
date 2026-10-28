@@ -3,9 +3,10 @@ import { loadGame, describeSave } from './save.js';
 import { inviteLink, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
 import {
-  RACES, RACE_KEYS, RES_INFO, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
-  powerReadyAt, powerCost, liftGain, fmt, UNIVERSE, SOIL, sameCell,
+  RACES, RACE_KEYS, RES_INFO, resIcon, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
+  powerReadyAt, powerCost, liftGain, fmt, UNIVERSE, SOIL, sameCell, sunFor, climateName, kindLabel, usedPlaces,
 } from './game.js';
+import { drawSun } from './sky.js';
 import { TECHS, SHIPS, SHIP_KEYS, techCost, techMissing, researchDuration, shipUnlock, shipUnlocked, shipStats, shipDuration } from './tech.js';
 import { TRADE_RES, TRADE_NAMES } from './trade.js';
 import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fuelAt, moving } from './fleet.js';
@@ -164,7 +165,6 @@ $('btn-create').onclick = async () => {
   session = await Session.create(name);
   session.ontoast = toast;
   session.onchange = onSessionChange;
-  inviteAfterRace = true; // la fenêtre d'invitation s'ouvre une fois la planète choisie
   startGame();
 };
 
@@ -339,19 +339,18 @@ $('btn-answer-ok').onclick = () => useAnswer($('answer-input').value);
 // Choix de la race, à l'arrivée dans la partie (définitif)
 // ---------------------------------------------------------------------------
 
-let inviteAfterRace = false;
 let pickedRace = null;
 
 function showRace() {
   pickedRace = null;
   $('races').innerHTML = RACE_KEYS.map((k) => {
     const R = RACES[k];
-    const res = R.resources.map((r) => `<span class="chip ${r}">${RES_INFO[r].name}</span>`).join('');
+    const res = R.resources.map((r) => `<span class="chip ${r}">${resIcon(r)}${RES_INFO[r].name}</span>`).join('');
     return `<button class="race card" role="radio" aria-checked="false" data-race="${k}" style="--race:${R.color}">
       <span class="race-top"><span class="race-icon" aria-hidden="true">${R.icon}</span><span class="race-name">${R.name}</span></span>
       <span class="race-pitch">${esc(R.pitch)}</span>
       <ul class="race-traits">${R.traits.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
-      <span class="chips">${res}${R.pop ? `<span class="chip pop">${R.pop.label}</span>` : '<span class="chip none">Sans population</span>'}</span>
+      <span class="chips">${res}${R.pop ? `<span class="chip pop">${resIcon('pop', R.pop.label)}${R.pop.label}</span>` : '<span class="chip none">Sans population</span>'}</span>
     </button>`;
   }).join('');
   updateRacePick();
@@ -396,9 +395,10 @@ function startGame() {
   buildStatic();
   selected = null;
   showView('map');
-  renderState();
+  // Le rafraîchissement d'abord : un premier rendu qui échouerait ne doit pas figer l'écran.
   clearInterval(liveTimer);
   liveTimer = setInterval(renderLive, 200);
+  renderState();
   keepAwake();
 }
 
@@ -418,21 +418,21 @@ function buildStatic() {
   const R = RACES[race];
   builtFor = race;
   const tiles = R.resources.map(
-    (r) => `<div class="tile ${r}">${spark(r)}
-      <span class="label">${RES_INFO[r].name}</span>
+    (r) => `<div class="tile ${r}" title="${RES_INFO[r].name}">${spark(r)}
+      <span class="label">${resIcon(r)}</span>
       <span class="amount mono" data-res="${r}">0</span>
       <span class="rate mono" data-rate="${r}"></span>
       <div class="gauge"><div class="gauge-fill" data-gauge="${r}"></div></div>
     </div>`,
   );
   if (R.pop) {
-    tiles.push(`<div class="tile pop">${spark('pop')}<span class="label">${R.pop.label}</span>
+    tiles.push(`<div class="tile pop" title="${R.pop.label}">${spark('pop')}<span class="label">${resIcon('pop', R.pop.label)}</span>
       <span class="amount mono" data-pop></span>
       <span class="rate mono" data-poprate></span>
       <span class="rate mono" data-popextra></span>
       <div class="gauge"><div class="gauge-fill" data-popgauge></div></div></div>`);
   } else {
-    tiles.push(`<div class="tile grid">${spark('grid')}<span class="label">Réseau</span>
+    tiles.push(`<div class="tile grid" title="Réseau électrique">${spark('grid')}<span class="label">${resIcon('energy', 'Réseau')}Réseau</span>
       <span class="amount mono" data-grid></span>
       <span class="rate mono" data-gridrate></span>
       <span class="rate mono" data-gridextra></span></div>`);
@@ -444,10 +444,10 @@ function buildStatic() {
   $('buildings').innerHTML = Object.entries(R.buildings)
     .map(
       ([k, b]) => `<article class="building card" data-card="${k}">
-      <div class="b-head"><h4>${b.name}</h4><span class="level mono" data-level="${k}"></span></div>
-      <p class="b-desc">${esc(b.desc)}</p>
+      ${cardHead(b.name, `data-level="${k}"`)}
       <p class="cost mono" data-cost="${k}"></p>
       <button class="secondary small" data-build="${k}">Améliorer</button>
+      <p class="b-desc">${esc(b.desc)}</p>
     </article>`,
     )
     .join('');
@@ -455,11 +455,10 @@ function buildStatic() {
   $('techs').innerHTML = Object.entries(TECHS[race])
     .map(
       ([k, t]) => `<article class="building card" data-tcard="${k}">
-      <div class="b-head"><h4>${esc(t.name)}</h4><span class="level mono" data-tlevel="${k}"></span></div>
-      <p class="b-desc">${esc(t.desc)}</p>
-      <p class="req" data-treq="${k}" hidden></p>
-      <p class="cost mono" data-tcost="${k}"></p>
+      ${cardHead(t.name, `data-tlevel="${k}"`)}
+      <p class="cost mono"><span data-tcost="${k}"></span> <span class="req" data-treq="${k}" hidden></span></p>
       <button class="secondary small" data-research="${k}">Rechercher</button>
+      <p class="b-desc">${esc(t.desc)}</p>
     </article>`,
     )
     .join('');
@@ -467,14 +466,13 @@ function buildStatic() {
   $('ships').innerHTML = SHIP_KEYS.map((k) => {
     const S = SHIPS[race][k];
     return `<article class="building card" data-scard="${k}">
-      <div class="b-head"><h4>${esc(S.name)}</h4><span class="level mono" data-sdocked="${k}"></span></div>
-      <p class="ship-stats" data-sstats="${k}"></p>
-      <p class="req" data-sreq="${k}" hidden></p>
-      <p class="cost mono" data-scost="${k}"></p>
+      ${cardHead(S.name, `data-sdocked="${k}"`)}
+      <p class="cost mono"><span data-scost="${k}"></span> <span class="req" data-sreq="${k}" hidden></span></p>
       <div class="ship-actions">
-        <button class="secondary small" data-ship="${k}" data-n="1">×1</button>
-        <button class="secondary small" data-ship="${k}" data-n="5">×5</button>
+        <button class="secondary small" data-ship="${k}" data-n="1" aria-label="Construire 1 ${esc(S.name)}">×1</button>
+        <button class="secondary small" data-ship="${k}" data-n="5" aria-label="Construire 5 ${esc(S.name)}">×5</button>
       </div>
+      <p class="ship-stats b-desc" data-sstats="${k}"></p>
     </article>`;
   }).join('');
 
@@ -483,20 +481,35 @@ function buildStatic() {
     race === 'alien'
       ? POWER_KEYS.map(
           (k) => `<article class="building power card" data-pcard="${k}">
-        <div class="b-head"><h4>${POWERS[k].name}</h4><span class="level mono" data-pready="${k}"></span></div>
-        <p class="b-desc">${esc(POWERS[k].desc)}</p>
+        ${cardHead(POWERS[k].name, `data-pready="${k}"`)}
         <p class="cost mono" data-pcost="${k}"></p>
         <button class="secondary small" data-power="${k}">Déclencher</button>
+        <p class="b-desc">${esc(POWERS[k].desc)}</p>
       </article>`,
         ).join('')
       : '';
 }
 
+/**
+ * Tête d'une carte compacte : le nom (qu'on touche pour voir la description)
+ * et un niveau ou un état à côté.
+ */
+const cardHead = (name, attr) =>
+  `<div class="b-head"><button class="b-name" aria-expanded="false" title="Afficher le détail">${esc(name)}</button><span class="level mono" ${attr}></span></div>`;
+
+// Toucher le nom d'une carte déplie ou replie sa description.
+document.addEventListener('click', (e) => {
+  const name = e.target.closest('.b-name');
+  if (!name) return;
+  const open = name.closest('.building').classList.toggle('open');
+  name.setAttribute('aria-expanded', String(open));
+});
+
 /** Tuiles des gisements (minéraux et nourriture du sol), remplies par fillSoil. */
 function soilTiles(prefix) {
   return SOIL.map(
     (r) => `<div class="tile ${r}" data-${prefix}-tile="${r}">${prefix === 'soil' ? spark(`soil-${r}`) : ''}
-      <span class="label">${RES_INFO[r].name}</span>
+      <span class="label">${resIcon(r)}${RES_INFO[r].name}</span>
       <span class="amount mono" data-${prefix}-amount="${r}"></span>
       <span class="rate mono" data-${prefix}-rate="${r}"></span>
       <span class="rate mono" data-${prefix}-detail="${r}"></span>
@@ -523,11 +536,13 @@ function fillSoil(prefix, nature, reserve, soil) {
     const detail = q(`[data-${prefix}-detail="${r}"]`);
     // Solde du gisement : ce qu'il produit de lui-même, moins ce qu'on en extrait.
     if (!soil) rate.textContent = 'Intact';
-    else if (limited) rate.textContent = `Épuisé : limité à ${fmt(n.regen)} / min`;
-    else if (left >= n.max - 0.5 && soil[r].got <= n.regen) rate.textContent = 'Plein : il se régénère plus vite qu’on n’extrait';
+    else if (limited) rate.textContent = `Épuisé : ${fmt(n.regen)} / min`;
+    else if (left >= n.max - 0.5 && soil[r].got <= n.regen) rate.textContent = 'Plein';
     else rate.textContent = rateText(n.regen - soil[r].got);
     rate.classList.toggle('neg', limited || (!!soil && soil[r].got > n.regen + 0.5));
-    detail.textContent = soil ? `extraction ${fmt(soil[r].got)} · régénère ${fmt(n.regen)} / min` : `régénère ${fmt(n.regen)} / min`;
+    detail.textContent = soil ? `−${fmt(soil[r].got)} +${fmt(n.regen)} / min` : `+${fmt(n.regen)} / min`;
+    detail.title = soil ? `Extraction ${fmt(soil[r].got)} / min, régénération ${fmt(n.regen)} / min` : `Régénération ${fmt(n.regen)} / min`;
+    rate.title = detail.title;
   }
 }
 
@@ -612,12 +627,50 @@ function drawSparks() {
 /** « 220 / 1 000 » : la quantité et, en plus discret, la capacité maximale. */
 const withCap = (v, cap) => `${fmt(v)}<span class="cap"> / ${fmt(cap)}</span>`;
 
-/** « 1 234 min. · 30 én. » */
+/** « 118 k » au-delà de 100 000 : un nombre qui tient dans une tuile étroite. */
+const compact = (v) => (v >= 1e5 ? `${fmt(Math.floor(v / 1000))} k` : fmt(v));
+
+// Toutes les fenêtres se ferment d'un toucher sur le fond sombre ou avec Échap (comme leur croix).
+for (const sheet of document.querySelectorAll('.sheet')) {
+  sheet.addEventListener('click', (e) => {
+    if (e.target === sheet) sheet.querySelector('.close-btn')?.click();
+  });
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const open = [...document.querySelectorAll('.sheet')].find((s) => !s.hidden);
+  open?.querySelector('.close-btn')?.click();
+});
+
+/** « 1 234 ◆ · 30 ⚡ », en HTML : chaque quantité suivie de l'icône de sa ressource. */
 function costText(cost) {
   return Object.entries(cost)
     .filter(([, v]) => v > 0)
-    .map(([r, v]) => `${fmt(v)} ${RES_INFO[r].short}`)
+    .map(([r, v]) => `<span class="qty">${fmt(v)}${resIcon(r)}</span>`)
     .join(' · ');
+}
+
+/** « Chaud · ×1,2 ⚡ · ×1,1 ◆ · ×0,9 🍃 » : le climat et son effet sur la production, en HTML. */
+function climateHtml(c) {
+  const x = (v) => `×${v.toFixed(2).replace('.', ',')}`;
+  const cls = c.heat >= 0.6 ? 'hot' : c.heat < 0.4 ? 'cold' : 'mild';
+  return `<span class="climate-name ${cls}">${climateName(c.heat)}</span> · production ${['energy', 'minerals', 'food']
+    .map((r) => `<span class="qty">${x(c[r])}${resIcon(r)}</span>`)
+    .join(' · ')}`;
+}
+
+/** Ligne du climat dans `el` (cachée pour une planète d'avant le climat). */
+function showClimate(el, climate) {
+  el.hidden = !climate;
+  if (climate) setHtml(el, climateHtml(climate));
+}
+
+/** innerHTML, réécrit seulement s'il a changé (ces lignes sont rafraîchies à chaque tic). */
+function setHtml(el, html) {
+  if (el.dataset.html !== html) {
+    el.innerHTML = html;
+    el.dataset.html = html;
+  }
 }
 
 /** Solde par minute réelle (= heure de jeu), signé. */
@@ -631,8 +684,7 @@ function rateText(v) {
 function popText(race, pop) {
   const R = RACES[race];
   if (!R.pop) return null;
-  const n = Math.floor(pop);
-  return `${fmt(n)} ${R.pop.unit}${n > 1 ? 's' : ''}`;
+  return `<span class="qty">${fmt(Math.floor(pop))}${resIcon('pop', R.pop.label)}</span>`;
 }
 
 $('buildings').addEventListener('click', (e) => {
@@ -655,15 +707,15 @@ function renderState() {
   const players = Object.values(st.players);
   $('players').innerHTML = players
     .map(
-      (p) => `<div class="player card${p.online ? '' : ' offline'}" data-player="${p.id}">
+      (p) => `<div class="player card${p.online ? '' : ' offline'}" data-player="${esc(p.id)}">
         <span class="dot" style="background:${esc(p.color)}"></span>
         <div class="p-main">
           <div class="p-name">${esc(p.name)}${p.id === session.me ? ' <span class="you">toi</span>' : ''}${
             p.race ? ` <span class="tag race-tag" style="--race:${RACES[p.race].color}">${RACES[p.race].icon} ${RACES[p.race].name}</span>` : ''
           }</div>
-          <div class="p-sub mono" data-psub="${p.id}"></div>
+          <div class="p-sub mono" data-psub="${esc(p.id)}"></div>
         </div>
-        <div class="p-score mono" data-pscore="${p.id}"></div>
+        <div class="p-score mono" data-pscore="${esc(p.id)}"></div>
       </div>`,
     )
     .join('');
@@ -744,8 +796,9 @@ function renderLive() {
       docked ? `${docked} vaisseau${docked > 1 ? 'x' : ''}` : null,
       flying ? `${flying} flotte${flying > 1 ? 's' : ''}` : null,
     ];
-    sub.textContent = [`${fmt(s.stock.minerals)} min.`, people, doing, ...space, net].filter(Boolean).join(' · ');
-    scoreEl.textContent = `${score(p.race, s.levels)} pts`;
+    const stock = `<span class="qty">${fmt(s.stock.minerals)}${resIcon('minerals')}</span>`;
+    setHtml(sub, [stock, people, ...[doing, ...space, net].filter(Boolean).map(esc)].filter(Boolean).join(' · '));
+    scoreEl.textContent = `${fmt(score(p.race, s.levels))} pts`;
   }
 }
 
@@ -767,17 +820,19 @@ function renderPlanet(me, now) {
 
   $('planet-title').textContent = openKey === 'home' ? pl.name : `${pl.name} · colonie`;
   $('soil-zone').hidden = !planet.nature;
+  showClimate($('soil-climate'), planet.climate);
   if (planet.nature) fillSoil('soil', planet.nature, s.reserve, f.soil);
 
   for (const r of R.resources) {
     const cap = f.caps[r];
     q(`[data-res="${r}"]`).innerHTML = withCap(s.stock[r], cap);
+    q(`[data-res="${r}"]`).firstChild.textContent = compact(s.stock[r]); // tuile étroite : « 118 k »
     const short = r === 'energy' ? f.effE < 1 : r === 'food' ? f.effF < 1 : false;
     const rate = q(`[data-rate="${r}"]`);
     rate.textContent = short
-      ? `Pénurie · ${Math.round((r === 'energy' ? f.effE : f.effF) * 100)} % servis`
+      ? `Pénurie ${Math.round((r === 'energy' ? f.effE : f.effF) * 100)} %`
       : s.stock[r] >= cap && f.net[r] >= 0
-        ? `Stock plein (${fmt(cap)})`
+        ? 'Plein'
         : rateText(f.net[r]);
     rate.classList.toggle('neg', short || f.net[r] < -0.5);
     q(`[data-gauge="${r}"]`).style.width = `${Math.min(100, (s.stock[r] / cap) * 100)}%`;
@@ -797,7 +852,8 @@ function renderPlanet(me, now) {
       const people = Math.floor(s.pop);
       const active = Math.min(people, f.jobs);
       const vacant = Math.max(0, f.jobs - people);
-      extra.textContent = `${fmt(active)} actifs / ${fmt(people)} habitants${vacant ? ` · ${fmt(vacant)} postes vides` : ''}`;
+      extra.textContent = `${fmt(active)} actifs${vacant ? ` · ${fmt(vacant)} vides` : ''}`;
+      extra.title = `${fmt(active)} habitants au travail sur ${fmt(people)}${vacant ? `, ${fmt(vacant)} postes vides` : ''}`;
       extra.classList.toggle('neg', vacant > 0);
     } else {
       q('[data-pop]').innerHTML = withCap(s.pop, cap);
@@ -806,30 +862,40 @@ function renderPlanet(me, now) {
       rate.textContent = starving
         ? 'Ils dépérissent !'
         : s.pop >= cap - 1e-6
-          ? `Sanctuaire plein (${fmt(cap)})`
-          : `Naissance dans ${Math.ceil(next)} min`;
-      extra.textContent = `Puissance ≈ ${fmt(power(me.race, s.pop))} humains`;
+          ? 'Plein'
+          : `+1 : ${Math.ceil(next)} min`;
+      extra.textContent = `≈ ${fmt(power(me.race, s.pop))} hum.`;
+      extra.title = `Puissance d'environ ${fmt(power(me.race, s.pop))} humains`;
     }
     rate.classList.toggle('neg', delta < -0.01 || f.effF < 1 || (me.race === 'alien' && f.effE < 1));
   } else {
     q('[data-grid]').textContent = `${Math.round(f.effE * 100)} %`;
-    q('[data-gridrate]').textContent = `Prod. ${fmt(f.in.energy)} · conso. ${fmt(f.out.energy / Math.max(f.effE, 1e-9))}`;
-    q('[data-gridextra]').textContent = f.effE < 1 ? 'Foreuses au ralenti' : 'Tout tourne à plein';
+    q('[data-gridrate]').textContent = `+${fmt(f.in.energy)} −${fmt(f.out.energy / Math.max(f.effE, 1e-9))}`;
+    q('[data-gridrate]').title = 'Production et consommation d’énergie, par minute';
+    q('[data-gridextra]').textContent = f.effE < 1 ? 'Ralenti' : 'À plein';
     q('[data-gridrate]').classList.toggle('neg', f.effE < 1);
   }
 
+  // Place : un niveau de bâtiment, une place (les planètes d'avant la place n'ont pas de limite).
+  const used = usedPlaces(s.levels);
+  const full = !!planet.places && used >= planet.places;
+  $('places').textContent = planet.places ? `${used} / ${planet.places} places` : '';
+  $('places').classList.toggle('full', full);
   for (const k of Object.keys(R.buildings)) {
     const level = s.levels[k] || 0;
     const cost = upgradeCost(me.race, k, level);
-    const ok = covers(s.stock, cost);
-    q(`[data-level="${k}"]`).textContent = `Niv. ${level}`;
-    q(`[data-cost="${k}"]`).textContent = `${costText(cost)} · ${buildDuration(me.race, s.levels, cost) / 1000} s`;
+    const ok = covers(s.stock, cost) && !full;
+    q(`[data-level="${k}"]`).textContent = `niv ${level}`;
+    setHtml(q(`[data-cost="${k}"]`), `${costText(cost)} · ${buildDuration(me.race, s.levels, cost) / 1000} s`);
     const card = q(`[data-card="${k}"]`);
     card.classList.toggle('affordable', ok && !s.queue);
     card.classList.toggle('building-now', s.queue?.key === k);
     const btn = q(`[data-build="${k}"]`);
     btn.disabled = !!s.queue || !ok || session.status !== 'playing';
-    btn.textContent = s.queue?.key === k ? 'En chantier' : `Niveau ${level + 1}`;
+    btn.textContent = s.queue?.key === k ? '…' : `▲ ${level + 1}`;
+    btn.title =
+      s.queue?.key === k ? 'En chantier' : full ? 'Plus de place sur cette planète' : !covers(s.stock, cost) ? 'Ressources insuffisantes' : `Passer au niveau ${level + 1}`;
+    btn.setAttribute('aria-label', `${R.buildings[k].name} : ${btn.title.toLowerCase()}`);
   }
 
   if (s.queue) {
@@ -848,12 +914,14 @@ function renderPlanet(me, now) {
       const wait = Math.max(0, powerReadyAt(planet, k) - now);
       const ok = covers(s.stock, cost);
       const idle = k === 'lift' && !liftGain({ ...planet, ...s }); // entrepôt plein ou sol vide : rien à gagner
-      q(`[data-pcost="${k}"]`).textContent = `${costText(cost)} · recharge ${POWERS[k].cooldown / 60000} min`;
-      q(`[data-pready="${k}"]`).textContent = k === 'trance' && trance ? `En transe ${clock(trance)}` : wait ? clock(wait) : 'Prêt';
+      setHtml(q(`[data-pcost="${k}"]`), `${costText(cost)} · ↻ ${POWERS[k].cooldown / 60000} min`);
+      q(`[data-pready="${k}"]`).textContent = k === 'trance' && trance ? `transe ${clock(trance)}` : wait ? clock(wait) : 'prêt';
       q(`[data-pcard="${k}"]`).classList.toggle('affordable', ok && !wait && !idle);
       const btn = q(`[data-power="${k}"]`);
       btn.disabled = !!wait || !ok || idle || session.status !== 'playing';
-      btn.textContent = wait ? 'En recharge' : idle ? 'Rien à arracher' : 'Déclencher';
+      btn.textContent = wait ? '…' : idle ? '∅' : '▶';
+      btn.title = wait ? 'En recharge' : idle ? 'Rien à arracher' : 'Déclencher';
+      btn.setAttribute('aria-label', `${POWERS[k].name} : ${btn.title.toLowerCase()}`);
     }
   }
 
@@ -877,11 +945,15 @@ function progress(prefix, job, label, now) {
 function renderResearch(me, pl, s, now) {
   const home = pl.key === 'home';
   $('research-zone').hidden = !home;
+  // Pas de recherche dans une colonie : son onglet disparaît.
+  $('tab-research').hidden = !home;
+  if (!home && $('view-planet').dataset.tab === 'research') showTab('build', false);
+  if (home && $('view-planet').dataset.tab !== chosenTab) showTab(chosenTab, false); // retour d'une colonie
   if (!home) return;
   const lab = s.levels.lab || 0;
   const T = TECHS[me.race];
   const labName = RACES[me.race].buildings.lab.name;
-  $('research-hint').textContent = lab ? '' : `Construis un ${labName} (bâtiments ci-dessus) pour commencer la recherche.`;
+  $('research-hint').textContent = lab ? '' : `🔒 Il faut un ${labName}.`;
   $('research-hint').hidden = !!lab;
   progress('research', s.research, s.research ? `${T[s.research.key].name} → niv. ${s.research.level}` : '', now);
   const q = (sel) => document.querySelector(sel);
@@ -891,29 +963,32 @@ function renderResearch(me, pl, s, now) {
     const miss = techMissing(me.race, k, s.tech, lab);
     const cost = techCost(me.race, k, level);
     const ok = !maxed && !miss && covers(s.stock, cost);
-    q(`[data-tlevel="${k}"]`).textContent = `Niv. ${level} / ${t.max}`;
+    q(`[data-tlevel="${k}"]`).textContent = `niv ${level}/${t.max}`;
     const req = q(`[data-treq="${k}"]`);
     req.hidden = !miss || maxed;
-    req.textContent = miss ? `Il faut : ${miss}` : '';
-    q(`[data-tcost="${k}"]`).textContent = maxed ? 'Niveau maximum' : `${costText(cost)} · ${clock(researchDuration(cost, Math.max(1, lab)))}`;
+    req.textContent = miss ? `🔒 ${miss}` : '';
+    setHtml(q(`[data-tcost="${k}"]`), maxed ? 'Niveau maximum' : `${costText(cost)} · ${clock(researchDuration(cost, Math.max(1, lab)))}`);
     q(`[data-tcard="${k}"]`).classList.toggle('locked', !!miss && !maxed);
     q(`[data-tcard="${k}"]`).classList.toggle('affordable', ok && !s.research);
     q(`[data-tcard="${k}"]`).classList.toggle('building-now', s.research?.key === k);
     const btn = q(`[data-research="${k}"]`);
     btn.disabled = !ok || !!s.research || session.status !== 'playing';
-    btn.textContent = s.research?.key === k ? 'En cours' : maxed ? 'Terminé' : `Niveau ${level + 1}`;
+    btn.textContent = s.research?.key === k ? '…' : maxed ? '✓' : `▲ ${level + 1}`;
+    btn.title = s.research?.key === k ? 'En cours' : maxed ? 'Terminé' : miss ? `Il faut : ${miss}` : !ok ? 'Ressources insuffisantes' : `Rechercher le niveau ${level + 1}`;
+    btn.setAttribute('aria-label', `${t.name} : ${btn.title.toLowerCase()}`);
   }
 }
 
+/** « ⚔ 12 · ◇ 30 · ▣ 50 · » 7,0 » : attaque, coque, soute, vitesse (cases/min). */
 const statText = (st) =>
-  `⚔ ${fmt(st.attack)} · ◇ ${fmt(st.hull)} · soute ${fmt(st.cargo)} · ${st.speed.toFixed(1).replace('.', ',')} cases/min`;
+  `⚔ ${fmt(st.attack)} · ◇ ${fmt(st.hull)} · ▣ ${fmt(st.cargo)} · » ${st.speed.toFixed(1).replace('.', ',')}`;
 
 /** Chantier naval de la planète ouverte. */
 function renderYard(me, pl, s, now) {
   const yard = s.levels.yard || 0;
   const S = SHIPS[me.race];
   const yardName = RACES[me.race].buildings.yard.name;
-  $('yard-hint').textContent = yard ? '' : `Construis un ${yardName} (bâtiments ci-dessus) pour construire des vaisseaux.`;
+  $('yard-hint').textContent = yard ? '' : `🔒 Il faut un ${yardName}.`;
   $('yard-hint').hidden = !!yard;
   progress('yard', s.yard, s.yard ? `${s.yard.count} × ${S[s.yard.type].name}` : '', now);
   const q = (sel) => document.querySelector(sel);
@@ -921,11 +996,12 @@ function renderYard(me, pl, s, now) {
     const unlocked = shipUnlocked(me.race, k, s.tech);
     const u = shipUnlock(me.race, k);
     q(`[data-sdocked="${k}"]`).textContent = s.ships[k] ? `${s.ships[k]} à quai` : '';
+    q(`[data-sstats="${k}"]`).title = 'Attaque · coque · soute · vitesse en cases par minute';
     q(`[data-sstats="${k}"]`).textContent = statText(shipStats(me.race, k, s.tech));
     const req = q(`[data-sreq="${k}"]`);
     req.hidden = unlocked;
-    req.textContent = unlocked ? '' : `Il faut : ${TECHS[me.race][u.key].name} ${u.level}`;
-    q(`[data-scost="${k}"]`).textContent = `${costText(S[k].cost)} · ${clock(shipDuration(me.race, k, 1, Math.max(1, yard)))} pièce`;
+    req.textContent = unlocked ? '' : `🔒 ${TECHS[me.race][u.key].name} ${u.level}`;
+    setHtml(q(`[data-scost="${k}"]`), `${costText(S[k].cost)} · ${clock(shipDuration(me.race, k, 1, Math.max(1, yard)))}/u`);
     q(`[data-scard="${k}"]`).classList.toggle('locked', !unlocked);
     for (const btn of document.querySelectorAll(`[data-ship="${k}"]`)) {
       const n = Number(btn.dataset.n);
@@ -960,9 +1036,9 @@ const cellName = (cell) => mapPlanets().find((w) => sameCell(w, cell))?.name || 
 /** « carburant 34 / 40 » */
 const fuelText = (race, f, now) => `carburant ${Math.floor(fuelAt(f, race, now))} / ${fleetTank(race, f.ships)}`;
 
-/** « 3 × Frégate, 1 × Cargo · 200 min. » */
+/** « 3 × Frégate, 1 × Cargo · 200 ◆ », en HTML. */
 function shipsLine(race, f) {
-  const ships = SHIP_KEYS.filter((k) => f.ships[k]).map((k) => `${f.ships[k]} × ${SHIPS[race][k].name}`).join(', ');
+  const ships = SHIP_KEYS.filter((k) => f.ships[k]).map((k) => `${f.ships[k]} × ${esc(SHIPS[race][k].name)}`).join(', ');
   const cargo = f.cargo && f.cargo.minerals + f.cargo.food ? ` · ${costText(f.cargo)}` : '';
   return `${ships}${cargo}`;
 }
@@ -985,7 +1061,7 @@ function fleetStatus(race, f, now) {
     return `Poursuite d’une flotte ${foe ? de(foe.name) : 'ennemie'}`;
   }
   if (moving(f, now)) return `${f.order ? ORDERS[f.order.kind]?.name || 'Ordre' : 'Déplacement'} → ${where}`;
-  return mapPlanets().some((w) => sameCell(w, f.to)) ? `En orbite de ${where}` : `Stationne en ${where}`;
+  return mapPlanets().some((w) => sameCell(w, f.to)) ? `En orbite ${de(where)}` : `Stationne en ${where}`;
 }
 
 $('fleets').addEventListener('click', (e) => {
@@ -1088,6 +1164,7 @@ function showView(view, key = openKey) {
     $('map-size').textContent = `${UNIVERSE.w} × ${UNIVERSE.h}`;
     if (!mapFrame) mapFrame = requestAnimationFrame(drawMap);
   } else stopMap();
+  if (session?.state) renderLive(); // pas d'image de l'écran précédent pendant 200 ms
 }
 
 function stopMap() {
@@ -1096,7 +1173,49 @@ function stopMap() {
 }
 
 $('btn-back-map').onclick = () => showView('map');
-$('btn-open-planet').onclick = (e) => showView('planet', e.currentTarget.dataset.key || 'home');
+
+/** Onglet de l'écran planète : bâtiments, recherche ou flottes. */
+/** Onglet choisi par le joueur (une colonie sans recherche peut en afficher un autre un moment). */
+let chosenTab = 'build';
+function showTab(tab, persist = true) {
+  $('view-planet').dataset.tab = tab;
+  if (persist) chosenTab = tab;
+  for (const b of document.querySelectorAll('[data-tab-btn]')) {
+    b.setAttribute('aria-selected', String(b.dataset.tabBtn === tab));
+    b.tabIndex = b.dataset.tabBtn === tab ? 0 : -1;
+  }
+  if (!persist) return; // changement forcé (colonie sans recherche) : l'onglet choisi reste mémorisé
+  try {
+    localStorage.setItem('astra.tab', tab);
+  } catch {}
+}
+for (const b of document.querySelectorAll('[data-tab-btn]')) b.onclick = () => showTab(b.dataset.tabBtn);
+// Flèches gauche et droite : onglet voisin (visible).
+document.querySelector('.tabs').addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  const tabs = [...document.querySelectorAll('[data-tab-btn]')].filter((b) => !b.hidden);
+  const i = tabs.findIndex((b) => b.getAttribute('aria-selected') === 'true');
+  const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+  showTab(next.dataset.tabBtn);
+  next.focus();
+});
+try {
+  const saved = localStorage.getItem('astra.tab');
+  if (['build', 'research', 'fleet'].includes(saved)) showTab(saved);
+} catch {}
+// Aide de la carte : une bulle au survol ; au doigt (pas de survol), un toucher l'ouvre ou la ferme.
+$('btn-map-help').onclick = (e) => {
+  const btn = e.currentTarget;
+  btn.setAttribute('aria-expanded', String(btn.getAttribute('aria-expanded') !== 'true'));
+};
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.help-wrap')) $('btn-map-help').setAttribute('aria-expanded', 'false');
+});
+$('btn-open-planet').onclick = (e) => {
+  selected = null; // sinon la fiche se rouvrirait au retour sur la carte
+  renderPick();
+  showView('planet', e.currentTarget.dataset.key || 'home');
+};
 
 /**
  * Toutes les planètes à afficher : celles de l'univers, avec leur
@@ -1127,9 +1246,50 @@ function noise(x, y) {
   return n - Math.floor(n);
 }
 
+/**
+ * Astéroïde (un caillou irrégulier) ou comète (une tête et une queue qui
+ * fuit le soleil), plus petits qu'une planète.
+ */
+function drawSmallBody(ctx, w, cx, cy, cell, color) {
+  if (w.kind === 'comet') {
+    const sun = sunFor(session.state.gid);
+    const sx = (sun.x + sun.size / 2) * cell;
+    const sy = (sun.y + sun.size / 2) * cell;
+    const a = Math.atan2(cy - sy, cx - sx);
+    const tail = ctx.createLinearGradient(cx, cy, cx + Math.cos(a) * cell * 0.8, cy + Math.sin(a) * cell * 0.8);
+    tail.addColorStop(0, 'rgba(170,220,255,0.55)');
+    tail.addColorStop(1, 'rgba(170,220,255,0)');
+    ctx.save();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = tail;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a + Math.PI / 2) * cell * 0.1, cy + Math.sin(a + Math.PI / 2) * cell * 0.1);
+    ctx.lineTo(cx + Math.cos(a) * cell * 0.8, cy + Math.sin(a) * cell * 0.8);
+    ctx.lineTo(cx + Math.cos(a - Math.PI / 2) * cell * 0.1, cy + Math.sin(a - Math.PI / 2) * cell * 0.1);
+    ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = w.owner ? color : '#cfe8ff';
+    ctx.beginPath();
+    ctx.arc(cx, cy, cell * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+  // Caillou : un polygone aux sommets irréguliers, le même à chaque image.
+  ctx.beginPath();
+  for (let k = 0; k < 7; k++) {
+    const r = cell * (0.1 + 0.07 * noise(w.x * 7 + k, w.y * 3 + k));
+    const t = (k / 7) * Math.PI * 2;
+    ctx[k ? 'lineTo' : 'moveTo'](cx + Math.cos(t) * r, cy + Math.sin(t) * r);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
 function drawMap() {
   mapFrame = null;
   if (!session || currentView !== 'map') return;
+  // L'image suivante est demandée tout de suite : une erreur dans celle-ci ne fige pas la carte.
+  mapFrame = requestAnimationFrame(drawMap);
   const canvas = $('map');
   const dpr = Math.min(3, window.devicePixelRatio || 1);
   const css = canvas.clientWidth;
@@ -1164,6 +1324,7 @@ function drawMap() {
     ctx.lineTo(W, i * cell);
   }
   ctx.stroke();
+  drawSun(ctx, sunFor(session.state.gid), cell);
 
   const me = session.state.players[session.me];
   const picking = !me?.home;
@@ -1188,9 +1349,21 @@ function drawMap() {
     const o = w.owner;
     const mine = o?.id === session.me;
     // Planète libre : grise, plus lumineuse quand on cherche où s'installer.
-    ctx.globalAlpha = o ? (o.online ? 1 : 0.45) : picking ? 0.55 + 0.35 * pulse : 0.6;
+    ctx.globalAlpha = o ? (o.online ? 1 : 0.45) : picking && w.kind === 'planet' ? 0.55 + 0.35 * pulse : 0.6;
     const color = o ? o.color : '#8d95b3';
     ctx.fillStyle = color;
+    if (w.kind === 'asteroid' || w.kind === 'comet') {
+      drawSmallBody(ctx, w, cx, cy, cell, color);
+      if (sameCell(selected, w) || mine) {
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = Math.max(1.5, cell * 0.06);
+        ctx.beginPath();
+        ctx.arc(cx, cy, cell * 0.4, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      continue;
+    }
     ctx.beginPath();
     ctx.arc(cx, cy, cell * (o ? 0.26 : 0.2), 0, Math.PI * 2);
     ctx.fill();
@@ -1301,8 +1474,6 @@ function drawMap() {
   }
 
   $('my-coords').textContent = me?.home ? `[${me.home.x}:${me.home.y}]` : 'à choisir';
-
-  mapFrame = requestAnimationFrame(drawMap);
 }
 
 /**
@@ -1355,8 +1526,10 @@ $('map').addEventListener('click', (e) => {
   const now = session.now();
   const dist = (s) => Math.hypot(s.x - fx, s.y - fy);
   // Toucher large : une case fait ~16 px sur un téléphone. Plusieurs flottes sous le doigt : chaque toucher passe à la suivante.
+  // Une flotte déjà choisie : toucher une case voisine l'y envoie, au lieu de choisir une flotte en orbite à côté.
+  const tap = { x: Math.round(fx), y: Math.round(fy) };
   const hits = fleetSpots(now)
-    .filter((s) => s.p.id === session.me && dist(s) < 0.7)
+    .filter((s) => s.p.id === session.me && dist(s) < 0.7 && (!selFleet || sameCell({ x: Math.round(s.x), y: Math.round(s.y) }, tap)))
     .sort((a, b) => dist(a) - dist(b));
   if (hits.length && (!best || dist(hits[0]) < best.d)) {
     const i = hits.findIndex((s) => s.f.id === selFleet);
@@ -1403,7 +1576,6 @@ $('map').addEventListener('click', (e) => {
   }
   selected = { x: w.x, y: w.y };
   renderPick();
-  $('planet-info').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 });
 
 /** Fiche de la flotte sélectionnée : son état, ses ordres, et le choix en attente sur une planète. */
@@ -1420,7 +1592,7 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
   const go = moving(f, now);
   const pos = fleetPos(f, now);
   $('fi-where').textContent = `[${Math.round(pos.x)}:${Math.round(pos.y)}]`;
-  $('fi-ships').textContent = shipsLine(me.race, f);
+  setHtml($('fi-ships'), shipsLine(me.race, f));
   $('fi-name').textContent = fleetName(f);
   $('fi-status').textContent = `${fleetStatus(me.race, f, now)}${go ? ` · ${clock(f.arrive - now)}` : ''}`;
   const here = !go && session.planetsAt(f.to)[0];
@@ -1433,6 +1605,7 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
   const mine = here && here.owner.id === session.me;
   $('btn-fi-stop').hidden = !go && f.order?.kind !== 'chase';
   $('btn-fi-dock').hidden = !mine;
+  $('btn-fi-return').hidden = !!mine && here.key === 'home'; // déjà chez elle
   $('btn-fi-refuel').hidden = !mine || fuel >= tank - 0.5;
   $('btn-fi-split').hidden = go || countShips(f.ships) < 2;
   renderBeside(me, f, now);
@@ -1543,13 +1716,13 @@ $('btn-trade-go').onclick = () => {
 function renderTrades(me, now) {
   if (!me) return;
   const incoming = session.incomingOffers().map(
-    ({ from, offer }) => `<div class="card trade"><p><strong>${esc(from.name)}</strong> te propose : il donne ${esc(tradeText(offer.give))}, il demande ${esc(tradeText(offer.want))}. <span class="mono" data-left="${offer.expires}"></span></p>
+    ({ from, offer }) => `<div class="card trade"><p><strong>${esc(from.name)}</strong> te propose : il donne ${esc(tradeText(offer.give))}, il demande ${esc(tradeText(offer.want))}. <span class="mono" data-left="${Number(offer.expires) || 0}"></span></p>
       <div class="fi-actions"><button class="primary small" data-accept="${esc(from.id)}:${esc(offer.id)}">Accepter</button>
       <button class="secondary small" data-refuse="${esc(from.id)}:${esc(offer.id)}">Refuser</button></div></div>`,
   );
   const mine = (me.offers || []).map((o) => {
     const to = session.state.players[o.to.pid];
-    return `<div class="card trade mine"><p>Échange proposé à ${esc(to?.name || '?')} : tu donnes ${esc(tradeText(o.give))}, tu demandes ${esc(tradeText(o.want))}. <span class="mono" data-left="${o.expires}"></span></p></div>`;
+    return `<div class="card trade mine"><p>Échange proposé à ${esc(to?.name || '?')} : tu donnes ${esc(tradeText(o.give))}, tu demandes ${esc(tradeText(o.want))}. <span class="mono" data-left="${Number(o.expires) || 0}"></span></p></div>`;
   });
   // HTML stable (redessiner sous le doigt ferait rater le toucher sur « Accepter ») ;
   // seuls les comptes à rebours changent.
@@ -1644,18 +1817,24 @@ function renderPick(me = session?.state?.players[session.me], now = session?.now
   const picking = !me?.home;
   $('pick').hidden = !picking;
   const w = selected && mapPlanets().find((x) => sameCell(x, selected));
-  $('planet-info').hidden = !w;
+  $('sheet-planet').hidden = !w;
   if (!w) return;
   const o = w.owner;
   $('pi-name').textContent = w.name;
   $('pi-where').textContent = `[${w.x}:${w.y}]`;
   $('pi-owner').textContent = o
-    ? `${o.id === session.me ? 'Ta planète' : `Planète ${de(o.name)}`}${o.race ? ` · ${RACES[o.race].icon} ${RACES[o.race].name}` : ''}`
-    : 'Planète libre. Ses gisements se vident quand on les exploite, et se reconstituent d’eux-mêmes jusqu’à leur maximum.';
+    ? `${o.id === session.me ? `${w.kind === 'asteroid' ? 'Ton' : 'Ta'} ${kindLabel(w.kind).toLowerCase()}` : `${kindLabel(w.kind)} ${de(o.name)}`}${o.race ? ` · ${RACES[o.race].icon} ${RACES[o.race].name}` : ''}`
+    : `${kindLabel(w.kind)} libre. Ses gisements se vident quand on les exploite, et se reconstituent d’eux-mêmes jusqu’à leur maximum.`;
   // Gisements : pleins pour une planète libre, calculés chez son propriétaire sinon.
   const planet = w.pl?.planet;
   const s = planet ? stateAt(planet, now) : null;
   const nature = o ? planet?.nature : w.nature;
+  showClimate($('pi-climate'), o ? planet?.climate : w.climate);
+  const places = o ? planet?.places : w.places;
+  $('pi-size').hidden = !places;
+  $('pi-size').textContent = places
+    ? `${kindLabel(w.kind)} · ${planet ? `${usedPlaces(stateAt(planet, now).levels)} / ${places}` : places} places${!o && w.kind !== 'planet' ? ' · à coloniser' : ''}`
+    : '';
   if (o && s) {
     const n = countShips(s.ships);
     $('pi-owner').textContent += `${w.pl.key === 'home' ? '' : ' · colonie'} · ${n ? `${n} vaisseau${n > 1 ? 'x' : ''} à quai` : 'aucun vaisseau à quai'}`;
@@ -1666,11 +1845,18 @@ function renderPick(me = session?.state?.players[session.me], now = session?.now
     if (!box.firstChild) box.innerHTML = soilTiles('pi');
     fillSoil('pi', nature, s ? s.reserve : w.reserve, s ? s.prod.soil : null);
   }
-  $('btn-claim').hidden = !picking || !!o;
+  $('btn-claim').hidden = !picking || !!o || (w.kind && w.kind !== 'planet');
   $('btn-claim').textContent = `S'installer sur ${w.name} (définitif)`;
   $('btn-open-planet').hidden = o?.id !== session.me || !w.pl;
   $('btn-open-planet').dataset.key = w.pl?.key || 'home';
 }
+
+/** Ferme la fiche de la planète : bouton Fermer, ou toucher le fond sombre autour. */
+function closePlanetSheet() {
+  selected = null;
+  renderPick();
+}
+$('btn-planet-close').onclick = closePlanetSheet;
 
 $('btn-claim').onclick = () => {
   const w = selected && session.planets.find((x) => sameCell(x, selected));
@@ -1679,10 +1865,6 @@ $('btn-claim').onclick = () => {
   buildStatic();
   renderPick();
   showView('planet');
-  if (inviteAfterRace) {
-    inviteAfterRace = false;
-    openInviteSheet();
-  }
 };
 
 // ---------------------------------------------------------------------------

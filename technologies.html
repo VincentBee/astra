@@ -117,9 +117,13 @@
     th, td { text-align: right; padding: 3px 4px; border-bottom: 1px solid var(--line); white-space: nowrap; }
     th:first-child, td:first-child { text-align: left; }
     th { color: var(--muted); font-weight: 500; }
-    .r-minerals { color: var(--minerals); }
-    .r-food { color: var(--food); }
-    .r-energy { color: var(--energy); }
+    /* Icône d'une ressource, à la taille et dans la couleur de sa ressource. */
+    .ri { width: 1.05em; height: 1.05em; vertical-align: -0.17em; fill: currentColor; flex: none; }
+    .ri-minerals { color: var(--minerals); }
+    .ri-food { color: var(--food); }
+    .ri-energy { color: var(--energy); }
+    .qty { white-space: nowrap; }
+    .qty .ri { margin-left: 0.2em; }
     dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 10px 0 0; font-size: 0.86rem; }
     dt { color: var(--muted); }
     dd { margin: 0; font-family: var(--mono); text-align: right; }

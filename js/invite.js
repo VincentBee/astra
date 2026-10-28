@@ -132,6 +132,10 @@ function unpack(bytes) {
     const addr = unpackAddr(r);
     candidates.push({ type, addr, port: r.u16() });
   }
+  // Ces textes finissent dans la description réseau, ligne par ligne : pas de retour à la ligne caché.
+  const ice = /^[A-Za-z0-9+/]{1,256}$/;
+  if (!ice.test(ufrag) || !ice.test(pwd)) throw new Error('identifiants réseau invalides');
+  if (candidates.some((c) => !/^[A-Za-z0-9.:-]{1,253}$/.test(String(c.addr)))) throw new Error('adresse invalide');
   return { setup, ufrag, pwd, hashAlg, hash, candidates };
 }
 

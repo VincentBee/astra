@@ -42,7 +42,8 @@ function play(players, clock, sync, turns) {
       }
       for (const f of p.fleets || []) {
         if (f.order || s.locked(f.id)) continue;
-        act(s, () => (turn % 3 === 2 ? s.returnFleet(f.id) : s.moveFleet(f.id, enemy.home, 'attack')));
+        // Une flotte sans armes ne peut pas attaquer : elle y va simplement (et peut y échanger).
+        act(s, () => (turn % 3 === 2 ? s.returnFleet(f.id) : s.moveFleet(f.id, enemy.home, 'attack') || s.moveFleet(f.id, enemy.home, 'move')));
       }
     }
     // L'autre accepte ou refuse avant que l'offre n'expire.
@@ -63,7 +64,7 @@ test('une partie rejouée depuis les journaux retombe sur les mêmes fiches', ()
 
   const kinds = new Set(Object.values(state.players).flatMap((p) => p.orders.map((o) => o.k)));
   for (const k of ['chooseRace', 'claimPlanet', 'build', 'research', 'buildShips', 'takeOff', 'moveFleet', 'proposeTrade', 'answerTrade', 'tick']) assert.ok(kinds.has(k), `la partie contient des « ${k} »`);
-  assert.ok(state.players.p0.orders.some((o) => o.ids?.length), 'des identifiants tirés sont notés');
+  assert.ok(Object.values(state.players).some((p) => p.orders.some((o) => o.ids?.length)), 'des identifiants tirés sont notés');
 
   assert.equal(replayable(state).ok, true);
   const r = replay(state);
@@ -97,5 +98,14 @@ test('un journal tronqué est signalé', () => {
   const { players } = newGame(2);
   const state = clone(players[0].snapshot());
   state.players.p1.orders.shift();
-  assert.deepEqual(replayable(state), { ok: false, missing: ['J1'] });
+  assert.deepEqual(replayable(state), { ok: false, missing: ['J1'], stale: false });
+});
+
+test('une copie pas encore à jour est signalée au lieu de faire planter le rejeu', () => {
+  const { players } = newGame(2);
+  const state = clone(players[0].snapshot());
+  // p0 dit connaître une entrée du journal de p1 que cette copie n'a pas encore reçue.
+  state.players.p0.orders.at(-1).s = { p1: state.players.p1.orders.length + 1 };
+  assert.equal(replayable(state).stale, true);
+  assert.equal(replayable(state).ok, false);
 });

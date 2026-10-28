@@ -22,10 +22,22 @@ export const RES = ['minerals', 'food', 'energy'];
 /** Ressources tirées du sol de la planète : elles s'épuisent et se régénèrent. */
 export const SOIL = ['minerals', 'food'];
 export const RES_INFO = {
-  minerals: { name: 'Minéraux', short: 'min.' },
-  food: { name: 'Nourriture', short: 'nourr.' },
-  energy: { name: 'Énergie', short: 'én.' },
+  minerals: { name: 'Minéraux' },
+  food: { name: 'Nourriture' },
+  energy: { name: 'Énergie' },
 };
+
+// Icônes des ressources (24 × 24, couleur du texte) : cristal, feuille, éclair, et un buste pour la population.
+const RES_PATHS = {
+  minerals: 'M7 3h10l4 6-9 12L3 9z',
+  food: 'M20 3C10 3 4 8.5 4 15.5c0 1.6.3 3 .9 4.3 1-4.3 4.2-8.3 9.1-10.3-4.1 3-6.6 6.7-7.6 10.7C14.6 21 20 14.5 20 3z',
+  energy: 'M13.5 2 4 14h7l-1.5 8L19 10h-7z',
+  pop: 'M12 2.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9zM3.5 21.5c0-4.7 3.8-8 8.5-8s8.5 3.3 8.5 8z',
+};
+
+/** Icône SVG d'une ressource (ou de la population, 'pop'), à insérer en HTML : nommée pour les lecteurs d'écran. */
+export const resIcon = (r, name = RES_INFO[r]?.name) =>
+  `<svg class="ri ri-${r}" viewBox="0 0 24 24" role="img" aria-label="${name}"><title>${name}</title><path d="${RES_PATHS[r]}"/></svg>`;
 
 /** a x L x 1.1^L, arrondi au millionième (évite le bruit des flottants). */
 function curve(a, level) {
@@ -152,17 +164,19 @@ export const RACES = {
           curve(10, lv(levels, 'mine')) + curve(6, lv(levels, 'farm')) + curve(3, lv(levels, 'habitat')) + curve(3, lv(levels, 'store')) + space(levels),
         food: (effE) => curve(18, lv(levels, 'farm')) * (0.3 + 0.7 * work) * effE,
         foodOut: 0.6 * pop,
-        // Revenu de base + impôt (0,2 minéral par habitant), puis les mines.
-        mineralsBase: 10 + 0.2 * pop,
-        minerals: (effE) => curve(30, lv(levels, 'mine')) * work * effE,
+        // Revenu de base + impôt (0,4 minéral par habitant), puis les mines.
+        mineralsBase: 10 + 0.4 * pop,
+        minerals: (effE) => curve(36, lv(levels, 'mine')) * work * effE,
         popCap: 15 + curve(20, lv(levels, 'habitat')),
         caps: capsFor(levels),
       };
     },
     /** Croissance logistique si nourris, mort par famine sinon. */
     grow(pop, cap, effF, effE, h) {
-      if (effF < 1) return pop * Math.exp(-0.4 * (1 - effF) * h);
-      if (pop > cap) return cap + (pop - cap) * Math.exp(-0.2 * h);
+      // Au-dessus du plafond, la population redescend au moins aussi vite que si elle était nourrie.
+      const over = pop > cap ? cap + (pop - cap) * Math.exp(-0.2 * h) : Infinity;
+      if (effF < 1) return Math.min(over, pop * Math.exp(-0.4 * (1 - effF) * h));
+      if (pop > cap) return over;
       const r = 0.12;
       return cap / (1 + (cap / pop - 1) * Math.exp(-r * h));
     },
@@ -341,7 +355,8 @@ export const RACES = {
     /** Naissances lentes (un psionique toutes les ~8 h de jeu), dépérissement si privés. */
     grow(pop, cap, effF, effE, h) {
       const eff = Math.min(effF, effE);
-      if (eff < 1) return pop - 0.25 * (1 - eff) * h;
+      // Au-dessus du plafond, ils redescendent au moins aussi vite que s'ils étaient nourris.
+      if (eff < 1) return Math.min(pop - 0.25 * (1 - eff) * h, pop > cap ? Math.max(cap, pop - 0.1 * h) : Infinity);
       if (pop >= cap) return Math.max(cap, pop - 0.1 * h);
       return Math.min(cap, pop + 0.12 * h);
     },
@@ -354,7 +369,7 @@ export const RACE_KEYS = Object.keys(RACES);
 export const POWERS = {
   lift: {
     name: 'Arrachement télékinésique',
-    desc: 'Arrache d’un coup au sol de la planète 60 minéraux par psionique.',
+    desc: 'Arrache d’un coup au sol de la planète 40 minéraux par psionique.',
     cooldown: 180_000,
     cost: (pop) => ({ minerals: 0, energy: 30 * Math.ceil(pop) }),
   },
@@ -363,7 +378,7 @@ export const POWERS = {
     desc: 'L’extraction télékinésique double pendant 2 minutes.',
     cooldown: 360_000,
     duration: 120_000,
-    cost: (pop) => ({ minerals: 0, energy: 40 * Math.ceil(pop) }),
+    cost: (pop) => ({ minerals: 0, energy: 25 * Math.ceil(pop) }),
   },
 };
 export const POWER_KEYS = Object.keys(POWERS);
@@ -387,6 +402,8 @@ export function newPlanet(race, now, world = null) {
     queue: null,
     powers: {},
     ...(world ? { nature: JSON.parse(JSON.stringify(world.nature)), reserve: { ...world.reserve } } : {}),
+    ...(world?.climate ? { climate: { ...world.climate } } : {}),
+    ...(world?.places ? { places: world.places, kind: world.kind } : {}),
   };
 }
 
@@ -411,10 +428,12 @@ function extract(res, want, nature, reserve, h) {
  * pénurie, ils valent la part de la demande couverte. `nature` et `reserve`
  * sont les gisements de la planète (minéraux et nourriture du sol).
  */
-export function flows(race, levels, pop, stock, h, boost = 1, nature = null, reserve = null, tech = null) {
+export function flows(race, levels, pop, stock, h, boost = 1, nature = null, reserve = null, tech = null, climate = null) {
   const R = RACES[race];
   const r = R.rates(levels, pop);
-  const b = techBonus(race, tech);
+  const t = techBonus(race, tech);
+  // Le climat de la planète s'ajoute aux technologies (planète d'avant le climat : ×1).
+  const b = { ...t, energy: t.energy * (climate?.energy ?? 1), food: t.food * (climate?.food ?? 1), minerals: t.minerals * (climate?.minerals ?? 1) };
   r.energyIn *= b.energy;
   const needE = r.energyOut * h;
   const effE = needE > 0 ? Math.min(1, (stock.energy + r.energyIn * h) / needE) : 1;
@@ -452,7 +471,7 @@ const capOf = (res, f) => f.caps[res];
 function advance(race, s, ms, boost) {
   const h = (Math.max(0, ms) / 3_600_000) * SPEED;
   if (h <= 0) return s;
-  const f = flows(race, s.levels, s.pop, s.stock, h, boost, s.nature, s.reserve, s.tech);
+  const f = flows(race, s.levels, s.pop, s.stock, h, boost, s.nature, s.reserve, s.tech, s.climate);
   const stock = {};
   const lost = {}; // ce qui ne rentre pas dans l'entrepôt plein
   for (const r of RES) {
@@ -489,7 +508,8 @@ function steps(race, s, from, to, boost) {
   let t = from;
   const total = to - from;
   if (total <= 0) return s;
-  const dt = Math.max(1000, Math.min(120_000, total / 300), total / 2000);
+  // Pas de 2 min au plus, même après des jours d'absence : de plus grands pas changeaient la population.
+  const dt = Math.max(1000, Math.min(120_000, total / 300));
   while (t < to) {
     const ms = Math.min(dt, to - t);
     s = advance(race, s, ms, boost);
@@ -523,6 +543,7 @@ export function stateAt(planet, now) {
     pop: planet.pop || 0,
     levels: planet.levels,
     nature: planet.nature,
+    climate: planet.climate,
     reserve: planet.reserve,
     tech: planet.tech || {},
     ships: planet.ships || {},
@@ -537,7 +558,7 @@ export function stateAt(planet, now) {
     if (!next) break;
     const [kind, job] = next;
     s = simulate(race, s, at, job.end, planet.trance);
-    at = job.end;
+    at = Math.max(at, job.end); // un ordre daté d'avant (vieille fiche) ne fait pas recompter
     if (kind === 'queue') s = { ...s, levels: { ...s.levels, [job.key]: job.level } };
     else if (kind === 'research') s = { ...s, tech: { ...s.tech, [job.key]: job.level } };
     else s = { ...s, ships: { ...s.ships, [job.type]: (s.ships[job.type] || 0) + job.count } };
@@ -546,7 +567,7 @@ export function stateAt(planet, now) {
   }
   s = simulate(race, s, at, now, planet.trance);
   // Rythme actuel, pour l'affichage (sur une seconde de jeu).
-  const prod = flows(race, s.levels, s.pop, s.stock, 1 / 3600, (planet.trance || 0) > now ? 2 : 1, s.nature, s.reserve, s.tech);
+  const prod = flows(race, s.levels, s.pop, s.stock, 1 / 3600, (planet.trance || 0) > now ? 2 : 1, s.nature, s.reserve, s.tech, s.climate);
   return { stock: s.stock, pop: s.pop, levels: s.levels, reserve: s.reserve, tech: s.tech, ships: s.ships, ...q, done, prod };
 }
 
@@ -602,7 +623,9 @@ export function startBuild(planet, key, now) {
   if (!R) return 'Choisis d’abord ta race.';
   if (!own(R.buildings, key)) return 'Bâtiment inconnu.';
   settle(planet, now);
+  now = planet.at; // heure qui recule : l'ordre part de l'heure déjà comptée, pas d'avant
   if (planet.queue) return 'Un chantier est déjà en cours.';
+  if (placesLeft(planet) <= 0) return `Plus de place : les ${planet.places} places de cette planète sont prises.`;
   const level = planet.levels[key] || 0;
   const cost = upgradeCost(planet.race, key, level);
   if (!covers(planet.stock, cost)) return 'Ressources insuffisantes.';
@@ -620,6 +643,7 @@ export function startResearch(planet, key, now) {
   const T = own(TECHS[planet.race], key);
   if (!T) return 'Technologie inconnue.';
   settle(planet, now);
+  now = planet.at; // heure qui recule : l'ordre part de l'heure déjà comptée, pas d'avant
   const lab = lv(planet.levels, 'lab');
   if (!lab) return 'Construis d’abord un labo.';
   if (planet.research) return 'Une recherche est déjà en cours.';
@@ -641,6 +665,7 @@ export function startShips(planet, type, count, now) {
   count = Math.floor(count);
   if (!(count >= 1 && count <= 50)) return 'Entre 1 et 50 vaisseaux par lot.';
   settle(planet, now);
+  now = planet.at; // heure qui recule : l'ordre part de l'heure déjà comptée, pas d'avant
   const yard = lv(planet.levels, 'yard');
   if (!yard) return 'Construis d’abord un chantier naval.';
   if (planet.yard) return 'Le chantier naval est déjà occupé.';
@@ -670,11 +695,14 @@ export function powerCost(planet, key, pop = planet.pop) {
  * Minéraux qu'un arrachement ajouterait : pas plus que ce qu'il reste au sol,
  * ni que ce que l'entrepôt peut recevoir.
  */
+/** Minéraux arrachés par psionique (avant l'amplificateur). */
+const LIFT_PER_PSI = 40;
+
 export function liftGain(planet, amp = 1 + 0.25 * lv(planet.levels, 'amplifier')) {
   const soil = planet.nature?.minerals ? planet.reserve.minerals : Infinity;
   const cap = capsFor(planet.levels).minerals;
   const before = planet.stock.minerals;
-  return Math.max(0, Math.min(Math.max(cap, before), before + Math.min(soil, 60 * planet.pop * amp)) - before);
+  return Math.max(0, Math.min(Math.max(cap, before), before + Math.min(soil, LIFT_PER_PSI * planet.pop * amp)) - before);
 }
 
 export function usePower(planet, key, now) {
@@ -682,11 +710,14 @@ export function usePower(planet, key, now) {
   const P = own(POWERS, key);
   if (!P) return { error: 'Pouvoir inconnu.' };
   settle(planet, now);
+  now = planet.at; // heure qui recule : l'ordre part de l'heure déjà comptée, pas d'avant
   if (powerReadyAt(planet, key) > now) return { error: 'Ce pouvoir se recharge encore.' };
   const cost = powerCost(planet, key);
   if (!covers(planet.stock, cost)) return { error: 'Pas assez d’énergie.' };
   const amp = 1 + 0.25 * lv(planet.levels, 'amplifier');
   const gain = key === 'lift' ? liftGain(planet, amp) : 0;
+  // La transe double l'extraction : sur un sol vide, il n'y a rien à doubler.
+  if (key === 'trance' && planet.nature?.minerals && planet.reserve.minerals < 1) return { error: 'Le sol est vide : la transe n’extrairait rien de plus.' };
   if (key === 'lift' && gain <= 0) return { error: planet.nature?.minerals && !planet.reserve.minerals ? 'Le sol est vide : rien à arracher.' : 'L’entrepôt de minéraux est plein.' };
   pay(planet, cost);
   planet.powers = { ...(planet.powers || {}), [key]: now + P.cooldown };
@@ -710,6 +741,7 @@ export function score(race, levels) {
   if (!R) return 0;
   let total = 0;
   for (const k of Object.keys(R.buildings)) {
+    if (k === 'store') continue; // empiler des entrepôts ne rend pas plus fort : il ne compte pas
     for (let l = 0; l < (levels[k] || 0); l++) {
       const c = upgradeCost(race, k, l);
       total += c.minerals + c.energy;
@@ -738,17 +770,26 @@ export const UNIVERSE = { w: 20, h: 20 };
 export const distance = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 
 /**
- * Case de départ libre, à au moins `minGap` pas des planètes existantes.
- * `random` est injectable pour les tests.
+ * Case de départ libre, à au moins `minGap` pas des planètes existantes, et
+ * acceptée par `ok`. `random` est injectable pour les tests.
  */
-export function freeCell(taken, random = Math.random, minGap = 4) {
+export function freeCell(taken, random = Math.random, minGap = 4, ok = () => true) {
   for (let gap = minGap; gap >= 0; gap--) {
     for (let tries = 0; tries < 200; tries++) {
       const c = { x: 1 + Math.floor(random() * (UNIVERSE.w - 2)), y: 1 + Math.floor(random() * (UNIVERSE.h - 2)) };
-      if (taken.every((t) => distance(t, c) >= Math.max(gap, 1))) return c;
+      if (ok(c) && taken.every((t) => distance(t, c) >= Math.max(gap, 1))) return c;
     }
   }
-  return { x: Math.floor(UNIVERSE.w / 2), y: Math.floor(UNIVERSE.h / 2) };
+  const center = { x: Math.floor(UNIVERSE.w / 2), y: Math.floor(UNIVERSE.h / 2) };
+  if (ok(center)) return center;
+  // Dernier recours : la première case libre en partant du coin.
+  for (let y = 0; y < UNIVERSE.h; y++) {
+    for (let x = 0; x < UNIVERSE.w; x++) {
+      const c = { x, y };
+      if (ok(c) && !taken.some((t) => sameCell(t, c))) return c;
+    }
+  }
+  return center;
 }
 
 // ---------------------------------------------------------------------------
@@ -761,6 +802,22 @@ export function freeCell(taken, random = Math.random, minGap = 4) {
 
 /** Plus de planètes que de joueurs possibles (8), pour avoir le choix. */
 export const PLANET_COUNT = 14;
+/** Places d'une planète : de 14 à 22 (à 12, les humains n'avaient plus de quoi s'équiper). */
+export const PLANET_PLACES = [14, 22];
+
+/**
+ * Petits corps, en plus des planètes : on ne s'y installe pas au départ,
+ * mais on peut les coloniser. Leurs gisements sont une fraction de ceux
+ * d'une planète : l'astéroïde est surtout de la roche, la comète surtout de
+ * la glace (de quoi faire de la nourriture).
+ */
+export const SMALL_BODIES = {
+  asteroid: { label: 'Astéroïde', count: 4, places: [7, 10], share: { minerals: 0.35, food: 0.1 }, names: ['Cérès', 'Vesta', 'Pallas', 'Junon', 'Hygie', 'Éros'] },
+  comet: { label: 'Comète', count: 3, places: [6, 8], share: { minerals: 0.2, food: 0.35 }, names: ['Halley', 'Encke', 'Tempel', 'Hale-Bopp', 'Swift'] },
+};
+
+/** « Planète », « Astéroïde » ou « Comète ». */
+export const kindLabel = (kind) => SMALL_BODIES[kind]?.label || 'Planète';
 const PLANET_NAMES = [
   'Aldébaran', 'Bételgeuse', 'Céphée', 'Deneb', 'Éridan', 'Fomalhaut', 'Gemma', 'Hadar',
   'Izar', 'Kochab', 'Lyra', 'Mira', 'Nashira', 'Orion', 'Pollux', 'Rigel',
@@ -784,9 +841,55 @@ export function seeded(text) {
  * planète riche a un gros gisement ; une planète vivace se régénère vite.
  */
 export const NATURE = {
-  minerals: { max: [6000, 20000], regen: [15, 45] },
-  food: { max: [1500, 6000], regen: [8, 25] },
+  minerals: { max: [60000, 200000], regen: [150, 450] },
+  food: { max: [15000, 60000], regen: [80, 250] },
 };
+
+/**
+ * Soleil de la partie `gid` : un carré de 2 × 2 à 4 × 4 cases au milieu de
+ * la carte, de taille tirée au hasard (le même sur tous les téléphones).
+ * Sur une carte de côté pair, le 3 × 3 est décalé d'une demi-case.
+ */
+export function sunFor(gid) {
+  const size = 2 + Math.floor(seeded(`${gid}/soleil`)() * 3);
+  return { x: Math.floor((UNIVERSE.w - size) / 2), y: Math.floor((UNIVERSE.h - size) / 2), size };
+}
+
+/** La case `c` est-elle dans le soleil ? */
+export const inSun = (sun, c) => c.x >= sun.x && c.x < sun.x + sun.size && c.y >= sun.y && c.y < sun.y + sun.size;
+
+const round2 = (v) => Math.round(v * 100) / 100;
+
+/**
+ * Climat d'une case : sa chaleur `heat` (1 au bord du soleil, 0 dans le coin
+ * le plus loin) et ce qu'elle fait à la production. Près du soleil, beaucoup
+ * d'énergie solaire et un sol volcanique riche en minéraux ; la nourriture
+ * pousse mieux en zone tempérée qu'au chaud ou au froid.
+ */
+export function climateAt(sun, c) {
+  const mid = { x: sun.x + sun.size / 2, y: sun.y + sun.size / 2 };
+  const far = Math.hypot(Math.max(mid.x, UNIVERSE.w - mid.x), Math.max(mid.y, UNIVERSE.h - mid.y)) - sun.size / 2;
+  const d = Math.hypot(c.x + 0.5 - mid.x, c.y + 0.5 - mid.y) - sun.size / 2;
+  const heat = round2(Math.min(1, Math.max(0, 1 - d / far)));
+  return {
+    heat,
+    energy: round2(0.8 + 0.4 * heat),
+    minerals: round2(0.9 + 0.2 * heat),
+    food: round2(1.3 - 1.4 * Math.abs(heat - 0.5)),
+  };
+}
+
+/** Nom du climat selon la chaleur. */
+export function climateName(heat) {
+  if (heat >= 0.8) return 'Brûlant';
+  if (heat >= 0.6) return 'Chaud';
+  if (heat >= 0.4) return 'Tempéré';
+  if (heat >= 0.2) return 'Froid';
+  return 'Glacé';
+}
+
+/** Nombre entier de `lo` à `hi`, chacun aussi souvent (between arrondit : les bornes sortent deux fois moins). */
+const pick = (random, [lo, hi]) => lo + Math.min(hi - lo, Math.floor(random() * (hi - lo + 1)));
 
 const between = (random, [lo, hi], step = 1) => Math.round((lo + random() * (hi - lo)) / step) * step;
 
@@ -811,7 +914,52 @@ export function planetsFor(gid) {
     const reserve = Object.fromEntries(SOIL.map((k) => [k, nature[k].max]));
     out.push({ id: `p${i}`, name: names[i % names.length], x: c.x, y: c.y, nature, reserve });
   }
+  // Une planète tirée dans le soleil est replacée ensuite, avec un hasard à
+  // part : les autres restent où elles étaient avant le soleil, ce qui garde
+  // les parties déjà commencées.
+  const sun = sunFor(gid);
+  const elsewhere = seeded(`${gid}/hors-soleil`);
+  for (const w of out) {
+    if (!inSun(sun, w)) continue;
+    const c = freeCell(out.filter((x) => x !== w), elsewhere, 3, (x) => !inSun(sun, x));
+    w.x = c.x;
+    w.y = c.y;
+  }
+  // Places et petits corps : tirés avec leur propre hasard, ajoutés après les
+  // planètes, pour que celles-ci restent où elles étaient dans les parties déjà commencées.
+  const sizes = seeded(`${gid}/taille`);
+  for (const w of out) Object.assign(w, { kind: 'planet', places: pick(sizes, PLANET_PLACES) });
+  const small = seeded(`${gid}/petits-corps`);
+  for (const [kind, b] of Object.entries(SMALL_BODIES)) {
+    const names = b.names.slice();
+    for (let i = 0; i < b.count; i++) {
+      const c = freeCell(out, small, 2, (x) => !inSun(sun, x));
+      const nature = {};
+      for (const k of SOIL) {
+        const max = Math.max(100, Math.round((between(small, NATURE[k].max) * b.share[k]) / 100) * 100);
+        nature[k] = { max, regen: Math.max(1, Math.round(between(small, NATURE[k].regen) * b.share[k])) };
+      }
+      const name = names.splice(Math.floor(small() * names.length), 1)[0] || `${b.label} ${i + 1}`;
+      const reserve = Object.fromEntries(SOIL.map((k) => [k, nature[k].max]));
+      out.push({ id: `${kind[0]}${i}`, name, x: c.x, y: c.y, nature, reserve, kind, places: pick(small, b.places) });
+    }
+  }
+  for (const w of out) w.climate = climateAt(sun, w);
   return out;
 }
 
 export const sameCell = (a, b) => !!a && !!b && a.x === b.x && a.y === b.y;
+
+// ---------------------------------------------------------------------------
+// Place sur les planètes
+// ---------------------------------------------------------------------------
+//
+// Chaque niveau de bâtiment occupe une place. Une planète a de 12 à 22
+// places, un astéroïde ou une comète bien moins. Les planètes d'avant la
+// place n'ont pas de limite.
+
+/** Places occupées : un niveau de bâtiment, une place. */
+export const usedPlaces = (levels) => Object.values(levels || {}).reduce((t, n) => t + (Number(n) || 0), 0);
+
+/** Places encore libres (Infinity pour une planète d'avant la place). */
+export const placesLeft = (planet) => (Number.isFinite(planet.places) ? planet.places - usedPlaces(planet.levels) : Infinity);

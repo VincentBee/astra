@@ -20,10 +20,10 @@
 import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates } from './save.js';
-import { newPlanet, settle, stateAt, startBuild, startResearch, startShips, usePower, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE } from './game.js';
+import { newPlanet, settle, stateAt, startBuild, startResearch, startShips, usePower, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces } from './game.js';
 import { TECHS, SHIPS, shipStats, sightRange } from './tech.js';
 import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, salvage, applyLosses, parkedCell, fleetPos, fleetCargo, fleetTank, ORDERS, MAX_FLEETS } from './fleet.js';
-import { amounts, isEmpty, holdings, lacks, noRoom, take, put, outcome, OFFER_MS, MAX_OFFERS } from './trade.js';
+import { amounts, isEmpty, holdings, lacks, noRoom, take, put, outcome, OFFER_MS, MAX_OFFERS, GRACE_MS } from './trade.js';
 
 /** « de Beta », « d'Alpha ». */
 const de = (name) => (/^[aeiouyhàâéèêëîïôöûü]/i.test(name) ? `d’${name}` : `de ${name}`);
@@ -52,6 +52,8 @@ function lootText(take) {
 
 const COLORS = ['#7aa2ff', '#ff9f6b', '#7cf0b4', '#f7d06b', '#d38bff', '#6fd3ff', '#ff7a93', '#b7e36b'];
 const MAX_PLAYERS = 8;
+/** Une même planète ne se pille qu'une fois toutes les 2 min. */
+const RAID_COOLDOWN_MS = 2 * 60_000;
 /**
  * Rapports de combat gardés dans ma fiche. Un rapport s'efface dès que sa
  * cible l'a appliqué : cette limite ne sert que pour une cible qui ne
@@ -101,26 +103,84 @@ const saveIdentity = (v) => {
  */
 export function normalize(p) {
   delete p.pos; // vaisseaux d'avant : on ne se déplace plus sur la carte
-  if (!RACES[p.race]) {
+  // Nom et couleur viennent d'un autre téléphone et finissent à l'écran : bornés et vérifiés.
+  p.name = String(p.name ?? 'Joueur').slice(0, 16) || 'Joueur';
+  if (typeof p.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(p.color)) p.color = COLORS[0];
+  if (!Object.hasOwn(RACES, p.race)) {
     p.race = null;
     p.planet = null;
   }
+  // Une fiche vient d'un autre téléphone, peut-être abîmée ou trafiquée : ce qui
+  // n'a pas la bonne forme est écarté, plutôt que de faire planter chaque passage.
+  if (p.planet && !planetOk(p.race, p.planet)) p.planet = null;
   // Colonies, flottes en route, dégâts infligés aux autres (et reçus, déjà appliqués).
-  if (!p.colonies || typeof p.colonies !== 'object') p.colonies = {};
+  if (!isObj(p.colonies)) p.colonies = {};
+  for (const [id, c] of Object.entries(p.colonies)) if (!planetOk(p.race, c)) delete p.colonies[id];
   if (!Array.isArray(p.fleets)) p.fleets = [];
+  p.fleets = p.fleets.filter((f) => isObj(f) && isCell(f.from) && isCell(f.to) && isObj(f.ships));
   p.fleets.forEach(upgradeFleet);
   if (!Array.isArray(p.effects)) p.effects = [];
+  p.effects = p.effects.filter((e) => isObj(e) && typeof e.to === 'string' && typeof e.id === 'string').map(cleanEffect);
   if (!Array.isArray(p.applied)) p.applied = [];
+  if (!isObj(p.raided)) p.raided = {};
+  p.applied = p.applied.filter((id) => typeof id === 'string');
+  // Mes combats de flottes récents (pour ne pas compter deux fois un même combat livré des deux côtés).
+  if (!Array.isArray(p.engaged)) p.engaged = [];
   // Flottes posées : id -> planète, pour que les dégâts qui les visaient encore les trouvent.
   if (!p.docked || typeof p.docked !== 'object') p.docked = {};
   // Échanges : mes offres en cours (avec leur séquestre), mes réponses à celles des autres.
   if (!Array.isArray(p.offers)) p.offers = [];
+  p.offers = p.offers.filter((o) => isObj(o) && isObj(o.to) && isObj(o.from) && typeof o.to.pid === 'string' && Number.isFinite(o.expires));
+  for (const o of p.offers) {
+    o.give = cleanAmounts(o.give);
+    o.want = cleanAmounts(o.want);
+  }
+  if (!Array.isArray(p.dropped)) p.dropped = [];
+  p.dropped = p.dropped.filter((d) => isObj(d) && typeof d.id === 'string' && typeof d.pid === 'string' && Number.isFinite(d.expires) && Number.isFinite(d.at));
+  for (const d of p.dropped) {
+    d.give = cleanAmounts(d.give);
+    d.want = cleanAmounts(d.want);
+  }
   if (!Array.isArray(p.answers)) p.answers = [];
+  p.answers = p.answers.filter((a) => isObj(a) && typeof a.offer === 'string');
   // Journal des ordres : { t, k, a?, ids?, s? } (heure, ordre ou « tick », arguments,
   // identifiants tirés, entrées des journaux des autres connues quand ce nombre a changé).
   if (!Array.isArray(p.orders)) p.orders = [];
   return p;
 }
+
+const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
+const isCell = (c) => isObj(c) && Number.isFinite(c.x) && Number.isFinite(c.y);
+/** Planète utilisable : stock, niveaux, et un chantier en cours sur un vrai bâtiment de sa race. */
+function planetOk(race, pl) {
+  if (!isObj(pl) || !isObj(pl.stock) || !isObj(pl.levels) || !Number.isFinite(pl.at)) return false;
+  // Gisements : pour chaque ressource du sol, un maximum et une repousse, et ce qu'il en reste.
+  const soilOk = isObj(pl.nature) && isObj(pl.reserve) && SOIL.every((r) => !pl.nature[r] || (isObj(pl.nature[r]) && Number.isFinite(pl.nature[r].max) && Number.isFinite(pl.nature[r].regen) && Number.isFinite(pl.reserve[r])));
+  if (!soilOk) {
+    delete pl.nature;
+    delete pl.reserve;
+  }
+  if (pl.climate !== undefined && !(isObj(pl.climate) && ['heat', 'energy', 'minerals', 'food'].every((k) => Number.isFinite(pl.climate[k])))) delete pl.climate;
+  if (pl.places !== undefined && !(Number.isInteger(pl.places) && pl.places > 0)) delete pl.places;
+  if (pl.queue && !(isObj(pl.queue) && race && Object.hasOwn(RACES[race].buildings, pl.queue.key))) pl.queue = null;
+  // Niveaux : seulement les bâtiments de la race, en entiers positifs (un niveau négatif libérerait des places).
+  if (race) pl.levels = Object.fromEntries(Object.keys(RACES[race].buildings).map((k) => [k, Math.max(0, Math.floor(Number(pl.levels[k]) || 0))]));
+  return true;
+}
+/** Quantités d'un rapport ou d'un échange : des nombres finis, positifs, bornés. */
+const MAX_AMOUNT = 1e7;
+function cleanAmounts(o) {
+  if (!isObj(o)) return {};
+  return Object.fromEntries(
+    Object.entries(o)
+      .filter(([k, v]) => !['__proto__', 'constructor', 'prototype'].includes(k) && Number.isFinite(v) && v > 0)
+      .map(([k, v]) => [k, Math.min(v, MAX_AMOUNT)]),
+  );
+}
+const cleanEffect = (e) => ({ ...e, ships: cleanAmounts(e.ships), take: cleanAmounts(e.take), ack: Array.isArray(e.ack) ? e.ack.filter((x) => typeof x === 'string').slice(0, 20) : [] });
+
+/** Identifiant de joueur acceptable (pas de clé spéciale comme __proto__). */
+export const pidOk = (pid) => typeof pid === 'string' && /^[A-Za-z0-9-]{1,24}$/.test(pid);
 
 /**
  * Flotte d'avant le pilotage libre (un trajet à mission, qui disparaissait à
@@ -402,11 +462,13 @@ export class Session {
     link.helloSeen = true;
     if (this.status !== 'playing') return;
     const name = String(msg.name || '').trim().slice(0, 16) || 'Joueur';
+    // Son secret se vérifie avec ce que je savais avant de lire sa copie (elle pourrait le remplacer).
+    const knownHash = msg.gid === this.state.gid && pidOk(msg.pid) ? this.state.players[msg.pid]?.secretHash : null;
     // Il apporte sa copie de la partie : on garde ce qu'elle a de plus récent.
     this.mergeIn(msg.copy, link);
     const st = this.state;
-    const known = msg.gid === st.gid && st.players[msg.pid];
-    if (known && typeof msg.secret === 'string' && (await sha256(msg.secret)) === known.secretHash) {
+    const known = msg.gid === st.gid && pidOk(msg.pid) && st.players[msg.pid];
+    if (known && typeof msg.secret === 'string' && (await sha256(msg.secret)) === (knownHash || known.secretHash)) {
       // Retour d'un joueur : son secret prouve que c'est bien lui.
       return this.admit(link, msg.pid, null);
     }
@@ -460,9 +522,16 @@ export class Session {
    * la plus récente, et on transmet ce qu'on vient d'apprendre à nos voisins.
    */
   mergeIn(st, from) {
-    if (!st?.players || st.gid !== this.state?.gid) return;
+    if (!st?.players || typeof st.players !== 'object' || st.gid !== this.state?.gid) return;
     const before = this.state;
-    const merged = mergeStates(before, clean(st));
+    const incoming = clean({ ...st, players: {} });
+    let count = Object.keys(before.players).length;
+    for (const [pid, rec] of Object.entries(st.players)) {
+      if (!this.recordOk(pid, rec)) continue;
+      if (!before.players[pid] && count++ >= MAX_PLAYERS * 2) continue;
+      incoming.players[pid] = normalize(JSON.parse(JSON.stringify(rec)));
+    }
+    const merged = mergeStates(before, incoming);
     delete merged.epoch;
     delete merged.nextRank;
     this.state = merged;
@@ -473,9 +542,37 @@ export class Session {
     this.changed();
   }
 
+  /**
+   * Une fiche d'un autre téléphone est-elle acceptable ? Personne d'autre que
+   * moi n'écrit la mienne ; le secret d'un joueur ne change jamais ; une fiche
+   * datée loin dans le futur bloquerait les vraies (elles paraîtraient plus vieilles).
+   */
+  recordOk(pid, rec) {
+    if (!pidOk(pid) || !isObj(rec) || rec.id !== pid || pid === this.me) return false;
+    // Un téléphone peut être en avance de quelques minutes ou heures (horloge mal réglée) : seule une
+    // date absurde (plus d'un jour d'avance) est refusée, elle figerait sa fiche chez tout le monde.
+    if (!(Number.isFinite(rec.actAt) || rec.actAt === undefined) || (rec.actAt || 0) > this.now() + 24 * 3_600_000) return false;
+    const ours = this.state?.players[pid];
+    // Installation antidatée : une planète que sa fiche ne montrait pas encore quand je l'ai vue,
+    // mais datée d'avant cette fiche. Une vraie installation est toujours datée d'après.
+    if (ours && (rec.actAt || 0) > (ours.actAt || 0) && this.backdated(ours, rec)) return false; // une fiche plus vieille est ignorée de toute façon
+    if (ours?.secretHash && rec.secretHash !== ours.secretHash) return false;
+    return true;
+  }
+
+  /**
+   * La fiche `rec` revendique-t-elle une planète mère avec une date d'avant
+   * la fiche `ours` qui ne l'avait pas ? (Une colonie, elle, est datée de
+   * l'arrivée de sa flotte, qui peut précéder la dernière fiche : pas ici.)
+   */
+  backdated(ours, rec) {
+    // Marge d'une minute : plusieurs ordres dans la même milliseconde font avancer l'heure de la fiche d'un cran chacun.
+    return isCell(rec.home) && !sameCell(rec.home, ours.home) && Number.isFinite(rec.claimAt) && rec.claimAt < (ours.actAt || 0) - 60_000;
+  }
+
   /** Fiche d'un joueur, reçue de proche en proche. */
   onRecord(link, rec, log) {
-    if (!rec || typeof rec.id !== 'string' || !this.state) return;
+    if (!rec || typeof rec.id !== 'string' || !this.state || !this.recordOk(rec.id, rec)) return;
     const ours = this.state.players[rec.id];
     if (ours && (rec.actAt || 0) <= (ours.actAt || 0)) return; // déjà vue
     if (!ours && Object.keys(this.state.players).length >= MAX_PLAYERS * 2) return;
@@ -704,6 +801,17 @@ export class Session {
     return best?.p || null;
   }
 
+  /**
+   * La planète `w` est-elle déjà à un autre joueur installé avant l'heure
+   * `at` (départagé comme ownerAt, par identifiant à égalité) ?
+   */
+  takenBefore(w, at) {
+    const owner = this.ownerAt(w);
+    if (!owner || owner.id === this.me) return !!owner;
+    const t = sameCell(owner.home, w) ? owner.claimAt || owner.rank || 0 : owner.colonies?.[w.id]?.claimAt || 0;
+    return t < at || (t === at && owner.id < this.me);
+  }
+
   /** Ma planète de l'univers (avec ses gisements de départ), ou null. */
   get myWorld() {
     const home = this.state?.players[this.me]?.home;
@@ -718,6 +826,10 @@ export class Session {
     if (!p?.race || !w) return false;
     if (p.home) {
       this.ontoast?.('Tu as déjà une planète.');
+      return false;
+    }
+    if (w.kind && w.kind !== 'planet') {
+      this.ontoast?.(`${w.name} est trop petit pour une planète mère : on peut seulement le coloniser.`);
       return false;
     }
     const owner = this.ownerAt(w);
@@ -764,6 +876,7 @@ export class Session {
     this.changed();
   }
 
+
   /**
    * Colonie perdue au profit d'un joueur arrivé avant moi : comme si ma
    * flotte de colonisation l'avait trouvée prise en arrivant, ses
@@ -803,6 +916,10 @@ export class Session {
     if (!p?.planet) return this.ontoast?.('Choisis d’abord ta race.');
     const pl = this.myPlanet(where);
     if (!pl) return;
+    // Les places sont celles de la carte, pas celles de la fiche (qu'on pourrait effacer ou gonfler).
+    // Une planète d'avant la place garde au moins ce qu'elle a déjà bâti.
+    const w = this.planets.find((x) => sameCell(x, pl.cell));
+    if (w?.places) pl.planet.places = Number.isFinite(pl.planet.places) ? w.places : Math.max(w.places, usedPlaces(pl.planet.levels));
     const err = startBuild(pl.planet, key, this.now());
     if (err) return this.ontoast?.(err);
     const b = RACES[p.race].buildings[key];
@@ -912,6 +1029,8 @@ export class Session {
       order = { kind, key: here.key };
     } else if (kind === 'attack') {
       if (!here || here.owner.id === this.me) return this.refuse('Aucune planète adverse ici.');
+      const armed = Object.entries(f.ships).some(([k, n]) => n && shipStats(p.race, k, p.planet.tech).attack > 0);
+      if (!armed) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas attaquer.');
       order = { kind, pid: here.owner.id, key: here.key };
     } else if (kind === 'colonize') {
       if (!w || here) return this.refuse('Cette planète n’est pas libre.');
@@ -1014,6 +1133,10 @@ export class Session {
       return true;
     }
     if (target.id !== f.order.fleet) f.order = { ...f.order, fleet: target.id }; // la cible a fusionné
+    // Un combat entre ces deux flottes déjà livré (par une autre de mes flottes, ou par lui) et pas
+    // encore lu : nos copies montrent l'état d'avant, le rejouer compterait les pertes deux fois.
+    // J'attends son rapport, ou qu'il lise le mien.
+    if (this.pendingFight(p, f, enemy, target)) return false;
     if (inContact(f, target, now)) return this.fight(p, f, enemy, target, now);
     // Appli en arrière-plan au moment de la rencontre : je regarde aussi l'instant de mon arrivée.
     if (!moving(f, now) && f.arrive > f.depart && inContact(f, target, f.arrive)) return this.fight(p, f, enemy, target, f.arrive);
@@ -1029,6 +1152,17 @@ export class Session {
     return true;
   }
 
+  /** Un rapport de combat entre ma flotte `f` et sa flotte `target`, dans un sens ou dans l'autre, pas encore lu ? */
+  pendingFight(p, f, enemy, target) {
+    const ids = (x) => [x.id, ...(x.absorbed || [])];
+    const theirs = ids(target);
+    const mine = ids(f);
+    return (
+      (p.effects || []).some((e) => e.to === enemy.id && theirs.includes(e.fleet) && !enemy.applied?.includes(e.id)) ||
+      (enemy.effects || []).some((e) => e.to === p.id && mine.includes(e.fleet) && !p.applied?.includes(e.id))
+    );
+  }
+
   /**
    * Combat entre ma flotte et celle d'un autre joueur, au contact. Je
    * calcule avec ce que je sais de la sienne ; son téléphone appliquera ses
@@ -1037,7 +1171,17 @@ export class Session {
   fight(p, f, enemy, target, now) {
     const res = battle({ race: p.race, ships: f.ships, tech: p.planet.tech }, { race: enemy.race, ships: target.ships, tech: enemy.planet?.tech || {} });
     const take = res.won ? salvage(p.race, res.attLeft, target.cargo, f.cargo) : {};
-    p.effects = [...(p.effects || []), { id: this.newId(8), to: enemy.id, fleet: target.id, at: now, ships: res.defLost, take }].slice(-MAX_EFFECTS);
+    // Lui aussi a pu livrer ce combat de son côté, sans avoir encore lu mon rapport (poursuite
+    // mutuelle) : c'est le même combat, chacun ne compte alors ses pertes qu'une fois. `sim` dit
+    // que je n'avais pas encore lu son rapport sur ce combat, `engaged` garde trace de mes combats.
+    // `ack` : ses rapports sur nos deux flottes que j'avais déjà lus. Un de ses combats absent de
+    // cette liste, il l'a livré sans que je le sache : le même combat que le mien.
+    const mine = [f.id, ...(f.absorbed || [])];
+    const theirs = [target.id, ...(target.absorbed || [])];
+    const ack = (p.engaged || []).filter((g) => g.got && theirs.includes(g.fleet) && mine.includes(g.by)).map((g) => g.got);
+    const id = this.newId(8);
+    p.engaged = [...(p.engaged || []), { fleet: target.id, by: f.id, at: now, id }].slice(-20);
+    p.effects = [...(p.effects || []), { id, to: enemy.id, fleet: target.id, by: f.id, sim: true, ack, at: now, ships: res.defLost, take }].slice(-MAX_EFFECTS);
     const loot = lootText(take);
     this.addLog(
       res.won
@@ -1177,6 +1321,7 @@ export class Session {
     const now = this.now();
     if (!offer || offer.to.pid !== this.me) return this.refuse('Offre introuvable.');
     if ((me.answers || []).some((a) => a.offer === offerId && a.pid === pid)) return this.refuse('Déjà répondu.');
+    if (ok && offer.to.fleet && this.locked(offer.to.fleet)) return false; // ses soutes sont réservées à son propre échange
     if (ok) {
       if (now >= offer.expires) return this.refuse('Offre expirée.');
       const mine = this.tradeSide(me, offer.to, now);
@@ -1189,7 +1334,7 @@ export class Session {
       take(mine.side, me.race, want, now);
       put(mine.side, me.race, give, now);
     }
-    me.answers = [...(me.answers || []), { offer: offerId, pid, ok: !!ok, at: now }].slice(-60);
+    me.answers = this.keptAnswers([...(me.answers || []), { offer: offerId, pid, ok: !!ok, at: now }]);
     this.touch(this.addLog(`${me.name} ${ok ? 'accepte' : 'refuse'} l’échange ${de(other.name)}.`));
     this.changed();
     return true;
@@ -1214,13 +1359,58 @@ export class Session {
         const f = this.fleetOf(p, o.from.fleet);
         if (f) mine = { side: { fleet: f } };
       }
-      if (!mine) continue; // flotte détruite : le séquestre est perdu avec elle
+      // Flotte détruite : le séquestre est perdu avec elle, mais ce que l'autre a payé arrive chez moi.
+      if (!mine && end === 'accepted') mine = this.tradeSide(p, { planet: 'home' }, now);
+      if (!mine) continue;
       put(mine.side, p.race, end === 'accepted' ? amounts(o.want) : amounts(o.give), now);
+      // Rendu faute de nouvelles : sa réponse peut encore arriver, datée d'avant l'expiration.
+      if (end === 'returned' && !answer) p.dropped = [...(p.dropped || []), { id: o.id, pid: o.to.pid, give: o.give, want: o.want, expires: o.expires, at: now }].slice(-20);
       const who = other?.name || 'l’autre joueur';
       this.addLog(end === 'accepted' ? `Échange conclu entre ${p.name} et ${who}.` : `Échange avec ${who} sans suite : ${p.name} récupère sa part.`);
       this.ontoast?.(end === 'accepted' ? `${who} a accepté ton échange.` : answer ? `${who} a refusé ton échange.` : `Ton échange avec ${who} a expiré.`);
     }
+    if (this.settleDropped(p, now)) any = true;
     return any;
+  }
+
+  /**
+   * Offres que j'ai reprises sans réponse (l'autre ne donnait plus de
+   * nouvelles) : s'il avait accepté à temps, je lui dois ce qu'il a payé et
+   * il a déjà reçu ma part. Je reprends donc ce que j'ai récupéré (ce qu'il
+   * en reste sur ma planète mère) et je reçois ce que j'avais demandé.
+   */
+  settleDropped(p, now) {
+    let any = false;
+    for (const d of [...(p.dropped || [])]) {
+      const other = this.state.players[d.pid];
+      const answer = other?.answers?.find((a) => a.offer === d.id && a.pid === this.me);
+      const silent = !answer && (!other || (other.actAt || 0) > d.at + GRACE_MS || now > d.at + 7 * 86_400_000);
+      if (!answer && !silent) continue;
+      p.dropped = p.dropped.filter((x) => x !== d);
+      any = true;
+      if (!answer?.ok || answer.at > d.expires) continue;
+      const home = this.tradeSide(p, { planet: 'home' }, now);
+      if (!home) continue;
+      const have = holdings(home.side, p.race, now);
+      const give = Object.fromEntries(Object.entries(amounts(d.give)).map(([r, v]) => [r, Math.min(v, have[r] || 0)]));
+      take(home.side, p.race, give, now);
+      put(home.side, p.race, amounts(d.want), now);
+      this.addLog(`Échange conclu en retard entre ${p.name} et ${other.name}.`);
+    }
+    return any;
+  }
+
+  /**
+   * Mes réponses à garder : tant que l'offre existe chez celui qui propose,
+   * il en a besoin pour la régler (l'oublier la ferait accepter deux fois, ou
+   * rendre son séquestre en plus). Une fois qu'il l'a réglée, elle peut partir.
+   */
+  keptAnswers(answers) {
+    const live = (a) => {
+      const other = this.state.players[a.pid];
+      return other?.offers?.some((o) => o.id === a.offer) || other?.dropped?.some((d) => d.id === a.offer);
+    };
+    return answers.filter(live).slice(-200);
   }
 
   /**
@@ -1234,7 +1424,7 @@ export class Session {
       for (const o of other.offers || []) {
         if (o.to.pid !== this.me || now < o.expires) continue;
         if ((p.answers || []).some((a) => a.offer === o.id && a.pid === other.id)) continue;
-        p.answers = [...(p.answers || []), { offer: o.id, pid: other.id, ok: false, at: now }].slice(-60);
+        p.answers = this.keptAnswers([...(p.answers || []), { offer: o.id, pid: other.id, ok: false, at: now }]);
         any = true;
       }
     }
@@ -1258,7 +1448,8 @@ export class Session {
     const f = this.myFleet(id);
     const now = this.now();
     if (!f || moving(f, now)) return this.refuse('La flotte doit être arrêtée pour faire le plein.');
-    const here = this.planetsAt(f.to)[0];
+    if (this.locked(id)) return false; // son réservoir doit garder la place du carburant échangé
+    const here = this.planetsAt(parkedCell(f))[0]; // en panne tout près : elle est en orbite
     const pl = here?.owner.id === this.me && this.planetOf(p, here.key);
     if (!pl) return this.refuse('Le plein se fait en orbite d’une de tes planètes.');
     const give = refuel(pl.planet, f, p.race, now);
@@ -1369,7 +1560,16 @@ export class Session {
     const now = this.now();
     let changed = false;
     this.tickLogs = []; // entrées du journal de ce passage, envoyées avec ma fiche
+    let techAt = now; // fin de la dernière recherche terminée depuis le passage précédent
+    // La planète mère d'abord (planetsOf la donne en premier) : ses recherches valent pour les colonies.
     for (const pl of this.planetsOf(p)) {
+      // Les technologies valent pour toutes mes planètes : chaque colonie en garde une copie, à
+      // partir de la fin de la recherche (et pas seulement du passage qui s'en aperçoit).
+      if (pl.key !== 'home' && JSON.stringify(pl.planet.tech || {}) !== JSON.stringify(p.planet.tech || {})) {
+        settle(pl.planet, Math.min(techAt, now));
+        pl.planet.tech = { ...(p.planet.tech || {}) };
+        changed = true;
+      }
       const due = ['queue', 'research', 'yard'].some((k) => pl.planet[k] && pl.planet[k].end <= now);
       if (!due) continue;
       for (const d of settle(pl.planet, now)) {
@@ -1377,24 +1577,19 @@ export class Session {
         const R = RACES[p.race];
         if (d.kind === 'queue') this.addLog(`${p.name} termine ${R.buildings[d.key].name} niv. ${d.level} sur ${pl.name}.`);
         else if (d.kind === 'research') {
+          techAt = Math.min(techAt, d.end);
           this.addLog(`${p.name} découvre ${TECHS[p.race][d.key].name} niv. ${d.level}.`);
           this.ontoast?.(`Recherche terminée : ${TECHS[p.race][d.key].name} niv. ${d.level}.`);
         } else this.addLog(`${p.name} reçoit ${d.count} × ${SHIPS[p.race][d.type].name} sur ${pl.name}.`);
       }
     }
-    // Les technologies valent pour toutes mes planètes : chaque colonie en garde une copie.
-    for (const pl of this.planetsOf(p)) {
-      if (pl.key === 'home' || JSON.stringify(pl.planet.tech || {}) === JSON.stringify(p.planet.tech || {})) continue;
-      settle(pl.planet, now);
-      pl.planet.tech = { ...(p.planet.tech || {}) };
-      changed = true;
-    }
+    // Les combats des autres d'abord : mes flottes agissent ensuite avec leurs vraies pertes.
+    if (this.applyEffects(p, now)) changed = true;
     for (const f of [...(p.fleets || [])]) {
       if (f.order?.kind === 'chase') {
         if (this.pursue(p, f, now)) changed = true;
       } else if (f.order && !moving(f, now) && this.arrive(p, f)) changed = true;
     }
-    if (this.applyEffects(p, now)) changed = true;
     if (this.settleOffers(p, now)) changed = true;
     if (this.refuseExpired(p, now)) changed = true;
     this.noticeOffers(now);
@@ -1434,7 +1629,9 @@ export class Session {
 
     if (order.kind === 'colonize') {
       const w = this.planets.find((x) => x.id === order.world);
-      if (!w || this.ownerAt(w) || !f.ships.colony) {
+      // Prise par un joueur arrivé après moi (son téléphone est passé avant le mien) : je
+      // fonde quand même, et son téléphone lui rendra sa flotte (checkClaim).
+      if (!w || !f.ships.colony || this.takenBefore(w, f.arrive)) {
         this.addLog(`${w?.name || 'La planète'} est déjà prise : la flotte ${de(p.name)} reste en orbite.`);
         return true;
       }
@@ -1446,6 +1643,10 @@ export class Session {
       if (!ships.colony) delete ships.colony;
       colony.ships = ships;
       p.colonies = { ...(p.colonies || {}), [w.id]: colony };
+      // Un combat contre cette flotte que je n'ai pas encore lu retombera sur la colonie.
+      const docked = { ...(p.docked || {}) };
+      for (const id of [f.id, ...(f.absorbed || [])]) docked[id] = w.id;
+      p.docked = Object.fromEntries(Object.entries(docked).slice(-60));
       drop();
       this.addLog(`${p.name} fonde une colonie sur ${w.name}.`);
       this.ontoast?.(`Colonie fondée sur ${w.name} !`);
@@ -1460,7 +1661,12 @@ export class Session {
       // son téléphone appliquera ses pertes en lisant mon rapport.
       const def = this.defenseAt(p, enemy, pl, f.arrive);
       const res = battle({ race: p.race, ships: f.ships, tech: p.planet.tech }, { race: enemy.race, ships: def.ships, tech: def.tech });
-      const take = res.won ? plunder(p.race, res.attLeft, def.stock, f.cargo) : {};
+      // Un pillage par planète toutes les 2 min au plus : sinon, des attaques à la chaîne depuis
+      // l'orbite (trajet de 0 case) vidaient tout, malgré la règle « la moitié au plus ».
+      const spot = `${enemy.id}:${pl.key}`;
+      const recent = (p.raided?.[spot] || 0) > f.arrive - RAID_COOLDOWN_MS;
+      const take = res.won && !recent ? plunder(p.race, res.attLeft, def.stock, f.cargo) : {};
+      if (res.won && !recent) p.raided = Object.fromEntries([...Object.entries(p.raided || {}).filter(([, t]) => t > f.arrive - RAID_COOLDOWN_MS), [spot, f.arrive]]);
       // Un identifiant par combat : une même flotte peut attaquer plusieurs fois.
       p.effects = [...(p.effects || []), { id: this.newId(8), to: enemy.id, key: pl.key, at: f.arrive, ships: res.defLost, take }].slice(-MAX_EFFECTS);
       const loot = lootText(take);
@@ -1488,7 +1694,9 @@ export class Session {
     const def = stateAt(pl.planet, at);
     const ships = { ...def.ships };
     const stock = { ...def.stock };
-    for (const e of p.effects || []) {
+    // Les combats des autres joueurs contre elle, que je vois et qu'elle n'a pas encore lus, aussi.
+    const reports = Object.values(this.state.players).flatMap((o) => (o.id === enemy.id ? [] : o.effects || []));
+    for (const e of reports) {
       if (e.to !== enemy.id || e.key !== pl.key || enemy.applied?.includes(e.id)) continue;
       for (const [k, n] of Object.entries(e.ships || {})) ships[k] = Math.max(0, (ships[k] || 0) - n);
       for (const [r, v] of Object.entries(e.take || {})) stock[r] = Math.max(0, (stock[r] || 0) - v);
@@ -1552,8 +1760,19 @@ export class Session {
   fleetHit(p, other, e, now) {
     const f = this.fleetOf(p, e.fleet);
     if (!f) return false;
-    const lost = countShips(e.ships);
-    if (!applyLosses(f, p.race, p.planet.tech, e.ships, e.take, now)) {
+    // Le même combat, que j'ai livré moi aussi sans avoir lu son rapport : mes pertes sont déjà comptées.
+    // Le même combat : un des miens contre sa flotte, qu'il ne connaissait pas encore en livrant le
+    // sien (absent de son `ack`). Une revanche, livrée après avoir lu mon rapport, est un autre combat.
+    // Chaque combat ne sert qu'une fois.
+    const mineIds = [f.id, ...(f.absorbed || [])];
+    // (À plus de 30 min d'écart, jamais le même : un rapport lu sans être noté ne doit pas annuler une revanche.)
+    const g = e.sim && e.by && (p.engaged || []).find((g) => g.id && g.fleet === e.by && mineIds.includes(g.by) && !(e.ack || []).includes(g.id) && Math.abs((g.at || 0) - e.at) < 30 * 60_000);
+    if (g) p.engaged = p.engaged.filter((x) => x !== g);
+    // Je garde trace de ce rapport lu : mes prochains combats contre lui le citeront (ack).
+    p.engaged = [...(p.engaged || []), { fleet: e.by, by: f.id, at: e.at, got: e.id }].slice(-20);
+    const ships = g ? {} : e.ships;
+    const lost = countShips(ships);
+    if (!applyLosses(f, p.race, p.planet.tech, ships, e.take, now)) {
       p.fleets = p.fleets.filter((x) => x.id !== f.id);
       this.addLog(`Une flotte ${de(p.name)} est détruite par ${other.name}.`);
       this.ontoast?.(`${other.name} a détruit une de tes flottes !`);
@@ -1675,10 +1894,11 @@ for (const k of [...ORDER_KINDS, 'tick']) {
       return act.apply(this, a);
     } finally {
       // Un ordre refusé a pu faire avancer l'heure d'une planète (calculs
-      // arrondis autrement) : on le garde aussi, il partira avec ma fiche.
+      // arrondis autrement) : on le garde aussi, et ma fiche change d'heure
+      // pour que les autres l'adoptent (à heure égale, chacun garde la sienne).
       const p = this.state.players[this.me];
       if (!this.entryKept && k !== 'tick' && p) {
-        p.orders = [...(p.orders || []), this.entry].slice(-MAX_ORDERS);
+        this.touch();
         this.scheduleSave();
       }
       this.entry = null;

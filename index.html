@@ -94,7 +94,12 @@
         <span id="me-name" class="me-name"></span>
         <span id="me-role" class="badge"></span>
       </div>
-      <div id="net" class="net" title="Joueurs connectés à ce téléphone"></div>
+      <div class="top-right">
+        <div id="net" class="net" title="Joueurs connectés à ce téléphone"></div>
+        <button id="btn-invite" class="icon-btn" title="Inviter un joueur" aria-label="Inviter un joueur">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M19 8v6M16 11h6"/></svg>
+        </button>
+      </div>
     </header>
 
     <div id="lost" class="banner warn" hidden>
@@ -109,17 +114,25 @@
       <div id="trades" class="trades" hidden></div>
       <div class="map-head">
         <span>Ta planète <strong id="my-coords" class="mono"></strong></span>
-        <span id="map-size" class="hint mono"></span>
+        <span class="pi-head-right"><span id="map-size" class="hint mono"></span><span class="help-wrap"><button id="btn-map-help" class="ghost help-btn" aria-expanded="false" aria-describedby="map-help" aria-label="Aide de la carte">?</button><span id="map-help" role="tooltip" class="tooltip">Touche une planète pour voir ses gisements, la tienne pour ouvrir ses bâtiments, une de tes flottes (triangle) pour la piloter. Planètes en pointillés : libres. Halo : ta portée de détection ; les flottes adverses n’apparaissent que dedans.</span></span></span>
       </div>
       <div class="map-wrap"><canvas id="map" aria-label="Carte de l'univers : touche une planète"></canvas></div>
 
-      <article id="planet-info" class="card planet-info" hidden>
-        <div class="b-head"><h4 id="pi-name"></h4><span id="pi-where" class="level mono"></span></div>
-        <p id="pi-owner" class="b-desc"></p>
-        <div id="pi-soil" class="soil"></div>
-        <button id="btn-claim" class="primary" hidden>S'installer ici</button>
-        <button id="btn-open-planet" class="secondary" hidden>Voir mes bâtiments</button>
-      </article>
+      <!-- Fiche de la planète touchée : devant la carte -->
+      <div id="sheet-planet" class="sheet" hidden>
+        <article id="planet-info" class="sheet-panel planet-info" role="dialog" aria-modal="true" aria-labelledby="pi-name">
+          <div class="sheet-head">
+            <h2 id="pi-name"></h2>
+            <span class="pi-head-right"><span id="pi-where" class="level mono"></span><button id="btn-planet-close" class="icon-btn close-btn" title="Fermer" aria-label="Fermer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span>
+          </div>
+          <p id="pi-owner" class="b-desc"></p>
+          <p id="pi-size" class="climate" hidden></p>
+          <p id="pi-climate" class="climate" hidden></p>
+          <div id="pi-soil" class="soil"></div>
+          <button id="btn-claim" class="primary" hidden>S'installer ici</button>
+          <button id="btn-open-planet" class="secondary" hidden>Voir mes bâtiments</button>
+        </article>
+      </div>
 
       <article id="fleet-info" class="card planet-info" hidden>
         <div class="b-head"><h4 id="fi-name">Flotte</h4><span id="fi-where" class="level mono"></span></div>
@@ -130,17 +143,16 @@
         <div id="fi-beside" class="fi-beside" hidden></div>
         <div id="fi-partners" class="fi-beside" hidden></div>
         <div class="fi-actions">
-          <button id="btn-fi-stop" class="secondary small">Stop</button>
-          <button id="btn-fi-return" class="secondary small">Rentrer</button>
-          <button id="btn-fi-dock" class="secondary small">Se poser</button>
-          <button id="btn-fi-refuel" class="secondary small">Faire le plein</button>
-          <button id="btn-fi-split" class="secondary small">Scinder…</button>
-          <button id="btn-fi-close" class="ghost small">Fermer</button>
+          <button id="btn-fi-stop" class="secondary small" title="Arrêter la flotte">■ Stop</button>
+          <button id="btn-fi-return" class="secondary small" title="Rentrer à la planète mère">⌂ Rentrer</button>
+          <button id="btn-fi-dock" class="secondary small" title="Se poser sur la planète">⤓ Poser</button>
+          <button id="btn-fi-refuel" class="secondary small" title="Faire le plein de carburant">⛽ Plein</button>
+          <button id="btn-fi-split" class="secondary small" title="Scinder la flotte">✂ Scinder</button>
+          <button id="btn-fi-close" class="ghost small" title="Fermer" aria-label="Fermer">✕</button>
         </div>
-        <p class="hint">Touche une case de la carte pour y envoyer la flotte, une flotte ennemie pour la poursuivre. Touche ta flotte encore pour passer à la suivante sur la même case.</p>
+        <p class="hint">Touche une case pour y aller, une flotte ennemie pour la poursuivre, ta flotte pour passer à la suivante.</p>
       </article>
 
-      <p class="hint">Touche une planète pour voir ses gisements, la tienne pour ouvrir ses bâtiments, une de tes flottes (triangle) pour la piloter. Planètes en pointillés : libres. Halo : ta portée de détection ; les flottes adverses n’apparaissent que dedans.</p>
 
       <section>
         <h3 class="section-title">Commandants</h3>
@@ -148,35 +160,42 @@
       </section>
     </section>
 
-    <main id="view-planet" class="game" hidden>
+    <main id="view-planet" class="game" data-tab="build" hidden>
       <div class="planet-head">
-        <button id="btn-back-map" class="ghost small">← Carte</button>
+        <button id="btn-back-map" class="icon-btn" title="Retour à la carte" aria-label="Retour à la carte">←</button>
         <h2 id="planet-title"></h2>
       </div>
 
       <section class="resources" id="resources"></section>
 
-      <section id="soil-zone" hidden>
+      <nav class="tabs" role="tablist" aria-label="Sections de la planète">
+        <button role="tab" class="tab" data-tab-btn="build" aria-selected="true">Bâtiments</button>
+        <button role="tab" class="tab" data-tab-btn="research" id="tab-research" aria-selected="false">Recherche</button>
+        <button role="tab" class="tab" data-tab-btn="fleet" aria-selected="false">Flottes</button>
+      </nav>
+
+      <section id="soil-zone" data-pane="build" hidden>
         <h3 class="section-title">Gisements de la planète</h3>
+        <p id="soil-climate" class="climate" hidden></p>
         <div id="soil" class="soil"></div>
       </section>
 
-      <section id="queue" class="queue card" hidden>
+      <section id="queue" class="queue card" data-pane="build" hidden>
         <div class="queue-head"><span id="queue-label"></span><span id="queue-left" class="mono"></span></div>
         <div class="bar"><div id="queue-bar" class="bar-fill"></div></div>
       </section>
 
-      <section id="powers-zone" hidden>
+      <section id="powers-zone" data-pane="build" hidden>
         <h3 class="section-title">Pouvoirs psychiques</h3>
         <div id="powers" class="buildings"></div>
       </section>
 
-      <section>
-        <h3 class="section-title">Bâtiments</h3>
+      <section data-pane="build">
+        <h3 class="section-title">Bâtiments <span id="places" class="places mono"></span></h3>
         <div id="buildings" class="buildings"></div>
       </section>
 
-      <section id="research-zone">
+      <section id="research-zone" data-pane="research">
         <h3 class="section-title">Recherche</h3>
         <section id="research-queue" class="queue card" hidden>
           <div class="queue-head"><span id="research-label"></span><span id="research-left" class="mono"></span></div>
@@ -186,7 +205,7 @@
         <div id="techs" class="buildings"></div>
       </section>
 
-      <section id="yard-zone">
+      <section id="yard-zone" data-pane="fleet">
         <h3 class="section-title">Chantier naval</h3>
         <section id="yard-queue" class="queue card" hidden>
           <div class="queue-head"><span id="yard-label"></span><span id="yard-left" class="mono"></span></div>
@@ -196,7 +215,7 @@
         <div id="ships" class="buildings"></div>
       </section>
 
-      <section id="fleet-zone">
+      <section id="fleet-zone" data-pane="fleet">
         <h3 class="section-title">Flottes</h3>
         <p id="docked" class="hint"></p>
         <button id="btn-send-fleet" class="secondary">Faire décoller une flotte</button>
@@ -204,10 +223,6 @@
         <div id="planet-partners" class="fi-beside" hidden></div>
       </section>
     </main>
-
-    <div class="fab-zone">
-      <button id="btn-invite" class="primary fab">Inviter un joueur</button>
-    </div>
   </section>
 
   <!-- Feuille d'invitation (tout le monde) -->
@@ -215,7 +230,7 @@
     <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="invite-title">
       <div class="sheet-head">
         <h2 id="invite-title">Inviter un joueur</h2>
-        <button id="btn-invite-close" class="ghost">Fermer</button>
+        <button id="btn-invite-close" class="icon-btn close-btn" title="Fermer" aria-label="Fermer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
 
       <div class="step">
@@ -248,7 +263,7 @@
     <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="fleet-title">
       <div class="sheet-head">
         <h2 id="fleet-title">Faire décoller une flotte</h2>
-        <button id="btn-fleet-close" class="ghost">Fermer</button>
+        <button id="btn-fleet-close" class="icon-btn close-btn" title="Fermer" aria-label="Fermer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <p class="hint">La flotte attend en orbite. Touche-la ensuite sur la carte, puis touche une case pour l’y envoyer : s’y poser, coloniser, attaquer ou juste stationner. Elle brûle son carburant (de l’énergie) à chaque case ; à sec, elle reste en panne là où elle est.</p>
       <div>
@@ -276,7 +291,7 @@
     <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="move-title">
       <div class="sheet-head">
         <h2 id="move-title"></h2>
-        <button id="btn-move-close" class="ghost">Fermer</button>
+        <button id="btn-move-close" class="icon-btn close-btn" title="Fermer" aria-label="Fermer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <p id="move-hint" class="hint"></p>
       <div>
@@ -296,7 +311,7 @@
     <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="trade-title">
       <div class="sheet-head">
         <h2 id="trade-title"></h2>
-        <button id="btn-trade-close" class="ghost">Fermer</button>
+        <button id="btn-trade-close" class="icon-btn close-btn" title="Fermer" aria-label="Fermer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <p class="hint">Ce que tu donnes part tout de suite sous séquestre. L’offre vaut 5 minutes et ne s’annule pas ; ta flotte reste bloquée jusqu’à la réponse. Refusée ou sans réponse, tu récupères ta part. Ne rien demander, c’est faire un don.</p>
       <div>

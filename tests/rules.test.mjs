@@ -66,3 +66,83 @@ test('un effectif négatif ou fractionnaire ne crée pas de vaisseaux au combat'
   assert.ok((res.attLeft.heavy || 0) <= 1, 'pas plus de croiseurs qu’au départ');
   assert.ok((res.defLeft.fighter || 0) <= 2, 'pas plus de drones qu’au départ');
 });
+
+test('le soleil est au milieu de la carte, de 2 × 2 à 4 × 4, et aucune planète n’y est', () => {
+  const sizes = new Set();
+  for (let i = 0; i < 300; i++) {
+    const gid = `g${i}`;
+    const sun = game.sunFor(gid);
+    sizes.add(sun.size);
+    assert.ok(sun.size >= 2 && sun.size <= 4);
+    assert.deepEqual(game.sunFor(gid), sun, 'le même sur tous les téléphones');
+    const mid = sun.x + sun.size / 2;
+    assert.ok(Math.abs(mid - game.UNIVERSE.w / 2) <= 0.5 && Math.abs(sun.y + sun.size / 2 - game.UNIVERSE.h / 2) <= 0.5);
+    const planets = game.planetsFor(gid);
+    assert.equal(planets.filter((w) => w.kind === 'planet').length, game.PLANET_COUNT);
+    assert.equal(planets.length, game.PLANET_COUNT + Object.values(game.SMALL_BODIES).reduce((t, b) => t + b.count, 0));
+    assert.ok(planets.every((w) => !game.inSun(sun, w)), `planète dans le soleil (${gid})`);
+    assert.equal(new Set(planets.map((w) => `${w.x}:${w.y}`)).size, planets.length, 'deux planètes sur la même case');
+  }
+  assert.deepEqual([...sizes].sort(), [2, 3, 4]);
+});
+
+test('plus une planète est près du soleil, plus elle est chaude, et son climat change la production', () => {
+  const sun = { x: 9, y: 9, size: 2 };
+  const near = game.climateAt(sun, { x: 8, y: 9 });
+  const mid = game.climateAt(sun, { x: 5, y: 5 });
+  const far = game.climateAt(sun, { x: 0, y: 0 });
+  assert.ok(near.heat > mid.heat && mid.heat > far.heat);
+  assert.ok(near.energy > mid.energy && mid.energy > far.energy, 'plus d’énergie solaire au chaud');
+  assert.ok(near.minerals > far.minerals, 'plus de minéraux au chaud');
+  assert.ok(mid.food > near.food && mid.food > far.food, 'la nourriture pousse mieux en zone tempérée');
+
+  // Même planète, avec et sans climat : la production suit les facteurs.
+  const base = game.planetsFor('gtest')[0];
+  const flat = game.newPlanet('human', T0, { ...base, climate: undefined });
+  const hot = game.newPlanet('human', T0, { ...base, climate: near });
+  const a = game.stateAt(flat, T0).prod.in;
+  const b = game.stateAt(hot, T0).prod.in;
+  assert.ok(Math.abs(b.energy - a.energy * near.energy) < 1e-9);
+  assert.ok(b.minerals > a.minerals);
+  assert.ok(b.food < a.food);
+  assert.ok(game.planetsFor('gtest').every((w) => w.climate && w.climate.heat >= 0 && w.climate.heat <= 1));
+});
+
+test('chaque niveau de bâtiment prend une place : une planète pleine ne construit plus', () => {
+  const worlds = game.planetsFor('gtest');
+  for (const w of worlds) {
+    const [lo, hi] = w.kind === 'planet' ? game.PLANET_PLACES : game.SMALL_BODIES[w.kind].places;
+    assert.ok(w.places >= lo && w.places <= hi, `${w.name} : ${w.places} places`);
+  }
+  // Les petits corps ont moins de gisements qu'une planète.
+  const small = worlds.filter((w) => w.kind !== 'planet');
+  assert.ok(small.every((w) => w.nature.minerals.max <= game.NATURE.minerals.max[1] * 0.35 + 100));
+  const p = game.newPlanet('human', T0, worlds[0]);
+  p.stock = { minerals: 1e6, food: 1e6, energy: 1e6 };
+  p.levels.store = 9;
+  p.levels.mine = p.places - game.usedPlaces(p.levels) + p.levels.mine; // toutes les places prises
+  assert.equal(game.placesLeft(p), 0);
+  assert.match(game.startBuild(p, 'mine', T0), /Plus de place/);
+});
+
+test('les places viennent de la carte : les effacer ou un niveau négatif ne libère rien', async () => {
+  const { newGame } = await import('./harness.mjs');
+  const { players: [A] } = newGame(1, ['human']);
+  const pl = A.state.players[A.me].planet;
+  pl.stock = { minerals: 1e6, food: 1e6, energy: 1e6 };
+  pl.levels.mine += pl.places - game.usedPlaces(pl.levels); // pleine
+  delete pl.places; // fiche trafiquée
+  A.build('farm');
+  assert.equal(pl.queue, null, 'toujours pleine');
+  const { normalize } = await import('../js/session.js');
+  const p = normalize({ race: 'human', planet: { ...pl, levels: { ...pl.levels, mine: -20, x: 1e9 } } });
+  assert.equal(p.planet.levels.mine, 0);
+  assert.equal(p.planet.levels.x, undefined);
+});
+
+test('une colonie humaine sur le plus petit corps garde des places libres', () => {
+  for (const b of Object.values(game.SMALL_BODIES)) {
+    const p = game.newPlanet('human', T0, { nature: game.planetsFor('gtest')[0].nature, reserve: {}, places: b.places[0], kind: 'comet' });
+    assert.ok(game.placesLeft(p) >= 2, `${b.label} : ${game.placesLeft(p)} place(s) libre(s)`);
+  }
+});

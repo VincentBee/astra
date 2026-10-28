@@ -37,6 +37,8 @@ function earlyBuffer(channel) {
  * l'envoie en morceaux, recollés à l'arrivée.
  */
 const PART = 60_000;
+/** Un message ne dépasse pas 200 morceaux (12 Mo) : bien plus qu'une partie entière. */
+const MAX_PARTS = 200;
 
 /** Enveloppe un canal de données : messages JSON, état de connexion. */
 export class Link {
@@ -53,9 +55,13 @@ export class Link {
       try {
         msg = JSON.parse(data);
         if (msg?.type === 'part') {
-          if (parts?.id !== msg.id) parts = { id: msg.id, n: msg.n, got: [] };
+          // Morceaux numérotés de 0 à n−1, n borné : un numéro énorme bloquerait le téléphone.
+          if (!Number.isInteger(msg.n) || msg.n < 1 || msg.n > MAX_PARTS || !Number.isInteger(msg.i) || msg.i < 0 || msg.i >= msg.n) return;
+          if (typeof msg.data !== 'string') return;
+          if (parts?.id !== msg.id || parts.n !== msg.n) parts = { id: msg.id, n: msg.n, got: [], count: 0 };
+          if (parts.got[msg.i] === undefined) parts.count++;
           parts.got[msg.i] = msg.data;
-          if (parts.got.filter((x) => typeof x === 'string').length < parts.n) return;
+          if (parts.count < parts.n) return;
           msg = JSON.parse(parts.got.join(''));
           parts = null;
         }
