@@ -36,8 +36,9 @@ const de = (name) => (/^[aeiouyhàâéèêëîïôöûü]/i.test(name) ? `d’${
  * 4 : flottes fusionnées (`absorbed`).
  * 5 : combats entre flottes (effets visant une flotte, `docked`).
  * 6 : échanges entre joueurs (`offers`, `answers`).
+ * 7 : journal des ordres (`orders`), messages envoyés en morceaux.
  */
-export const FORMAT = 6;
+export const FORMAT = 7;
 
 const shipsText = (n) => `${n} vaisseau${n > 1 ? 'x' : ''}`;
 
@@ -62,6 +63,12 @@ const HEARTBEAT_MS = 1500;
 // écran verrouillé quelques secondes ne doit pas faire sortir de la partie).
 const SILENCE_MS = 30000;
 const ID_KEY = 'astra.identity';
+/**
+ * Ordres gardés dans la fiche d'un joueur, pour rejouer la partie
+ * (js/replay.js). La fiche voyage à chaque changement : au-delà, les plus
+ * anciens s'effacent et la partie ne se rejoue plus depuis le début.
+ */
+export const MAX_ORDERS = 1500;
 
 function rid(n = 8) {
   const a = new Uint8Array(n);
@@ -92,7 +99,7 @@ const saveIdentity = (v) => {
  * produisaient métal, cristal et deutérium : une fiche sans race n'a pas
  * encore de planète, son joueur choisira sa race en revenant.
  */
-function normalize(p) {
+export function normalize(p) {
   delete p.pos; // vaisseaux d'avant : on ne se déplace plus sur la carte
   if (!RACES[p.race]) {
     p.race = null;
@@ -109,6 +116,8 @@ function normalize(p) {
   // Échanges : mes offres en cours (avec leur séquestre), mes réponses à celles des autres.
   if (!Array.isArray(p.offers)) p.offers = [];
   if (!Array.isArray(p.answers)) p.answers = [];
+  // Journal des ordres : { t, k, a?, ids? } (heure, ordre ou « tick », arguments, identifiants tirés).
+  if (!Array.isArray(p.orders)) p.orders = [];
   return p;
 }
 
@@ -256,9 +265,22 @@ export class Session {
 
   // ----- état ------------------------------------------------------------------
 
-  /** Heure de la partie : celle du téléphone (réglée automatiquement par le réseau). */
+  /**
+   * Heure de la partie : celle du téléphone (réglée automatiquement par le
+   * réseau). Figée le temps d'un ordre, pour qu'il se rejoue à l'identique.
+   */
   now() {
-    return Date.now();
+    return this.entry?.t ?? Date.now();
+  }
+
+  /**
+   * Identifiant neuf (flotte, offre, rapport de combat). Noté avec l'ordre
+   * en cours : un ordre suivant peut le viser, le rejeu doit retrouver le même.
+   */
+  newId(n) {
+    const id = this.replayIds?.length ? this.replayIds.shift() : rid(n);
+    if (this.entry) (this.entry.ids ||= []).push(id);
+    return id;
   }
 
   /** Joueurs joignables depuis ce téléphone. */
@@ -479,6 +501,11 @@ export class Session {
     const p = this.state.players[this.me];
     p.actAt = Math.max(this.now(), (p.actAt || 0) + 1);
     p.v = FORMAT;
+    // L'ordre (ou le passage) qui a changé ma fiche rejoint mon journal, une fois.
+    if (this.entry && !this.entryKept) {
+      this.entryKept = true;
+      p.orders = [...(p.orders || []), this.entry].slice(-MAX_ORDERS);
+    }
     this.spread(p, log);
   }
 
@@ -755,7 +782,7 @@ export class Session {
       room -= cargo[r];
     }
     const fuel = Math.min(fleetTank(p.race, colony.ships), Math.floor(colony.stock.energy || 0));
-    const res = launch(colony, { ships: colony.ships, cargo, fuel, at: { x: w.x, y: w.y }, origin: 'home', id: rid(6) }, now);
+    const res = launch(colony, { ships: colony.ships, cargo, fuel, at: { x: w.x, y: w.y }, origin: 'home', id: this.newId(6) }, now);
     if (res.error) return null;
     p.fleets.push(res.fleet);
     return res.fleet;
@@ -855,7 +882,7 @@ export class Session {
       this.ontoast?.(`Pas plus de ${MAX_FLEETS} flottes.`);
       return false;
     }
-    const res = launch(from.planet, { ships, cargo, fuel, at: from.cell, origin: fromKey, id: rid(6) }, this.now());
+    const res = launch(from.planet, { ships, cargo, fuel, at: from.cell, origin: fromKey, id: this.newId(6) }, this.now());
     if (res.error) {
       this.ontoast?.(res.error);
       return false;
@@ -1009,7 +1036,7 @@ export class Session {
   fight(p, f, enemy, target, now) {
     const res = battle({ race: p.race, ships: f.ships, tech: p.planet.tech }, { race: enemy.race, ships: target.ships, tech: enemy.planet?.tech || {} });
     const take = res.won ? salvage(p.race, res.attLeft, target.cargo, f.cargo) : {};
-    p.effects = [...(p.effects || []), { id: rid(8), to: enemy.id, fleet: target.id, at: now, ships: res.defLost, take }].slice(-MAX_EFFECTS);
+    p.effects = [...(p.effects || []), { id: this.newId(8), to: enemy.id, fleet: target.id, at: now, ships: res.defLost, take }].slice(-MAX_EFFECTS);
     const loot = lootText(take);
     this.addLog(
       res.won
@@ -1113,7 +1140,7 @@ export class Session {
     const err = lacks(mine.side, p.race, give, now) || noRoom(mine.side, p.race, want, now, give);
     if (err) return this.refuse(err);
     take(mine.side, p.race, give, now);
-    const offer = { id: rid(8), from: fromRef, to: toRef, give, want, at: now, expires: now + OFFER_MS };
+    const offer = { id: this.newId(8), from: fromRef, to: toRef, give, want, at: now, expires: now + OFFER_MS };
     p.offers = [...(p.offers || []), offer];
     this.touch(this.addLog(`${p.name} propose un échange à ${other.name}.`));
     this.changed();
@@ -1293,7 +1320,7 @@ export class Session {
     if (!f || this.locked(id)) return false;
     if (moving(f, now)) return this.refuse('La flotte doit être arrêtée pour se scinder.');
     if (p.fleets.length >= MAX_FLEETS) return this.refuse(`Pas plus de ${MAX_FLEETS} flottes.`);
-    const res = split(f, p.race, part, rid(6), now);
+    const res = split(f, p.race, part, this.newId(6), now);
     if (res.error) return this.refuse(res.error);
     p.fleets.push(res.fleet);
     this.touch();
@@ -1434,7 +1461,7 @@ export class Session {
       const res = battle({ race: p.race, ships: f.ships, tech: p.planet.tech }, { race: enemy.race, ships: def.ships, tech: def.tech });
       const take = res.won ? plunder(p.race, res.attLeft, def.stock, f.cargo) : {};
       // Un identifiant par combat : une même flotte peut attaquer plusieurs fois.
-      p.effects = [...(p.effects || []), { id: rid(8), to: enemy.id, key: pl.key, at: f.arrive, ships: res.defLost, take }].slice(-MAX_EFFECTS);
+      p.effects = [...(p.effects || []), { id: this.newId(8), to: enemy.id, key: pl.key, at: f.arrive, ships: res.defLost, take }].slice(-MAX_EFFECTS);
       const loot = lootText(take);
       this.addLog(
         res.won
@@ -1609,4 +1636,29 @@ export class Session {
     this.rdv?.leave();
     this.rdv = null;
   }
+}
+
+/**
+ * Ce qui change ma fiche, noté pour le rejeu : mes ordres, et les passages
+ * (`tick`) qui ont fait avancer quelque chose (voir touch). Le reste de la partie vient des fiches des
+ * autres, qui ont chacune leur journal.
+ */
+export const ORDER_KINDS = ['chooseRace', 'claimPlanet', 'build', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'splitFleet', 'returnFleet', 'power'];
+for (const k of [...ORDER_KINDS, 'tick']) {
+  const act = Session.prototype[k];
+  Session.prototype[k] = function (...a) {
+    if (this.entry || !this.state) return act.apply(this, a); // un ordre dans un ordre : déjà noté
+    while (a.length && a[a.length - 1] === undefined) a.pop();
+    this.entry = { t: this.now(), k, ...(a.length ? { a: JSON.parse(JSON.stringify(a)) } : {}) };
+    this.entryKept = false;
+    try {
+      return act.apply(this, a);
+    } finally {
+      // Un ordre refusé a pu faire avancer l'heure d'une planète (calculs
+      // arrondis autrement) : on le garde aussi, il partira avec ma fiche.
+      const p = this.state.players[this.me];
+      if (!this.entryKept && k !== 'tick' && p) p.orders = [...(p.orders || []), this.entry].slice(-MAX_ORDERS);
+      this.entry = null;
+    }
+  };
 }

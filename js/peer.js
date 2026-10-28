@@ -31,6 +31,13 @@ function earlyBuffer(channel) {
   return early;
 }
 
+/**
+ * Un message ne doit pas dépasser 256 Ko (a=max-message-size, js/invite.js) :
+ * au-delà de cette taille de texte (3 octets au plus par caractère), on
+ * l'envoie en morceaux, recollés à l'arrivée.
+ */
+const PART = 60_000;
+
 /** Enveloppe un canal de données : messages JSON, état de connexion. */
 export class Link {
   constructor(pc, channel, early = []) {
@@ -40,10 +47,18 @@ export class Link {
     this.closed = false;
     this._onmessage = null;
     this._queue = [];
+    let parts = null; // { id, n, got: [] } : message en morceaux en cours de réception
     const receive = (data) => {
       let msg;
       try {
         msg = JSON.parse(data);
+        if (msg?.type === 'part') {
+          if (parts?.id !== msg.id) parts = { id: msg.id, n: msg.n, got: [] };
+          parts.got[msg.i] = msg.data;
+          if (parts.got.filter((x) => typeof x === 'string').length < parts.n) return;
+          msg = JSON.parse(parts.got.join(''));
+          parts = null;
+        }
       } catch {
         return;
       }
@@ -84,7 +99,12 @@ export class Link {
   }
 
   send(msg) {
-    if (this.channel.readyState === 'open') this.channel.send(JSON.stringify(msg));
+    if (this.channel.readyState !== 'open') return;
+    const text = JSON.stringify(msg);
+    if (text.length <= PART) return this.channel.send(text);
+    const id = `${Date.now()}-${Math.random()}`;
+    const n = Math.ceil(text.length / PART);
+    for (let i = 0; i < n; i++) this.channel.send(JSON.stringify({ type: 'part', id, i, n, data: text.slice(i * PART, (i + 1) * PART) }));
   }
 
   close() {
