@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#070a14">
+  <title>Astra · Technologies</title>
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <style>
+    /* Même ambiance que le jeu (style.css), mais page autonome : elle ne
+       charge ni le jeu ni ses écrans. */
+    :root {
+      --bg: #070a14;
+      --panel: #111729;
+      --panel-2: #182039;
+      --line: rgba(150, 170, 230, 0.16);
+      --text: #e8ebf7;
+      --muted: #8d95b3;
+      --accent: #7aa2ff;
+      --minerals: #b9c2d6;
+      --food: #7cf0b4;
+      --energy: #ffd166;
+      --radius: 14px;
+      --mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', Menlo, monospace;
+      --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      --race: var(--accent);
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      background: radial-gradient(ellipse at top, #121a33 0%, var(--bg) 60%) fixed, var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.45;
+      min-height: 100vh;
+    }
+    main { max-width: 1400px; margin: 0 auto; padding: 28px 16px 64px; }
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 8vw, 3rem);
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      background: linear-gradient(180deg, #fff, #9db8ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    h2 { font-size: 1.1rem; margin: 36px 0 12px; letter-spacing: 0.04em; }
+    a { color: var(--accent); }
+    .lead { color: var(--muted); margin: 8px 0 0; max-width: 60ch; }
+
+    /* Onglets des races */
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 24px 0 8px; }
+    .tabs button {
+      font: inherit; font-weight: 600; cursor: pointer;
+      min-height: 44px; padding: 0 16px; border-radius: 12px;
+      color: var(--text); background: var(--panel); border: 1px solid var(--line);
+    }
+    .tabs button[aria-selected="true"] { border-color: var(--c); background: color-mix(in srgb, var(--c) 18%, var(--panel)); }
+    .tabs button span { color: var(--c); margin-right: 6px; }
+    .pitch { color: var(--muted); margin: 8px 0 0; }
+
+    /* Graphe : technologies et vaisseaux en bulles, prérequis en flèches.
+       Trop large pour un téléphone : il défile dans son cadre, pas la page. */
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; margin-top: 18px; align-items: start; }
+    .layout > * { min-width: 0; }
+    .graph-wrap {
+      overflow-x: auto; background: var(--panel); border: 1px solid var(--line);
+      border-radius: var(--radius); padding: 12px;
+    }
+    .graph { display: block; margin: 0 auto; }
+    .gnode { cursor: pointer; outline: none; }
+    .gnode rect { fill: var(--panel-2); stroke: var(--race); stroke-width: 1.5; transition: opacity .15s; }
+    .gnode.ship rect { fill: var(--bg); stroke-dasharray: 5 4; }
+    .gnode.building rect { stroke: var(--muted); fill: var(--panel); }
+    .gnode.power rect { fill: color-mix(in srgb, var(--race) 12%, var(--bg)); }
+    .gnode .name { fill: var(--text); font-family: var(--sans); font-size: 13px; font-weight: 600; }
+    .gnode .sub { fill: var(--muted); font-family: var(--mono); font-size: 10.5px; }
+    .gnode:hover rect, .gnode:focus-visible rect { stroke-width: 2.5; }
+    .gnode.sel rect { stroke-width: 3; fill: color-mix(in srgb, var(--race) 22%, var(--panel-2)); }
+    .gnode.dim, .edge.dim, .edge-label.dim { opacity: 0.2; }
+    .edge { fill: none; stroke: var(--race); stroke-opacity: 0.6; stroke-width: 2; }
+    .edge.unlock { stroke-dasharray: 5 4; }
+    .edge.bld { stroke: var(--muted); stroke-opacity: 0.3; stroke-width: 1.2; }
+    .edge.boost { stroke-dasharray: 1 4; stroke-linecap: round; stroke-width: 2.5; }
+    .edge.bld.hl { stroke: var(--race); stroke-opacity: 0.8; stroke-width: 2; }
+    .edge.hl { stroke-opacity: 1; stroke-width: 3; }
+    .arrow { fill: var(--race); }
+    .edge-label {
+      fill: var(--text); font-family: var(--mono); font-size: 10.5px;
+      stroke: var(--panel); stroke-width: 4px; paint-order: stroke; stroke-linejoin: round;
+    }
+    .legend { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 0.8rem; margin: 10px 4px 0; }
+    .legend i { display: inline-block; width: 22px; border-top: 2px solid var(--race); vertical-align: middle; margin-right: 6px; }
+    .legend i.dash { border-top-style: dashed; }
+    .legend i.bld { border-top: 1px solid var(--muted); }
+    .legend i.boost { border-top: 3px dotted var(--race); }
+
+    /* Fiche de la bulle choisie */
+    .panel {
+      background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--race);
+      border-radius: var(--radius); padding: 14px 16px; position: sticky; top: 16px;
+    }
+    .panel h3 { margin: 0; font-size: 1.05rem; }
+    .panel p { margin: 6px 0 0; font-size: 0.9rem; color: var(--muted); }
+    .panel .kind { font-family: var(--mono); font-size: 0.72rem; color: var(--race); text-transform: uppercase; letter-spacing: 0.08em; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .tag {
+      font-family: var(--mono); font-size: 0.72rem; padding: 2px 8px; border-radius: 999px;
+      background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+    }
+    .tag.unlock { border-color: var(--race); color: var(--race); }
+    .tag.req { color: var(--muted); }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; font-family: var(--mono); font-size: 0.75rem; }
+    th, td { text-align: right; padding: 3px 4px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    th:first-child, td:first-child { text-align: left; }
+    th { color: var(--muted); font-weight: 500; }
+    .r-minerals { color: var(--minerals); }
+    .r-food { color: var(--food); }
+    .r-energy { color: var(--energy); }
+    dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 10px 0 0; font-size: 0.86rem; }
+    dt { color: var(--muted); }
+    dd { margin: 0; font-family: var(--mono); text-align: right; }
+    .foot { color: var(--muted); font-size: 0.85rem; margin-top: 40px; }
+
+    @media (max-width: 1240px) {
+      .layout { grid-template-columns: 1fr; }
+      .panel { position: static; }
+    }
+  </style>
+  <script type="module" src="js/techtree.js"></script>
+</head>
+<body>
+  <main>
+    <h1>Technologies</h1>
+    <p class="lead">L’arbre de recherche et les vaisseaux de chaque race d’Astra. Touche une bulle pour voir ce qu’elle demande, ce qu’elle ouvre et ce qu’elle coûte.</p>
+    <nav class="tabs" role="tablist" id="tabs"></nav>
+    <p class="pitch" id="pitch"></p>
+    <div class="layout">
+      <div>
+        <div class="graph-wrap" id="graph" aria-label="Graphe des technologies"></div>
+        <p class="legend"><span><i></i>prérequis</span><span><i class="dash"></i>débloque un vaisseau</span><span><i class="bld"></i>bâtiment nécessaire</span><span><i class="boost"></i>renforce</span><span>« niv. 2 » : niveau demandé</span></p>
+      </div>
+      <aside class="panel" id="panel" aria-live="polite"></aside>
+    </div>
+    <p class="foot">Le coût de chaque niveau est multiplié par 1,7. La durée est donnée pour le labo minimal demandé ; un labo plus grand va plus vite (+50 % par niveau au-dessus de 1). <a href="./">Retour au jeu</a></p>
+  </main>
+</body>
+</html>

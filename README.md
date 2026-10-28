@@ -34,6 +34,7 @@ Ensuite : quelqu'un crée la partie. Pour inviter, n'importe quel joueur appuie 
 |---|---|
 | `js/game.js` | Règles pures (port de `game.rs`), en vitesse ×60 : une « heure » de jeu = une minute |
 | `js/tech.js` | Arbre des technologies et vaisseaux de chaque race (données pures) |
+| `technologies.html`, `js/techtree.js` | Page à part, hors du jeu : le graphe de chaque race (bâtiments, technologies, vaisseaux, pouvoirs), lu dans les données du jeu |
 | `js/fleet.js` | Flottes : décollage, déplacements libres sur la carte, carburant, poursuite, combat sans hasard, pillage |
 | `js/trade.js` | Échanges entre joueurs : séquestre, réception, issue d'une offre |
 | `js/save.js` | Sauvegarde de la partie sur le téléphone et fusion de deux copies |
