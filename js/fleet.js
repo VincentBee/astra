@@ -370,7 +370,8 @@ export function applyLosses(f, race, tech, lost, take, now) {
 export function battle(a, d) {
   const side = (x) => ({
     race: x.race,
-    n: Object.fromEntries(SHIP_KEYS.map((k) => [k, x.ships?.[k] || 0])),
+    // Entiers positifs seulement : une fiche abîmée ne doit pas créer de vaisseaux.
+    n: Object.fromEntries(SHIP_KEYS.map((k) => [k, Math.max(0, Math.floor(Number(x.ships?.[k]) || 0))])),
     st: Object.fromEntries(SHIP_KEYS.map((k) => [k, shipStats(x.race, k, x.tech)])),
     dmg: Object.fromEntries(SHIP_KEYS.map((k) => [k, 0])),
   });

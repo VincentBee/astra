@@ -272,6 +272,7 @@ export function researchDuration(cost, labLevel) {
 
 /** Ce qui manque pour rechercher une technologie, en clair, ou null si rien. */
 export function techMissing(race, key, tech, labLevel) {
+  if (!Object.hasOwn(TECHS[race] || {}, key)) return 'technologie inconnue';
   const t = TECHS[race][key];
   const miss = [];
   for (const [k, need] of Object.entries(t.req)) {

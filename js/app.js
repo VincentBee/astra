@@ -4,7 +4,7 @@ import { inviteLink, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
 import {
   RACES, RACE_KEYS, RES_INFO, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
-  powerReadyAt, powerCost, fmt, UNIVERSE, SOIL, sameCell,
+  powerReadyAt, powerCost, liftGain, fmt, UNIVERSE, SOIL, sameCell,
 } from './game.js';
 import { TECHS, SHIPS, SHIP_KEYS, techCost, techMissing, researchDuration, shipUnlock, shipUnlocked, shipStats, shipDuration } from './tech.js';
 import { TRADE_RES, TRADE_NAMES } from './trade.js';
@@ -798,7 +798,7 @@ function renderPlanet(me, now) {
     } else {
       q('[data-pop]').innerHTML = withCap(s.pop, cap);
       const starving = Math.min(f.effE, f.effF) < 1;
-      const next = (Math.floor(s.pop) + 1 - s.pop) / 0.06; // heures de jeu = minutes réelles
+      const next = (Math.floor(s.pop) + 1 - s.pop) / 0.12; // 0,12 naissance par heure de jeu (game.js) ; heures de jeu = minutes réelles
       rate.textContent = starving
         ? 'Ils dépérissent !'
         : s.pop >= cap - 1e-6
@@ -843,12 +843,13 @@ function renderPlanet(me, now) {
       const cost = powerCost(planet, k, s.pop);
       const wait = Math.max(0, powerReadyAt(planet, k) - now);
       const ok = covers(s.stock, cost);
+      const idle = k === 'lift' && !liftGain({ ...planet, ...s }); // entrepôt plein ou sol vide : rien à gagner
       q(`[data-pcost="${k}"]`).textContent = `${costText(cost)} · recharge ${POWERS[k].cooldown / 60000} min`;
       q(`[data-pready="${k}"]`).textContent = k === 'trance' && trance ? `En transe ${clock(trance)}` : wait ? clock(wait) : 'Prêt';
-      q(`[data-pcard="${k}"]`).classList.toggle('affordable', ok && !wait);
+      q(`[data-pcard="${k}"]`).classList.toggle('affordable', ok && !wait && !idle);
       const btn = q(`[data-power="${k}"]`);
-      btn.disabled = !!wait || !ok || session.status !== 'playing';
-      btn.textContent = wait ? 'En recharge' : 'Déclencher';
+      btn.disabled = !!wait || !ok || idle || session.status !== 'playing';
+      btn.textContent = wait ? 'En recharge' : idle ? 'Rien à arracher' : 'Déclencher';
     }
   }
 

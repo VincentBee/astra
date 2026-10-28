@@ -33,6 +33,8 @@ function curve(a, level) {
 }
 
 const lv = (levels, k) => levels[k] || 0;
+/** `table[key]` si c'est une vraie entrée de la table (pas `constructor`, `__proto__`…), sinon null. */
+const own = (table, key) => (table && Object.hasOwn(table, key) ? table[key] : null);
 
 // ---------------------------------------------------------------------------
 // Races
@@ -477,12 +479,17 @@ function advance(race, s, ms, boost) {
   return { ...s, stock, pop, reserve };
 }
 
-/** Fait avancer de `from` à `to` (ms), par 300 pas au plus. */
+/**
+ * Fait avancer de `from` à `to` (ms réelles). Des pas de 2 min réelles au plus
+ * (2 h de jeu) : plus longs, une longue absence ne donnerait pas la même
+ * population que des passages réguliers. Au-delà de 2000 pas (environ 2,7
+ * jours réels), les pas s'allongent pour que le calcul reste rapide.
+ */
 function steps(race, s, from, to, boost) {
   let t = from;
   const total = to - from;
   if (total <= 0) return s;
-  const dt = Math.max(1000, total / 300);
+  const dt = Math.max(1000, Math.min(120_000, total / 300), total / 2000);
   while (t < to) {
     const ms = Math.min(dt, to - t);
     s = advance(race, s, ms, boost);
@@ -549,6 +556,9 @@ export function stateAt(planet, now) {
  * [{ kind: 'queue' | 'research' | 'yard', ... }].
  */
 export function settle(planet, now) {
+  // Une heure qui recule (ou invalide) ne doit pas faire recompter la production déjà comptée.
+  if (!Number.isFinite(now)) return [];
+  now = Math.max(now, planet.at || 0);
   const s = stateAt(planet, now);
   planet.stock = s.stock;
   planet.pop = s.pop;
@@ -590,7 +600,7 @@ function pay(planet, cost) {
 export function startBuild(planet, key, now) {
   const R = raceOf(planet);
   if (!R) return 'Choisis d’abord ta race.';
-  if (!R.buildings[key]) return 'Bâtiment inconnu.';
+  if (!own(R.buildings, key)) return 'Bâtiment inconnu.';
   settle(planet, now);
   if (planet.queue) return 'Un chantier est déjà en cours.';
   const level = planet.levels[key] || 0;
@@ -607,7 +617,7 @@ export function startBuild(planet, key, now) {
 
 /** Lance une recherche sur la planète mère. Renvoie une erreur lisible ou null. */
 export function startResearch(planet, key, now) {
-  const T = TECHS[planet.race]?.[key];
+  const T = own(TECHS[planet.race], key);
   if (!T) return 'Technologie inconnue.';
   settle(planet, now);
   const lab = lv(planet.levels, 'lab');
@@ -626,7 +636,7 @@ export function startResearch(planet, key, now) {
 
 /** Lance un lot de vaisseaux au chantier naval de cette planète. */
 export function startShips(planet, type, count, now) {
-  const S = SHIPS[planet.race]?.[type];
+  const S = own(SHIPS[planet.race], type);
   if (!S) return 'Vaisseau inconnu.';
   count = Math.floor(count);
   if (!(count >= 1 && count <= 50)) return 'Entre 1 et 50 vaisseaux par lot.';
@@ -656,24 +666,32 @@ export function powerCost(planet, key, pop = planet.pop) {
 /**
  * Déclenche un pouvoir. Renvoie { error } ou { text } (résumé pour le journal).
  */
+/**
+ * Minéraux qu'un arrachement ajouterait : pas plus que ce qu'il reste au sol,
+ * ni que ce que l'entrepôt peut recevoir.
+ */
+export function liftGain(planet, amp = 1 + 0.25 * lv(planet.levels, 'amplifier')) {
+  const soil = planet.nature?.minerals ? planet.reserve.minerals : Infinity;
+  const cap = capsFor(planet.levels).minerals;
+  const before = planet.stock.minerals;
+  return Math.max(0, Math.min(Math.max(cap, before), before + Math.min(soil, 60 * planet.pop * amp)) - before);
+}
+
 export function usePower(planet, key, now) {
   if (planet.race !== 'alien') return { error: 'Seuls les aliens ont des pouvoirs psychiques.' };
-  const P = POWERS[key];
+  const P = own(POWERS, key);
   if (!P) return { error: 'Pouvoir inconnu.' };
   settle(planet, now);
   if (powerReadyAt(planet, key) > now) return { error: 'Ce pouvoir se recharge encore.' };
   const cost = powerCost(planet, key);
   if (!covers(planet.stock, cost)) return { error: 'Pas assez d’énergie.' };
+  const amp = 1 + 0.25 * lv(planet.levels, 'amplifier');
+  const gain = key === 'lift' ? liftGain(planet, amp) : 0;
+  if (key === 'lift' && gain <= 0) return { error: planet.nature?.minerals && !planet.reserve.minerals ? 'Le sol est vide : rien à arracher.' : 'L’entrepôt de minéraux est plein.' };
   pay(planet, cost);
   planet.powers = { ...(planet.powers || {}), [key]: now + P.cooldown };
-  const amp = 1 + 0.25 * lv(planet.levels, 'amplifier');
   if (key === 'lift') {
-    // Arraché au sol de la planète : pas plus que ce qu'il en reste, ni que ce que l'entrepôt peut recevoir.
-    const soil = planet.nature?.minerals ? planet.reserve.minerals : Infinity;
-    const cap = capsFor(planet.levels).minerals;
-    const before = planet.stock.minerals;
-    planet.stock.minerals = Math.min(Math.max(cap, before), before + Math.min(soil, 60 * planet.pop * amp));
-    const gain = planet.stock.minerals - before;
+    planet.stock.minerals += gain;
     if (planet.nature?.minerals) planet.reserve = { ...planet.reserve, minerals: planet.reserve.minerals - gain };
     return { text: `arrache ${fmt(gain)} minéraux par télékinésie` };
   }
