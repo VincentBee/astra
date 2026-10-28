@@ -1657,7 +1657,10 @@ for (const k of [...ORDER_KINDS, 'tick']) {
       // Un ordre refusé a pu faire avancer l'heure d'une planète (calculs
       // arrondis autrement) : on le garde aussi, il partira avec ma fiche.
       const p = this.state.players[this.me];
-      if (!this.entryKept && k !== 'tick' && p) p.orders = [...(p.orders || []), this.entry].slice(-MAX_ORDERS);
+      if (!this.entryKept && k !== 'tick' && p) {
+        p.orders = [...(p.orders || []), this.entry].slice(-MAX_ORDERS);
+        this.scheduleSave();
+      }
       this.entry = null;
     }
   };

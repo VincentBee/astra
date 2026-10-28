@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#070a14">
+  <title>Astra · Replay</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="js/replay-view.js"></script>
+</head>
+<body>
+  <section class="screen replay">
+    <header class="rp-head">
+      <a href="./" class="rp-back" aria-label="Retour à l'accueil">←</a>
+      <div>
+        <p class="eyebrow">Replay</p>
+        <h1 id="rp-title">Partie</h1>
+      </div>
+    </header>
+
+    <p id="rp-note" class="note" hidden></p>
+
+    <div id="rp-main" hidden>
+      <div class="map-wrap"><canvas id="rp-map" aria-label="Carte de l'univers au moment choisi"></canvas></div>
+
+      <div class="rp-controls card">
+        <div class="rp-row">
+          <button id="rp-play" class="primary rp-play" aria-label="Lecture">▶</button>
+          <div class="rp-when">
+            <span id="rp-clock" class="mono"></span>
+            <span id="rp-elapsed" class="hint mono"></span>
+          </div>
+          <select id="rp-speed" aria-label="Vitesse de lecture">
+            <option value="60">1 min / s</option>
+            <option value="600" selected>10 min / s</option>
+            <option value="3600">1 h / s</option>
+          </select>
+        </div>
+        <input id="rp-time" type="range" min="0" max="1000" value="0" step="1" aria-label="Moment de la partie">
+        <div class="rp-row rp-steps">
+          <button id="rp-prev" class="secondary" aria-label="Événement précédent">⏮ Précédent</button>
+          <button id="rp-next" class="secondary" aria-label="Événement suivant">Suivant ⏭</button>
+        </div>
+      </div>
+
+      <section>
+        <h2 class="rp-h">Joueurs</h2>
+        <div id="rp-players" class="players"></div>
+      </section>
+
+      <section>
+        <h2 class="rp-h">Journal</h2>
+        <ol id="rp-log" class="rp-log"></ol>
+      </section>
+    </div>
+  </section>
+</body>
+</html>

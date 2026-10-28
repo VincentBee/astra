@@ -37,7 +37,9 @@ Ensuite : quelqu'un crée la partie. Pour inviter, n'importe quel joueur appuie 
 | `js/fleet.js` | Flottes : décollage, déplacements libres sur la carte, carburant, poursuite, combat sans hasard, pillage |
 | `js/trade.js` | Échanges entre joueurs : séquestre, réception, issue d'une offre |
 | `js/save.js` | Sauvegarde de la partie sur le téléphone et fusion de deux copies |
-| `js/session.js` | Une partie vue d'un téléphone : copie de l'état, fiches des joueurs, connexions entre joueurs, invitations |
+| `js/session.js` | Une partie vue d'un téléphone : copie de l'état, fiches des joueurs, connexions entre joueurs, invitations, journal des ordres |
+| `js/replay.js` | Rejeu d'une partie à partir des journaux d'ordres des fiches |
+| `replay.html`, `js/replay-view.js` | Écran du replay : la carte, les joueurs et le journal, au fil du temps |
 | `js/rendezvous.js` | Reconnexion automatique, sans rescanner : rendez-vous via des relais Nostr publics (Trystero) |
 | `js/peer.js` | WebRTC : offre/réponse sans serveur de signalisation, canal de données |
 | `js/invite.js` | Code d'invitation compact (≈150 car.) et dessin du QR code |
@@ -70,6 +72,7 @@ Ensuite : quelqu'un crée la partie. Pour inviter, n'importe quel joueur appuie 
 - **Reconnexion sans rescanner** : le QR ne sert qu'à la première arrivée. Il transmet la clé secrète de la partie, et chaque téléphone s'annonce ensuite dans un salon propre à la partie, sur des relais Nostr publics et gratuits (bibliothèque [Trystero](https://github.com/dmotz/trystero), sans compte). Les joueurs se reconnectent seuls en quelques secondes : écran déverrouillé, appli rouverte, réseau revenu, ou « Reprendre la partie » le lendemain. Les relais ne voient que des offres de connexion chiffrées avec la clé ; le jeu circule ensuite directement entre téléphones.
 - **Retour par QR** : sans Internet, on peut toujours revenir en scannant l'invitation de n'importe quel joueur. Un secret gardé sur le téléphone (dont les autres ne connaissent que l'empreinte SHA-256) prouve que c'est bien lui.
 - **Débogage** : `astra.session` dans la console du navigateur. Le journal de la partie (arrivées, chantiers, pouvoirs) n'est pas affiché dans le jeu : il s'écrit dans cette console.
+- **Replay** : chaque fiche garde le journal de son joueur (`orders`) : ses ordres, même refusés, et les passages qui ont fait avancer quelque chose (chantier fini, arrivée, combat), avec l'heure et les identifiants tirés (flottes, offres, rapports). Comme chaque joueur est le seul à écrire sa fiche et que tout se calcule à partir de l'heure, rejouer ces journaux dans l'ordre refait la partie (`js/replay.js`). « Revoir la partie » à l'accueil la montre comme un film : carte, joueurs, journal complet, lecture et curseur de temps. Les gros messages entre téléphones partent en morceaux (limite de 256 Ko par message WebRTC).
 - **Écran allumé** : l'appli le demande au téléphone (Wake Lock) pendant la partie.
 
 ## Réseau
@@ -88,6 +91,7 @@ Ensuite : quelqu'un crée la partie. Pour inviter, n'importe quel joueur appuie 
 - **Versions mélangées** : chaque fiche porte la version de son format. Un téléphone qui voit la fiche d'un joueur plus à jour lui demande de recharger l'appli. Les téléphones d'avant les flottes pilotées ne sont pas prévenus : ils doivent recharger l'appli à la main. Les flottes d'avant le pilotage libre sont converties toutes seules (leur mission devient l'ordre qui les attend à l'arrivée).
 - La sauvegarde est sur le téléphone : vider les données du navigateur ou changer de téléphone fait perdre sa copie (les autres ont la leur).
 - Une invitation ne sert qu'une fois.
+- **Replay** : il rejoue la partie comme si tout le monde avait été connecté. Ce qui dépend du moment où une fiche est arrivée chez un autre (partie coupée en deux, téléphone en veille) peut tourner autrement ; l'écran le signale quand la fin ne retombe pas sur la vraie partie. Chaque journal garde 1 500 entrées au plus : au-delà, la partie ne se rejoue plus depuis le début. Les parties commencées avant le journal ne se rejouent pas.
 - Chaque joueur a la partie complète : la détection ne fait que cacher à l'écran, un joueur curieux peut tout lire dans la console (pas de vrai brouillard de guerre possible en pair à pair).
 - Contenu de jeu minimal : 3 races, 7 technologies et 4 vaisseaux chacune, 2 pouvoirs aliens (arrachement, transe), colonies, flottes pilotées avec carburant, combats, échanges et détection (pas de défenses planétaires ni d'espionnage). Équilibrage à affiner.
 - Les planètes d'avant les races (métal, cristal, deutérium) repartent de zéro : leur joueur choisit sa race en revenant.

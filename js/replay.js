@@ -21,8 +21,13 @@ function firstFiche(p) {
   return { id: p.id, name: p.name, rank: p.rank, color: p.color, secretHash: p.secretHash, race: null, planet: null, home: null, actAt: p.rank };
 }
 
-/** Texte stable d'une valeur (clés triées), pour comparer deux fiches. */
+/**
+ * Texte stable d'une valeur (clés triées), pour comparer deux fiches. Les
+ * nombres sont arrondis à 10 chiffres : deux navigateurs ne calculent pas
+ * les puissances et exponentielles au dernier chiffre près.
+ */
 function stable(x) {
+  if (typeof x === 'number') return JSON.stringify(Number.isFinite(x) ? Number(x.toPrecision(10)) : x);
   if (Array.isArray(x)) return `[${x.map(stable).join(',')}]`;
   if (x && typeof x === 'object') {
     return `{${Object.keys(x)

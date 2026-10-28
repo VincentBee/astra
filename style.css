@@ -416,3 +416,27 @@ details > button { width: 100%; }
 .fleet-grid label { display: grid; gap: 4px; font-size: 0.82rem; color: var(--muted); }
 .fleet-grid input { padding: 8px 10px; font-size: 1rem; }
 #sheet-fleet .sheet-panel { display: grid; gap: 14px; }
+
+/* ----- Replay (replay.html) ----- */
+
+.replay { display: grid; gap: 14px; }
+.rp-head { display: flex; align-items: center; gap: 12px; }
+.rp-head h1 { font-size: 1.15rem; }
+.rp-back {
+  display: grid; place-items: center; width: 44px; height: 44px; flex: none;
+  border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line);
+  color: var(--text); text-decoration: none; font-size: 1.2rem;
+}
+#rp-main { display: grid; gap: 14px; }
+.rp-controls { padding: 12px 14px; display: grid; gap: 10px; }
+.rp-row { display: flex; align-items: center; gap: 12px; }
+.rp-play { width: 56px; flex: none; padding: 0; }
+.rp-when { flex: 1; min-width: 0; display: grid; }
+.rp-when .mono:first-child { font-weight: 600; }
+.rp-controls select { width: auto; flex: none; }
+.rp-controls input[type=range] { width: 100%; accent-color: var(--accent); }
+.rp-steps > button { flex: 1; min-height: 40px; font-size: 0.9rem; }
+.rp-h { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+.rp-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 0.9rem; }
+.rp-log li { display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; gap: 8px; }
+.rp-log .dot { width: 8px; height: 8px; }

@@ -147,6 +147,10 @@ $('btn-resume').onclick = () => {
   toast('Partie reprise. Les autres te retrouveront dès qu’ils ouvriront l’appli.');
 };
 
+$('btn-replay').onclick = () => {
+  location.href = 'replay.html';
+};
+
 window.addEventListener('pagehide', () => session?.save?.());
 
 $('btn-create').onclick = async () => {
