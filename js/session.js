@@ -1397,7 +1397,7 @@ export class Session {
       if (!pl || !sameCell(pl.cell, f.to)) return true;
       // Je calcule le combat avec ce que je sais du défenseur à l'heure de l'arrivée ;
       // son téléphone appliquera ses pertes en lisant mon rapport.
-      const def = stateAt(pl.planet, f.arrive);
+      const def = this.defenseAt(p, enemy, pl, f.arrive);
       const res = battle({ race: p.race, ships: f.ships, tech: p.planet.tech }, { race: enemy.race, ships: def.ships, tech: def.tech });
       const take = res.won ? plunder(p.race, res.attLeft, def.stock, f.cargo) : {};
       // Un identifiant par combat : une même flotte peut attaquer plusieurs fois.
@@ -1415,6 +1415,24 @@ export class Session {
       return true;
     }
     return true;
+  }
+
+  /**
+   * Planète d'un autre joueur telle que je la vois à `at`, moins mes
+   * combats que son téléphone n'a pas encore lus : sa fiche ne montre ces
+   * pertes et ces pillages qu'après, et les ignorer ferait piller le même
+   * stock et tuer les mêmes vaisseaux plusieurs fois.
+   */
+  defenseAt(p, enemy, pl, at) {
+    const def = stateAt(pl.planet, at);
+    const ships = { ...def.ships };
+    const stock = { ...def.stock };
+    for (const e of p.effects || []) {
+      if (e.to !== enemy.id || e.key !== pl.key || enemy.applied?.includes(e.id)) continue;
+      for (const [k, n] of Object.entries(e.ships || {})) ships[k] = Math.max(0, (ships[k] || 0) - n);
+      for (const [r, v] of Object.entries(e.take || {})) stock[r] = Math.max(0, (stock[r] || 0) - v);
+    }
+    return { ...def, ships, stock };
   }
 
   /**
