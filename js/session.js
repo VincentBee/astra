@@ -22,7 +22,7 @@ import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates } from './save.js';
 import { newPlanet, settle, stateAt, startBuild, startResearch, startShips, usePower, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE } from './game.js';
 import { TECHS, SHIPS, shipStats, sightRange } from './tech.js';
-import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, salvage, applyLosses, parkedCell, fleetPos, ORDERS, MAX_FLEETS } from './fleet.js';
+import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, salvage, applyLosses, parkedCell, fleetPos, fleetCargo, fleetTank, ORDERS, MAX_FLEETS } from './fleet.js';
 import { amounts, isEmpty, holdings, lacks, noRoom, take, put, outcome, OFFER_MS, MAX_OFFERS } from './trade.js';
 
 /** « de Beta », « d'Alpha ». */
@@ -718,8 +718,10 @@ export class Session {
       const w = this.planets.find((x) => x.id === id);
       const owner = w && this.ownerAt(w);
       if (!owner || owner.id === this.me) continue;
+      const fleet = this.evacuate(p, p.colonies[id], w);
       delete p.colonies[id];
-      this.touch(this.addLog(`${owner.name} a fondé sa colonie sur ${w.name} juste avant ${p.name}.`));
+      const after = fleet ? ` : la flotte ${de(p.name)} reste en orbite avec ${shipsText(countShips(fleet.ships))}` : '';
+      this.touch(this.addLog(`${owner.name} a fondé sa colonie sur ${w.name} juste avant ${p.name}${after}.`));
       this.changed();
     }
     if (!p.home) return;
@@ -732,6 +734,31 @@ export class Session {
     this.touch();
     this.ontoast?.(`${owner.name} s'est installé sur ${w?.name || 'cette planète'} juste avant toi : choisis-en une autre.`);
     this.changed();
+  }
+
+  /**
+   * Colonie perdue au profit d'un joueur arrivé avant moi : comme si ma
+   * flotte de colonisation l'avait trouvée prise en arrivant, ses
+   * vaisseaux (colonisateur compris), ce qui tient dans leurs soutes et
+   * leurs réservoirs repartent en flotte, en orbite. Renvoie cette flotte.
+   */
+  evacuate(p, colony, w) {
+    const now = this.now();
+    p.fleets ||= [];
+    if (!colony || p.fleets.length >= MAX_FLEETS) return null;
+    settle(colony, now);
+    colony.ships = { ...(colony.ships || {}), colony: (colony.ships?.colony || 0) + 1 };
+    let room = fleetCargo(p.race, colony.ships);
+    const cargo = {};
+    for (const r of SOIL) {
+      cargo[r] = Math.min(room, Math.floor(colony.stock[r] || 0));
+      room -= cargo[r];
+    }
+    const fuel = Math.min(fleetTank(p.race, colony.ships), Math.floor(colony.stock.energy || 0));
+    const res = launch(colony, { ships: colony.ships, cargo, fuel, at: { x: w.x, y: w.y }, origin: 'home', id: rid(6) }, now);
+    if (res.error) return null;
+    p.fleets.push(res.fleet);
+    return res.fleet;
   }
 
   /** Une de mes planètes, pour un ordre ; sinon un message. */
