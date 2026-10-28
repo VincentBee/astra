@@ -1,7 +1,8 @@
-// Page « Technologies » (technologies.html), hors du jeu : l'arbre de
-// recherche et les vaisseaux de chaque race, lus dans les données du jeu.
+// Page « Technologies » (technologies.html), hors du jeu : le graphe de
+// chaque race (bâtiments, technologies, vaisseaux, pouvoirs), lu dans les
+// données du jeu.
 import { TECHS, SHIPS, SHIP_KEYS, techCost, researchDuration, shipUnlock } from './tech.js';
-import { RACES, RACE_KEYS, RES_INFO } from './game.js';
+import { RACES, RACE_KEYS, RES_INFO, POWERS, POWER_KEYS, upgradeCost, buildDuration } from './game.js';
 
 const ROLES = { cargo: 'Cargo', fighter: 'Chasseur', heavy: 'Vaisseau lourd', colony: 'Colonisateur' };
 const BONUS = { minerals: 'minéraux', food: 'nourriture', energy: 'énergie', speed: 'vitesse', attack: 'attaque', hull: 'coque' };
@@ -23,6 +24,14 @@ const techReqs = (t) => Object.entries(t.req).filter(([k]) => k !== 'lab');
 
 let race = RACE_KEYS.includes(location.hash.slice(1)) ? location.hash.slice(1) : RACE_KEYS[0];
 let selected = null;
+let graph = null;
+
+// Taille des bulles et écarts, en px.
+const W = 164;
+const H = 50;
+const GX = 46;
+const GY = 20;
+const PAD = 8;
 
 function renderTabs() {
   $('tabs').innerHTML = RACE_KEYS.map((r) => {
@@ -31,7 +40,165 @@ function renderTabs() {
   }).join('');
 }
 
-function techNode(key, t) {
+/**
+ * Bulles et flèches, rangées en couches de gauche à droite : les bâtiments
+ * d'abord, puis chaque technologie juste après son prérequis le plus profond,
+ * chaque vaisseau après la technologie qui le débloque, et les pouvoirs après
+ * le bâtiment qui les renforce.
+ *
+ * Flèches : `req` (technologie à avoir avant), `unlock` (débloque un
+ * vaisseau), `bld` (bâtiment nécessaire : labo, chantier), `boost` (renforce).
+ * `parents` ne sert qu'à la mise en page.
+ */
+function buildGraph() {
+  const R = RACES[race];
+  const techs = TECHS[race];
+  const nodes = {};
+  const edges = [];
+  const bkeys = Object.keys(R.buildings);
+  for (const k of ['lab', 'yard', ...bkeys.filter((k) => k !== 'lab' && k !== 'yard')]) {
+    // Le chantier se range juste avant les vaisseaux, en bas, pour garder ses flèches courtes.
+    nodes[`b:${k}`] = { id: `b:${k}`, kind: 'building', key: k, parents: [], float: k === 'yard' };
+  }
+  for (const [k, t] of Object.entries(techs)) {
+    nodes[k] = { id: k, kind: 'tech', parents: ['b:lab', ...techReqs(t).map(([p]) => p)] };
+    // Le labo ne pointe que vers les premières technologies, pour ne pas barrer le
+    // graphe : le niveau de labo de chacune est écrit dans sa bulle.
+    if (!techReqs(t).length) edges.push({ from: 'b:lab', to: k, lv: t.req.lab, kind: 'bld' });
+    for (const [p, lv] of techReqs(t)) edges.push({ from: p, to: k, lv, kind: 'req' });
+  }
+  for (const type of SHIP_KEYS) {
+    const u = shipUnlock(race, type);
+    const id = `ship:${type}`;
+    nodes[id] = { id, kind: 'ship', type, parents: u ? [u.key] : [] };
+    if (u) edges.push({ from: u.key, to: id, lv: u.level, kind: 'unlock' });
+    edges.push({ from: 'b:yard', to: id, lv: 1, kind: 'bld' });
+  }
+  if (race === 'alien') {
+    for (const k of POWER_KEYS) {
+      nodes[`p:${k}`] = { id: `p:${k}`, kind: 'power', key: k, parents: ['b:amplifier'] };
+      edges.push({ from: 'b:amplifier', to: `p:${k}`, lv: 1, kind: 'boost' });
+    }
+  }
+  const children = (id) => edges.filter((e) => e.from === id).map((e) => e.to);
+  const depth = (id) => (nodes[id].depth ??= Math.max(-1, ...nodes[id].parents.map(depth)) + 1);
+  const size = (id) => (nodes[id].size ??= children(id).reduce((n, c) => n + 1 + (nodes[c].float ? 0 : size(c)), 0));
+  Object.keys(nodes).forEach((id) => (depth(id), size(id)));
+  for (const n of Object.values(nodes)) if (n.float) n.depth = Math.min(...children(n.id).map((c) => nodes[c].depth)) - 1;
+
+  // Rangées : chaque bulle vise la rangée de son parent, sans en chevaucher une autre.
+  // Les grosses branches d'abord, pour que l'arbre principal reste en haut.
+  const cols = [];
+  for (const n of Object.values(nodes)) (cols[n.depth] ||= []).push(n);
+  let rows = 0;
+  for (const col of cols) {
+    const want = (n) => (n.float ? Infinity : n.parents.length ? Math.max(...n.parents.map((p) => nodes[p].row)) : 0);
+    col.sort((a, b) => want(a) - want(b) || b.size - a.size);
+    let next = 0;
+    for (const n of col) {
+      n.row = n.float ? next : Math.max(want(n), next);
+      next = n.row + 1;
+      n.x = PAD + n.depth * (W + GX);
+      n.y = PAD + n.row * (H + GY);
+    }
+    rows = Math.max(rows, next);
+  }
+  return { nodes, edges, width: 2 * PAD + cols.length * W + (cols.length - 1) * GX, height: 2 * PAD + rows * H + (rows - 1) * GY };
+}
+
+/** Nom et sous-titre d'une bulle. */
+function label(n) {
+  const R = RACES[race];
+  if (n.kind === 'tech') {
+    const t = TECHS[race][n.id];
+    return [t.name, `${R.buildings.lab.short} ${t.req.lab} · max ${t.max}`];
+  }
+  if (n.kind === 'ship') return [SHIPS[race][n.type].name, ROLES[n.type]];
+  if (n.kind === 'power') return [POWERS[n.key].name, `Pouvoir · recharge ${dur(POWERS[n.key].cooldown)}`];
+  const b = R.buildings[n.key];
+  return [b.name, b.start ? `Bâtiment · niv. ${b.start} au départ` : 'Bâtiment'];
+}
+
+function renderGraph() {
+  graph = buildGraph();
+  const { nodes, edges, width, height } = graph;
+  const out = [
+    `<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>`,
+  ];
+  // Flèches des bâtiments d'abord : elles passent sous les autres.
+  const order = { bld: 0, boost: 1, unlock: 2, req: 3 };
+  for (const e of [...edges].sort((a, b) => order[a.kind] - order[b.kind])) {
+    const a = nodes[e.from];
+    const b = nodes[e.to];
+    const x1 = a.x + W;
+    const y1 = a.y + H / 2;
+    const x2 = b.x - 2;
+    const y2 = b.y + H / 2;
+    const c1 = x1 + Math.min(GX, (x2 - x1) / 2);
+    const c2 = x2 - GX / 2;
+    out.push(`<path class="edge ${e.kind}" data-from="${e.from}" data-to="${e.to}" d="M${x1},${y1} C${c1},${y1} ${c2},${y2} ${x2},${y2}" marker-end="url(#arrow)"/>`);
+    // Étiquette au milieu de la courbe (point t = 0,5 de la courbe de Bézier).
+    // Pas pour le labo : le niveau demandé est écrit sur chaque technologie.
+    const lx = (x1 + 3 * c1 + 3 * c2 + x2) / 8;
+    const ly = (y1 + y2) / 2 - 5;
+    if (e.lv > 1 && e.kind !== 'bld') out.push(`<text class="edge-label" data-from="${e.from}" data-to="${e.to}" x="${lx}" y="${ly}" text-anchor="middle">niv. ${e.lv}</text>`);
+  }
+  for (const n of Object.values(nodes)) {
+    const [name, sub] = label(n);
+    const rx = n.kind === 'building' ? 3 : n.kind === 'power' ? H / 2 : 10;
+    out.push(`
+      <g class="gnode ${n.kind}" data-id="${n.id}" tabindex="0" role="button" aria-label="${esc(name)}" transform="translate(${n.x},${n.y})">
+        <rect width="${W}" height="${H}" rx="${rx}"/>
+        <text class="name" x="12" y="21">${esc(name)}</text>
+        <text class="sub" x="12" y="38">${esc(sub)}</text>
+      </g>`);
+  }
+  $('graph').innerHTML = `<svg class="graph" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${out.join('')}</svg>`;
+  // Les noms trop longs pour la bulle sont resserrés.
+  for (const t of $('graph').querySelectorAll('.gnode text')) {
+    if (t.getComputedTextLength() > W - 22) t.setAttribute('textLength', W - 22), t.setAttribute('lengthAdjust', 'spacingAndGlyphs');
+  }
+}
+
+function buildingPanel(key) {
+  const R = RACES[race];
+  const b = R.buildings[key];
+  const rows = [];
+  for (let lv = 0; lv < 6; lv++) {
+    const c = Object.fromEntries(Object.entries(upgradeCost(race, key, lv)).filter(([, v]) => v > 0));
+    rows.push(`<tr><td>${lv + 1}</td><td>${cost(c)}</td><td>${dur(buildDuration(race, {}, upgradeCost(race, key, lv)))}</td></tr>`);
+  }
+  const opens = {
+    lab: 'Ouvre la recherche. Chaque technologie demande un niveau de labo, écrit dans sa bulle.',
+    yard: 'Nécessaire pour construire chaque vaisseau.',
+    amplifier: 'Renforce les deux pouvoirs psychiques : +25 % par niveau.',
+  }[key];
+  return `
+    <div class="kind">Bâtiment</div>
+    <h3>${esc(b.name)}</h3>
+    <p>${esc(b.desc)}</p>
+    ${opens ? `<p>${esc(opens)}</p>` : ''}
+    <div class="tags"><span class="tag req">${b.start ? `niv. ${b.start} au départ` : 'à construire'}</span><span class="tag req">coût ×${String(b.factor).replace('.', ',')} par niveau</span></div>
+    <table><thead><tr><th>Niv.</th><th>Coût</th><th>Durée</th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
+}
+
+function powerPanel(key) {
+  const P = POWERS[key];
+  const c1 = P.cost(1);
+  return `
+    <div class="kind">Pouvoir psychique</div>
+    <h3>${esc(P.name)}</h3>
+    <p>${esc(P.desc)}</p>
+    <p>Renforcé par l’${esc(RACES.alien.buildings.amplifier.name.toLowerCase())} : +25 % par niveau.</p>
+    <dl>
+      <dt>Coût</dt><dd><span class="r-energy">${num(c1.energy)} ${RES_INFO.energy.short}</span> par psionique</dd>
+      <dt>Recharge</dt><dd>${dur(P.cooldown)}</dd>
+      ${P.duration ? `<dt>Durée</dt><dd>${dur(P.duration)}</dd>` : ''}
+    </dl>`;
+}
+
+function techPanel(key) {
+  const t = TECHS[race][key];
   const lab = RACES[race].buildings.lab.short;
   const tags = [];
   for (const [type, lv] of Object.entries(t.unlock || {})) {
@@ -48,99 +215,67 @@ function techNode(key, t) {
     rows.push(`<tr><td>${lv + 1}</td><td>${cost(c)}</td><td>${dur(researchDuration(c, t.req.lab))}</td></tr>`);
   }
   return `
-    <article class="node" data-key="${key}" tabindex="0">
-      <span class="max">max ${t.max}</span>
-      <h3>${esc(t.name)}</h3>
-      <p>${esc(t.desc)}</p>
-      <div class="tags">${tags.join('')}</div>
-      <details>
-        <summary>Coût par niveau</summary>
-        <table><thead><tr><th>Niv.</th><th>Coût</th><th>Durée</th></tr></thead><tbody>${rows.join('')}</tbody></table>
-      </details>
-    </article>`;
+    <div class="kind">Technologie</div>
+    <h3>${esc(t.name)}</h3>
+    <p>${esc(t.desc)}</p>
+    <div class="tags">${tags.join('')}</div>
+    <table><thead><tr><th>Niv.</th><th>Coût</th><th>Durée</th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
 }
 
-function renderTree() {
-  const techs = TECHS[race];
-  const lab = RACES[race].buildings.lab;
-  const levels = [...new Set(Object.values(techs).map((t) => t.req.lab))].sort((a, b) => a - b);
-  const cols = levels.map((L) => {
-    const nodes = Object.entries(techs)
-      .filter(([, t]) => t.req.lab === L)
-      .map(([k, t]) => techNode(k, t))
-      .join('');
-    return `<div class="col"><div class="col-head">${esc(lab.name)} · niv. ${L}</div>${nodes}</div>`;
-  });
-  $('tree').innerHTML = `<svg aria-hidden="true"></svg><div class="cols">${cols.join('')}</div>`;
-  drawEdges();
+function shipPanel(type) {
+  const s = SHIPS[race][type];
+  const u = shipUnlock(race, type);
+  const by = u ? `${TECHS[race][u.key].name}${u.level > 1 ? ` niv. ${u.level}` : ''}` : '—';
+  return `
+    <div class="kind">Vaisseau · ${ROLES[type]}</div>
+    <h3>${esc(s.name)}</h3>
+    <p>Débloqué par ${esc(by)}.</p>
+    <dl>
+      <dt>Attaque</dt><dd>${s.attack}</dd>
+      <dt>Coque</dt><dd>${s.hull}</dd>
+      <dt>Soute</dt><dd>${num(s.cargo)}</dd>
+      <dt>Vitesse</dt><dd>${s.speed} cases/min</dd>
+      <dt>Autonomie</dt><dd>${Math.round(s.tank / s.burn)} cases</dd>
+      <dt>Coût</dt><dd>${cost(s.cost)}</dd>
+    </dl>`;
 }
 
-/** Liens prérequis → technologie, recalculés à chaque changement de mise en page. */
-function drawEdges() {
-  const tree = $('tree');
-  const svg = tree.querySelector('svg');
-  if (!svg) return;
-  const box = tree.getBoundingClientRect();
-  const rect = (k) => {
-    const r = tree.querySelector(`.node[data-key="${k}"]`).getBoundingClientRect();
-    return { l: r.left - box.left, r: r.right - box.left, t: r.top - box.top, b: r.bottom - box.top, cx: r.left - box.left + r.width / 2, cy: r.top - box.top + r.height / 2 };
-  };
-  const out = [];
-  for (const [key, t] of Object.entries(TECHS[race])) {
-    for (const [from, lv] of techReqs(t)) {
-      const a = rect(from);
-      const b = rect(key);
-      const on = selected && (selected === key || selected === from) ? ' hl' : '';
-      // Colonnes empilées (téléphone) : pas de lien, le SVG est caché.
-      if (b.l < a.r) continue;
-      const mx = (a.r + b.l) / 2;
-      out.push(`<path class="edge${on}" d="M${a.r},${a.cy} C${mx},${a.cy} ${mx},${b.cy} ${b.l},${b.cy}"/>`);
-      // Étiquette juste avant la carte visée : le lien peut traverser une colonne.
-      if (lv > 1) out.push(`<text class="edge-label" x="${b.l - 22}" y="${b.cy - 6}" text-anchor="middle">niv. ${lv}</text>`);
-    }
+function renderPanel() {
+  const R = RACES[race];
+  if (!selected) {
+    $('panel').innerHTML = `
+      <div class="kind">${R.icon} ${esc(R.name)}</div>
+      <h3>Choisis une bulle</h3>
+      <p>À gauche les bâtiments (coins carrés), puis les technologies, les vaisseaux (en pointillés)${race === 'alien' ? ' et les pouvoirs (arrondis)' : ''}. Chaque flèche part de ce qu’il faut avoir avant.</p>
+      <p>La recherche demande d’abord un labo sur la planète mère : ${esc(R.buildings.lab.name)}. « ${esc(R.buildings.lab.short)} 2 » veut dire qu’il doit être au niveau 2.</p>`;
+    return;
   }
-  svg.innerHTML = out.join('');
+  const n = graph.nodes[selected];
+  $('panel').innerHTML = { tech: () => techPanel(n.id), ship: () => shipPanel(n.type), building: () => buildingPanel(n.key), power: () => powerPanel(n.key) }[n.kind]();
 }
 
-/** Met en avant une technologie, ses prérequis et ce qu'elle ouvre. */
-function highlight(key) {
-  selected = selected === key ? null : key;
-  const techs = TECHS[race];
+/** Met en avant une bulle, tout ce qu'il faut avant elle et ce qu'elle ouvre juste après. */
+function select(id) {
+  selected = selected === id ? null : id;
+  const { nodes, edges } = graph;
   const linked = new Set();
   if (selected) {
     linked.add(selected);
-    // Tous les ancêtres.
     const up = [selected];
-    while (up.length) for (const [k] of techReqs(techs[up.pop()])) if (!linked.has(k)) linked.add(k), up.push(k);
-    // Les descendants directs.
-    for (const [k, t] of Object.entries(techs)) if (techReqs(t).some(([r]) => r === selected)) linked.add(k);
+    while (up.length) for (const p of nodes[up.pop()].parents) if (!linked.has(p)) linked.add(p), up.push(p);
+    for (const e of edges) if (e.from === selected) linked.add(e.to);
   }
-  for (const n of $('tree').querySelectorAll('.node')) {
-    n.classList.toggle('hl', n.dataset.key === selected);
-    n.classList.toggle('dim', !!selected && !linked.has(n.dataset.key));
+  const svg = $('graph');
+  for (const g of svg.querySelectorAll('.gnode')) {
+    g.classList.toggle('sel', g.dataset.id === selected);
+    g.classList.toggle('dim', !!selected && !linked.has(g.dataset.id));
   }
-  drawEdges();
-}
-
-function renderShips() {
-  $('ships').innerHTML = SHIP_KEYS.map((type) => {
-    const s = SHIPS[race][type];
-    const u = shipUnlock(race, type);
-    const by = u ? `${TECHS[race][u.key].name}${u.level > 1 ? ` niv. ${u.level}` : ''}` : '—';
-    return `
-      <article class="ship">
-        <h3>${esc(s.name)}</h3>
-        <div class="role">${ROLES[type]} · débloqué par ${esc(by)}</div>
-        <dl>
-          <dt>Attaque</dt><dd>${s.attack}</dd>
-          <dt>Coque</dt><dd>${s.hull}</dd>
-          <dt>Soute</dt><dd>${num(s.cargo)}</dd>
-          <dt>Vitesse</dt><dd>${s.speed} cases/min</dd>
-          <dt>Autonomie</dt><dd>${Math.round(s.tank / s.burn)} cases</dd>
-          <dt>Coût</dt><dd>${cost(s.cost)}</dd>
-        </dl>
-      </article>`;
-  }).join('');
+  for (const el of svg.querySelectorAll('.edge, .edge-label')) {
+    const on = linked.has(el.dataset.from) && linked.has(el.dataset.to);
+    el.classList.toggle('hl', !!selected && on);
+    el.classList.toggle('dim', !!selected && !on);
+  }
+  renderPanel();
 }
 
 function render() {
@@ -148,10 +283,9 @@ function render() {
   document.documentElement.style.setProperty('--race', R.color);
   renderTabs();
   $('pitch').textContent = R.pitch;
-  $('ships-title').textContent = `Vaisseaux des ${R.name.toLowerCase()}`;
   selected = null;
-  renderTree();
-  renderShips();
+  renderGraph();
+  renderPanel();
 }
 
 $('tabs').addEventListener('click', (e) => {
@@ -161,20 +295,17 @@ $('tabs').addEventListener('click', (e) => {
   history.replaceState(null, '', `#${race}`);
   render();
 });
-$('tree').addEventListener('click', (e) => {
-  if (e.target.closest('details')) return;
-  const n = e.target.closest('.node');
-  if (n) highlight(n.dataset.key);
+$('graph').addEventListener('click', (e) => {
+  const g = e.target.closest('.gnode');
+  if (g) select(g.dataset.id);
 });
-$('tree').addEventListener('keydown', (e) => {
-  const n = e.target.closest('.node');
-  if (n && (e.key === 'Enter' || e.key === ' ')) e.preventDefault(), highlight(n.dataset.key);
+$('graph').addEventListener('keydown', (e) => {
+  const g = e.target.closest('.gnode');
+  if (g && (e.key === 'Enter' || e.key === ' ')) e.preventDefault(), select(g.dataset.id);
 });
 addEventListener('hashchange', () => {
   const r = location.hash.slice(1);
   if (RACE_KEYS.includes(r) && r !== race) (race = r), render();
 });
-// Les liens suivent la mise en page (taille d'écran, détails ouverts).
-new ResizeObserver(drawEdges).observe($('tree'));
 
 render();
