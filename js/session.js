@@ -51,6 +51,12 @@ function lootText(take) {
 
 const COLORS = ['#7aa2ff', '#ff9f6b', '#7cf0b4', '#f7d06b', '#d38bff', '#6fd3ff', '#ff7a93', '#b7e36b'];
 const MAX_PLAYERS = 8;
+/**
+ * Rapports de combat gardés dans ma fiche. Un rapport s'efface dès que sa
+ * cible l'a appliqué : cette limite ne sert que pour une cible qui ne
+ * revient jamais.
+ */
+const MAX_EFFECTS = 300;
 const HEARTBEAT_MS = 1500;
 // Sans nouvelles depuis ce délai, la connexion est considérée perdue (un
 // écran verrouillé quelques secondes ne doit pas faire sortir de la partie).
@@ -976,7 +982,7 @@ export class Session {
   fight(p, f, enemy, target, now) {
     const res = battle({ race: p.race, ships: f.ships, tech: p.planet.tech }, { race: enemy.race, ships: target.ships, tech: enemy.planet?.tech || {} });
     const take = res.won ? salvage(p.race, res.attLeft, target.cargo, f.cargo) : {};
-    p.effects = [...(p.effects || []), { id: rid(8), to: enemy.id, fleet: target.id, at: now, ships: res.defLost, take }].slice(-60);
+    p.effects = [...(p.effects || []), { id: rid(8), to: enemy.id, fleet: target.id, at: now, ships: res.defLost, take }].slice(-MAX_EFFECTS);
     const loot = lootText(take);
     this.addLog(
       res.won
@@ -1401,7 +1407,7 @@ export class Session {
       const res = battle({ race: p.race, ships: f.ships, tech: p.planet.tech }, { race: enemy.race, ships: def.ships, tech: def.tech });
       const take = res.won ? plunder(p.race, res.attLeft, def.stock, f.cargo) : {};
       // Un identifiant par combat : une même flotte peut attaquer plusieurs fois.
-      p.effects = [...(p.effects || []), { id: rid(8), to: enemy.id, key: pl.key, at: f.arrive, ships: res.defLost, take }].slice(-60);
+      p.effects = [...(p.effects || []), { id: rid(8), to: enemy.id, key: pl.key, at: f.arrive, ships: res.defLost, take }].slice(-MAX_EFFECTS);
       const loot = lootText(take);
       this.addLog(
         res.won
@@ -1442,11 +1448,20 @@ export class Session {
   applyEffects(p, now) {
     p.applied ||= [];
     let any = false;
+    // Mes rapports déjà appliqués par leur cible : je peux les oublier.
+    const pending = (p.effects || []).filter((e) => !this.state.players[e.to]?.applied?.includes(e.id));
+    if (pending.length !== (p.effects || []).length) {
+      p.effects = pending;
+      any = true;
+    }
+    const live = new Set();
     for (const other of Object.values(this.state.players)) {
       if (other.id === this.me) continue;
       for (const e of other.effects || []) {
-        if (e.to !== this.me || p.applied.includes(e.id)) continue;
-        p.applied = [...p.applied, e.id].slice(-200);
+        if (e.to !== this.me) continue;
+        live.add(e.id);
+        if (p.applied.includes(e.id)) continue;
+        p.applied = [...p.applied, e.id];
         any = true;
         if (e.fleet && this.fleetHit(p, other, e, now)) continue;
         const pl = this.planetOf(p, e.fleet ? p.docked?.[e.fleet] : e.key); // flotte posée entre-temps : sa planète encaisse
@@ -1461,6 +1476,15 @@ export class Session {
         this.addLog(`${pl.name} (${p.name}) est attaquée par ${other.name} : ${ships}${loot ? `, ${loot} pillés` : ''}.`);
         this.ontoast?.(`${other.name} attaque ${pl.name} !`);
       }
+    }
+    // Un rapport que son auteur a effacé ne reviendra pas (sa fiche ne fait
+    // qu'avancer) : je n'ai plus besoin de me souvenir que je l'ai appliqué.
+    // Couper cette liste par la fin ferait au contraire réappliquer un
+    // rapport encore présent chez son auteur.
+    const applied = p.applied.filter((id) => live.has(id));
+    if (applied.length !== p.applied.length) {
+      p.applied = applied;
+      any = true;
     }
     return any;
   }
