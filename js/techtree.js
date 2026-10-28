@@ -2,7 +2,7 @@
 // chaque race (bâtiments, technologies, vaisseaux, pouvoirs), lu dans les
 // données du jeu.
 import { TECHS, SHIPS, SHIP_KEYS, techCost, researchDuration, shipUnlock } from './tech.js';
-import { RACES, RACE_KEYS, RES_INFO, POWERS, POWER_KEYS, upgradeCost, buildDuration } from './game.js';
+import { RACES, RACE_KEYS, resIcon, POWERS, POWER_KEYS, upgradeCost, buildDuration } from './game.js';
 
 const ROLES = { cargo: 'Cargo', fighter: 'Chasseur', heavy: 'Vaisseau lourd', colony: 'Colonisateur' };
 const BONUS = { minerals: 'minéraux', food: 'nourriture', energy: 'énergie', speed: 'vitesse', attack: 'attaque', hull: 'coque' };
@@ -12,7 +12,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 const num = (n) => Math.round(n).toLocaleString('fr-FR');
 const cost = (c) =>
   Object.entries(c)
-    .map(([r, v]) => `<span class="r-${r}">${num(v)} ${RES_INFO[r].short}</span>`)
+    .map(([r, v]) => `<span class="qty">${num(v)}${resIcon(r)}</span>`)
     .join(' · ');
 const dur = (ms) => {
   const s = Math.round(ms / 1000);
@@ -191,7 +191,7 @@ function powerPanel(key) {
     <p>${esc(P.desc)}</p>
     <p>Renforcé par l’${esc(RACES.alien.buildings.amplifier.name.toLowerCase())} : +25 % par niveau.</p>
     <dl>
-      <dt>Coût</dt><dd><span class="r-energy">${num(c1.energy)} ${RES_INFO.energy.short}</span> par psionique</dd>
+      <dt>Coût</dt><dd><span class="qty">${num(c1.energy)}${resIcon('energy')}</span> par psionique</dd>
       <dt>Recharge</dt><dd>${dur(P.cooldown)}</dd>
       ${P.duration ? `<dt>Durée</dt><dd>${dur(P.duration)}</dd>` : ''}
     </dl>`;

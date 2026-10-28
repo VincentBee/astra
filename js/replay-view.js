@@ -4,7 +4,8 @@
 
 import { loadGame } from './save.js';
 import { replay, replayable } from './replay.js';
-import { RACES, UNIVERSE, planetsFor, stateAt, score, sameCell } from './game.js';
+import { RACES, UNIVERSE, planetsFor, stateAt, score, sameCell, sunFor } from './game.js';
+import { drawSun } from './sky.js';
 import { fleetPos, moving, countShips } from './fleet.js';
 
 const $ = (id) => document.getElementById(id);
@@ -33,6 +34,7 @@ function load() {
     .map((p) => p.name)
     .join(', ');
   const ok = replayable(st);
+  if (ok.stale) return note('Cette copie de la partie n’est pas encore à jour : rouvre la partie pour te synchroniser avec les autres, puis réessaie.');
   if (!ok.ok) {
     return note(
       `Cette partie ne se rejoue pas depuis le début : il manque le début du journal de ${ok.missing.join(', ')} (partie commencée avant le journal, ou plus de 1 500 ordres).`,
@@ -130,6 +132,7 @@ function drawMap(players) {
     ctx.lineTo(W, k * cell);
   }
   ctx.stroke();
+  drawSun(ctx, sunFor(film.gid), cell);
 
   // Planètes : grises si libres, à la couleur de leur propriétaire sinon.
   const owner = (w) => players.find((p) => sameCell(p.home, w) || p.colonies?.[w.id]);
@@ -142,7 +145,7 @@ function drawMap(players) {
     ctx.globalAlpha = o ? 1 : 0.5;
     ctx.fillStyle = o ? o.color : '#8d95b3';
     ctx.beginPath();
-    ctx.arc(cx, cy, cell * (o ? 0.26 : 0.18), 0, Math.PI * 2);
+    ctx.arc(cx, cy, cell * (w.kind && w.kind !== 'planet' ? 0.12 : o ? 0.26 : 0.18), 0, Math.PI * 2); // petits corps : plus petits
     ctx.fill();
     if (o && sameCell(o.home, w)) {
       ctx.strokeStyle = o.color;

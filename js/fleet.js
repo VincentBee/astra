@@ -214,13 +214,13 @@ export function transfer(a, b, race, part, now) {
   const fuelB = b.ships && countShips(b.ships) ? fuelAt(b, race, now) : b.fuel || 0;
   const ships = {};
   for (const k of SHIP_KEYS) {
-    const n = Math.floor(part.ships?.[k] || 0);
+    const n = Math.floor(Number(part.ships?.[k]) || 0);
     if (n < 0 || n > (a.ships[k] || 0)) return `Pas assez de ${SHIPS[race][k].name}.`;
     if (n) ships[k] = n;
   }
   const cargo = {};
   for (const r of SOIL) {
-    const v = Math.floor(part.cargo?.[r] || 0);
+    const v = Math.floor(Number(part.cargo?.[r]) || 0);
     if (v < 0 || v > (a.cargo?.[r] || 0)) return 'Pas autant dans les soutes.';
     cargo[r] = v;
   }
@@ -404,7 +404,7 @@ export function battle(a, d) {
     defLeft: left(D),
     attLost: lost(a.ships, A),
     defLost: lost(d.ships, D),
-    won: alive(A) && !alive(D),
+    won: alive(A) && !alive(D) && firepower(A) > 0, // des cargos sans armes ne gagnent pas, même contre personne
   };
 }
 

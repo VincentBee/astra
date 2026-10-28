@@ -172,6 +172,16 @@ details > button { width: 100%; }
 .me-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .badge { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); white-space: nowrap; }
 .net { font: 0.8rem var(--mono); color: var(--ok); white-space: nowrap; }
+.top-right { display: flex; align-items: center; gap: 10px; flex: none; }
+/* Bouton rond avec une icône : inviter un joueur, à tout moment. */
+button.icon-btn {
+  width: 40px; min-height: 40px; padding: 0; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--panel-2); border-color: var(--line); color: var(--accent);
+}
+.icon-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+button.close-btn { color: var(--muted); background: transparent; }
+button.close-btn svg { width: 18px; height: 18px; }
 .net.slow { color: var(--warn); }
 .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--muted); }
 
@@ -283,6 +293,16 @@ details > button { width: 100%; }
 .chip.energy { --c: var(--energy); }
 .chip.pop { --c: var(--pop); }
 
+/* Icône d'une ressource, à la taille et dans la couleur de sa ressource. */
+.ri { width: 1.05em; height: 1.05em; vertical-align: -0.17em; fill: currentColor; flex: none; }
+.ri-minerals { color: var(--minerals); }
+.ri-food { color: var(--food); }
+.ri-energy { color: var(--energy); }
+.ri-pop { color: var(--pop); }
+.qty { white-space: nowrap; }
+.qty .ri { margin-left: 0.2em; }
+.label .ri, .chip .ri { margin-right: 0.3em; }
+
 
 .requests { display: grid; gap: 8px; margin-bottom: 10px; }
 .banner {
@@ -296,15 +316,6 @@ details > button { width: 100%; }
 .banner p { margin: 0; }
 .banner.warn { border-color: rgba(255, 179, 107, 0.5); margin-bottom: 10px; }
 
-.fab-zone {
-  position: sticky;
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 18px;
-}
-.fab { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); }
-
 /* ----- Planète du joueur ----- */
 
 .planet-head { display: flex; align-items: center; gap: 12px; }
@@ -313,6 +324,16 @@ details > button { width: 100%; }
 .tile.empty .amount { color: var(--warn); }
 .planet-info { padding: 12px 14px; display: grid; gap: 10px; }
 .planet-info .b-desc { margin: 0; }
+#planet-info.sheet-panel { gap: 14px; }
+.climate { margin: 0; font: 0.8rem var(--mono); color: var(--muted); }
+.climate-name { font-weight: 700; }
+.places { float: right; letter-spacing: 0; text-transform: none; }
+.places.full { color: var(--warn); }
+.climate-name.hot { color: #ff9a4d; }
+.climate-name.mild { color: var(--food); }
+.climate-name.cold { color: #7fc8ff; }
+#soil-zone .climate { margin-bottom: 10px; }
+.pi-head-right { display: flex; align-items: center; gap: 12px; }
 .fi-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .fi-fuel { display: grid; gap: 4px; }
 .fi-beside { display: grid; gap: 8px; }
@@ -440,3 +461,87 @@ details > button { width: 100%; }
 .rp-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 0.9rem; }
 .rp-log li { display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; gap: 8px; }
 .rp-log .dot { width: 8px; height: 8px; }
+
+/* ----- Onglets de la planète : bâtiments, recherche, flottes ----- */
+.tabs { display: flex; gap: 4px; padding: 3px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; position: sticky; top: calc(62px + env(safe-area-inset-top, 0px)); z-index: 4; }
+.tab { flex: 1; min-height: 36px; padding: 0 8px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-size: 0.88rem; }
+.tab[aria-selected="true"] { background: var(--panel-2); color: var(--text); }
+.tab .tab-dot { display: inline-block; width: 6px; height: 6px; margin-left: 5px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
+#view-planet[data-tab="build"] [data-pane]:not([data-pane="build"]),
+#view-planet[data-tab="research"] [data-pane]:not([data-pane="research"]),
+#view-planet[data-tab="fleet"] [data-pane]:not([data-pane="fleet"]) { display: none; }
+
+/* ----- Interface condensée -----
+   Tout tient en peu de place : icônes plutôt que mots, une ligne par
+   bâtiment, la description seulement quand on touche le nom. */
+
+.game { gap: 12px; }
+.section-title { font-size: 0.68rem; margin-bottom: 6px; }
+
+/* Une colonne par tuile (4, ou 3 pour les machines sans population), de même largeur. */
+.resources { grid-template-columns: none; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; gap: 6px; }
+.resources .tile { padding: 6px 7px 7px; gap: 0; }
+.resources .tile .amount { font-size: 1.02rem; }
+.resources .tile .amount .cap { display: none; }
+.resources .tile .rate { font-size: 0.66rem; line-height: 1.25; overflow-wrap: anywhere; }
+.resources .tile .label { font-size: 0.85rem; letter-spacing: 0; }
+.resources .tile .label .ri { margin-right: 0.15em; }
+.resources .spark { top: 6px; right: 6px; width: 55%; height: 18px; }
+.resources .gauge { margin-top: 4px; height: 3px; }
+
+.soil { gap: 6px; }
+.soil .tile { padding: 6px 8px 8px; gap: 0; }
+.soil .tile .label { font-size: 0.66rem; }
+.soil .tile .amount { font-size: 1.05rem; }
+.soil .tile .amount .cap { font-size: 0.7rem; }
+.soil .tile .rate { font-size: 0.68rem; }
+.soil .spark { top: 6px; right: 8px; width: 38%; height: 14px; }
+/* Le détail (extraction, régénération) passe en info-bulle : le solde suffit. */
+#soil [data-soil-detail] { display: none; }
+.soil .gauge { margin-top: 4px; height: 3px; }
+
+.buildings { gap: 6px; }
+.building {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "head act" "cost act" "desc desc";
+  align-items: center;
+  gap: 1px 10px;
+  padding: 7px 10px;
+}
+.building .b-head { grid-area: head; justify-content: flex-start; align-items: baseline; gap: 8px; min-width: 0; }
+.building .cost { grid-area: cost; font-size: 0.74rem; }
+.building .cost .req { font-size: 0.72rem; }
+.building > button, .building .ship-actions { grid-area: act; justify-self: end; }
+.building > button, .building .ship-actions button { min-height: 34px; padding: 0 12px; font-size: 0.85rem; }
+.building .ship-actions { gap: 4px; flex-wrap: nowrap; }
+.building .b-desc { grid-area: desc; display: none; font-size: 0.78rem; padding-top: 4px; }
+.building.open .b-desc { display: block; }
+.building .level { font-size: 0.72rem; }
+.b-name {
+  background: none; border: 0; padding: 0; min-height: 0;
+  font-weight: 600; font-size: 0.92rem; color: var(--text); text-align: left;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.b-name::after { content: ' ⓘ'; color: var(--muted); font-size: 0.72em; font-weight: 400; }
+.queue { padding: 8px 10px; gap: 6px; font-size: 0.85rem; }
+
+.players { gap: 6px; }
+.player { padding: 7px 10px; gap: 10px; }
+.p-sub { font-size: 0.7rem; }
+.p-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.map-head { align-items: center; }
+.help-btn { width: 28px; min-height: 28px; padding: 0; border-radius: 50%; font-size: 0.85rem; color: var(--muted); }
+/* Bulle d'aide : au survol, au clavier, ou ouverte d'un toucher (aria-expanded). */
+.help-wrap { position: relative; display: inline-flex; }
+.tooltip {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 6;
+  width: min(270px, 80vw); padding: 10px 12px;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  font-size: 0.8rem; line-height: 1.4; color: var(--text); text-align: left;
+  opacity: 0; visibility: hidden; transition: opacity 0.15s;
+}
+@media (hover: hover) { .help-wrap:hover .tooltip { opacity: 1; visibility: visible; } }
+.help-btn:focus-visible + .tooltip, .help-btn[aria-expanded="true"] + .tooltip { opacity: 1; visibility: visible; }
+.fi-actions button { min-height: 34px; padding: 0 10px; }
