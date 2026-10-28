@@ -4,7 +4,7 @@
 
 import { loadGame } from './save.js';
 import { replay, replayable } from './replay.js';
-import { RACES, UNIVERSE, planetsFor, stateAt, score, sameCell, sunFor } from './game.js';
+import { RACES, raceIcon, UNIVERSE, planetsFor, stateAt, score, sameCell, sunFor } from './game.js';
 import { drawSun } from './sky.js';
 import { fleetPos, moving, countShips } from './fleet.js';
 
@@ -214,7 +214,7 @@ function renderPlayers(players) {
       return `<div class="player card">
         <span class="dot" style="background:${esc(p.color)}"></span>
         <div class="p-main">
-          <div class="p-name">${esc(p.name)}${R ? ` <span class="tag race-tag" style="--race:${R.color}">${R.icon} ${R.name}</span>` : ''}</div>
+          <div class="p-name">${esc(p.name)}${R ? ` <span class="tag race-tag" style="--race:${R.color}">${raceIcon(p.race)} ${R.name}</span>` : ''}</div>
           <div class="p-sub mono">${esc(sub)}</div>
         </div>
         <div class="p-score mono">${s ? `${score(p.race, s.levels)} pts` : ''}</div>

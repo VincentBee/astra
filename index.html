@@ -20,50 +20,44 @@
     <div class="home">
       <header class="hero">
         <h1>Astra</h1>
-        <p>Conquête spatiale entre téléphones. Sans serveur, sans compte.</p>
+        <p>Conquête spatiale entre téléphones.</p>
       </header>
-      <section id="saved" class="saved card" hidden>
-        <p class="eyebrow">Partie en cours sur ce téléphone</p>
-        <p id="saved-names" class="saved-names"></p>
-        <p id="saved-when" class="hint"></p>
-        <button id="btn-resume" class="primary">Reprendre la partie</button>
-        <button id="btn-replay" class="secondary">Revoir la partie (replay)</button>
+      <section id="saved" class="saved" hidden>
+        <h3 class="section-title"><i data-ic="replay"></i> Historique</h3>
+        <ul id="games" class="games"></ul>
       </section>
-      <label class="field" for="name">Ton nom de commandant
+      <label class="field" for="name">Nom
         <input id="name" maxlength="16" autocomplete="nickname" placeholder="ex. Vincent">
       </label>
       <div class="stack">
-        <button id="btn-create" class="primary">Créer une partie</button>
-        <button id="btn-join" class="secondary">Rejoindre une partie</button>
+        <button id="btn-create" class="primary"><i data-ic="plus"></i>Créer</button>
+        <button id="btn-join" class="secondary"><i data-ic="join"></i>Rejoindre</button>
       </div>
-      <p id="new-warning" class="note" hidden>Une nouvelle partie remplace celle en cours sur ce téléphone. Appuie encore une fois pour confirmer.</p>
-      <p class="hint">Tous les joueurs sont au même niveau : n'importe qui dans la partie peut en inviter d'autres, avec un QR code ou un lien envoyé par message. La partie est sauvegardée sur chaque téléphone : n'importe qui peut la reprendre, même le lendemain.</p>
-      <p id="home-note" class="note" hidden></p>
+            <p id="home-note" class="note" hidden></p>
     </div>
   </section>
 
   <!-- Rejoindre -->
   <section id="screen-join" class="screen" hidden>
     <div class="flow">
-      <button class="back" data-go="home">← Retour</button>
+      <button class="back icon-only" data-go="home" title="Retour" aria-label="Retour"><i data-ic="back"></i></button>
 
       <div id="join-step-1" class="step">
-        <h2><span class="num">1</span> Lis l'invitation d'un joueur</h2>
-        <button id="btn-scan-offer" class="primary">Scanner son QR code</button>
+        <h2><span class="num">1</span> Scanne l'invitation</h2>
+        <button id="btn-scan-offer" class="primary"><i data-ic="scan"></i>Scanner</button>
         <details>
-          <summary>Pas de caméra ? Colle le lien ou le code</summary>
+          <summary>Coller un lien</summary>
           <textarea id="offer-input" rows="3" placeholder="https://…#o1.… ou o1.…"></textarea>
-          <button id="btn-offer-ok" class="secondary">Valider</button>
+          <button id="btn-offer-ok" class="secondary"><i data-ic="check"></i>Valider</button>
         </details>
       </div>
 
       <div id="join-step-2" class="step" hidden>
-        <h2><span class="num">2</span> Montre-lui ta réponse</h2>
-        <p class="hint">Il la scanne depuis son écran d'invitation. À distance : copie la réponse et envoie-la-lui par message.</p>
+        <h2><span class="num">2</span> Montre ta réponse</h2>
         <div class="qr-box"><canvas id="answer-qr" aria-label="QR code de ta réponse"></canvas></div>
         <div class="row">
-          <button id="btn-copy-answer" class="secondary">Copier la réponse</button>
-          <button id="btn-share-answer" class="secondary">Partager</button>
+          <button id="btn-copy-answer" class="secondary icon-only" title="Copier la réponse" aria-label="Copier la réponse"><i data-ic="copy"></i></button>
+          <button id="btn-share-answer" class="secondary icon-only" title="Partager" aria-label="Partager"><i data-ic="share"></i></button>
         </div>
         <p id="join-status" class="status">En attente de la personne qui t’invite…</p>
       </div>
@@ -76,12 +70,11 @@
   <section id="screen-race" class="screen" hidden>
     <div class="flow">
       <header class="race-head">
-        <p class="eyebrow">Arrivée dans la partie</p>
         <h2>Choisis ta race</h2>
-        <p class="hint">Ce choix est définitif : tu ne pourras plus en changer dans cette partie.</p>
       </header>
       <div id="races" class="races" role="radiogroup" aria-label="Races jouables"></div>
-      <button id="btn-race" class="primary" disabled>Choisis une race</button>
+      <article id="race-detail" class="race-detail card" aria-live="polite"></article>
+      <button id="btn-race" class="primary"></button>
       <p id="race-others" class="hint"></p>
     </div>
   </section>
@@ -95,26 +88,25 @@
         <span id="me-role" class="badge"></span>
       </div>
       <div class="top-right">
-        <div id="net" class="net" title="Joueurs connectés à ce téléphone"></div>
-        <button id="btn-invite" class="icon-btn" title="Inviter un joueur" aria-label="Inviter un joueur">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M19 8v6M16 11h6"/></svg>
+        <button id="net" class="net-btn" title="Joueurs, classement, invitations" aria-label="Joueurs en ligne, classement et invitations">
+          <i data-ic="users"></i><span id="net-count" class="mono"></span>
         </button>
       </div>
     </header>
 
     <div id="lost" class="banner warn" hidden>
-      <p>Tu es seul en ligne. La partie continue et reste sauvegardée sur ce téléphone. Les autres te retrouveront tout seuls dès qu'ils rouvriront l'appli (il faut Internet), et vos progressions seront fusionnées. Sans Internet, invite-les par QR code.</p>
-      <button id="btn-rejoin" class="secondary small">Rejoindre les autres</button>
+      <p title="La partie continue et reste sauvegardée. Les autres te retrouveront dès qu'ils rouvriront l'appli ; vos progressions seront fusionnées.">Seul en ligne.</p>
+      <button id="btn-rejoin" class="secondary small"><i data-ic="join"></i>Rejoindre</button>
     </div>
 
     <section id="view-universe" class="universe" aria-label="Carte de l'univers">
       <div id="pick" class="banner" hidden>
-        <p><strong>Choisis ta planète de départ.</strong> Touche une planète libre sur la carte pour voir ses gisements, puis installe-toi. Ce choix est définitif.</p>
+        <p><i data-ic="planet"></i> <strong>Choisis ta planète</strong> <span class="hint">· définitif</span></p>
       </div>
       <div id="trades" class="trades" hidden></div>
       <div class="map-head">
-        <span>Ta planète <strong id="my-coords" class="mono"></strong></span>
-        <span class="pi-head-right"><span id="map-size" class="hint mono"></span><span class="help-wrap"><button id="btn-map-help" class="ghost help-btn" aria-expanded="false" aria-describedby="map-help" aria-label="Aide de la carte">?</button><span id="map-help" role="tooltip" class="tooltip">Touche une planète pour voir ses gisements, la tienne pour ouvrir ses bâtiments, une de tes flottes (triangle) pour la piloter. Planètes en pointillés : libres. Halo : ta portée de détection ; les flottes adverses n’apparaissent que dedans.</span></span></span>
+        <span><i data-ic="planet"></i> <strong id="my-coords" class="mono"></strong> <span class="help-wrap"><button id="btn-map-help" class="ghost help-btn" aria-expanded="false" aria-describedby="map-help" aria-label="Aide de la carte">?</button><span id="map-help" role="tooltip" class="tooltip">Touche une planète pour voir ses gisements, la tienne pour ouvrir ses bâtiments, une de tes flottes (triangle) pour la piloter. Planètes en pointillés : libres. Halo : ta portée de détection ; les flottes adverses n’apparaissent que dedans.</span></span></span>
+        <span class="pi-head-right"></span>
       </div>
       <div class="map-wrap"><canvas id="map" aria-label="Carte de l'univers : touche une planète"></canvas></div>
 
@@ -129,8 +121,8 @@
           <p id="pi-size" class="climate" hidden></p>
           <p id="pi-climate" class="climate" hidden></p>
           <div id="pi-soil" class="soil"></div>
-          <button id="btn-claim" class="primary" hidden>S'installer ici</button>
-          <button id="btn-open-planet" class="secondary" hidden>Voir mes bâtiments</button>
+          <button id="btn-claim" class="primary" hidden><i data-ic="dock"></i>S'installer</button>
+          <button id="btn-open-planet" class="secondary" hidden><i data-ic="build"></i>Bâtiments</button>
         </article>
       </div>
 
@@ -143,130 +135,126 @@
         <div id="fi-beside" class="fi-beside" hidden></div>
         <div id="fi-partners" class="fi-beside" hidden></div>
         <div class="fi-actions">
-          <button id="btn-fi-stop" class="secondary small" title="Arrêter la flotte">■ Stop</button>
-          <button id="btn-fi-return" class="secondary small" title="Rentrer à la planète mère">⌂ Rentrer</button>
-          <button id="btn-fi-dock" class="secondary small" title="Se poser sur la planète">⤓ Poser</button>
-          <button id="btn-fi-refuel" class="secondary small" title="Faire le plein de carburant">⛽ Plein</button>
-          <button id="btn-fi-split" class="secondary small" title="Scinder la flotte">✂ Scinder</button>
-          <button id="btn-fi-close" class="ghost small" title="Fermer" aria-label="Fermer">✕</button>
+          <button id="btn-fi-stop" class="secondary small icon-only" title="Arrêter la flotte" aria-label="Arrêter la flotte"><i data-ic="stop"></i></button>
+          <button id="btn-fi-return" class="secondary small icon-only" title="Rentrer à la planète mère" aria-label="Rentrer à la planète mère"><i data-ic="home"></i></button>
+          <button id="btn-fi-dock" class="secondary small icon-only" title="Se poser sur la planète" aria-label="Se poser sur la planète"><i data-ic="dock"></i></button>
+          <button id="btn-fi-refuel" class="secondary small icon-only" title="Faire le plein de carburant" aria-label="Faire le plein de carburant"><i data-ic="fuel"></i></button>
+          <button id="btn-fi-split" class="secondary small icon-only" title="Scinder la flotte" aria-label="Scinder la flotte"><i data-ic="split"></i></button>
+          <button id="btn-fi-close" class="ghost small icon-only" title="Fermer" aria-label="Fermer"><i data-ic="close"></i></button>
         </div>
-        <p class="hint">Touche une case pour y aller, une flotte ennemie pour la poursuivre, ta flotte pour passer à la suivante.</p>
-      </article>
+              </article>
 
 
-      <section>
-        <h3 class="section-title">Commandants</h3>
-        <div id="players" class="players"></div>
-      </section>
     </section>
 
     <main id="view-planet" class="game" data-tab="build" hidden>
       <div class="planet-head">
-        <button id="btn-back-map" class="icon-btn" title="Retour à la carte" aria-label="Retour à la carte">←</button>
+        <button id="btn-back-map" class="icon-btn" title="Retour à la carte" aria-label="Retour à la carte"><i data-ic="back"></i></button>
         <h2 id="planet-title"></h2>
+        <p id="soil-climate" class="climate" title="Production selon le climat" hidden></p>
       </div>
+
+      <section id="soil-zone" hidden>
+        <div id="soil" class="soil"></div>
+      </section>
 
       <section class="resources" id="resources"></section>
 
       <nav class="tabs" role="tablist" aria-label="Sections de la planète">
-        <button role="tab" class="tab" data-tab-btn="build" aria-selected="true">Bâtiments</button>
-        <button role="tab" class="tab" data-tab-btn="research" id="tab-research" aria-selected="false">Recherche</button>
-        <button role="tab" class="tab" data-tab-btn="fleet" aria-selected="false">Flottes</button>
+        <button role="tab" class="tab" data-tab-btn="build" aria-selected="true" title="Bâtiments" aria-label="Bâtiments"><i data-ic="build"></i></button>
+        <button role="tab" class="tab" data-tab-btn="power" id="tab-power" aria-selected="false" title="Pouvoirs" aria-label="Pouvoirs" hidden><i data-ic="power"></i></button>
+        <button role="tab" class="tab" data-tab-btn="research" id="tab-research" aria-selected="false" title="Recherche" aria-label="Recherche"><i data-ic="research"></i></button>
+        <button role="tab" class="tab" data-tab-btn="fleet" aria-selected="false" title="Flottes" aria-label="Flottes"><i data-ic="fleet"></i></button>
       </nav>
 
-      <section id="soil-zone" data-pane="build" hidden>
-        <h3 class="section-title">Gisements de la planète</h3>
-        <p id="soil-climate" class="climate" hidden></p>
-        <div id="soil" class="soil"></div>
-      </section>
-
-      <section id="queue" class="queue card" data-pane="build" hidden>
-        <div class="queue-head"><span id="queue-label"></span><span id="queue-left" class="mono"></span></div>
-        <div class="bar"><div id="queue-bar" class="bar-fill"></div></div>
-      </section>
-
-      <section id="powers-zone" data-pane="build" hidden>
-        <h3 class="section-title">Pouvoirs psychiques</h3>
+      <section id="powers-zone" data-pane="power" hidden>
+        <h3 class="section-title"><i data-ic="power"></i> Pouvoirs</h3>
         <div id="powers" class="buildings"></div>
       </section>
 
       <section data-pane="build">
-        <h3 class="section-title">Bâtiments <span id="places" class="places mono"></span></h3>
+        <h3 class="section-title"><i data-ic="build"></i> Bâtiments <span id="places" class="places mono"></span></h3>
         <div id="buildings" class="buildings"></div>
       </section>
 
       <section id="research-zone" data-pane="research">
-        <h3 class="section-title">Recherche</h3>
-        <section id="research-queue" class="queue card" hidden>
-          <div class="queue-head"><span id="research-label"></span><span id="research-left" class="mono"></span></div>
-          <div class="bar"><div id="research-bar" class="bar-fill"></div></div>
-        </section>
+        <h3 class="section-title"><i data-ic="research"></i> Recherche</h3>
         <p id="research-hint" class="hint"></p>
         <div id="techs" class="buildings"></div>
       </section>
 
       <section id="yard-zone" data-pane="fleet">
-        <h3 class="section-title">Chantier naval</h3>
-        <section id="yard-queue" class="queue card" hidden>
-          <div class="queue-head"><span id="yard-label"></span><span id="yard-left" class="mono"></span></div>
-          <div class="bar"><div id="yard-bar" class="bar-fill"></div></div>
-        </section>
+        <h3 class="section-title"><i data-ic="fleet"></i> Chantier</h3>
         <p id="yard-hint" class="hint"></p>
         <div id="ships" class="buildings"></div>
       </section>
 
       <section id="fleet-zone" data-pane="fleet">
-        <h3 class="section-title">Flottes</h3>
+        <h3 class="section-title"><i data-ic="fleet"></i> Flottes</h3>
         <p id="docked" class="hint"></p>
-        <button id="btn-send-fleet" class="secondary">Faire décoller une flotte</button>
+        <button id="btn-send-fleet" class="secondary"><i data-ic="fleet"></i>Décoller</button>
         <div id="fleets" class="players"></div>
         <div id="planet-partners" class="fi-beside" hidden></div>
       </section>
     </main>
   </section>
 
+  <!-- Joueurs : en ligne, classement, invitations -->
+  <div id="sheet-players" class="sheet" hidden>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="players-title">
+      <div class="sheet-head">
+        <h2 id="players-title">Joueurs</h2>
+        <button id="btn-players-close" class="icon-btn close-btn" title="Fermer" aria-label="Fermer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <p id="net-detail" class="net"></p>
+      <button id="btn-invite" class="primary"><i data-ic="invite"></i>Inviter un joueur</button>
+      <section>
+        <h3 class="section-title"><i data-ic="trophy"></i> Classement</h3>
+        <div id="players" class="players"></div>
+      </section>
+    </div>
+  </div>
+
   <!-- Feuille d'invitation (tout le monde) -->
   <div id="sheet-invite" class="sheet" hidden>
     <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="invite-title">
       <div class="sheet-head">
-        <h2 id="invite-title">Inviter un joueur</h2>
+        <h2 id="invite-title">Inviter</h2>
         <button id="btn-invite-close" class="icon-btn close-btn" title="Fermer" aria-label="Fermer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
 
       <div class="step">
-        <h3><span class="num">1</span> Le joueur scanne ce QR code</h3>
+        <h3><span class="num">1</span> Il scanne</h3>
         <div class="qr-box"><canvas id="offer-qr" aria-label="QR code d'invitation"></canvas>
-          <p id="offer-wait" class="qr-wait">Préparation de l'invitation…</p>
+          <p id="offer-wait" class="qr-wait">…</p>
         </div>
         <div class="row">
-          <button id="btn-copy-offer" class="secondary">Copier le lien</button>
-          <button id="btn-share-offer" class="secondary">Partager</button>
+          <button id="btn-copy-offer" class="secondary icon-only" title="Copier le lien" aria-label="Copier le lien"><i data-ic="copy"></i></button>
+          <button id="btn-share-offer" class="secondary icon-only" title="Partager" aria-label="Partager"><i data-ic="share"></i></button>
         </div>
       </div>
 
       <div class="step">
-        <h3><span class="num">2</span> Scanne la réponse qu'il affiche</h3>
-        <button id="btn-scan-answer" class="primary">Scanner sa réponse</button>
+        <h3><span class="num">2</span> Scanne sa réponse</h3>
+        <button id="btn-scan-answer" class="primary"><i data-ic="scan"></i>Scanner</button>
         <details>
-          <summary>Il est à distance ? Colle la réponse reçue</summary>
+          <summary>Coller une réponse</summary>
           <textarea id="answer-input" rows="3" placeholder="a1.…"></textarea>
-          <button id="btn-answer-ok" class="secondary">Valider</button>
+          <button id="btn-answer-ok" class="secondary"><i data-ic="check"></i>Valider</button>
         </details>
         <p id="invite-status" class="status"></p>
       </div>
-      <p class="hint">Une invitation ne sert qu'une fois. Pour un autre joueur, rouvre cette fenêtre.</p>
-    </div>
+          </div>
   </div>
 
   <!-- Décollage d'une flotte -->
   <div id="sheet-fleet" class="sheet" hidden>
     <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="fleet-title">
       <div class="sheet-head">
-        <h2 id="fleet-title">Faire décoller une flotte</h2>
+        <h2 id="fleet-title"><i data-ic="fleet"></i> Décollage</h2>
         <button id="btn-fleet-close" class="icon-btn close-btn" title="Fermer" aria-label="Fermer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
-      <p class="hint">La flotte attend en orbite. Touche-la ensuite sur la carte, puis touche une case pour l’y envoyer : s’y poser, coloniser, attaquer ou juste stationner. Elle brûle son carburant (de l’énergie) à chaque case ; à sec, elle reste en panne là où elle est.</p>
-      <div>
+            <div>
         <h3 class="section-title">Vaisseaux</h3>
         <div id="fleet-ships" class="fleet-grid"></div>
       </div>
@@ -282,7 +270,7 @@
         </div>
         <p id="fleet-tank" class="hint"></p>
       </div>
-      <button id="btn-fleet-go" class="primary">Décoller</button>
+      <button id="btn-fleet-go" class="primary"><i data-ic="fleet"></i>Décoller</button>
     </div>
   </div>
 
@@ -313,16 +301,16 @@
         <h2 id="trade-title"></h2>
         <button id="btn-trade-close" class="icon-btn close-btn" title="Fermer" aria-label="Fermer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
-      <p class="hint">Ce que tu donnes part tout de suite sous séquestre. L’offre vaut 5 minutes et ne s’annule pas ; ta flotte reste bloquée jusqu’à la réponse. Refusée ou sans réponse, tu récupères ta part. Ne rien demander, c’est faire un don.</p>
+      <p class="hint">Offre de 5 min, non annulable. Refusée : tu récupères ta part.</p>
       <div>
-        <h3 class="section-title">Je donne</h3>
+        <h3 class="section-title"><i data-ic="give"></i> Je donne</h3>
         <div id="trade-give" class="fleet-grid"></div>
       </div>
       <div>
-        <h3 class="section-title">Je demande</h3>
+        <h3 class="section-title"><i data-ic="back"></i> Je demande</h3>
         <div id="trade-want" class="fleet-grid"></div>
       </div>
-      <button id="btn-trade-go" class="primary">Proposer</button>
+      <button id="btn-trade-go" class="primary"><i data-ic="trade"></i>Proposer</button>
     </div>
   </div>
 
@@ -330,8 +318,8 @@
   <div id="scanner" class="scanner" hidden>
     <video id="scanner-video" playsinline muted></video>
     <div class="scanner-frame"></div>
-    <p class="scanner-hint">Vise le QR code. Monte la luminosité de l'autre écran si besoin.</p>
-    <button id="btn-scan-cancel" class="secondary scanner-cancel">Annuler</button>
+    <p class="scanner-hint">Vise le QR code</p>
+    <button id="btn-scan-cancel" class="secondary scanner-cancel"><i data-ic="close"></i>Annuler</button>
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>

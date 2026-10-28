@@ -10,28 +10,97 @@
 // où il a agi le plus récemment (`actAt`). Chacun garde ainsi sa propre
 // progression. Le journal est l'union des deux.
 
-const SAVE_KEY = 'astra.save';
+const SAVE_KEY = 'astra.save'; // la partie en cours
+const SAVES_KEY = 'astra.saves'; // historique : { gid: sauvegarde }
+const ID_KEY = 'astra.identity'; // mon identité dans la partie en cours
+const IDS_KEY = 'astra.identities'; // historique : { gid: identité }
+const KEEP = 10; // nombre de parties gardées dans l'historique
 
-export function saveGame(me, state) {
+const read = (k, d) => {
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, me, savedAt: Date.now(), state }));
-  } catch {}
-}
-
-/** { me, savedAt, state } ou null. */
-export function loadGame() {
-  try {
-    const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
-    return s && s.v === 1 && s.state?.players ? s : null;
+    return JSON.parse(localStorage.getItem(k) || 'null') ?? d;
   } catch {
-    return null;
+    return d;
   }
+};
+const write = (k, v) => {
+  try {
+    localStorage.setItem(k, JSON.stringify(v));
+  } catch {}
+};
+const valid = (s) => s && s.v === 1 && s.state?.players;
+
+/** Range la partie en cours et la garde dans l'historique (les plus récentes seulement). */
+export function saveGame(me, state) {
+  const save = { v: 1, me, savedAt: Date.now(), state };
+  const all = archive(); // avant d'écraser la partie en cours, pour la garder
+  all[state.gid] = save;
+  write(SAVE_KEY, save);
+  const keep = Object.values(all).sort((a, b) => b.savedAt - a.savedAt).slice(0, KEEP);
+  write(SAVES_KEY, Object.fromEntries(keep.map((x) => [x.state.gid, x])));
 }
 
-export function forgetGame() {
-  try {
-    localStorage.removeItem(SAVE_KEY);
-  } catch {}
+/** { me, savedAt, state } de la partie en cours, ou null. */
+export function loadGame() {
+  const s = read(SAVE_KEY, null);
+  return valid(s) ? s : null;
+}
+
+/** L'historique, sauvegardes d'avant l'historique comprises. */
+function archive() {
+  const all = read(SAVES_KEY, {});
+  const cur = loadGame();
+  if (cur && !all[cur.state.gid]) all[cur.state.gid] = cur;
+  return all;
+}
+
+/** Les dernières parties jouées sur ce téléphone, la plus récente d'abord. */
+export function listGames() {
+  return Object.values(archive())
+    .filter(valid)
+    .sort((a, b) => b.savedAt - a.savedAt);
+}
+
+/** Fait d'une partie de l'historique la partie en cours (avec mon identité dedans). */
+export function selectGame(gid) {
+  const save = archive()[gid];
+  if (!valid(save)) return null;
+  write(SAVE_KEY, save);
+  const id = identities()[gid];
+  if (id) write(ID_KEY, id);
+  return save;
+}
+
+/** Retire une partie de l'historique (et de la partie en cours si c'est elle). */
+export function forgetGame(gid) {
+  const all = archive();
+  delete all[gid];
+  write(SAVES_KEY, all);
+  if (loadGame()?.state.gid === gid) {
+    try {
+      localStorage.removeItem(SAVE_KEY);
+    } catch {}
+  }
+  const ids = identities();
+  delete ids[gid];
+  write(IDS_KEY, ids);
+}
+
+function identities() {
+  const ids = read(IDS_KEY, {});
+  const cur = read(ID_KEY, null);
+  if (cur?.gid && !ids[cur.gid]) ids[cur.gid] = cur;
+  return ids;
+}
+
+export const loadIdentity = () => read(ID_KEY, null);
+
+/** Mon identité dans la partie en cours, gardée aussi pour la reprendre plus tard. */
+export function saveIdentity(id) {
+  const ids = identities(); // avant d'écraser l'identité en cours, pour la garder
+  ids[id.gid] = id;
+  write(IDS_KEY, ids);
+  write(ID_KEY, id);
 }
 
 /**

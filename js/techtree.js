@@ -2,7 +2,7 @@
 // chaque race (bâtiments, technologies, vaisseaux, pouvoirs), lu dans les
 // données du jeu.
 import { TECHS, SHIPS, SHIP_KEYS, techCost, researchDuration, shipUnlock } from './tech.js';
-import { RACES, RACE_KEYS, resIcon, POWERS, POWER_KEYS, upgradeCost, buildDuration } from './game.js';
+import { RACES, RACE_KEYS, resIcon, raceIcon, POWERS, POWER_KEYS, upgradeCost, buildDuration } from './game.js';
 
 const ROLES = { cargo: 'Cargo', fighter: 'Chasseur', heavy: 'Vaisseau lourd', colony: 'Colonisateur' };
 const BONUS = { minerals: 'minéraux', food: 'nourriture', energy: 'énergie', speed: 'vitesse', attack: 'attaque', hull: 'coque' };
@@ -36,7 +36,7 @@ const PAD = 8;
 function renderTabs() {
   $('tabs').innerHTML = RACE_KEYS.map((r) => {
     const R = RACES[r];
-    return `<button role="tab" data-race="${r}" aria-selected="${r === race}" style="--c:${R.color}"><span>${R.icon}</span>${esc(R.name)}</button>`;
+    return `<button role="tab" data-race="${r}" aria-selected="${r === race}" style="--c:${R.color}">${raceIcon(r)}${esc(R.name)}</button>`;
   }).join('');
 }
 
@@ -244,7 +244,7 @@ function renderPanel() {
   const R = RACES[race];
   if (!selected) {
     $('panel').innerHTML = `
-      <div class="kind">${R.icon} ${esc(R.name)}</div>
+      <div class="kind">${raceIcon(race)} ${esc(R.name)}</div>
       <h3>Choisis une bulle</h3>
       <p>À gauche les bâtiments (coins carrés), puis les technologies, les vaisseaux (en pointillés)${race === 'alien' ? ' et les pouvoirs (arrondis)' : ''}. Chaque flèche part de ce qu’il faut avoir avant.</p>
       <p>La recherche demande d’abord un labo sur la planète mère : ${esc(R.buildings.lab.name)}. « ${esc(R.buildings.lab.short)} 2 » veut dire qu’il doit être au niveau 2.</p>`;

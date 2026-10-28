@@ -1,15 +1,39 @@
 import { Session } from './session.js';
-import { loadGame, describeSave } from './save.js';
+import { loadGame, listGames, selectGame, forgetGame, describeSave } from './save.js';
 import { inviteLink, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
 import {
-  RACES, RACE_KEYS, RES_INFO, resIcon, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
+  RACES, RACE_KEYS, RES_INFO, resIcon, raceIcon, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
   powerReadyAt, powerCost, liftGain, fmt, UNIVERSE, SOIL, sameCell, sunFor, climateName, kindLabel, usedPlaces,
 } from './game.js';
 import { drawSun } from './sky.js';
+import { ic, fillIcons } from './icons.js';
+import { startGalaxy } from './galaxy.js';
 import { TECHS, SHIPS, SHIP_KEYS, techCost, techMissing, researchDuration, shipUnlock, shipUnlocked, shipStats, shipDuration } from './tech.js';
 import { TRADE_RES, TRADE_NAMES } from './trade.js';
 import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fuelAt, moving } from './fleet.js';
+
+fillIcons(); // les icônes du HTML statique, avant tout le reste
+startGalaxy();
+
+// Haut de l'écran de la planète : nom, gisements et stocks se collent sous la
+// barre au même endroit, le suivant recouvrant le précédent ; les onglets se
+// collent sous les stocks. À la fin, on voit toujours les stocks et les onglets.
+const [BAR, ...STICKY] = ['.topbar', '.planet-head', '#soil-zone', '#resources'].map((q) => document.querySelector(q));
+const TABS = document.querySelector('.tabs');
+function stackSticky() {
+  const top = BAR.offsetHeight;
+  for (const el of STICKY) el.style.top = `calc(${top}px + env(safe-area-inset-top, 0px))`;
+  TABS.style.top = `calc(${top + STICKY[STICKY.length - 1].offsetHeight}px + env(safe-area-inset-top, 0px))`;
+  const edge = BAR.getBoundingClientRect().bottom + 1;
+  // Un bloc arrivé en haut cache tous ceux d'avant (sinon les plus grands dépasseraient dessous).
+  const stuck = STICKY.filter((el) => el.offsetHeight && el.getBoundingClientRect().top <= edge);
+  const last = stuck[stuck.length - 1];
+  for (const el of STICKY) el.classList.toggle('sticky-covered', stuck.includes(el) && el !== last);
+}
+const stack = new ResizeObserver(stackSticky);
+for (const el of [BAR, ...STICKY, TABS]) stack.observe(el);
+addEventListener('scroll', stackSticky, { passive: true });
 
 const DRY = 1e-6; // en dessous, un réservoir est vide
 
@@ -118,50 +142,58 @@ for (const el of document.querySelectorAll('[data-go]')) {
   };
 }
 
-// Partie sauvegardée sur ce téléphone : la reprendre, ou en créer une autre.
-let confirmNew = false;
-function showSaved() {
-  const saved = loadGame();
-  $('saved').hidden = !saved;
-  $('btn-create').textContent = saved ? 'Nouvelle partie' : 'Créer une partie';
-  $('btn-create').className = saved ? 'secondary' : 'primary';
-  $('new-warning').hidden = true;
-  confirmNew = false;
-  if (!saved) return;
-  const d = describeSave(saved);
-  $('saved-names').textContent = d.names.join(', ');
-  const when = new Date(d.savedAt);
-  const sameDay = when.toDateString() === new Date().toDateString();
+// Historique des parties de ce téléphone : en reprendre une, la revoir, l'oublier.
+function whenText(at) {
+  const when = new Date(at);
   const time = when.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-  $('saved-when').textContent = `Tu y joues sous le nom ${d.me || '?'} · dernière activité ${
-    sameDay ? `aujourd'hui à ${time}` : `le ${when.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} à ${time}`
-  }.`;
+  if (when.toDateString() === new Date().toDateString()) return time;
+  return `${when.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} ${time}`;
 }
 
-$('btn-resume').onclick = () => {
-  const saved = loadGame();
+function showSaved() {
+  const games = listGames();
+  $('saved').hidden = !games.length;
+  $('btn-create').className = games.length ? 'secondary' : 'primary';
+  $('games').innerHTML = games
+    .map((g) => {
+      const d = describeSave(g);
+      const gid = esc(g.state.gid);
+      return `<li class="game-row card">
+        <div class="g-main">
+          <span class="g-names">${d.names.map((n) => (n === d.me ? `<strong>${esc(n)}</strong>` : esc(n))).join(' · ')}</span>
+          <span class="g-when mono">${whenText(d.savedAt)}</span>
+        </div>
+        <button class="primary icon-only" data-resume="${gid}" title="Reprendre" aria-label="Reprendre la partie">${ic('play')}</button>
+        <button class="secondary icon-only" data-replay="${gid}" title="Revoir" aria-label="Revoir la partie">${ic('replay')}</button>
+        <button class="ghost icon-only" data-forget="${gid}" title="Oublier" aria-label="Oublier la partie">${ic('close')}</button>
+      </li>`;
+    })
+    .join('');
+}
+
+$('games').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-resume], [data-replay], [data-forget]');
+  if (!btn) return;
+  const { resume, replay, forget } = btn.dataset;
+  if (forget) {
+    forgetGame(forget);
+    return showSaved();
+  }
+  const saved = selectGame(resume || replay);
   if (!saved) return showSaved();
+  if (replay) return (location.href = 'replay.html');
   session = Session.resume(saved);
   session.ontoast = toast;
   session.onchange = onSessionChange;
   startGame();
-  toast('Partie reprise. Les autres te retrouveront dès qu’ils ouvriront l’appli.');
-};
-
-$('btn-replay').onclick = () => {
-  location.href = 'replay.html';
-};
+  toast('Partie reprise.');
+});
 
 window.addEventListener('pagehide', () => session?.save?.());
 
 $('btn-create').onclick = async () => {
   const name = playerName();
   if (!name) return;
-  if (loadGame() && !confirmNew) {
-    confirmNew = true;
-    $('new-warning').hidden = false;
-    return;
-  }
   session = await Session.create(name);
   session.ontoast = toast;
   session.onchange = onSessionChange;
@@ -283,7 +315,16 @@ function closeInviteSheet() {
   $('sheet-invite').hidden = true;
 }
 
-$('btn-invite').onclick = openInviteSheet;
+// Fenêtre des joueurs : qui est en ligne, le classement, et inviter.
+$('net').onclick = () => {
+  $('sheet-players').hidden = false;
+  renderLive();
+};
+$('btn-players-close').onclick = () => ($('sheet-players').hidden = true);
+$('btn-invite').onclick = () => {
+  $('sheet-players').hidden = true;
+  openInviteSheet();
+};
 $('btn-invite-close').onclick = () => {
   session.cancelInvite();
   closeInviteSheet();
@@ -342,36 +383,39 @@ $('btn-answer-ok').onclick = () => useAnswer($('answer-input').value);
 let pickedRace = null;
 
 function showRace() {
-  pickedRace = null;
-  $('races').innerHTML = RACE_KEYS.map((k) => {
-    const R = RACES[k];
-    const res = R.resources.map((r) => `<span class="chip ${r}">${resIcon(r)}${RES_INFO[r].name}</span>`).join('');
-    return `<button class="race card" role="radio" aria-checked="false" data-race="${k}" style="--race:${R.color}">
-      <span class="race-top"><span class="race-icon" aria-hidden="true">${R.icon}</span><span class="race-name">${R.name}</span></span>
-      <span class="race-pitch">${esc(R.pitch)}</span>
-      <ul class="race-traits">${R.traits.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
-      <span class="chips">${res}${R.pop ? `<span class="chip pop">${resIcon('pop', R.pop.label)}${R.pop.label}</span>` : '<span class="chip none">Sans population</span>'}</span>
-    </button>`;
-  }).join('');
+  pickedRace = RACE_KEYS[0];
+  $('races').innerHTML = RACE_KEYS.map(
+    (k) => `<button class="race" role="radio" aria-checked="false" data-race="${k}" style="--race:${RACES[k].color}">
+      ${raceIcon(k)}<span class="race-name">${RACES[k].name}</span>
+    </button>`,
+  ).join('');
   updateRacePick();
   renderRaceOthers();
   show('race');
 }
 
+/** La race choisie est cochée, et seule sa fiche s'affiche. */
 function updateRacePick() {
   for (const el of document.querySelectorAll('[data-race]')) el.setAttribute('aria-checked', String(el.dataset.race === pickedRace));
-  const btn = $('btn-race');
-  btn.disabled = !pickedRace;
-  btn.textContent = pickedRace ? `Jouer les ${RACES[pickedRace].name} (définitif)` : 'Choisis une race';
+  const R = RACES[pickedRace];
+  const res = R.resources.map((r) => `<span class="chip ${r}">${resIcon(r)}${RES_INFO[r].name}</span>`).join('');
+  $('race-detail').style.setProperty('--race', R.color);
+  $('race-detail').innerHTML = `<p class="race-pitch">${esc(R.pitch)}</p>
+    <ul class="race-traits">${R.traits.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+    <span class="chips">${res}${R.pop ? `<span class="chip pop">${resIcon('pop', R.pop.label)}${R.pop.label}</span>` : '<span class="chip none">Sans population</span>'}</span>`;
+  // Le premier arrivé ouvre la partie ; les suivants la rejoignent.
+  const players = Object.values(session?.state?.players || {});
+  const first = !players.some((p) => p.id !== session.me && p.rank < session.state.players[session.me]?.rank);
+  $('btn-race').innerHTML = first ? `${ic('play')}Commencer la partie` : `${ic('join')}Rejoindre la partie`;
 }
 
 /** Ce qu'ont choisi les autres, pour se décider. */
 function renderRaceOthers() {
   if (!session?.state) return;
   const others = Object.values(session.state.players).filter((p) => p.id !== session.me);
-  $('race-others').textContent = others.length
-    ? 'Dans la partie : ' + others.map((p) => `${p.name} (${p.race ? RACES[p.race].name : 'en train de choisir'})`).join(', ') + '.'
-    : '';
+  $('race-others').innerHTML = others
+    .map((p) => `<span class="other">${p.race ? raceIcon(p.race) : ''}${esc(p.name)}</span>`)
+    .join('');
 }
 
 $('races').addEventListener('click', (e) => {
@@ -446,8 +490,9 @@ function buildStatic() {
       ([k, b]) => `<article class="building card" data-card="${k}">
       ${cardHead(b.name, `data-level="${k}"`)}
       <p class="cost mono" data-cost="${k}"></p>
-      <button class="secondary small" data-build="${k}">Améliorer</button>
+      <button class="secondary small" data-build="${k}">${ic('up')}</button>
       <p class="b-desc">${esc(b.desc)}</p>
+      <div class="card-bar" hidden><div class="bar-fill"></div></div>
     </article>`,
     )
     .join('');
@@ -457,8 +502,9 @@ function buildStatic() {
       ([k, t]) => `<article class="building card" data-tcard="${k}">
       ${cardHead(t.name, `data-tlevel="${k}"`)}
       <p class="cost mono"><span data-tcost="${k}"></span> <span class="req" data-treq="${k}" hidden></span></p>
-      <button class="secondary small" data-research="${k}">Rechercher</button>
+      <button class="secondary small" data-research="${k}">${ic('up')}</button>
       <p class="b-desc">${esc(t.desc)}</p>
+      <div class="card-bar" hidden><div class="bar-fill"></div></div>
     </article>`,
     )
     .join('');
@@ -473,17 +519,21 @@ function buildStatic() {
         <button class="secondary small" data-ship="${k}" data-n="5" aria-label="Construire 5 ${esc(S.name)}">×5</button>
       </div>
       <p class="ship-stats b-desc" data-sstats="${k}"></p>
+      <div class="card-bar" hidden><div class="bar-fill"></div></div>
     </article>`;
   }).join('');
 
   $('powers-zone').hidden = race !== 'alien';
+  // Les pouvoirs ont leur onglet, chez les aliens seulement.
+  $('tab-power').hidden = race !== 'alien';
+  if (race !== 'alien' && $('view-planet').dataset.tab === 'power') showTab('build');
   $('powers').innerHTML =
     race === 'alien'
       ? POWER_KEYS.map(
           (k) => `<article class="building power card" data-pcard="${k}">
         ${cardHead(POWERS[k].name, `data-pready="${k}"`)}
         <p class="cost mono" data-pcost="${k}"></p>
-        <button class="secondary small" data-power="${k}">Déclencher</button>
+        <button class="secondary small" data-power="${k}">${ic('play')}</button>
         <p class="b-desc">${esc(POWERS[k].desc)}</p>
       </article>`,
         ).join('')
@@ -506,16 +556,21 @@ document.addEventListener('click', (e) => {
 });
 
 /** Tuiles des gisements (minéraux et nourriture du sol), remplies par fillSoil. */
+// Dans le sol, la nourriture n'est encore que de la biomasse : elle ne devient
+// « nourriture » qu'une fois récoltée, dans les stocks du joueur.
+const SOIL_NAMES = { food: 'Biomasse' };
+
 function soilTiles(prefix) {
-  return SOIL.map(
-    (r) => `<div class="tile ${r}" data-${prefix}-tile="${r}">${prefix === 'soil' ? spark(`soil-${r}`) : ''}
-      <span class="label">${resIcon(r)}${RES_INFO[r].name}</span>
+  return SOIL.map((r) => {
+    const name = SOIL_NAMES[r] || RES_INFO[r].name;
+    return `<div class="tile ${r}" data-${prefix}-tile="${r}">${prefix === 'soil' ? spark(`soil-${r}`) : ''}
+      <span class="label">${resIcon(r, name)}${name}</span>
       <span class="amount mono" data-${prefix}-amount="${r}"></span>
       <span class="rate mono" data-${prefix}-rate="${r}"></span>
       <span class="rate mono" data-${prefix}-detail="${r}"></span>
       <div class="gauge"><div class="gauge-fill" data-${prefix}-gauge="${r}"></div></div>
-    </div>`,
-  ).join('');
+    </div>`;
+  }).join('');
 }
 
 /**
@@ -651,18 +706,20 @@ function costText(cost) {
 }
 
 /** « Chaud · ×1,2 ⚡ · ×1,1 ◆ · ×0,9 🍃 » : le climat et son effet sur la production, en HTML. */
-function climateHtml(c) {
+function climateHtml(c, short = false) {
   const x = (v) => `×${v.toFixed(2).replace('.', ',')}`;
   const cls = c.heat >= 0.6 ? 'hot' : c.heat < 0.4 ? 'cold' : 'mild';
-  return `<span class="climate-name ${cls}">${climateName(c.heat)}</span> · production ${['energy', 'minerals', 'food']
-    .map((r) => `<span class="qty">${x(c[r])}${resIcon(r)}</span>`)
-    .join(' · ')}`;
+  const qty = ['energy', 'minerals', 'food'].map((r) => `<span class="qty">${x(c[r])}${resIcon(r)}</span>`);
+  // Version courte (à côté du nom de la planète) : sans mots ni séparateurs.
+  return short
+    ? `<span class="climate-name ${cls}">${climateName(c.heat)}</span> ${qty.join(' ')}`
+    : `<span class="climate-name ${cls}">${climateName(c.heat)}</span> · production ${qty.join(' · ')}`;
 }
 
 /** Ligne du climat dans `el` (cachée pour une planète d'avant le climat). */
-function showClimate(el, climate) {
+function showClimate(el, climate, short = false) {
   el.hidden = !climate;
-  if (climate) setHtml(el, climateHtml(climate));
+  if (climate) setHtml(el, climateHtml(climate, short));
 }
 
 /** innerHTML, réécrit seulement s'il a changé (ces lignes sont rafraîchies à chaque tic). */
@@ -700,7 +757,8 @@ function renderState() {
     $('me-name').textContent = me.name;
     $('me-dot').style.background = me.color;
   }
-  $('me-role').textContent = me?.race ? `${RACES[me.race].icon} ${RACES[me.race].name}` : 'Commandant';
+  $('me-role').innerHTML = me?.race ? `${raceIcon(me.race)} ${RACES[me.race].name}` : 'Commandant';
+  $('me-role').style.setProperty('--race', me?.race ? RACES[me.race].color : '');
   $('lost').hidden = !session.alone;
 
 
@@ -711,7 +769,7 @@ function renderState() {
         <span class="dot" style="background:${esc(p.color)}"></span>
         <div class="p-main">
           <div class="p-name">${esc(p.name)}${p.id === session.me ? ' <span class="you">toi</span>' : ''}${
-            p.race ? ` <span class="tag race-tag" style="--race:${RACES[p.race].color}">${RACES[p.race].icon} ${RACES[p.race].name}</span>` : ''
+            p.race ? ` <span class="tag race-tag" style="--race:${RACES[p.race].color}">${raceIcon(p.race)} ${RACES[p.race].name}</span>` : ''
           }</div>
           <div class="p-sub mono" data-psub="${esc(p.id)}"></div>
         </div>
@@ -754,10 +812,12 @@ function renderLive() {
     const online = session.peerCount;
     const rtts = [...session.links.values()].map((l) => l.rtt).filter((v) => v != null);
     const worst = rtts.length ? Math.max(...rtts) : null;
-    $('net').textContent = online
-      ? `${online} joueur${online > 1 ? 's' : ''} en ligne${worst != null ? ` · ${worst} ms` : ''}`
-      : 'seul en ligne';
-    $('net').className = 'net' + (worst != null && worst > 250 ? ' slow' : '');
+    $('net-count').textContent = online + 1; // moi compris
+    $('net').classList.toggle('slow', worst != null && worst > 250);
+    $('net-detail').textContent = online
+      ? `${online + 1} joueurs en ligne${worst != null ? ` · ${worst} ms` : ''}`
+      : 'Seul en ligne';
+    $('net-detail').className = 'net' + (worst != null && worst > 250 ? ' slow' : '');
   }
 
   if (me?.planet) {
@@ -798,7 +858,10 @@ function renderLive() {
     ];
     const stock = `<span class="qty">${fmt(s.stock.minerals)}${resIcon('minerals')}</span>`;
     setHtml(sub, [stock, people, ...[doing, ...space, net].filter(Boolean).map(esc)].filter(Boolean).join(' · '));
-    scoreEl.textContent = `${fmt(score(p.race, s.levels))} pts`;
+    const pts = score(p.race, s.levels);
+    scoreEl.textContent = `${fmt(pts)} pts`;
+    // Classement : le meilleur score en haut (ordre d'affichage, sans redessiner la liste).
+    scoreEl.closest('.player').style.order = String(-Math.round(pts));
   }
 }
 
@@ -820,7 +883,7 @@ function renderPlanet(me, now) {
 
   $('planet-title').textContent = openKey === 'home' ? pl.name : `${pl.name} · colonie`;
   $('soil-zone').hidden = !planet.nature;
-  showClimate($('soil-climate'), planet.climate);
+  showClimate($('soil-climate'), planet.climate, true);
   if (planet.nature) fillSoil('soil', planet.nature, s.reserve, f.soil);
 
   for (const r of R.resources) {
@@ -892,20 +955,13 @@ function renderPlanet(me, now) {
     card.classList.toggle('building-now', s.queue?.key === k);
     const btn = q(`[data-build="${k}"]`);
     btn.disabled = !!s.queue || !ok || session.status !== 'playing';
-    btn.textContent = s.queue?.key === k ? '…' : `▲ ${level + 1}`;
+    const job = s.queue?.key === k ? s.queue : null;
+    cardProgress(card, job, now);
+    setHtml(btn, job ? `${ic('wait')}${clock(Math.max(0, job.end - now))}` : `${ic('up')}${level + 1}`);
     btn.title =
       s.queue?.key === k ? 'En chantier' : full ? 'Plus de place sur cette planète' : !covers(s.stock, cost) ? 'Ressources insuffisantes' : `Passer au niveau ${level + 1}`;
     btn.setAttribute('aria-label', `${R.buildings[k].name} : ${btn.title.toLowerCase()}`);
   }
-
-  if (s.queue) {
-    const total = s.queue.end - s.queue.start;
-    const left = Math.max(0, s.queue.end - now);
-    $('queue').hidden = false;
-    $('queue-label').textContent = `${R.buildings[s.queue.key].name} → niv. ${s.queue.level}`;
-    $('queue-left').textContent = `${Math.ceil(left / 1000)} s`;
-    $('queue-bar').style.width = `${Math.min(100, (1 - left / total) * 100)}%`;
-  } else $('queue').hidden = true;
 
   if (me.race === 'alien') {
     const trance = Math.max(0, (planet.trance || 0) - now);
@@ -919,7 +975,7 @@ function renderPlanet(me, now) {
       q(`[data-pcard="${k}"]`).classList.toggle('affordable', ok && !wait && !idle);
       const btn = q(`[data-power="${k}"]`);
       btn.disabled = !!wait || !ok || idle || session.status !== 'playing';
-      btn.textContent = wait ? '…' : idle ? '∅' : '▶';
+      setHtml(btn, ic(wait ? 'wait' : idle ? 'none' : 'play'));
       btn.title = wait ? 'En recharge' : idle ? 'Rien à arracher' : 'Déclencher';
       btn.setAttribute('aria-label', `${POWERS[k].name} : ${btn.title.toLowerCase()}`);
     }
@@ -931,14 +987,13 @@ function renderPlanet(me, now) {
   renderPartners($('planet-partners'), { planet: pl.key });
 }
 
-/** Barre de progression d'une file (chantier, recherche, chantier naval). */
-function progress(prefix, job, label, now) {
-  $(`${prefix}-queue`).hidden = !job;
+/** Chantier, recherche ou vaisseaux en cours : la barre de progression s'affiche sur la carte concernée. */
+function cardProgress(card, job, now) {
+  const bar = card.querySelector('.card-bar');
+  bar.hidden = !job;
   if (!job) return;
   const left = Math.max(0, job.end - now);
-  $(`${prefix}-label`).textContent = label;
-  $(`${prefix}-left`).textContent = clock(left);
-  $(`${prefix}-bar`).style.width = `${Math.min(100, (1 - left / Math.max(1, job.end - job.start)) * 100)}%`;
+  bar.firstElementChild.style.width = `${Math.min(100, (1 - left / Math.max(1, job.end - job.start)) * 100)}%`;
 }
 
 /** Arbre des technologies : sur la planète mère seulement, avec un labo. */
@@ -955,7 +1010,6 @@ function renderResearch(me, pl, s, now) {
   const labName = RACES[me.race].buildings.lab.name;
   $('research-hint').textContent = lab ? '' : `🔒 Il faut un ${labName}.`;
   $('research-hint').hidden = !!lab;
-  progress('research', s.research, s.research ? `${T[s.research.key].name} → niv. ${s.research.level}` : '', now);
   const q = (sel) => document.querySelector(sel);
   for (const [k, t] of Object.entries(T)) {
     const level = s.tech[k] || 0;
@@ -973,7 +1027,9 @@ function renderResearch(me, pl, s, now) {
     q(`[data-tcard="${k}"]`).classList.toggle('building-now', s.research?.key === k);
     const btn = q(`[data-research="${k}"]`);
     btn.disabled = !ok || !!s.research || session.status !== 'playing';
-    btn.textContent = s.research?.key === k ? '…' : maxed ? '✓' : `▲ ${level + 1}`;
+    const job = s.research?.key === k ? s.research : null;
+    cardProgress(q(`[data-tcard="${k}"]`), job, now);
+    setHtml(btn, job ? `${ic('wait')}${clock(Math.max(0, job.end - now))}` : maxed ? ic('done') : `${ic('up')}${level + 1}`);
     btn.title = s.research?.key === k ? 'En cours' : maxed ? 'Terminé' : miss ? `Il faut : ${miss}` : !ok ? 'Ressources insuffisantes' : `Rechercher le niveau ${level + 1}`;
     btn.setAttribute('aria-label', `${t.name} : ${btn.title.toLowerCase()}`);
   }
@@ -990,12 +1046,16 @@ function renderYard(me, pl, s, now) {
   const yardName = RACES[me.race].buildings.yard.name;
   $('yard-hint').textContent = yard ? '' : `🔒 Il faut un ${yardName}.`;
   $('yard-hint').hidden = !!yard;
-  progress('yard', s.yard, s.yard ? `${s.yard.count} × ${S[s.yard.type].name}` : '', now);
   const q = (sel) => document.querySelector(sel);
   for (const k of SHIP_KEYS) {
     const unlocked = shipUnlocked(me.race, k, s.tech);
     const u = shipUnlock(me.race, k);
-    q(`[data-sdocked="${k}"]`).textContent = s.ships[k] ? `${s.ships[k]} à quai` : '';
+    const job = s.yard?.type === k ? s.yard : null;
+    cardProgress(q(`[data-scard="${k}"]`), job, now);
+    q(`[data-sdocked="${k}"]`).textContent = [
+      s.ships[k] ? `${s.ships[k]} à quai` : '',
+      job ? `+${job.count} · ${clock(Math.max(0, job.end - now))}` : '',
+    ].filter(Boolean).join(' · ');
     q(`[data-sstats="${k}"]`).title = 'Attaque · coque · soute · vitesse en cases par minute';
     q(`[data-sstats="${k}"]`).textContent = statText(shipStats(me.race, k, s.tech));
     const req = q(`[data-sreq="${k}"]`);
@@ -1159,9 +1219,10 @@ function showView(view, key = openKey) {
   openKey = key;
   $('view-universe').hidden = view !== 'map';
   $('view-planet').hidden = view !== 'planet';
+  // Pas de barre du haut : le compteur de joueurs se range à droite de la première ligne de l'écran.
+  (view === 'map' ? document.querySelector('.map-head .pi-head-right') : document.querySelector('.planet-head')).append($('net'));
   window.scrollTo(0, 0);
   if (view === 'map') {
-    $('map-size').textContent = `${UNIVERSE.w} × ${UNIVERSE.h}`;
     if (!mapFrame) mapFrame = requestAnimationFrame(drawMap);
   } else stopMap();
   if (session?.state) renderLive(); // pas d'image de l'écran précédent pendant 200 ms
@@ -1174,7 +1235,7 @@ function stopMap() {
 
 $('btn-back-map').onclick = () => showView('map');
 
-/** Onglet de l'écran planète : bâtiments, recherche ou flottes. */
+/** Onglet de l'écran planète : bâtiments, pouvoirs (aliens), recherche ou flottes. */
 /** Onglet choisi par le joueur (une colonie sans recherche peut en afficher un autre un moment). */
 let chosenTab = 'build';
 function showTab(tab, persist = true) {
@@ -1201,7 +1262,7 @@ document.querySelector('.tabs').addEventListener('keydown', (e) => {
 });
 try {
   const saved = localStorage.getItem('astra.tab');
-  if (['build', 'research', 'fleet'].includes(saved)) showTab(saved);
+  if (['build', 'power', 'research', 'fleet'].includes(saved)) showTab(saved);
 } catch {}
 // Aide de la carte : une bulle au survol ; au doigt (pas de survol), un toucher l'ouvre ou la ferme.
 $('btn-map-help').onclick = (e) => {
@@ -1301,20 +1362,20 @@ function drawMap() {
   ctx.fillStyle = '#05070f';
   ctx.fillRect(0, 0, W, W);
 
-  // Étoiles et quadrillage
+  // Étoiles et quadrillage : du décor, très discret, pour que seuls les objets qu'on peut toucher ressortent.
   for (let y = 0; y < UNIVERSE.h; y++) {
     for (let x = 0; x < UNIVERSE.w; x++) {
       const n = noise(x, y);
       if (n > 0.72) {
-        ctx.fillStyle = `rgba(220,230,255,${0.15 + (n - 0.72) * 2})`;
-        const r = Math.max(0.6, cell * 0.04 * (n * 2));
+        ctx.fillStyle = `rgba(220,230,255,${0.05 + (n - 0.72) * 0.6})`;
+        const r = Math.max(0.5, cell * 0.025 * (n * 2));
         ctx.beginPath();
         ctx.arc((x + noise(y, x)) * cell, (y + noise(x + 7, y + 3)) * cell, r, 0, Math.PI * 2);
         ctx.fill();
       }
     }
   }
-  ctx.strokeStyle = 'rgba(150,170,230,0.10)';
+  ctx.strokeStyle = 'rgba(150,170,230,0.05)';
   ctx.lineWidth = Math.max(1, dpr * 0.5);
   ctx.beginPath();
   for (let i = 1; i < UNIVERSE.w; i++) {
@@ -1614,7 +1675,7 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
   const warn = choice[0]?.short ? ' · panne en route' : '';
   const foe = prey && session.state.players[prey.pid];
   const html = foe
-    ? `<button class="primary small" data-fchase>Poursuivre et attaquer la flotte ${esc(de(foe.name))}</button>`
+    ? `<button class="primary small" data-fchase>${ic('attack')}Attaquer · ${esc(foe.name)}</button>`
     : choice
         .map((o) => `<button class="${o.kind === 'move' ? 'secondary' : 'primary'} small" data-forder="${o.kind}">${esc(o.label + warn)}</button>`)
         .join('');
@@ -1666,10 +1727,10 @@ function tradeText(a) {
 function renderPartners(box, fromRef) {
   const list = fromRef ? session.tradePartners(fromRef) : [];
   const html = list.length
-    ? `<p class="hint">Autres joueurs ici :</p>${list
+    ? `<p class="hint">Ici :</p>${list
         .map(
           (x) => `<div class="row"><span>${esc(x.name)}</span>
-            <button class="secondary small" data-trade='${esc(JSON.stringify({ from: fromRef, pid: x.pid, ref: x.ref, name: x.name }))}'>Proposer un échange…</button></div>`,
+            <button class="secondary small" data-trade='${esc(JSON.stringify({ from: fromRef, pid: x.pid, ref: x.ref, name: x.name }))}' title="Proposer un échange" aria-label="Proposer un échange à ${esc(x.name)}">${ic('trade')}</button></div>`,
         )
         .join('')}`
     : '';
@@ -1717,8 +1778,8 @@ function renderTrades(me, now) {
   if (!me) return;
   const incoming = session.incomingOffers().map(
     ({ from, offer }) => `<div class="card trade"><p><strong>${esc(from.name)}</strong> te propose : il donne ${esc(tradeText(offer.give))}, il demande ${esc(tradeText(offer.want))}. <span class="mono" data-left="${Number(offer.expires) || 0}"></span></p>
-      <div class="fi-actions"><button class="primary small" data-accept="${esc(from.id)}:${esc(offer.id)}">Accepter</button>
-      <button class="secondary small" data-refuse="${esc(from.id)}:${esc(offer.id)}">Refuser</button></div></div>`,
+      <div class="fi-actions"><button class="primary small" data-accept="${esc(from.id)}:${esc(offer.id)}" title="Accepter" aria-label="Accepter">${ic('check')}</button>
+      <button class="secondary small" data-refuse="${esc(from.id)}:${esc(offer.id)}" title="Refuser" aria-label="Refuser">${ic('close')}</button></div></div>`,
   );
   const mine = (me.offers || []).map((o) => {
     const to = session.state.players[o.to.pid];
@@ -1751,12 +1812,12 @@ function renderBeside(me, f, now) {
   const html = others
     .map(
       (g) => `<div class="row"><span>${esc(fleetName(g))} · ${countShips(g.ships)} vaisseau${countShips(g.ships) > 1 ? 'x' : ''} · ${esc(fuelText(me.race, g, now))}</span>
-        <button class="secondary small" data-give="${esc(g.id)}">Donner…</button>
-        <button class="secondary small" data-merge="${esc(g.id)}">Fusionner ici</button></div>`,
+        <button class="secondary small" data-give="${esc(g.id)}" title="Donner" aria-label="Donner">${ic('give')}</button>
+        <button class="secondary small" data-merge="${esc(g.id)}" title="Fusionner ici" aria-label="Fusionner ici">${ic('merge')}</button></div>`,
     )
     .join('');
   $('fi-beside').hidden = !others.length;
-  const full = others.length ? `<p class="hint">Sur la même case :</p>${html}` : '';
+  const full = others.length ? `<p class="hint">Ici :</p>${html}` : '';
   if ($('fi-beside').dataset.html !== full) {
     $('fi-beside').innerHTML = full;
     $('fi-beside').dataset.html = full;
@@ -1794,7 +1855,7 @@ function openMoveSheet(kind, to = null) {
     SOIL.map(
       (r) => `<label>${RES_INFO[r].name} (${fmt(f.cargo?.[r] || 0)})<input type="number" inputmode="numeric" min="0" max="${f.cargo?.[r] || 0}" value="0" data-mcargo="${r}"></label>`,
     ).join('') + `<label>Carburant (${fuel})<input type="number" inputmode="numeric" min="0" max="${fuel}" value="0" data-mfuel></label>`;
-  $('btn-move-go').textContent = kind === 'give' ? 'Donner' : 'Scinder';
+  $('btn-move-go').innerHTML = kind === 'give' ? ic('give') + 'Donner' : ic('split') + 'Scinder';
   $('sheet-move').hidden = false;
 }
 
@@ -1823,7 +1884,7 @@ function renderPick(me = session?.state?.players[session.me], now = session?.now
   $('pi-name').textContent = w.name;
   $('pi-where').textContent = `[${w.x}:${w.y}]`;
   $('pi-owner').textContent = o
-    ? `${o.id === session.me ? `${w.kind === 'asteroid' ? 'Ton' : 'Ta'} ${kindLabel(w.kind).toLowerCase()}` : `${kindLabel(w.kind)} ${de(o.name)}`}${o.race ? ` · ${RACES[o.race].icon} ${RACES[o.race].name}` : ''}`
+    ? `${o.id === session.me ? `${w.kind === 'asteroid' ? 'Ton' : 'Ta'} ${kindLabel(w.kind).toLowerCase()}` : `${kindLabel(w.kind)} ${de(o.name)}`}${o.race ? ` · ${RACES[o.race].name}` : ''}`
     : `${kindLabel(w.kind)} libre. Ses gisements se vident quand on les exploite, et se reconstituent d’eux-mêmes jusqu’à leur maximum.`;
   // Gisements : pleins pour une planète libre, calculés chez son propriétaire sinon.
   const planet = w.pl?.planet;
@@ -1846,7 +1907,7 @@ function renderPick(me = session?.state?.players[session.me], now = session?.now
     fillSoil('pi', nature, s ? s.reserve : w.reserve, s ? s.prod.soil : null);
   }
   $('btn-claim').hidden = !picking || !!o || (w.kind && w.kind !== 'planet');
-  $('btn-claim').textContent = `S'installer sur ${w.name} (définitif)`;
+  $('btn-claim').innerHTML = `${ic('dock')}S'installer · ${esc(w.name)}`;
   $('btn-open-planet').hidden = o?.id !== session.me || !w.pl;
   $('btn-open-planet').dataset.key = w.pl?.key || 'home';
 }

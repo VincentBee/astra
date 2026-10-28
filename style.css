@@ -16,7 +16,7 @@
   --ok: #7cf0b4;
   --warn: #ffb36b;
   --danger: #ff6b7a;
-  --radius: 14px;
+  --radius: 0;
   --mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', Menlo, monospace;
   --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   color-scheme: dark;
@@ -29,11 +29,7 @@ html, body { margin: 0; min-height: 100%; }
 body {
   font: 16px/1.45 var(--sans);
   color: var(--text);
-  background:
-    radial-gradient(900px 500px at 85% -10%, rgba(122, 162, 255, 0.16), transparent 60%),
-    radial-gradient(700px 420px at -10% 110%, rgba(124, 240, 180, 0.07), transparent 60%),
-    var(--bg);
-  background-attachment: fixed;
+  background: var(--bg);
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
   -webkit-tap-highlight-color: transparent;
@@ -55,7 +51,7 @@ h1, h2, h3, h4 { margin: 0; text-wrap: balance; }
 button {
   font: inherit;
   font-weight: 600;
-  border-radius: 12px;
+  border-radius: 0;
   border: 1px solid transparent;
   min-height: 48px;
   padding: 0 18px;
@@ -82,7 +78,7 @@ input, textarea, select {
   color: var(--text);
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 0;
   padding: 12px 14px;
 }
 input { font-size: 1.1rem; }
@@ -108,13 +104,10 @@ details > button { width: 100%; }
 .home { display: grid; gap: 22px; padding-top: 10vh; }
 .hero h1 {
   font-size: clamp(3rem, 16vw, 4.6rem);
-  font-weight: 800;
-  letter-spacing: 0.16em;
+  font-weight: 300;
+  letter-spacing: 0.3em;
   text-transform: uppercase;
-  background: linear-gradient(180deg, #fff, #9db8ff);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--text);
   line-height: 1;
 }
 .hero p { color: var(--muted); margin: 10px 0 0; }
@@ -137,7 +130,7 @@ details > button { width: 100%; }
   place-items: center;
   width: 26px;
   height: 26px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--accent);
   color: var(--accent-ink);
   font-size: 0.85rem;
@@ -145,7 +138,7 @@ details > button { width: 100%; }
 }
 .qr-box {
   background: #fff;
-  border-radius: var(--radius);
+  border-radius: 0;
   padding: 10px;
   display: grid;
   place-items: center;
@@ -175,7 +168,7 @@ details > button { width: 100%; }
 .top-right { display: flex; align-items: center; gap: 10px; flex: none; }
 /* Bouton rond avec une icône : inviter un joueur, à tout moment. */
 button.icon-btn {
-  width: 40px; min-height: 40px; padding: 0; border-radius: 50%;
+  width: 40px; min-height: 40px; padding: 0; border-radius: 0;
   display: grid; place-items: center;
   background: var(--panel-2); border-color: var(--line); color: var(--accent);
 }
@@ -183,7 +176,7 @@ button.icon-btn {
 button.close-btn { color: var(--muted); background: transparent; }
 button.close-btn svg { width: 18px; height: 18px; }
 .net.slow { color: var(--warn); }
-.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--muted); }
+.dot { width: 10px; height: 10px; border-radius: 0; flex: none; background: var(--muted); }
 
 .game { display: grid; gap: 22px; }
 .section-title {
@@ -193,7 +186,7 @@ button.close-btn svg { width: 18px; height: 18px; }
   color: var(--muted);
   margin-bottom: 10px;
 }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 0; }
 
 .resources { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .tile {
@@ -202,7 +195,7 @@ button.close-btn svg { width: 18px; height: 18px; }
   background: var(--panel);
   border: 1px solid var(--line);
   border-top: 2px solid var(--c);
-  border-radius: var(--radius);
+  border-radius: 0;
   padding: 10px 12px 12px;
   display: grid;
   gap: 2px;
@@ -222,12 +215,12 @@ button.close-btn svg { width: 18px; height: 18px; }
 .spark-line { fill: none; stroke: var(--c); stroke-width: 1.5; vector-effect: non-scaling-stroke; opacity: 0.45; }
 .spark-area { fill: var(--c); opacity: 0.07; }
 .tile > :not(.spark) { position: relative; }
-.gauge { margin-top: 6px; height: 4px; border-radius: 99px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
+.gauge { margin-top: 6px; height: 4px; border-radius: 0; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
 .gauge-fill { height: 100%; width: 0; background: var(--c); transition: width 0.2s linear; }
 
 .queue { padding: 12px 14px; display: grid; gap: 8px; border-color: rgba(122, 162, 255, 0.4); }
 .queue-head { display: flex; justify-content: space-between; gap: 10px; font-weight: 600; }
-.bar { height: 6px; border-radius: 99px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.bar { height: 6px; border-radius: 0; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
 .bar-fill { height: 100%; width: 0; background: var(--accent); transition: width 0.2s linear; }
 
 .buildings { display: grid; gap: 10px; }
@@ -250,7 +243,7 @@ button.close-btn svg { width: 18px; height: 18px; }
 .p-name { font-weight: 600; }
 .p-sub { font-size: 0.75rem; color: var(--muted); overflow-wrap: anywhere; }
 .p-score { font-size: 0.85rem; color: var(--energy); white-space: nowrap; }
-.you, .tag { font-size: 0.7rem; padding: 1px 6px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); font-weight: 500; }
+.you, .tag { font-size: 0.7rem; padding: 1px 6px; border-radius: 0; border: 1px solid var(--line); color: var(--muted); font-weight: 500; }
 .tag { color: var(--accent); }
 .race-tag { color: var(--race); border-color: color-mix(in srgb, var(--race) 45%, transparent); white-space: nowrap; }
 
@@ -284,7 +277,7 @@ button.close-btn svg { width: 18px; height: 18px; }
   --c: var(--muted);
   font-size: 0.72rem;
   padding: 2px 8px;
-  border-radius: 99px;
+  border-radius: 0;
   border: 1px solid color-mix(in srgb, var(--c) 50%, transparent);
   color: var(--c);
 }
@@ -308,7 +301,7 @@ button.close-btn svg { width: 18px; height: 18px; }
 .banner {
   background: var(--panel-2);
   border: 1px solid rgba(122, 162, 255, 0.45);
-  border-radius: var(--radius);
+  border-radius: 0;
   padding: 12px 14px;
   display: grid;
   gap: 10px;
@@ -357,10 +350,10 @@ button.close-btn svg { width: 18px; height: 18px; }
 .map-wrap {
   background: #05070f;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: 0;
   padding: 6px;
 }
-.map-wrap canvas { display: block; width: 100%; height: auto; aspect-ratio: 1; border-radius: 8px; touch-action: none; }
+.map-wrap canvas { display: block; width: 100%; height: auto; aspect-ratio: 1; border-radius: 0; touch-action: none; }
 
 
 /* ----- Feuille d'invitation ----- */
@@ -382,7 +375,7 @@ button.close-btn svg { width: 18px; height: 18px; }
   background: var(--bg);
   border: 1px solid var(--line);
   border-bottom: 0;
-  border-radius: 20px 20px 0 0;
+  border-radius: 0;
   padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
   display: grid;
   gap: 18px;
@@ -399,7 +392,7 @@ button.close-btn svg { width: 18px; height: 18px; }
   width: min(72vw, 360px);
   aspect-ratio: 1;
   border: 3px solid rgba(255, 255, 255, 0.85);
-  border-radius: 18px;
+  border-radius: 0;
   box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.45);
 }
 .scanner-hint { position: absolute; top: calc(24px + env(safe-area-inset-top, 0px)); left: 16px; right: 16px; text-align: center; margin: 0; color: #fff; }
@@ -416,7 +409,7 @@ button.close-btn svg { width: 18px; height: 18px; }
   max-width: calc(100vw - 32px);
   background: var(--panel-2);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 0;
   padding: 10px 14px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
@@ -445,7 +438,7 @@ button.close-btn svg { width: 18px; height: 18px; }
 .rp-head h1 { font-size: 1.15rem; }
 .rp-back {
   display: grid; place-items: center; width: 44px; height: 44px; flex: none;
-  border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 0; background: var(--panel-2); border: 1px solid var(--line);
   color: var(--text); text-decoration: none; font-size: 1.2rem;
 }
 #rp-main { display: grid; gap: 14px; }
@@ -463,13 +456,14 @@ button.close-btn svg { width: 18px; height: 18px; }
 .rp-log .dot { width: 8px; height: 8px; }
 
 /* ----- Onglets de la planète : bâtiments, recherche, flottes ----- */
-.tabs { display: flex; gap: 4px; padding: 3px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; position: sticky; top: calc(62px + env(safe-area-inset-top, 0px)); z-index: 4; }
-.tab { flex: 1; min-height: 36px; padding: 0 8px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-size: 0.88rem; }
+.tabs { display: flex; gap: 4px; padding: 3px; background: var(--panel); border: 1px solid var(--line); border-radius: 0; position: sticky; top: calc(62px + env(safe-area-inset-top, 0px)); z-index: 4; }
+.tab { flex: 1; min-height: 36px; padding: 0 8px; border: 0; border-radius: 0; background: transparent; color: var(--muted); font-size: 0.88rem; }
 .tab[aria-selected="true"] { background: var(--panel-2); color: var(--text); }
-.tab .tab-dot { display: inline-block; width: 6px; height: 6px; margin-left: 5px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
+.tab .tab-dot { display: inline-block; width: 6px; height: 6px; margin-left: 5px; border-radius: 0; background: var(--accent); vertical-align: middle; }
 #view-planet[data-tab="build"] [data-pane]:not([data-pane="build"]),
 #view-planet[data-tab="research"] [data-pane]:not([data-pane="research"]),
-#view-planet[data-tab="fleet"] [data-pane]:not([data-pane="fleet"]) { display: none; }
+#view-planet[data-tab="fleet"] [data-pane]:not([data-pane="fleet"]),
+#view-planet[data-tab="power"] [data-pane]:not([data-pane="power"]) { display: none; }
 
 /* ----- Interface condensée -----
    Tout tient en peu de place : icônes plutôt que mots, une ligne par
@@ -531,13 +525,13 @@ button.close-btn svg { width: 18px; height: 18px; }
 .p-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .map-head { align-items: center; }
-.help-btn { width: 28px; min-height: 28px; padding: 0; border-radius: 50%; font-size: 0.85rem; color: var(--muted); }
+.help-btn { width: 28px; min-height: 28px; padding: 0; border-radius: 0; font-size: 0.85rem; color: var(--muted); }
 /* Bulle d'aide : au survol, au clavier, ou ouverte d'un toucher (aria-expanded). */
 .help-wrap { position: relative; display: inline-flex; }
 .tooltip {
   position: absolute; right: 0; top: calc(100% + 8px); z-index: 6;
   width: min(270px, 80vw); padding: 10px 12px;
-  background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 0;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
   font-size: 0.8rem; line-height: 1.4; color: var(--text); text-align: left;
   opacity: 0; visibility: hidden; transition: opacity 0.15s;
@@ -545,3 +539,142 @@ button.close-btn svg { width: 18px; height: 18px; }
 @media (hover: hover) { .help-wrap:hover .tooltip { opacity: 1; visibility: visible; } }
 .help-btn:focus-visible + .tooltip, .help-btn[aria-expanded="true"] + .tooltip { opacity: 1; visibility: visible; }
 .fi-actions button { min-height: 34px; padding: 0 10px; }
+
+/* ----- Design épuré -----
+   Angles droits, aplats, filets fins ; une icône plutôt qu'un mot. */
+
+:root { --line: rgba(150, 170, 230, 0.12); --panel: #0d1222; --panel-2: #131a2e; }
+button { font-weight: 500; border-color: var(--line); }
+button.primary { border-color: var(--accent); }
+button.secondary, button.ghost { background: transparent; }
+button:not(:disabled):hover { border-color: var(--accent); }
+.topbar { background: var(--bg); border-bottom: 1px solid var(--line); }
+.card, .tile, .banner, .map-wrap { box-shadow: none; }
+.tile { border-top-width: 1px; }
+.toast, .tooltip { box-shadow: none; }
+.sheet-panel { border-bottom: 0; }
+.scanner-frame { border-width: 2px; }
+
+/* Icônes de l'interface : trait fin, couleur du texte. */
+.ic { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: square; stroke-linejoin: miter; vertical-align: -0.2em; }
+button:has(> .ic) { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+button.icon-only, .building > button, .ship-actions button, .fi-actions button, .tab { padding: 0 10px; }
+.building > button { min-width: 44px; gap: 4px; font-family: var(--mono); }
+.icon-btn .ic { width: 20px; height: 20px; }
+.tab .ic { width: 20px; height: 20px; }
+.section-title { display: flex; align-items: center; gap: 6px; }
+.section-title .ic { width: 14px; height: 14px; }
+.section-title .places { margin-left: auto; }
+.map-head .ic, .banner .ic { color: var(--accent); }
+.back.icon-only { justify-self: start; width: 40px; }
+.back .ic { width: 22px; height: 22px; }
+.saved .row > .primary { flex: 1 1 auto; }
+.saved .row > .icon-only { flex: 0 0 48px; }
+.row > button.icon-only { flex: 0 0 56px; }
+.dot { border-radius: 0; }
+.b-name::after { content: none; }
+
+/* Historique des parties (accueil) */
+.saved { padding: 0; border: 0; gap: 0; }
+.games { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.game-row { display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 12px; }
+.game-row button { flex: none; width: 44px; min-height: 44px; padding: 0; }
+.g-main { flex: 1; min-width: 0; display: grid; }
+.g-names { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.g-names strong { color: var(--text); font-weight: 600; }
+.g-when { font-size: 0.75rem; color: var(--muted); }
+
+/* ----- Fond de galaxie (js/galaxy.js) -----
+   Une nébuleuse en dégradé, fixe ; par-dessus, trois couches d'étoiles en parallaxe. */
+body {
+  background:
+    radial-gradient(120% 60% at 15% 85%, rgba(122, 92, 255, 0.18), transparent 60%),
+    radial-gradient(90% 50% at 90% 10%, rgba(64, 140, 255, 0.16), transparent 60%),
+    linear-gradient(160deg, transparent 30%, rgba(160, 120, 255, 0.07) 48%, rgba(255, 170, 200, 0.05) 52%, transparent 70%),
+    var(--bg);
+  background-attachment: fixed;
+}
+.galaxy { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.galaxy > div { position: absolute; top: 0; left: 0; width: 200%; height: 200%; background-repeat: repeat; will-change: transform; }
+.topbar { background: transparent; }
+
+/* ----- Choix de la race : trois icônes, une seule fiche ----- */
+.races { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.race {
+  display: grid; justify-items: center; gap: 8px;
+  padding: 16px 6px 12px; min-height: 0;
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
+  border: 1px solid var(--line); color: var(--muted); text-align: center;
+}
+.race .rci { width: 44px; height: 44px; color: var(--race); opacity: 0.55; transition: opacity 0.15s, transform 0.15s; }
+.race .race-name { font-size: 0.9rem; font-weight: 600; }
+.race[aria-checked="true"] { color: var(--text); border-color: var(--race); box-shadow: inset 0 -2px 0 var(--race); background: color-mix(in srgb, var(--race) 12%, var(--panel)); }
+.race[aria-checked="true"] .rci { opacity: 1; transform: scale(1.08); }
+.race-detail {
+  --race: var(--accent); padding: 14px 16px; display: grid; gap: 10px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--race) 10%, var(--panel)), var(--panel) 70%);
+}
+.race-detail p { margin: 0; }
+#race-others { display: flex; flex-wrap: wrap; gap: 12px; }
+#race-others .other { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Icône de race en ligne (barre du haut, étiquettes) */
+.rci { width: 1.15em; height: 1.15em; flex: none; vertical-align: -0.22em; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+.badge .rci, .race-tag .rci { color: var(--race, var(--accent)); }
+#race-others .rci { width: 18px; height: 18px; }
+
+/* Nom de la planète, son climat sur la même ligne, ses gisements juste dessous. */
+.planet-head { gap: 10px; flex-wrap: wrap; }
+.planet-head h2 { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.planet-head .climate { margin-left: auto; white-space: nowrap; font-size: 0.75rem; }
+.planet-head .climate .qty .ri { margin-left: 0.1em; }
+
+/* Compteur de joueurs en ligne (barre du haut) : ouvre la fenêtre des joueurs. */
+button.net-btn {
+  min-height: 40px; padding: 0 12px; gap: 6px;
+  background: transparent; border-color: var(--line); color: var(--ok);
+}
+button.net-btn.slow { color: var(--warn); }
+.net-btn .ic { width: 18px; height: 18px; }
+#sheet-players .sheet-panel { gap: 14px; }
+#net-detail { margin: 0; }
+
+/* Marges autour de la page réduites : plus de place pour le jeu. */
+.screen {
+  padding-left: max(8px, env(safe-area-inset-left, 0px));
+  padding-right: max(8px, env(safe-area-inset-right, 0px));
+  padding-block: 4px 16px;
+}
+.sheet-panel { padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }
+.topbar { margin-bottom: 10px; }
+.universe { gap: 6px; }
+
+/* En haut de l'écran de la planète, nom et climat, gisements puis stocks se
+   collent sous la barre au même endroit, le suivant par-dessus le précédent ;
+   les onglets se collent sous les stocks. js/app.js (stackSticky) fixe les
+   `top` et cache les blocs recouverts. */
+.planet-head, #soil-zone, #resources, .tabs { position: sticky; }
+.planet-head { z-index: 4; }
+#soil-zone { z-index: 5; }
+#resources { z-index: 6; }
+.tabs { z-index: 7; }
+.planet-head, #soil-zone, #resources { padding-block: 4px; background: var(--bg); }
+.sticky-covered { visibility: hidden; }
+
+/* Progression sur la carte même (bâtiment en chantier, recherche, vaisseaux) : un trait qui avance en bas. */
+.building { position: relative; }
+.card-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(255, 255, 255, 0.06); }
+.card-bar .bar-fill { height: 100%; width: 0; background: var(--accent); transition: width 0.2s linear; }
+.planet-head { background: transparent; }
+
+/* Plus de barre du haut : seul le compteur de joueurs reste, sur la première ligne de l'écran. */
+.topbar { display: none; }
+.map-head, .planet-head { min-height: 48px; }
+.planet-head #net { margin-left: 8px; }
+/* Climat centré entre le nom de la planète et le compteur de joueurs. */
+.planet-head .climate { flex: 1; margin-left: 0; text-align: center; }
+/* L'icône du compteur garde la couleur du bouton (vert, orange si lent), partout. */
+#net .ic { color: inherit; }
+/* Aide de la carte à gauche, à côté des coordonnées : sa bulle s'ouvre vers la droite. */
+.map-head > span:first-child { display: flex; align-items: center; gap: 8px; }
+.map-head .help-wrap .tooltip { right: auto; left: 0; }

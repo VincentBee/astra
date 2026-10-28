@@ -19,7 +19,7 @@
 
 import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Rendezvous } from './rendezvous.js';
-import { saveGame, loadGame, mergeStates } from './save.js';
+import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity } from './save.js';
 import { newPlanet, settle, stateAt, startBuild, startResearch, startShips, usePower, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces } from './game.js';
 import { TECHS, SHIPS, shipStats, sightRange } from './tech.js';
 import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, salvage, applyLosses, parkedCell, fleetPos, fleetCargo, fleetTank, ORDERS, MAX_FLEETS } from './fleet.js';
@@ -64,7 +64,6 @@ const HEARTBEAT_MS = 1500;
 // Sans nouvelles depuis ce délai, la connexion est considérée perdue (un
 // écran verrouillé quelques secondes ne doit pas faire sortir de la partie).
 const SILENCE_MS = 30000;
-const ID_KEY = 'astra.identity';
 /**
  * Ordres gardés dans la fiche d'un joueur, pour rejouer la partie
  * (js/replay.js). La fiche voyage à chaque changement : au-delà, les plus
@@ -82,19 +81,6 @@ async function sha256(text) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
   return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
 }
-
-const loadIdentity = () => {
-  try {
-    return JSON.parse(localStorage.getItem(ID_KEY) || 'null');
-  } catch {
-    return null;
-  }
-};
-const saveIdentity = (v) => {
-  try {
-    localStorage.setItem(ID_KEY, JSON.stringify(v));
-  } catch {}
-};
 
 /**
  * Fiche d'un joueur au format actuel. Avant les races, les planètes
