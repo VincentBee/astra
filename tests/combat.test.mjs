@@ -4,7 +4,9 @@
 // Lancer : node --test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newGame, game, clone } from './harness.mjs';
+import { newGame, game, fleet, clone } from './harness.mjs';
+
+const countShips = (ships) => Object.values(ships).reduce((t, n) => t + n, 0);
 
 /** A (humain) attaque B (machine), qui a 4000 minéraux et 4 drones à quai. */
 function raid() {
@@ -77,4 +79,23 @@ test('70 attaques avant le retour du défenseur : chaque pillage est subi', () =
   const r = outcome([id]);
   assert.equal(r.killed, 4, 'le rapport du premier combat est encore là');
   assert.ok(Math.abs(r.looted + r.left - r.real) <= 1, `pillé ${r.looted} + restant ${r.left} ≠ stock réel ${r.real}`);
+});
+
+test('les vaisseaux perdus emportent la cargaison qu’ils portaient', () => {
+  const { players: [A, B], sync } = newGame(2, ['human', 'machine']);
+  B.state.players[B.me].planet.ships = { fighter: 18 };
+  B.touch();
+  sync(A, B);
+  const ap = A.state.players[A.me].planet;
+  Object.assign(ap, { ships: { cargo: 5, heavy: 3 }, stock: { ...ap.stock, minerals: 3000 } });
+  ap.levels.store = 3;
+  const id = A.takeOff('home', { cargo: 5, heavy: 3 }, { minerals: 2950 }, 0);
+  const cell = { x: A.planets[1].x, y: A.planets[1].y };
+  Object.assign(A.myFleet(id), { from: { ...cell }, to: { ...cell }, fuel: 400 });
+  A.moveFleet(id, cell, 'attack');
+  A.tick();
+  const f = A.myFleet(id);
+  const carried = Object.values(f.cargo).reduce((t, v) => t + v, 0);
+  assert.ok(countShips(f.ships) < 8, 'la flotte a perdu des vaisseaux');
+  assert.ok(carried <= fleet.fleetCargo('human', f.ships), `cargaison ${carried} > soute ${fleet.fleetCargo('human', f.ships)}`);
 });

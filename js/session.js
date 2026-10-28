@@ -22,7 +22,7 @@ import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates } from './save.js';
 import { newPlanet, settle, stateAt, startBuild, startResearch, startShips, usePower, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE } from './game.js';
 import { TECHS, SHIPS, shipStats, sightRange } from './tech.js';
-import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, setShips, together, transfer, split, merge, intercept, inContact, salvage, applyLosses, parkedCell, fleetPos, ORDERS, MAX_FLEETS } from './fleet.js';
+import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, salvage, applyLosses, parkedCell, fleetPos, ORDERS, MAX_FLEETS } from './fleet.js';
 import { amounts, isEmpty, holdings, lacks, noRoom, take, put, outcome, OFFER_MS, MAX_OFFERS } from './trade.js';
 
 /** « de Beta », « d'Alpha ». */
@@ -1415,9 +1415,9 @@ export class Session {
           : `${p.name} perd le combat sur ${pl.name} (${enemy.name}).`,
       );
       this.ontoast?.(res.won ? `Victoire sur ${pl.name} !` : `Défaite sur ${pl.name}.`);
-      if (!countShips(res.attLeft)) return drop(), true;
-      setShips(f, p.race, res.attLeft, now);
-      f.cargo = Object.fromEntries(SOIL.map((r) => [r, (f.cargo?.[r] || 0) + (take[r] || 0)]));
+      // Les soutes perdues emportent leur cargaison, comme en combat entre flottes.
+      if (!applyLosses(f, p.race, p.planet.tech, res.attLost, null, now)) return drop(), true;
+      f.cargo =Object.fromEntries(SOIL.map((r) => [r, (f.cargo?.[r] || 0) + (take[r] || 0)]));
       return true;
     }
     return true;
