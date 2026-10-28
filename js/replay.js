@@ -7,10 +7,10 @@
 // partir de l'heure, rejouer ces journaux dans l'ordre des heures, sur une
 // horloge commune, refait la partie.
 //
-// Limite : on rejoue comme si tout le monde était connecté. Ce qui dépend
-// du moment où une fiche est arrivée chez un autre (partie coupée en deux,
-// téléphone en veille) peut tourner autrement. `faithful` dit si la fin du
-// rejeu retombe sur les fiches de la vraie partie.
+// Chaque entrée dit aussi combien d'entrées des journaux des autres le
+// joueur avait reçues : au rejeu, il retrouve les fiches des autres telles
+// qu'il les voyait, même partie coupée en deux ou horloges décalées.
+// `faithful` dit si la fin du rejeu retombe sur les fiches de la vraie partie.
 
 import { Session, normalize } from './session.js';
 
@@ -57,57 +57,81 @@ export function replayable(state) {
 /**
  * Rejoue la partie `state` (une copie complète, celle de la sauvegarde).
  * Renvoie {
- *   frames : [{ t, pid, k, a, fiche }] — une image par événement, avec la
- *            fiche du joueur concerné juste après (sans son journal) ;
+ *   frames : [{ t, pid, k, a, fiche }] — une image par entrée, dans l'ordre
+ *            des heures, avec la fiche du joueur juste après (sans son journal) ;
  *   log    : [{ at, pid, text }] — tout le journal de la partie, sans limite ;
  *   players: { pid: fiche } — les fiches à la fin du rejeu ;
  *   faithful : { pid: bool } — la fiche rejouée est-elle celle de la partie ?
  * }
+ * Lance une erreur si les journaux se contredisent (chacun dit connaître
+ * une entrée de l'autre que celui-ci n'a pas encore écrite).
  */
 export function replay(state) {
   const fiches = Object.values(state.players).sort((a, b) => a.rank - b.rank || (a.id < b.id ? -1 : 1));
-  const events = [];
-  for (const p of fiches) {
-    events.push({ t: p.rank, pid: p.id, k: 'join' });
-    for (const o of p.orders || []) events.push({ ...o, pid: p.id });
-  }
-  // Ordre des heures ; à égalité, l'ordre des journaux (stable).
-  events.sort((a, b) => a.t - b.t);
+  const orders = Object.fromEntries(fiches.map((p) => [p.id, p.orders || []]));
+  // Les fiches des autres dont quelqu'un aura besoin : après n entrées de leur journal.
+  const need = Object.fromEntries(fiches.map((p) => [p.id, new Set([0])]));
+  for (const p of fiches) for (const o of orders[p.id]) for (const [pid, n] of Object.entries(o.s || {})) need[pid]?.add(n);
+  const snaps = Object.fromEntries(fiches.map((p) => [p.id, new Map([[0, normalize(firstFiche(p))]])]));
 
-  const clock = { t: 0 };
-  const sessions = new Map();
   const log = [];
   const frames = [];
-  for (const e of events) {
-    clock.t = e.t;
-    let s = sessions.get(e.pid);
-    if (e.k === 'join') {
-      const p = fiches.find((x) => x.id === e.pid);
-      s = new Session(p.name);
-      // Un téléphone sans réseau ni sauvegarde, à l'heure du rejeu.
-      Object.assign(s, { now: () => clock.t, start() {}, meet() {}, save() {}, scheduleSave() {}, me: p.id, status: 'playing' });
-      const others = sessions.values().next().value;
-      s.state = { gid: state.gid, key: state.key, players: others ? copy(others.state.players) : {}, log: [] };
-      s.state.players[p.id] = normalize(firstFiche(p));
-      const add = s.addLog.bind(s);
-      s.addLog = (text) => {
-        const entry = add(text);
-        log.push({ at: entry.at, pid: p.id, text });
-        return entry;
-      };
-      sessions.set(p.id, s);
-    } else {
-      s.replayIds = [...(e.ids || [])];
-      if (e.k === 'tick') s.tick();
-      else if (typeof s[e.k] === 'function') s[e.k](...(e.a || []).map((v) => (v === null ? undefined : v)));
-      s.replayIds = null;
-    }
-    // Tout le monde reçoit la fiche du joueur qui vient de changer.
-    const fiche = s.state.players[e.pid];
-    for (const o of sessions.values()) if (o !== s) o.onRecord(null, copy(fiche));
-    const { orders, online, ...shown } = fiche;
-    frames.push({ t: e.t, pid: e.pid, k: e.k, a: e.a, fiche: copy(shown) });
+  const done = {}; // entrées rejouées, par joueur
+  const known = {}; // ce que chacun sait des autres : pid -> { autre: n }
+  const shown = {}; // la copie des autres que chacun a en ce moment : pid -> { autre: n }
+  const busy = new Set();
+  const sessions = new Map();
+  for (const p of fiches) {
+    const s = new Session(p.name);
+    // Un téléphone sans réseau ni sauvegarde, à l'heure de l'entrée rejouée.
+    Object.assign(s, { at: p.rank, now: () => s.at, start() {}, meet() {}, save() {}, scheduleSave() {}, me: p.id, status: 'playing' });
+    s.state = { gid: state.gid, key: state.key, players: { [p.id]: normalize(firstFiche(p)) }, log: [] };
+    const add = s.addLog.bind(s);
+    s.addLog = (text) => {
+      const entry = add(text);
+      log.push({ at: entry.at, pid: p.id, text });
+      return entry;
+    };
+    sessions.set(p.id, s);
+    done[p.id] = 0;
+    known[p.id] = {};
+    shown[p.id] = {};
   }
+
+  /** Rejoue l'entrée suivante du journal de `pid`. */
+  const next = (pid) => {
+    const e = orders[pid][done[pid]];
+    const s = sessions.get(pid);
+    busy.add(pid);
+    Object.assign(known[pid], e.s);
+    // Les fiches des autres, telles que ce joueur les avait à ce moment-là.
+    for (const [other, n] of Object.entries(known[pid])) {
+      if (!sessions.has(other) || shown[pid][other] === n) continue;
+      while (done[other] < n) {
+        if (busy.has(other) || done[other] >= orders[other].length) throw new Error('Journaux incohérents.');
+        next(other);
+      }
+      s.state.players[other] = { ...copy(snaps[other].get(n)), orders: orders[other].slice(0, n) };
+      shown[pid][other] = n;
+    }
+    s.at = e.t;
+    s.replayIds = [...(e.ids || [])];
+    if (e.k === 'tick') s.tick();
+    else if (typeof s[e.k] === 'function') s[e.k](...(e.a || []).map((v) => (v === null ? undefined : v)));
+    s.replayIds = null;
+    busy.delete(pid);
+    done[pid]++;
+    const { orders: _, online, ...fiche } = s.state.players[pid];
+    if (need[pid].has(done[pid])) snaps[pid].set(done[pid], copy(fiche));
+    frames.push({ t: e.t, pid, k: e.k, a: e.a, fiche: copy(fiche) });
+  };
+
+  // Dans l'ordre des heures ; une entrée qui en attend une autre la fait passer avant elle.
+  const events = fiches.flatMap((p) => orders[p.id].map((o, i) => ({ t: o.t, pid: p.id, i })));
+  events.sort((a, b) => a.t - b.t);
+  // (Une heure qui recule sur un téléphone : ses entrées restent dans l'ordre de son journal.)
+  for (const e of events) while (done[e.pid] <= e.i) next(e.pid);
+  frames.sort((a, b) => a.t - b.t);
 
   const players = {};
   const faithful = {};
@@ -115,7 +139,7 @@ export function replay(state) {
     players[pid] = s.state.players[pid];
     faithful[pid] = comparable(players[pid]) === comparable(state.players[pid]);
   }
-  return { frames, log, players, faithful };
+  return { frames, log: log.sort((a, b) => a.at - b.at), players, faithful };
 }
 
 /** Les fiches de tous les joueurs à l'image `i` (la dernière connue de chacun). */

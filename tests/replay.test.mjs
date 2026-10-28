@@ -35,11 +35,18 @@ function play(players, clock, sync, turns) {
       const docked = Object.fromEntries(Object.entries(pl.ships || {}).filter(([k, n]) => n > 0 && k !== 'colony'));
       if (Object.keys(docked).length && !(p.fleets || []).length) act(s, () => s.takeOff('home', docked, {}, Math.floor(pl.stock.energy / 2)));
       const enemy = players[(i + 1) % players.length].state.players[players[(i + 1) % players.length].me];
+      // Échanges : une flotte arrêtée chez un autre lui donne un peu de carburant.
       for (const f of p.fleets || []) {
-        if (f.order) continue;
+        const partner = !f.order && s.tradePartners({ fleet: f.id })[0];
+        if (partner) act(s, () => s.proposeTrade({ fleet: f.id }, { pid: partner.pid, ...partner.ref }, { fuel: 1 }, {}));
+      }
+      for (const f of p.fleets || []) {
+        if (f.order || s.locked(f.id)) continue;
         act(s, () => (turn % 3 === 2 ? s.returnFleet(f.id) : s.moveFleet(f.id, enemy.home, 'attack')));
       }
     }
+    // L'autre accepte ou refuse avant que l'offre n'expire.
+    for (const s of players) for (const { from, offer } of s.incomingOffers()) act(s, () => s.answerTrade(from.id, offer.id, turn % 2 === 0));
     clock.t += 7 * MIN;
     for (const s of players) {
       s.tick();
@@ -55,7 +62,7 @@ test('une partie rejouée depuis les journaux retombe sur les mêmes fiches', ()
   for (const s of players) sync(players[0], s);
 
   const kinds = new Set(Object.values(state.players).flatMap((p) => p.orders.map((o) => o.k)));
-  for (const k of ['chooseRace', 'claimPlanet', 'build', 'research', 'buildShips', 'takeOff', 'moveFleet', 'tick']) assert.ok(kinds.has(k), `la partie contient des « ${k} »`);
+  for (const k of ['chooseRace', 'claimPlanet', 'build', 'research', 'buildShips', 'takeOff', 'moveFleet', 'proposeTrade', 'answerTrade', 'tick']) assert.ok(kinds.has(k), `la partie contient des « ${k} »`);
   assert.ok(state.players.p0.orders.some((o) => o.ids?.length), 'des identifiants tirés sont notés');
 
   assert.equal(replayable(state).ok, true);
@@ -65,8 +72,25 @@ test('une partie rejouée depuis les journaux retombe sur les mêmes fiches', ()
     assert.equal(r.faithful[p.id], true);
   }
   assert.ok(r.log.length > 40, 'le journal rejoué garde tout');
+  for (const word of ['accepte', 'refuse', 'Échange conclu']) assert.ok(r.log.some((l) => l.text.includes(word)), `des échanges : « ${word} »`);
   const last = playersAt(r.frames, r.frames.length - 1);
   assert.equal(Object.keys(last).length, 3);
+});
+
+test('partie coupée en deux puis recollée : chacun est rejoué avec ce qu’il savait', () => {
+  const { players, clock, sync } = newGame(3);
+  play(players, clock, sync, 15);
+  // J0 joue seul de son côté pendant que J1 et J2 continuent ensemble, puis tout se recolle.
+  const [a, ...rest] = players;
+  play([a], clock, () => {}, 12);
+  clock.t -= 12 * 7 * MIN;
+  play(rest, clock, sync, 12);
+  for (const x of players) for (const y of players) if (x !== y) sync(x, y);
+  play(players, clock, sync, 10);
+  for (const s of players) sync(players[0], s);
+  const state = clone(players[0].snapshot());
+  const r = replay(state);
+  for (const p of Object.values(state.players)) assert.equal(comparable(r.players[p.id]), comparable(p), `fiche de ${p.name}`);
 });
 
 test('un journal tronqué est signalé', () => {

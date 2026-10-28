@@ -116,7 +116,8 @@ export function normalize(p) {
   // Échanges : mes offres en cours (avec leur séquestre), mes réponses à celles des autres.
   if (!Array.isArray(p.offers)) p.offers = [];
   if (!Array.isArray(p.answers)) p.answers = [];
-  // Journal des ordres : { t, k, a?, ids? } (heure, ordre ou « tick », arguments, identifiants tirés).
+  // Journal des ordres : { t, k, a?, ids?, s? } (heure, ordre ou « tick », arguments,
+  // identifiants tirés, entrées des journaux des autres connues quand ce nombre a changé).
   if (!Array.isArray(p.orders)) p.orders = [];
   return p;
 }
@@ -1639,6 +1640,25 @@ export class Session {
 }
 
 /**
+ * Ce que je sais des autres a changé depuis ma dernière entrée : { s: { pid:
+ * nombre d'entrées de son journal dans ma copie } }, ou rien. Le rejeu redonne
+ * ainsi à chacun, à chaque ordre, les fiches des autres telles qu'il les
+ * voyait (même partie coupée en deux, même horloges décalées).
+ */
+function seenNews(state, me) {
+  const mine = state.players[me];
+  if (!mine) return {};
+  const before = {};
+  for (const o of mine.orders || []) if (o.s) Object.assign(before, o.s);
+  const s = {};
+  for (const p of Object.values(state.players)) {
+    const n = p.orders?.length || 0;
+    if (p.id !== me && before[p.id] !== n) s[p.id] = n;
+  }
+  return Object.keys(s).length ? { s } : {};
+}
+
+/**
  * Ce qui change ma fiche, noté pour le rejeu : mes ordres, et les passages
  * (`tick`) qui ont fait avancer quelque chose (voir touch). Le reste de la partie vient des fiches des
  * autres, qui ont chacune leur journal.
@@ -1649,7 +1669,7 @@ for (const k of [...ORDER_KINDS, 'tick']) {
   Session.prototype[k] = function (...a) {
     if (this.entry || !this.state) return act.apply(this, a); // un ordre dans un ordre : déjà noté
     while (a.length && a[a.length - 1] === undefined) a.pop();
-    this.entry = { t: this.now(), k, ...(a.length ? { a: JSON.parse(JSON.stringify(a)) } : {}) };
+    this.entry = { t: this.now(), k, ...(a.length ? { a: JSON.parse(JSON.stringify(a)) } : {}), ...seenNews(this.state, this.me) };
     this.entryKept = false;
     try {
       return act.apply(this, a);

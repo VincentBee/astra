@@ -41,7 +41,12 @@ function load() {
   note('Calcul du replay…');
   // Laisse le message s'afficher avant le calcul.
   setTimeout(() => {
-    const r = replay(st);
+    let r;
+    try {
+      r = replay(st);
+    } catch (e) {
+      return note(`Le replay de cette partie a échoué : ${e.message}`);
+    }
     const frames = r.frames;
     // Pour chaque image, où trouver la dernière fiche de chaque joueur : le défilement reste rapide.
     const at = [];
@@ -52,7 +57,7 @@ function load() {
     });
     film = { frames, log: r.log, at, start: frames[0].t, end: Math.max(frames[frames.length - 1].t, saved.savedAt || 0), gid: st.gid };
     const off = Object.values(st.players).filter((p) => r.faithful[p.id] === false);
-    note(off.length ? `Rejoué comme si tout le monde était connecté : la fin diffère un peu pour ${off.map((p) => p.name).join(', ')}.` : '');
+    note(off.length ? `Replay approché : la fin ne retombe pas tout à fait sur la vraie partie pour ${off.map((p) => p.name).join(', ')}.` : '');
     $('rp-main').hidden = false;
     seek(film.start);
   }, 30);
