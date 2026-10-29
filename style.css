@@ -308,6 +308,8 @@ button.close-btn svg { width: 18px; height: 18px; }
 }
 .banner p { margin: 0; }
 .banner.warn { border-color: rgba(255, 179, 107, 0.5); margin-bottom: 10px; }
+.banner.race { margin-bottom: 10px; padding: 8px 14px; }
+.banner.race.hot { border-color: rgba(255, 179, 107, 0.8); }
 
 /* ----- Planète du joueur ----- */
 

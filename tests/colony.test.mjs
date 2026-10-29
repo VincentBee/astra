@@ -32,5 +32,6 @@ test('colonie perdue au recollage : les vaisseaux et la cargaison restent en orb
   const back = pa.fleets.find((f) => f.to.x === cell.x && f.to.y === cell.y);
   assert.ok(back, 'une flotte de A attend en orbite');
   assert.deepEqual(back.ships, { colony: 1, fighter: 5, cargo: 2 });
-  assert.equal(back.cargo.minerals, 800);
+  // La cargaison revient, plus ce que la colonie a produit pendant sa courte vie.
+  assert.ok(back.cargo.minerals >= 800 && back.cargo.minerals < 810, `cargaison ${back.cargo.minerals}`);
 });

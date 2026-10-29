@@ -4,7 +4,7 @@ import { inviteLink, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
 import {
   RACES, RACE_KEYS, RES_INFO, resIcon, raceIcon, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
-  powerReadyAt, powerCost, liftGain, fmt, UNIVERSE, SOIL, sameCell, sunFor, climateName, kindLabel, usedPlaces,
+  powerReadyAt, powerCost, liftGain, fmt, UNIVERSE, SOIL, sameCell, sunFor, climateName, kindLabel, usedPlaces, TEMPO, frostLine,
 } from './game.js';
 import { drawSun } from './sky.js';
 import { ic, fillIcons } from './icons.js';
@@ -591,12 +591,12 @@ function fillSoil(prefix, nature, reserve, soil) {
     const detail = q(`[data-${prefix}-detail="${r}"]`);
     // Solde du gisement : ce qu'il produit de lui-même, moins ce qu'on en extrait.
     if (!soil) rate.textContent = 'Intact';
-    else if (limited) rate.textContent = `Épuisé : ${fmt(n.regen)} / min`;
+    else if (limited) rate.textContent = `Épuisé : ${fmt(n.regen * TEMPO)} / min`;
     else if (left >= n.max - 0.5 && soil[r].got <= n.regen) rate.textContent = 'Plein';
-    else rate.textContent = rateText(n.regen - soil[r].got);
+    else rate.textContent = rateText((n.regen - soil[r].got) * TEMPO);
     rate.classList.toggle('neg', limited || (!!soil && soil[r].got > n.regen + 0.5));
-    detail.textContent = soil ? `−${fmt(soil[r].got)} +${fmt(n.regen)} / min` : `+${fmt(n.regen)} / min`;
-    detail.title = soil ? `Extraction ${fmt(soil[r].got)} / min, régénération ${fmt(n.regen)} / min` : `Régénération ${fmt(n.regen)} / min`;
+    detail.textContent = soil ? `−${fmt(soil[r].got * TEMPO)} +${fmt(n.regen * TEMPO)} / min` : `+${fmt(n.regen * TEMPO)} / min`;
+    detail.title = soil ? `Extraction ${fmt(soil[r].got * TEMPO)} / min, régénération ${fmt(n.regen * TEMPO)} / min` : `Régénération ${fmt(n.regen * TEMPO)} / min`;
     rate.title = detail.title;
   }
 }
@@ -730,7 +730,7 @@ function setHtml(el, html) {
   }
 }
 
-/** Solde par minute réelle (= heure de jeu), signé. */
+/** Solde par minute réelle, signé (un débit par heure de jeu se multiplie par TEMPO). */
 function rateText(v) {
   const n = Math.round(v);
   if (n === 0) return '±0 / min';
@@ -807,6 +807,7 @@ function renderLive() {
   const st = session.state;
   const me = st.players[session.me];
   const now = session.now();
+  renderRace(now);
 
   {
     const online = session.peerCount;
@@ -843,6 +844,12 @@ function renderLive() {
       scoreEl.textContent = '—';
       continue;
     }
+    if (session.deadAt(p, now) != null) {
+      sub.textContent = `éliminé${net ? ' · ' + net : ''}`;
+      scoreEl.textContent = `${fmt(session.scoreOf(p))} pts`;
+      scoreEl.closest('.player').style.order = '1';
+      continue;
+    }
     const s = stateAt(p.planet, now);
     const R = RACES[p.race];
     const doing = s.queue ? `${R.buildings[s.queue.key].short} ${s.queue.level} dans ${Math.ceil((s.queue.end - now) / 1000)} s` : 'aucun chantier';
@@ -858,11 +865,46 @@ function renderLive() {
     ];
     const stock = `<span class="qty">${fmt(s.stock.minerals)}${resIcon('minerals')}</span>`;
     setHtml(sub, [stock, people, ...[doing, ...space, net].filter(Boolean).map(esc)].filter(Boolean).join(' · '));
-    const pts = score(p.race, s.levels);
+    const pts = session.scoreOf(p);
     scoreEl.textContent = `${fmt(pts)} pts`;
     // Classement : le meilleur score en haut (ordre d'affichage, sans redessiner la liste).
     scoreEl.closest('.player').style.order = String(-Math.round(pts));
   }
+}
+
+/** Le froid : quand il part, ma planète la plus menacée, puis le vainqueur. */
+function renderRace(now) {
+  const el = $('race');
+  const start = session.startedAt;
+  el.hidden = start == null;
+  if (start == null) return;
+  const players = session.state.players;
+  const me = players[session.me];
+  const over = session.over;
+  const mmss = (ms) => `${Math.floor(ms / 60_000)}:${String(Math.floor((ms % 60_000) / 1000)).padStart(2, '0')}`;
+  let html;
+  let hot = false;
+  if (over) {
+    const mine = over.winner === session.me;
+    hot = !mine;
+    html = `<strong>${mine ? 'Victoire !' : `${esc(players[over.winner].name)} gagne.`}</strong> <span class="hint">· partie finie</span>`;
+  } else if (me?.out) {
+    hot = true;
+    const alive = session.ranking(now).filter((r) => r.dead == null).length;
+    html = `<strong>Éliminé.</strong> <span class="hint">· encore ${alive} en vie</span>`;
+  } else {
+    const alive = session.ranking(now).filter((r) => r.dead == null).length;
+    const mine = session.livePlanets(me, now).map((pl) => session.frostOf(pl.cell));
+    const first = mine.length ? Math.min(...mine) : Infinity;
+    const leave = first - now;
+    hot = leave < 3 * 60_000;
+    const left = Object.keys(players).length > 1 ? ` · ${alive} en vie` : '';
+    html = Number.isFinite(leave)
+      ? `<strong>${mine.length > 1 ? 'Ta planète la plus exposée gèle' : 'Ta planète gèle'} dans <span class="mono">${mmss(Math.max(0, leave))}</span></strong> <span class="hint">· va vers le soleil${left}</span>`
+      : `<strong>Le soleil s’éteint.</strong> <span class="hint">· dernier en vie gagne${left}</span>`;
+  }
+  el.classList.toggle('hot', hot);
+  setHtml($('race-text'), html);
 }
 
 /** La planète ouverte (mère ou colonie) : ressources, population, chantiers, recherche, flottes. */
@@ -896,7 +938,7 @@ function renderPlanet(me, now) {
       ? `Pénurie ${Math.round((r === 'energy' ? f.effE : f.effF) * 100)} %`
       : s.stock[r] >= cap && f.net[r] >= 0
         ? 'Plein'
-        : rateText(f.net[r]);
+        : rateText(f.net[r] * TEMPO);
     rate.classList.toggle('neg', short || f.net[r] < -0.5);
     q(`[data-gauge="${r}"]`).style.width = `${Math.min(100, (s.stock[r] / cap) * 100)}%`;
   }
@@ -921,7 +963,7 @@ function renderPlanet(me, now) {
     } else {
       q('[data-pop]').innerHTML = withCap(s.pop, cap);
       const starving = Math.min(f.effE, f.effF) < 1;
-      const next = (Math.floor(s.pop) + 1 - s.pop) / 0.12; // 0,12 naissance par heure de jeu (game.js) ; heures de jeu = minutes réelles
+      const next = (Math.floor(s.pop) + 1 - s.pop) / 0.12 / TEMPO; // 0,12 naissance par heure de jeu (game.js) ; une heure de jeu = 1 / TEMPO minute réelle
       rate.textContent = starving
         ? 'Ils dépérissent !'
         : s.pop >= cap - 1e-6
@@ -933,7 +975,7 @@ function renderPlanet(me, now) {
     rate.classList.toggle('neg', delta < -0.01 || f.effF < 1 || (me.race === 'alien' && f.effE < 1));
   } else {
     q('[data-grid]').textContent = `${Math.round(f.effE * 100)} %`;
-    q('[data-gridrate]').textContent = `+${fmt(f.in.energy)} −${fmt(f.out.energy / Math.max(f.effE, 1e-9))}`;
+    q('[data-gridrate]').textContent = `+${fmt(f.in.energy * TEMPO)} −${fmt((f.out.energy / Math.max(f.effE, 1e-9)) * TEMPO)}`;
     q('[data-gridrate]').title = 'Production et consommation d’énergie, par minute';
     q('[data-gridextra]').textContent = f.effE < 1 ? 'Ralenti' : 'À plein';
     q('[data-gridrate]').classList.toggle('neg', f.effE < 1);
@@ -970,7 +1012,7 @@ function renderPlanet(me, now) {
       const wait = Math.max(0, powerReadyAt(planet, k) - now);
       const ok = covers(s.stock, cost);
       const idle = k === 'lift' && !liftGain({ ...planet, ...s }); // entrepôt plein ou sol vide : rien à gagner
-      setHtml(q(`[data-pcost="${k}"]`), `${costText(cost)} · ↻ ${POWERS[k].cooldown / 60000} min`);
+      setHtml(q(`[data-pcost="${k}"]`), `${costText(cost)} · ↻ ${Math.round(POWERS[k].cooldown / 1000)} s`);
       q(`[data-pready="${k}"]`).textContent = k === 'trance' && trance ? `transe ${clock(trance)}` : wait ? clock(wait) : 'prêt';
       q(`[data-pcard="${k}"]`).classList.toggle('affordable', ok && !wait && !idle);
       const btn = q(`[data-power="${k}"]`);
@@ -1037,7 +1079,7 @@ function renderResearch(me, pl, s, now) {
 
 /** « ⚔ 12 · ◇ 30 · ▣ 50 · » 7,0 » : attaque, coque, soute, vitesse (cases/min). */
 const statText = (st) =>
-  `⚔ ${fmt(st.attack)} · ◇ ${fmt(st.hull)} · ▣ ${fmt(st.cargo)} · » ${st.speed.toFixed(1).replace('.', ',')}`;
+  `⚔ ${fmt(st.attack)} · ◇ ${fmt(st.hull)} · ▣ ${fmt(st.cargo)} · » ${(st.speed * TEMPO).toFixed(1).replace('.', ',')}`;
 
 /** Chantier naval de la planète ouverte. */
 function renderYard(me, pl, s, now) {
@@ -1346,6 +1388,30 @@ function drawSmallBody(ctx, w, cx, cy, cell, color) {
   ctx.fill();
 }
 
+/** Le froid : tout ce qui est hors du cercle autour du soleil est gelé. */
+function drawFrost(ctx, sun, cell, W) {
+  const start = session.startedAt;
+  if (start == null) return;
+  const line = frostLine(sun, start, Math.min(session.now(), session.over?.at ?? Infinity)); // la partie finie, le froid s'arrête
+  if (!Number.isFinite(line)) return;
+  const cx = (sun.x + sun.size / 2) * cell;
+  const cy = (sun.y + sun.size / 2) * cell;
+  const r = (line + sun.size / 2) * cell;
+  ctx.save();
+  ctx.fillStyle = 'rgba(150,200,255,0.16)';
+  ctx.beginPath();
+  ctx.rect(0, 0, W, W);
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill('evenodd');
+  ctx.strokeStyle = 'rgba(170,215,255,0.7)';
+  ctx.lineWidth = Math.max(1, cell * 0.06);
+  ctx.setLineDash([cell * 0.25, cell * 0.15]);
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawMap() {
   mapFrame = null;
   if (!session || currentView !== 'map') return;
@@ -1385,10 +1451,12 @@ function drawMap() {
     ctx.lineTo(W, i * cell);
   }
   ctx.stroke();
-  drawSun(ctx, sunFor(session.state.gid), cell);
+  const sun = sunFor(session.state.gid);
+  drawSun(ctx, sun, cell);
+  drawFrost(ctx, sun, cell, W);
 
   const me = session.state.players[session.me];
-  const picking = !me?.home;
+  const picking = !me?.home && !me?.out;
   const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 300);
 
   // Portée de détection : ce que je vois, en léger halo (hors du halo, les flottes adverses sont cachées).
@@ -1409,8 +1477,8 @@ function drawMap() {
     const cy = (w.y + 0.5) * cell;
     const o = w.owner;
     const mine = o?.id === session.me;
-    // Planète libre : grise, plus lumineuse quand on cherche où s'installer.
-    ctx.globalAlpha = o ? (o.online ? 1 : 0.45) : picking && w.kind === 'planet' ? 0.55 + 0.35 * pulse : 0.6;
+    // Planète libre : grise, plus lumineuse quand on cherche où s'installer. Gelée : presque effacée.
+    ctx.globalAlpha = session.frostOf(w) <= session.now() ? 0.15 : o ? (o.online ? 1 : 0.45) : picking && w.kind === 'planet' ? 0.55 + 0.35 * pulse : 0.6;
     const color = o ? o.color : '#8d95b3';
     ctx.fillStyle = color;
     if (w.kind === 'asteroid' || w.kind === 'comet') {
@@ -1514,7 +1582,7 @@ function drawMap() {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(spot.ang);
-    ctx.fillStyle = ['attack', 'chase'].includes(f.order?.kind) || f.mission === 'attack' ? '#ff7a93' : p.color;
+    ctx.fillStyle = ['attack', 'conquer', 'chase'].includes(f.order?.kind) || f.mission === 'attack' ? '#ff7a93' : p.color;
     const k = spot.moving ? 1 : 0.8;
     ctx.beginPath();
     ctx.moveTo(cell * 0.28 * k, 0);
@@ -1534,7 +1602,7 @@ function drawMap() {
     ctx.globalAlpha = 1;
   }
 
-  $('my-coords').textContent = me?.home ? `[${me.home.x}:${me.home.y}]` : 'à choisir';
+  $('my-coords').textContent = me?.home ? `[${me.home.x}:${me.home.y}]` : me?.out ? 'éliminé' : 'à choisir';
 }
 
 /**
@@ -1875,7 +1943,7 @@ $('btn-move-go').onclick = () => {
 /** Bandeau de choix de la planète de départ et fiche de la planète touchée. */
 function renderPick(me = session?.state?.players[session.me], now = session?.now()) {
   if (!session?.state) return;
-  const picking = !me?.home;
+  const picking = !me?.home && !me?.out;
   $('pick').hidden = !picking;
   const w = selected && mapPlanets().find((x) => sameCell(x, selected));
   $('sheet-planet').hidden = !w;

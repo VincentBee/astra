@@ -14,10 +14,12 @@
 // n'a pas de formule fermée : on l'intègre par petits pas (300 au plus par
 // calcul, même après une journée d'absence).
 
-import { techBonus, TECHS, SHIPS, techCost, techMissing, researchDuration, shipUnlocked, shipDuration } from './tech.js';
+import { techBonus, TECHS, SHIPS, techCost, techMissing, researchDuration, shipUnlocked, shipDuration, TEMPO } from './tech.js';
 
-/** Facteur de vitesse : 60 = une « heure » de jeu dure une minute. */
-export const SPEED = 60;
+export { TEMPO };
+
+/** Facteur de vitesse : 60 × TEMPO (à TEMPO 1, une « heure » de jeu dure une minute). */
+export const SPEED = 60 * TEMPO;
 export const RES = ['minerals', 'food', 'energy'];
 /** Ressources tirées du sol de la planète : elles s'épuisent et se régénèrent. */
 export const SOIL = ['minerals', 'food'];
@@ -164,6 +166,24 @@ export const RACES = {
         base: { minerals: 250, energy: 0 },
         factor: 1.8,
       },
+      cannon: {
+        name: 'Batterie de canons',
+        short: 'Canons',
+        start: 0,
+        desc: 'Défense : ⚔ 12 et ◇ 40 par niveau. Polyvalente.',
+        base: { minerals: 130, energy: 0 },
+        factor: 1.5,
+        defense: { attack: 12, hull: 40 },
+      },
+      shield: {
+        name: 'Bouclier déflecteur',
+        short: 'Bouclier',
+        start: 0,
+        desc: 'Défense : ◇ 150 par niveau. Encaisse sans riposter.',
+        base: { minerals: 140, energy: 0 },
+        factor: 1.5,
+        defense: { attack: 0, hull: 150 },
+      },
     },
     rates(levels, pop) {
       const jobs = 10 * lv(levels, 'mine') + 5 * lv(levels, 'farm');
@@ -258,6 +278,24 @@ export const RACES = {
         base: { minerals: 220, energy: 80 },
         factor: 1.8,
       },
+      turret: {
+        name: 'Tourelles automatiques',
+        short: 'Tourelles',
+        start: 0,
+        desc: 'Défense : ⚔ 18 et ◇ 15 par niveau. Bon marché, frappe fort, casse vite.',
+        base: { minerals: 90, energy: 30 },
+        factor: 1.45,
+        defense: { attack: 18, hull: 15 },
+      },
+      shield: {
+        name: 'Blindage réactif',
+        short: 'Blindage',
+        start: 0,
+        desc: 'Défense : ◇ 90 par niveau. Bon marché.',
+        base: { minerals: 90, energy: 30 },
+        factor: 1.45,
+        defense: { attack: 0, hull: 90 },
+      },
     },
     rates(levels) {
       return {
@@ -348,6 +386,24 @@ export const RACES = {
         base: { minerals: 260, energy: 60 },
         factor: 1.8,
       },
+      spines: {
+        name: 'Épines psioniques',
+        short: 'Épines',
+        start: 0,
+        desc: 'Défense : ⚔ 8 par niveau, plus 1 par psionique. Plus la ruche est peuplée, plus elle mord.',
+        base: { minerals: 200, energy: 40 },
+        factor: 1.6,
+        defense: { attack: 8, hull: 60, perPop: 1 },
+      },
+      dome: {
+        name: 'Dôme psychique',
+        short: 'Dôme',
+        start: 0,
+        desc: 'Défense : ◇ 260 par niveau. Cher, mais presque infranchissable.',
+        base: { minerals: 240, energy: 60 },
+        factor: 1.6,
+        defense: { attack: 0, hull: 260 },
+      },
     },
     rates(levels, pop) {
       const amp = 1 + 0.25 * lv(levels, 'amplifier');
@@ -382,14 +438,14 @@ export const POWERS = {
   lift: {
     name: 'Arrachement télékinésique',
     desc: 'Arrache d’un coup au sol de la planète 40 minéraux par psionique.',
-    cooldown: 180_000,
+    cooldown: 180_000 / TEMPO,
     cost: (pop) => ({ minerals: 0, energy: 30 * Math.ceil(pop) }),
   },
   trance: {
     name: 'Transe collective',
-    desc: 'L’extraction télékinésique double pendant 2 minutes.',
-    cooldown: 360_000,
-    duration: 120_000,
+    desc: `L’extraction télékinésique double pendant ${Math.round(120 / TEMPO)} s.`,
+    cooldown: 360_000 / TEMPO,
+    duration: 120_000 / TEMPO,
     cost: (pop) => ({ minerals: 0, energy: 25 * Math.ceil(pop) }),
   },
 };
@@ -511,17 +567,16 @@ function advance(race, s, ms, boost) {
 }
 
 /**
- * Fait avancer de `from` à `to` (ms réelles). Des pas de 2 min réelles au plus
- * (2 h de jeu) : plus longs, une longue absence ne donnerait pas la même
- * population que des passages réguliers. Au-delà de 2000 pas (environ 2,7
- * jours réels), les pas s'allongent pour que le calcul reste rapide.
+ * Fait avancer de `from` à `to` (ms réelles). Des pas de 2 h de jeu au plus
+ * (2 min réelles au tempo d'origine) : plus longs, une longue absence ne
+ * donnerait pas la même population que des passages réguliers.
  */
 function steps(race, s, from, to, boost) {
   let t = from;
   const total = to - from;
   if (total <= 0) return s;
-  // Pas de 2 min au plus, même après des jours d'absence : de plus grands pas changeaient la population.
-  const dt = Math.max(1000, Math.min(120_000, total / 300));
+  // Pas de 2 h de jeu au plus, même après des jours d'absence : de plus grands pas changeaient la population.
+  const dt = Math.max(1000, Math.min(120_000 / TEMPO, total / 300));
   while (t < to) {
     const ms = Math.min(dt, to - t);
     s = advance(race, s, ms, boost);
@@ -618,7 +673,7 @@ export function upgradeCost(race, key, level) {
 
 /** Durée de construction en ms (accélérée). */
 export function buildDuration(race, levels, cost) {
-  return Math.max(4, Math.round((cost.minerals + cost.energy) / 25)) * 1000;
+  return Math.round((Math.max(4, Math.round((cost.minerals + cost.energy) / 25)) * 1000) / TEMPO);
 }
 
 export function covers(stock, cost) {
@@ -762,6 +817,50 @@ export function score(race, levels) {
   return Math.floor(total / 100);
 }
 
+/**
+ * Points d'un empire : les bâtiments de toutes ses planètes (hors entrepôts),
+ * ses recherches et ses vaisseaux, posés ou en vol (prix / 100). Ils
+ * départagent les joueurs que le froid prend en même temps.
+ */
+export function empireScore(race, planets, fleets = []) {
+  if (!RACES[race]) return 0;
+  let total = 0;
+  const tech = planets[0]?.tech || {};
+  for (const [k, n] of Object.entries(tech)) {
+    if (!Object.hasOwn(TECHS[race], k)) continue;
+    for (let l = 0; l < (Number(n) || 0); l++) for (const v of Object.values(techCost(race, k, l))) total += v;
+  }
+  const ships = (list) => {
+    for (const [t, n] of Object.entries(list || {})) {
+      if (!Object.hasOwn(SHIPS[race], t)) continue;
+      for (const v of Object.values(SHIPS[race][t].cost)) total += v * Math.max(0, Number(n) || 0);
+    }
+  };
+  for (const pl of planets) ships(pl.ships);
+  for (const f of fleets) ships(f.ships);
+  return Math.floor(total / 100) + planets.reduce((t, pl) => t + score(race, pl.levels || {}), 0);
+}
+
+/**
+ * Défense d'une planète, qui se bat comme un seul gros vaisseau : ⚔ 2 et
+ * ◇ 20 par niveau de bâtiment ordinaire, plus les bâtiments de défense de
+ * sa race (canons, boucliers…). Pour prendre ou piller la planète, il faut
+ * l'abattre avec des vaisseaux d'attaque, en même temps que ceux posés dessus.
+ */
+export function fortOf(race, levels, pop = 0) {
+  const R = RACES[race];
+  const out = { attack: 0, hull: 0 };
+  if (!R) return out;
+  for (const [k, b] of Object.entries(R.buildings)) {
+    const n = Math.max(0, Number(levels?.[k]) || 0);
+    if (!n) continue;
+    const d = b.defense || { attack: 2, hull: 20 };
+    out.attack += n * (d.attack + (d.perPop || 0) * Math.floor(pop));
+    out.hull += n * d.hull;
+  }
+  return out;
+}
+
 /** Puissance : un humain vaut 1, un psionique 120 (plus de cent humains réunis). */
 export function power(race, pop) {
   const R = RACES[race];
@@ -879,9 +978,7 @@ const round2 = (v) => Math.round(v * 100) / 100;
  * pousse mieux en zone tempérée qu'au chaud ou au froid.
  */
 export function climateAt(sun, c) {
-  const mid = { x: sun.x + sun.size / 2, y: sun.y + sun.size / 2 };
-  const far = Math.hypot(Math.max(mid.x, UNIVERSE.w - mid.x), Math.max(mid.y, UNIVERSE.h - mid.y)) - sun.size / 2;
-  const d = Math.hypot(c.x + 0.5 - mid.x, c.y + 0.5 - mid.y) - sun.size / 2;
+  const { d, far } = sunDistance(sun, c);
   const heat = round2(Math.min(1, Math.max(0, 1 - d / far)));
   return {
     heat,
@@ -889,6 +986,36 @@ export function climateAt(sun, c) {
     minerals: round2(0.9 + 0.2 * heat),
     food: round2(1.3 - 1.4 * Math.abs(heat - 0.5)),
   };
+}
+
+/** Distance d'une case au bord du soleil `d`, et la plus grande possible `far` (en cases). */
+export function sunDistance(sun, c) {
+  const mid = { x: sun.x + sun.size / 2, y: sun.y + sun.size / 2 };
+  const far = Math.hypot(Math.max(mid.x, UNIVERSE.w - mid.x), Math.max(mid.y, UNIVERSE.h - mid.y)) - sun.size / 2;
+  const d = Math.hypot(c.x + 0.5 - mid.x, c.y + 0.5 - mid.y) - sun.size / 2;
+  return { d: Math.min(far, Math.max(0, d)), far };
+}
+
+/**
+ * Le soleil s'éteint. `delayMs` après le début de la course, le froid part
+ * du coin le plus loin et se resserre vers le soleil, qu'il atteint
+ * `durationMs` plus tard. Une planète que le froid atteint est perdue :
+ * il faut migrer vers le centre, où il y a de moins en moins de place.
+ * `ease` > 1 : il avance lentement au début, puis de plus en plus vite.
+ */
+export const FROST = { delayMs: 12 * 60_000, durationMs: 24 * 60_000, ease: 2 };
+
+/** Heure à laquelle le froid atteint la case `c` (la course a commencé à `start`). */
+export function frostAt(sun, start, c) {
+  const { d, far } = sunDistance(sun, c);
+  return start + FROST.delayMs + FROST.durationMs * Math.pow(1 - d / far, 1 / FROST.ease);
+}
+
+/** Distance au soleil où passe le froid à `now` (Infinity avant son départ). */
+export function frostLine(sun, start, now) {
+  const { far } = sunDistance(sun, sun);
+  const k = (now - start - FROST.delayMs) / FROST.durationMs;
+  return k < 0 || !Number.isFinite(k) ? Infinity : Math.max(0, far * (1 - Math.pow(Math.min(1, k), FROST.ease)));
 }
 
 /** Nom du climat selon la chaleur. */

@@ -32,7 +32,7 @@ Ensuite : quelqu'un crée la partie. Pour inviter, n'importe quel joueur appuie 
 
 | Fichier | Rôle |
 |---|---|
-| `js/game.js` | Règles pures (port de `game.rs`), en vitesse ×60 : une « heure » de jeu = une minute |
+| `js/game.js` | Règles pures (port de `game.rs`), en vitesse ×150 (`TEMPO` 2,5 dans `js/tech.js`) : une « heure » de jeu = 24 s. Le soleil s’éteint : le froid part du bord et se resserre vers le soleil (`FROST`), une planète qu’il atteint est perdue ; une planète se prend aussi en gagnant un combat avec un colonisateur. Sans planète, on est éliminé : le dernier en vie gagne |
 | `js/tech.js` | Arbre des technologies et vaisseaux de chaque race (données pures) |
 | `technologies.html`, `js/techtree.js` | Page à part, hors du jeu : le graphe de chaque race (bâtiments, technologies, vaisseaux, pouvoirs), lu dans les données du jeu |
 | `js/fleet.js` | Flottes : décollage, déplacements libres sur la carte, carburant, poursuite, combat sans hasard, pillage |

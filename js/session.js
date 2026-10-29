@@ -20,8 +20,8 @@
 import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity } from './save.js';
-import { newPlanet, settle, stateAt, startBuild, startResearch, startShips, usePower, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces } from './game.js';
-import { TECHS, SHIPS, shipStats, sightRange } from './tech.js';
+import { newPlanet, settle, stateAt, startBuild, startResearch, startShips, usePower, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, sunFor, fortOf } from './game.js';
+import { TECHS, SHIPS, shipStats, sightRange, TEMPO } from './tech.js';
 import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, salvage, applyLosses, parkedCell, fleetPos, fleetCargo, fleetTank, ORDERS, MAX_FLEETS } from './fleet.js';
 import { amounts, isEmpty, holdings, lacks, noRoom, take, put, outcome, OFFER_MS, MAX_OFFERS, GRACE_MS } from './trade.js';
 
@@ -37,8 +37,9 @@ const de = (name) => (/^[aeiouyhàâéèêëîïôöûü]/i.test(name) ? `d’${
  * 5 : combats entre flottes (effets visant une flotte, `docked`).
  * 6 : échanges entre joueurs (`offers`, `answers`).
  * 7 : journal des ordres (`orders`), messages envoyés en morceaux.
+ * 8 : tempo ×2,5, score de tout l'empire, froid, prise de planète, élimination (`out`) et fin (`over`).
  */
-export const FORMAT = 7;
+export const FORMAT = 8;
 
 const shipsText = (n) => `${n} vaisseau${n > 1 ? 'x' : ''}`;
 
@@ -52,8 +53,8 @@ function lootText(take) {
 
 const COLORS = ['#7aa2ff', '#ff9f6b', '#7cf0b4', '#f7d06b', '#d38bff', '#6fd3ff', '#ff7a93', '#b7e36b'];
 const MAX_PLAYERS = 8;
-/** Une même planète ne se pille qu'une fois toutes les 2 min. */
-const RAID_COOLDOWN_MS = 2 * 60_000;
+/** Une même planète ne se pille qu'une fois toutes les 2 min (au tempo d'origine). */
+const RAID_COOLDOWN_MS = (2 * 60_000) / TEMPO;
 /**
  * Rapports de combat gardés dans ma fiche. Un rapport s'efface dès que sa
  * cible l'a appliqué : cette limite ne sert que pour une cible qui ne
@@ -552,6 +553,8 @@ export class Session {
    * l'arrivée de sa flotte, qui peut précéder la dernière fiche : pas ici.)
    */
   backdated(ours, rec) {
+    // Une de ses colonies devenue planète mère (l'ancienne est perdue) garde sa date : ce n'est pas une installation.
+    if (isCell(rec.home) && Object.keys(ours.colonies || {}).some((id) => sameCell(this.planets.find((w) => w.id === id), rec.home))) return false;
     // Marge d'une minute : plusieurs ordres dans la même milliseconde font avancer l'heure de la fiche d'un cran chacun.
     return isCell(rec.home) && !sameCell(rec.home, ours.home) && Number.isFinite(rec.claimAt) && rec.claimAt < (ours.actAt || 0) - 60_000;
   }
@@ -713,6 +716,131 @@ export class Session {
     };
   }
 
+  /** On peut jouer : partie en cours, pas finie, et je ne suis pas éliminé. */
+  get canAct() {
+    return this.status === 'playing' && !this.over && !this.state?.players[this.me]?.out;
+  }
+
+  /** Points de l'empire d'un joueur (toutes ses planètes, ses recherches, ses vaisseaux). */
+  scoreOf(p) {
+    if (!p?.race) return 0;
+    return empireScore(p.race, this.planetsOf(p).map((x) => x.planet), p.fleets || []);
+  }
+
+  /** Début de la course : la première installation d'un joueur, ou null (partie d'avant la course, sans fin). */
+  get startedAt() {
+    const t = Object.values(this.state?.players || {}).map((p) => p.since).filter(Number.isFinite);
+    return t.length ? Math.min(...t) : null;
+  }
+
+  /** Heure à laquelle le froid prend la case `cell` (Infinity : partie sans froid). */
+  frostOf(cell) {
+    const start = this.startedAt;
+    if (start == null) return Infinity;
+    if (this.sunCache?.gid !== this.state.gid) this.sunCache = { gid: this.state.gid, sun: sunFor(this.state.gid) };
+    return frostAt(this.sunCache.sun, start, cell);
+  }
+
+  /** Planètes encore en vie d'un joueur : ni gelées, ni prises. */
+  livePlanets(p, now = this.now()) {
+    if (p?.out) return [];
+    return this.planetsOf(p).filter((pl) => this.frostOf(pl.cell) > now && this.ownerAt(pl.cell)?.id === p.id);
+  }
+
+  /** Heure à laquelle un joueur a tout perdu, ou null s'il est encore en vie. Calculable par tous, même s'il est hors ligne. */
+  deadAt(p, now = this.now()) {
+    if (!p?.race || !Number.isFinite(p.since)) return null;
+    if (Number.isFinite(p.out)) return p.out;
+    const all = this.planetsOf(p);
+    if (!all.length || this.livePlanets(p, now).length) return null;
+    const frozen = all.map((pl) => this.frostOf(pl.cell)).filter((t) => t <= now);
+    return frozen.length === all.length ? Math.max(...frozen) : now;
+  }
+
+  /** Fin de la partie, ou null : { at, winner }, la plus ancienne qu'un joueur a vue. */
+  get over() {
+    const players = this.state?.players || {};
+    const seen = Object.values(players).map((p) => p.over).filter((o) => isObj(o) && Number.isFinite(o.at) && Object.hasOwn(players, o.winner));
+    if (!seen.length) return null;
+    return seen.sort((a, b) => a.at - b.at || (a.winner < b.winner ? -1 : 1))[0];
+  }
+
+  /** Classement : [{ id, pts, dead }], les vivants d'abord, puis les derniers tombés, puis les points. */
+  ranking(now = this.now()) {
+    return Object.values(this.state?.players || {})
+      .filter((p) => p.race && p.planet)
+      .map((p) => ({ id: p.id, pts: this.scoreOf(p), dead: this.deadAt(p, now) }))
+      .sort((a, b) => (a.dead ?? Infinity) !== (b.dead ?? Infinity) ? (b.dead ?? Infinity) - (a.dead ?? Infinity) : b.pts - a.pts || (a.id < b.id ? -1 : 1));
+  }
+
+  /**
+   * La partie est-elle finie ? À plusieurs : quand il ne reste qu'un joueur
+   * en vie (ou aucun : le dernier tombé gagne). Seul : quand le froid a tout
+   * pris. Si oui, je l'inscris dans ma fiche.
+   */
+  checkOver(p, now) {
+    if (this.over || this.startedAt == null) return false;
+    const rank = this.ranking(now).filter((r) => Number.isFinite(this.state.players[r.id].since));
+    const alive = rank.filter((r) => r.dead == null);
+    if (!rank.length || alive.length > (rank.length > 1 ? 1 : 0)) return false;
+    const winner = rank[0];
+    const at = Math.max(...rank.map((r) => r.dead ?? -Infinity));
+    p.over = { at: Number.isFinite(at) ? at : now, winner: winner.id };
+    this.addLog(`Fin de la partie : ${this.state.players[winner.id].name} l'emporte${alive.length ? ', dernier en vie' : ''}.`);
+    return true;
+  }
+
+  /**
+   * Je perds une de mes planètes (gel ou prise) à l'heure `at`. Ma planète
+   * mère perdue, ma plus vieille colonie en vie la remplace ; sans colonie,
+   * je suis éliminé.
+   */
+  losePlanet(p, key, at, why) {
+    const pl = this.planetOf(p, key);
+    if (!pl) return;
+    if (key !== 'home') {
+      const colonies = { ...p.colonies };
+      delete colonies[key];
+      p.colonies = colonies;
+      this.addLog(`${p.name} perd sa colonie ${pl.name} (${why}).`);
+      this.ontoast?.(`Colonie ${pl.name} perdue (${why}).`);
+      return;
+    }
+    const next = this.livePlanets(p, at)
+      .filter((x) => x.key !== 'home')
+      .sort((a, b) => (a.planet.claimAt || 0) - (b.planet.claimAt || 0) || (a.key < b.key ? -1 : 1))[0];
+    if (!next) {
+      p.home = null;
+      p.out = at;
+      this.addLog(`${p.name} perd ${pl.name} (${why}) : plus aucune planète, ${p.name} est éliminé.`);
+      this.ontoast?.(`${pl.name} perdue (${why}) : tu es éliminé.`);
+      return;
+    }
+    const colonies = { ...p.colonies };
+    delete colonies[next.key];
+    settle(next.planet, at);
+    p.colonies = colonies;
+    p.home = { ...next.cell };
+    p.claimAt = next.planet.claimAt || at;
+    p.planet = next.planet;
+    this.addLog(`${p.name} perd ${pl.name} (${why}) : ${next.name} devient sa planète mère.`);
+    this.ontoast?.(`${pl.name} perdue (${why}) : ${next.name} devient ta planète mère.`);
+  }
+
+  /** Le froid prend mes planètes qu'il a atteintes, la plus lointaine d'abord. */
+  freeze(p, now) {
+    let any = false;
+    for (;;) {
+      const pl = this.planetsOf(p)
+        .map((x) => ({ ...x, at: this.frostOf(x.cell) }))
+        .filter((x) => x.at <= now)
+        .sort((a, b) => a.at - b.at)[0];
+      if (!pl) return any;
+      this.losePlanet(p, pl.key, pl.at, 'gelée');
+      any = true;
+    }
+  }
+
   /** Ma race, ou null tant que je ne l'ai pas choisie. */
   get myRace() {
     return this.state?.players[this.me]?.race || null;
@@ -720,7 +848,7 @@ export class Session {
 
   /** Choix de race : une seule fois, il ne se défait pas. */
   chooseRace(race) {
-    if (this.status !== 'playing' || !RACES[race]) return false;
+    if (!this.canAct || !RACES[race]) return false;
     const p = this.state.players[this.me];
     if (!p) return false;
     if (p.race) {
@@ -779,10 +907,15 @@ export class Session {
       if (!best || k[0] < best.k[0] || (k[0] === best.k[0] && k[1] < best.k[1])) best = { p, k };
     };
     const w = this.planets.find((x) => sameCell(x, cell));
-    for (const p of Object.values(this.state?.players || {})) {
-      if (sameCell(p.home, cell)) consider(p, p.claimAt || p.rank || 0);
+    const players = Object.values(this.state?.players || {});
+    // Prise par un attaquant dont le rapport n'est pas encore lu : elle n'est déjà plus à son ancien propriétaire.
+    const taken = players.flatMap((o) => (o.effects || []).filter((e) => e.capture && sameCell(e.cell, cell)));
+    const lost = (p, t) => taken.some((e) => e.to === p.id && e.at >= t);
+    for (const p of players) {
+      const t = p.claimAt || p.rank || 0;
+      if (sameCell(p.home, cell) && !lost(p, t)) consider(p, t);
       const col = w && p.colonies?.[w.id];
-      if (col) consider(p, col.claimAt || 0);
+      if (col && !lost(p, col.claimAt || 0)) consider(p, col.claimAt || 0);
     }
     return best?.p || null;
   }
@@ -806,12 +939,20 @@ export class Session {
 
   /** M'installer sur une planète libre : une fois la race choisie, au début de la partie. */
   claimPlanet(id) {
-    if (this.status !== 'playing') return false;
+    if (!this.canAct) return false;
     const p = this.state.players[this.me];
     const w = this.planets.find((x) => x.id === id);
     if (!p?.race || !w) return false;
     if (p.home) {
       this.ontoast?.('Tu as déjà une planète.');
+      return false;
+    }
+    if (p.out) {
+      this.ontoast?.('Tu as perdu toutes tes planètes : tu es éliminé.');
+      return false;
+    }
+    if (this.frostOf(w) <= this.now()) {
+      this.ontoast?.(`${w.name} est gelée.`);
       return false;
     }
     if (w.kind && w.kind !== 'planet') {
@@ -826,6 +967,7 @@ export class Session {
     const now = this.now();
     p.home = { x: w.x, y: w.y };
     p.claimAt = now;
+    p.since ??= now; // entrée dans la course (les parties d'avant la course n'en ont pas)
     p.planet ||= newPlanet(p.race, now, w);
     this.touch(this.addLog(`${p.name} s'installe sur ${w.name}.`));
     this.changed();
@@ -840,10 +982,12 @@ export class Session {
   checkClaim() {
     const p = this.state?.players[this.me];
     if (!p) return;
+    // Une planète prise au combat n'est pas une installation simultanée : applyEffects la retire.
+    const captured = (cell) => Object.values(this.state.players).some((o) => (o.effects || []).some((e) => e.capture && e.to === this.me && sameCell(e.cell, cell)));
     for (const id of Object.keys(p.colonies || {})) {
       const w = this.planets.find((x) => x.id === id);
       const owner = w && this.ownerAt(w);
-      if (!owner || owner.id === this.me) continue;
+      if (!owner || owner.id === this.me || captured(w)) continue;
       const fleet = this.evacuate(p, p.colonies[id], w);
       delete p.colonies[id];
       const after = fleet ? ` : la flotte ${de(p.name)} reste en orbite avec ${shipsText(countShips(fleet.ships))}` : '';
@@ -852,7 +996,7 @@ export class Session {
     }
     if (!p.home) return;
     const owner = this.ownerAt(p.home);
-    if (!owner || owner.id === this.me) return;
+    if (!owner || owner.id === this.me || captured(p.home)) return;
     const w = this.myWorld;
     p.home = null;
     p.planet = null;
@@ -897,7 +1041,7 @@ export class Session {
   }
 
   build(key, where = 'home') {
-    if (this.status !== 'playing') return;
+    if (!this.canAct) return;
     const p = this.state.players[this.me];
     if (!p?.planet) return this.ontoast?.('Choisis d’abord ta race.');
     const pl = this.myPlanet(where);
@@ -915,7 +1059,7 @@ export class Session {
 
   /** Recherche : sur la planète mère, là où est le labo. */
   research(key) {
-    if (this.status !== 'playing') return;
+    if (!this.canAct) return;
     const p = this.state.players[this.me];
     if (!p?.planet) return;
     const err = startResearch(p.planet, key, this.now());
@@ -926,7 +1070,7 @@ export class Session {
 
   /** Lot de vaisseaux au chantier naval d'une de mes planètes. */
   buildShips(type, count, where = 'home') {
-    if (this.status !== 'playing') return;
+    if (!this.canAct) return;
     const p = this.state.players[this.me];
     const pl = this.myPlanet(where);
     if (!pl) return;
@@ -963,7 +1107,13 @@ export class Session {
     const here = this.planetsAt(cell)[0];
     const out = [];
     if (here?.owner.id === this.me) out.push({ kind: 'dock', label: `Se poser sur ${here.name}` });
-    else if (here) out.push({ kind: 'attack', label: `Attaquer ${here.name} (${here.owner.name})` });
+    else if (here) {
+      out.push({ kind: 'attack', label: `Attaquer ${here.name} (${here.owner.name})` });
+      const pl = this.planetOf(here.owner, here.key);
+      const st = pl && stateAt(pl.planet, this.now());
+      const fort = fortOf(here.owner.race, st?.levels, st?.pop);
+      out.push({ kind: 'conquer', label: `Conquérir ${here.name} · défense ⚔ ${fort.attack} ◇ ${fort.hull}` });
+    }
     else if (w && f.ships.colony) out.push({ kind: 'colonize', label: `Coloniser ${w.name}` });
     out.push({ kind: 'move', label: w || here ? 'Juste y aller (orbite)' : 'Y aller' });
     const me = this.state.players[this.me];
@@ -974,7 +1124,7 @@ export class Session {
 
   /** Faire décoller des vaisseaux (avec cargaison et carburant) d'une de mes planètes. */
   takeOff(fromKey, ships, cargo, fuel) {
-    if (this.status !== 'playing') return false;
+    if (!this.canAct) return false;
     const p = this.state.players[this.me];
     const from = this.planetOf(p, fromKey);
     if (!from) {
@@ -1002,7 +1152,7 @@ export class Session {
    * move, dock, colonize ou attack.
    */
   moveFleet(id, cell, kind = 'move') {
-    if (this.status !== 'playing') return false;
+    if (!this.canAct) return false;
     const p = this.state.players[this.me];
     const f = this.myFleet(id);
     if (!f || this.locked(id)) return false;
@@ -1013,7 +1163,7 @@ export class Session {
     if (kind === 'dock') {
       if (here?.owner.id !== this.me) return this.refuse('Ce n’est pas une de tes planètes.');
       order = { kind, key: here.key };
-    } else if (kind === 'attack') {
+    } else if (kind === 'attack' || kind === 'conquer') {
       if (!here || here.owner.id === this.me) return this.refuse('Aucune planète adverse ici.');
       const armed = Object.entries(f.ships).some(([k, n]) => n && shipStats(p.race, k, p.planet.tech).attack > 0);
       if (!armed) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas attaquer.');
@@ -1035,7 +1185,7 @@ export class Session {
 
   /** Arrête une de mes flottes sur la case la plus proche. */
   stopFleet(id) {
-    if (this.status !== 'playing') return false;
+    if (!this.canAct) return false;
     const p = this.state.players[this.me];
     const f = this.myFleet(id);
     if (!f || this.locked(id)) return false;
@@ -1078,7 +1228,7 @@ export class Session {
 
   /** Lance une de mes flottes à la poursuite d'une flotte d'un autre joueur, pour la combattre. */
   chaseFleet(id, pid, targetId) {
-    if (this.status !== 'playing') return false;
+    if (!this.canAct) return false;
     const p = this.state.players[this.me];
     const f = this.myFleet(id);
     const enemy = this.state.players[pid];
@@ -1255,7 +1405,7 @@ export class Session {
    * bloquée jusqu'à la réponse.
    */
   proposeTrade(fromRef, toRef, giveIn, wantIn) {
-    if (this.status !== 'playing') return false;
+    if (!this.canAct) return false;
     const p = this.state.players[this.me];
     const other = this.state.players[toRef?.pid];
     const now = this.now();
@@ -1300,7 +1450,7 @@ export class Session {
    * séquestre). Mon téléphone vérifie l'expiration, la case et les places.
    */
   answerTrade(pid, offerId, ok) {
-    if (this.status !== 'playing') return false;
+    if (!this.canAct) return false;
     const me = this.state.players[this.me];
     const other = this.state.players[pid];
     const offer = other?.offers?.find((o) => o.id === offerId);
@@ -1429,7 +1579,7 @@ export class Session {
 
   /** Plein d'une de mes flottes, arrêtée sur une de mes planètes, avec l'énergie de celle-ci. */
   refuelFleet(id) {
-    if (this.status !== 'playing') return false;
+    if (!this.canAct) return false;
     const p = this.state.players[this.me];
     const f = this.myFleet(id);
     const now = this.now();
@@ -1466,7 +1616,7 @@ export class Session {
 
   /** Fait passer vaisseaux, cargaison et carburant d'une de mes flottes à une autre. */
   transferFleet(fromId, toId, part) {
-    if (this.status !== 'playing') return false;
+    if (!this.canAct) return false;
     const pair = this.pairOf(fromId, toId);
     if (!pair) return false;
     const err = transfer(pair[0], pair[1], this.state.players[this.me].race, part, this.now());
@@ -1478,7 +1628,7 @@ export class Session {
 
   /** Fusionne une de mes flottes dans une autre, sur la même case. */
   mergeFleets(fromId, intoId) {
-    if (this.status !== 'playing') return false;
+    if (!this.canAct) return false;
     const pair = this.pairOf(fromId, intoId);
     if (!pair) return false;
     const p = this.state.players[this.me];
@@ -1491,7 +1641,7 @@ export class Session {
 
   /** Scinde une de mes flottes arrêtées : `part` forme une nouvelle flotte, au même endroit. */
   splitFleet(id, part) {
-    if (this.status !== 'playing') return false;
+    if (!this.canAct) return false;
     const p = this.state.players[this.me];
     const f = this.myFleet(id);
     const now = this.now();
@@ -1522,7 +1672,7 @@ export class Session {
 
   /** Pouvoir psychique (aliens), sur une de mes planètes. */
   power(key, where = 'home') {
-    if (this.status !== 'playing') return;
+    if (!this.canAct) return;
     const p = this.state.players[this.me];
     const pl = p?.planet && this.myPlanet(where);
     if (!pl) return;
@@ -1546,6 +1696,13 @@ export class Session {
     const now = this.now();
     let changed = false;
     this.tickLogs = []; // entrées du journal de ce passage, envoyées avec ma fiche
+    if (this.over) {
+      // Partie finie : tout s'arrête, sauf la lecture des derniers combats.
+      if (this.applyEffects(p, now)) this.touch(this.tickLogs.length ? this.tickLogs : null), this.changed();
+      this.tickLogs = null;
+      return;
+    }
+    if (this.freeze(p, now)) changed = true;
     let techAt = now; // fin de la dernière recherche terminée depuis le passage précédent
     // La planète mère d'abord (planetsOf la donne en premier) : ses recherches valent pour les colonies.
     for (const pl of this.planetsOf(p)) {
@@ -1579,6 +1736,7 @@ export class Session {
     if (this.settleOffers(p, now)) changed = true;
     if (this.refuseExpired(p, now)) changed = true;
     this.noticeOffers(now);
+    if (this.checkOver(p, now)) changed = true;
     const logs = this.tickLogs;
     this.tickLogs = null;
     if (!changed) return;
@@ -1621,6 +1779,10 @@ export class Session {
         this.addLog(`${w?.name || 'La planète'} est déjà prise : la flotte ${de(p.name)} reste en orbite.`);
         return true;
       }
+      if (this.frostOf(w) <= f.arrive) {
+        this.addLog(`${w.name} est gelée : la flotte ${de(p.name)} reste en orbite.`);
+        return true;
+      }
       const colony = newPlanet(p.race, f.arrive, w);
       colony.stock = { minerals: 0, food: 0, ...f.cargo, energy: Math.floor(fuelAt(f, p.race, now)) };
       colony.tech = { ...(p.planet.tech || {}) };
@@ -1639,22 +1801,31 @@ export class Session {
       return true;
     }
 
-    if (order.kind === 'attack') {
+    if (order.kind === 'attack' || order.kind === 'conquer') {
       const enemy = this.state.players[order.pid];
       const pl = enemy && this.planetOf(enemy, order.key);
       if (!pl || !sameCell(pl.cell, f.to)) return true;
       // Je calcule le combat avec ce que je sais du défenseur à l'heure de l'arrivée ;
       // son téléphone appliquera ses pertes en lisant mon rapport.
       const def = this.defenseAt(p, enemy, pl, f.arrive);
-      const res = battle({ race: p.race, ships: f.ships, tech: p.planet.tech }, { race: enemy.race, ships: def.ships, tech: def.tech });
+      // La planète se défend avec ses vaisseaux posés et sa défense (ses bâtiments : canons, boucliers…).
+      const fort = fortOf(enemy.race, def.levels, def.pop);
+      const res = battle({ race: p.race, ships: f.ships, tech: p.planet.tech }, { race: enemy.race, ships: def.ships, tech: def.tech, fort });
+      if (!res.won) this.addLog(`La défense de ${pl.name} (${enemy.name}) repousse ${de(p.name)}.`);
       // Un pillage par planète toutes les 2 min au plus : sinon, des attaques à la chaîne depuis
       // l'orbite (trajet de 0 case) vidaient tout, malgré la règle « la moitié au plus ».
       const spot = `${enemy.id}:${pl.key}`;
       const recent = (p.raided?.[spot] || 0) > f.arrive - RAID_COOLDOWN_MS;
       const take = res.won && !recent ? plunder(p.race, res.attLeft, def.stock, f.cargo) : {};
       if (res.won && !recent) p.raided = Object.fromEntries([...Object.entries(p.raided || {}).filter(([, t]) => t > f.arrive - RAID_COOLDOWN_MS), [spot, f.arrive]]);
+      // Conquête : vaisseaux et défense abattus, sur une planète que le froid n'a pas prise, elle change de main.
+      const w = this.planets.find((x) => sameCell(x, pl.cell));
+      const capture = order.kind === 'conquer' && res.won && !!w && this.frostOf(w) > f.arrive;
       // Un identifiant par combat : une même flotte peut attaquer plusieurs fois.
-      p.effects = [...(p.effects || []), { id: this.newId(8), to: enemy.id, key: pl.key, at: f.arrive, ships: res.defLost, take }].slice(-MAX_EFFECTS);
+      const effect = { id: this.newId(8), to: enemy.id, key: pl.key, at: f.arrive, ships: res.defLost, take };
+      if (capture) Object.assign(effect, { capture: true, cell: { ...pl.cell } });
+      p.effects = [...(p.effects || []), effect].slice(-MAX_EFFECTS);
+      if (capture) return this.capture(p, f, w, pl, enemy, res, take, now);
       const loot = lootText(take);
       this.addLog(
         res.won
@@ -1667,6 +1838,30 @@ export class Session {
       f.cargo =Object.fromEntries(SOIL.map((r) => [r, (f.cargo?.[r] || 0) + (take[r] || 0)]));
       return true;
     }
+    return true;
+  }
+
+  /**
+   * Ma flotte vient de prendre la planète `pl` de `enemy` : ses bâtiments
+   * sont tombés avec sa défense, elle devient ma colonie (à rebâtir pour ma
+   * race), avec ce qui reste de la flotte, sa cargaison et le butin. Son téléphone la retirera de sa fiche en
+   * lisant mon rapport.
+   */
+  capture(p, f, w, pl, enemy, res, take, now) {
+    const colony = newPlanet(p.race, f.arrive, w);
+    colony.stock = { minerals: 0, food: 0 };
+    for (const r of SOIL) colony.stock[r] = (f.cargo?.[r] || 0) + (take[r] || 0);
+    colony.stock.energy = Math.floor(fuelAt(f, p.race, now));
+    colony.tech = { ...(p.planet.tech || {}) };
+    colony.claimAt = f.arrive;
+    colony.ships = { ...res.attLeft };
+    p.colonies = { ...(p.colonies || {}), [w.id]: colony };
+    const docked = { ...(p.docked || {}) };
+    for (const id of [f.id, ...(f.absorbed || [])]) docked[id] = w.id;
+    p.docked = Object.fromEntries(Object.entries(docked).slice(-60));
+    p.fleets = p.fleets.filter((x) => x.id !== f.id);
+    this.addLog(`${p.name} prend ${pl.name} à ${enemy.name} !`);
+    this.ontoast?.(`${pl.name} est à toi !`);
     return true;
   }
 
@@ -1713,8 +1908,15 @@ export class Session {
         p.applied = [...p.applied, e.id];
         any = true;
         if (e.fleet && this.fleetHit(p, other, e, now)) continue;
-        const pl = this.planetOf(p, e.fleet ? p.docked?.[e.fleet] : e.key); // flotte posée entre-temps : sa planète encaisse
+        // Une prise vise une case : ma planète mère a pu changer depuis (la clé « home » ne suffit pas).
+        const pl = e.capture
+          ? this.planetsOf(p).find((x) => sameCell(x.cell, e.cell))
+          : this.planetOf(p, e.fleet ? p.docked?.[e.fleet] : e.key); // flotte posée entre-temps : sa planète encaisse
         if (!pl) continue;
+        if (e.capture) {
+          this.losePlanet(p, pl.key, e.at, `prise par ${other.name}`);
+          continue;
+        }
         settle(pl.planet, now);
         pl.planet.ships ||= {};
         for (const [k, n] of Object.entries(e.ships || {})) pl.planet.ships[k] = Math.max(0, (pl.planet.ships[k] || 0) - n);

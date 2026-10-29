@@ -12,6 +12,13 @@
 // d'un niveau. `range` ajoute des cases à la portée de détection (voir
 // sightRange), autour des planètes et des flottes du joueur.
 
+/**
+ * Tempo de la partie : tout le jeu va TEMPO fois plus vite qu'à l'origine
+ * (production, chantiers, recherches, trajets, pouvoirs), pour une partie
+ * de 20 à 40 minutes.
+ */
+export const TEMPO = 2.5;
+
 export const TECHS = {
   human: {
     forage: {
@@ -61,8 +68,8 @@ export const TECHS = {
       name: 'Arches coloniales',
       desc: 'Débloque l’arche, qui fonde une colonie sur une planète libre.',
       max: 1,
-      req: { lab: 3, propulsion: 2 },
-      base: { minerals: 800 },
+      req: { lab: 2, propulsion: 2 },
+      base: { minerals: 400 },
       unlock: { colony: 1 },
     },
     radar: {
@@ -123,8 +130,8 @@ export const TECHS = {
       name: 'Réplication autonome',
       desc: 'Débloque la sonde réplicatrice, qui fonde une colonie.',
       max: 1,
-      req: { lab: 3, ions: 2 },
-      base: { minerals: 700, energy: 250 },
+      req: { lab: 2, ions: 2 },
+      base: { minerals: 350, energy: 125 },
       unlock: { colony: 1 },
     },
     capteurs: {
@@ -185,8 +192,8 @@ export const TECHS = {
       name: 'Ponte astrale',
       desc: 'Débloque la graine-ruche, qui fonde une colonie.',
       max: 1,
-      req: { lab: 3, levitation: 2 },
-      base: { minerals: 750, food: 220 },
+      req: { lab: 2, levitation: 2 },
+      base: { minerals: 375, food: 110 },
       unlock: { colony: 1 },
     },
     clairvoyance: {
@@ -223,19 +230,19 @@ export function sightRange(race, tech, kind) {
 export const SHIPS = {
   human: {
     cargo: { name: 'Cargo Hermès', attack: 0, hull: 20, cargo: 500, speed: 6, burn: 1, tank: 40, cost: { minerals: 110, energy: 40 } },
-    colony: { name: 'Arche coloniale', attack: 0, hull: 40, cargo: 300, speed: 4, burn: 2, tank: 80, cost: { minerals: 600 } },
+    colony: { name: 'Arche coloniale', attack: 0, hull: 40, cargo: 300, speed: 4, burn: 2, tank: 80, cost: { minerals: 360 } },
     fighter: { name: 'Frégate', attack: 12, hull: 30, cargo: 50, speed: 7, burn: 1, tank: 40, cost: { minerals: 150, energy: 50 } },
     heavy: { name: 'Croiseur', attack: 40, hull: 120, cargo: 150, speed: 5, burn: 3, tank: 120, cost: { minerals: 470, energy: 180 } },
   },
   machine: {
     cargo: { name: 'Drone-cargo', attack: 0, hull: 12, cargo: 400, speed: 8, burn: 1, tank: 36, cost: { minerals: 100, energy: 40 } },
-    colony: { name: 'Sonde réplicatrice', attack: 0, hull: 25, cargo: 200, speed: 6, burn: 3, tank: 90, cost: { minerals: 450, energy: 150 } },
+    colony: { name: 'Sonde réplicatrice', attack: 0, hull: 25, cargo: 200, speed: 6, burn: 3, tank: 90, cost: { minerals: 270, energy: 90 } },
     fighter: { name: 'Drone d’assaut', attack: 9, hull: 15, cargo: 20, speed: 9, burn: 1, tank: 36, cost: { minerals: 90, energy: 40 } },
     heavy: { name: 'Destroyer', attack: 35, hull: 90, cargo: 100, speed: 6, burn: 3, tank: 108, cost: { minerals: 550, energy: 200 } },
   },
   alien: {
     cargo: { name: 'Méduse porteuse', attack: 0, hull: 35, cargo: 450, speed: 5, burn: 1.5, tank: 75, cost: { minerals: 180, food: 60 } },
-    colony: { name: 'Graine-ruche', attack: 0, hull: 60, cargo: 250, speed: 4, burn: 3, tank: 150, cost: { minerals: 650, food: 200 } },
+    colony: { name: 'Graine-ruche', attack: 0, hull: 60, cargo: 250, speed: 4, burn: 3, tank: 150, cost: { minerals: 390, food: 120 } },
     fighter: { name: 'Dard', attack: 18, hull: 40, cargo: 30, speed: 7, burn: 2, tank: 100, cost: { minerals: 260, food: 80 } },
     heavy: { name: 'Léviathan', attack: 60, hull: 200, cargo: 200, speed: 4, burn: 5, tank: 250, cost: { minerals: 900, food: 270 } },
   },
@@ -267,7 +274,7 @@ export function techCost(race, key, level) {
 /** Durée de recherche en ms : plus courte avec un labo plus grand. */
 export function researchDuration(cost, labLevel) {
   const total = Object.values(cost).reduce((a, b) => a + b, 0);
-  return Math.max(8, Math.round(total / (20 * (1 + 0.5 * Math.max(0, labLevel - 1))))) * 1000;
+  return Math.round((Math.max(8, Math.round(total / (20 * (1 + 0.5 * Math.max(0, labLevel - 1))))) * 1000) / TEMPO);
 }
 
 /** Ce qui manque pour rechercher une technologie, en clair, ou null si rien. */
@@ -305,5 +312,5 @@ export function shipStats(race, type, tech) {
 export function shipDuration(race, type, count, yardLevel) {
   const c = SHIPS[race][type].cost;
   const total = Object.values(c).reduce((a, b) => a + b, 0) * count;
-  return Math.max(6, Math.round(total / (30 * (1 + 0.5 * Math.max(0, yardLevel - 1))))) * 1000;
+  return Math.round((Math.max(6, Math.round(total / (30 * (1 + 0.5 * Math.max(0, yardLevel - 1))))) * 1000) / TEMPO);
 }
