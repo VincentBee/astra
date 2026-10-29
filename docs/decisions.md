@@ -594,6 +594,22 @@ Aucune conversation ne les prouve.
 - Alternative : heure de Paris. Qui : Claude (défaut, proposé par la session de vérification).
   Statut : en vigueur.
 
+**D-082 — Chaque décision a un test, ou une raison de ne pas en avoir**
+- 2026-10-29 07:35. Demande : « je voudrais m'assurer que les tests unitaires couvrent toutes les
+  décisions qui ont été prises ».
+- Choix : un tableau [architecture/tests-decisions.md](architecture/tests-decisions.md) donne,
+  pour chaque D-xxx, le test qui la protège ou la raison (remplacée, en cours, méthode,
+  navigateur seulement). Les nouveaux tests vont dans `tests/decisions-<domaine>.test.mjs`, leur
+  nom commence par le numéro de la décision, et ils vérifient **ce que dit la doc**, pas ce que
+  fait le code. Chaque test est contrôlé par mutation (on casse la règle, le test doit échouer).
+  Un écart doc ≠ code est signalé, pas corrigé dans les tests.
+- Méthode : 3 sessions `/swarm-it` par domaine (Vincent : « fait une version 3 sessions », au lieu
+  des 5 proposées) ; le coordinateur a intégré et refait 7 mutations lui-même.
+- Alternatives : 5 ou 8 sessions (vérificateur et intégrateur à part) ; ranger les tests dans les
+  fichiers existants.
+- Qui : Vincent (demande, nombre de sessions) ; méthode et rangement par Claude (défaut).
+  Source : `a961aeb5` 07:35:40 → 08:43:08. Statut : en vigueur.
+
 ---
 
 ## Annexe A — affirmations réfutées (retirées ou corrigées avant assemblage)

@@ -62,9 +62,10 @@ Ordre conseillé pour arriver sur le projet : README racine → `reseau.md` §1-
 | `js/sky.js` | Soleil central de la carte | interface (et regles pour la carte) |
 | `js/galaxy.js` | Fond de galaxie en parallaxe | interface |
 | `js/icons.js` | Icônes SVG (31 tracés) | interface |
-| `tests/` | 8 fichiers `*.test.mjs` (35 tests) + `harness.mjs` | regles (règles), reseau (`peer`, `hostile`, `harness`) |
+| `tests/` | 11 fichiers `*.test.mjs` (109 tests) + `harness.mjs` | regles (règles), reseau (`peer`, `hostile`, `harness`), [tests-decisions](architecture/tests-decisions.md) (`decisions-*.test.mjs`) |
 
-Lancer les tests : `node --test tests/*.test.mjs` (35/35 réussis le 2026-10-29). Attention :
+Lancer les tests : `node --test tests/*.test.mjs` (109/109 réussis le 2026-10-29). Quel test
+protège quelle décision : [architecture/tests-decisions.md](architecture/tests-decisions.md). Attention :
 `node --test tests/` échoue (voir reseau.md §9).
 
 ## Problèmes connus (au 2026-10-29)

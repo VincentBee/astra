@@ -1,0 +1,114 @@
+# Tests et décisions
+
+Pour chaque décision de [decisions.md](../decisions.md), le test qui la protège, ou la raison
+pour laquelle il n'y en a pas (voir D-082). État au 2026-10-29 : `node --test tests/*.test.mjs` →
+109 tests, 109 réussis.
+
+- **nouveau test** : ajouté le 2026-10-29 dans `tests/decisions-planete.test.mjs` (24),
+  `tests/decisions-flotte.test.mjs` (30) ou `tests/decisions-reseau.test.mjs` (20). Le nom de
+  chaque test commence par le numéro de la décision.
+- **test existant** : la règle était déjà protégée par un des 8 fichiers d'avant.
+- **non testable** : décision remplacée, en cours, de méthode, ou qui ne vit que dans le
+  navigateur (DOM, CSS, caméra, WebRTC réel).
+
+Chaque nouveau test a été contrôlé par **mutation** : on casse exprès la règle dans `js/`, on
+vérifie que le test échoue, puis on remet le code. Le test vérifie ce que dit la doc, pas ce
+que fait le code.
+
+**Quand une décision change** : mettre à jour son test et sa ligne ici, dans le même commit.
+**Nouvelle décision** : ajouter sa ligne ici (test, ou raison de ne pas en avoir).
+
+## Écart signalé, non tranché
+
+- **D-062** : la doc dit « machines +20 % d'autonomie ». Le chasseur, le cargo et le vaisseau
+  lourd passent bien de 30 à 36 cases, mais pas la sonde réplicatrice (`js/tech.js:233`, réservoir
+  90 / conso 3 = 30 cases, inchangée par `061744b`). La décision ne dit pas si le colonisateur est
+  concerné : **non confirmé** (voir aussi [regles.md](regles.md) §18). Le test D-062 ne vérifie que
+  le chasseur, le cargo et le vaisseau lourd.
+
+## Tableau
+
+| Décision | Titre | Couverture | Tests | Remarque |
+|---|---|---|---|---|
+| D-001 | Site statique, sans serveur de jeu, WebRTC après QR | non testable |  | Hébergement statique, service worker et vrai WebRTC/caméra : navigateur seulement. Les pièces internes (invitation à usage unique, accueil sans serveur) sont couvertes sous D-006/D-010. |
+| D-002 | Règles « port de `game.rs` », vitesse ×60 | nouveau test | `decisions-planete.test.mjs` D-002 : une heure de jeu dure une minute réelle (SPEED = 60) |  |
+| D-003 | Un maître du jeu (MJ) fait foi, réseau en étoile | non testable |  | remplacée par D-005 puis D-010 |
+| D-004 | Déplacements synchronisés par le MJ | non testable |  | remplacée par D-010 et D-017 |
+| D-005 | Relève du MJ | nouveau test | `decisions-reseau.test.mjs` D-005/D-010 : un joueur revient avec son secret, sans devenir un nouveau joueur | Relève du MJ et époques : remplacées par D-010, pas de test |
+| D-006 | Les deux scans valent accord | nouveau test | `decisions-reseau.test.mjs` D-006 : un nouveau venu entre sans validation de l’hôte<br>`decisions-reseau.test.mjs` D-006 : 8 joueurs au plus, le 9e est refusé<br>`decisions-reseau.test.mjs` D-006 : une invitation ne sert qu’une fois | createInvite (peer.js, même ufrag rescanné) demande RTCPeerConnection : testé au niveau Session.acceptAnswer seulement |
+| D-007 | Sauvegarde locale et reprise | nouveau test | `decisions-reseau.test.mjs` D-007 : la partie est sauvegardée à chaque changement<br>`decisions-reseau.test.mjs` D-007 : la reprise rattrape le temps écoulé<br>`decisions-reseau.test.mjs` D-007 : fusion de deux copies, la plus récente action par joueur gagne<br>`rules.test.mjs` une longue absence donne la même planète que des passages toutes les heures |  |
+| D-008 | Hébergement sur GitHub Pages | non testable |  | hébergement GitHub Pages (déploiement) |
+| D-009 | Reconnexion sans rescanner (Trystero, relais Nostr) | nouveau test | `decisions-reseau.test.mjs` D-009 : au rendez-vous, seuls les joueurs de la même partie sont reliés<br>`decisions-reseau.test.mjs` D-009 : salon protégé par la clé de la partie ; le lien rendez-vous est gardé | join() (salon g-<gid>, password = clé, relais Nostr) charge vendor/trystero-nostr.mjs : non testable sans réseau |
+| D-010 | Plus de maître du jeu : tous au même niveau | nouveau test | `decisions-reseau.test.mjs` D-010 : une fiche plus récente passe de proche en proche, sauf vers sa source<br>`decisions-reseau.test.mjs` D-010 : plus de relève ni d’époques dans une copie reçue<br>`hostile.test.mjs` personne ne réécrit ma fiche ni le secret d’un autre, ni ne date sa fiche loin dans le futur | « Tout le monde peut inviter » : openInvite demande RTCPeerConnection (le test D-006 fait accueillir par un joueur qui n'a pas créé la partie) |
+| D-011 | Trois races et trois ressources | nouveau test | `decisions-planete.test.mjs` D-011 : trois races, trois ressources, race choisie une fois pour toutes |  |
+| D-012 | Départ serré, l'ordre de construction compte | nouveau test | `decisions-planete.test.mjs` D-012 : départ serré, entrepôts limités | « économie exigeante » est vague : seul le plafond est une règle chiffrée ; le reste est un proxy |
+| D-013 | `.claude/launch.json` n'est jamais commité | non testable |  | règle de dépôt (.claude/launch.json non commité) |
+| D-014 | Le guide sort du jeu et devient `GUIDE.md` | non testable |  | documentation (GUIDE.md) |
+| D-015 | Gisements : minéraux et nourriture | nouveau test | `decisions-planete.test.mjs` D-015 : seuls minéraux et nourriture viennent d’un gisement, l’énergie est sans limite |  |
+| D-016 | Sens de « limite min / max » d'un gisement | nouveau test | `decisions-planete.test.mjs` D-016 : gisement vide = production de base ; sans exploitation, il remonte jusqu’au maximum |  |
+| D-017 | Plus de déplacement aux flèches sur la carte | nouveau test | `decisions-flotte.test.mjs` D-017 : une fiche d’avant garde sa position aux flèches, elle disparaît |  |
+| D-018 | Choix techniques par défaut de la session `aeb160d5` | nouveau test | `decisions-planete.test.mjs` D-018 : 14 planètes tirées de l’identifiant de la partie, les mêmes partout<br>`decisions-planete.test.mjs` D-018 : deux joueurs sur la même planète mère, le premier l’emporte<br>`decisions-planete.test.mjs` D-018 / D-060 : repousse des gisements ×10 (minéraux 150–450/min, nourriture 80–250/min)<br>`decisions-planete.test.mjs` D-015 : … (assertion « planète d’avant les gisements : sans limite »)<br>`colony.test.mjs` colonie perdue au recollage : les vaisseaux et la cargaison restent en orbite (premier arrivé, colonies) | journal console « [Astra hh:mm:ss] » (js/app.js:796) et mini-graphes 10 min / 5 s (js/app.js:625-626) : non-testable, app.js dépend du DOM au chargement |
+| D-019 | Tout ce qui est produit est pris à la planète | nouveau test | `decisions-planete.test.mjs` D-019 : tout ce qui entre au stock sort du gisement, revenu de base compris<br>`decisions-planete.test.mjs` D-019 : l’arrachement ne dépasse ni le gisement ni la place en entrepôt<br>`rules.test.mjs` l’arrachement est refusé, sans rien payer, quand il ne rapporterait rien |  |
+| D-020 | Les vaisseaux servent à coloniser, transporter et combattre | nouveau test | `decisions-flotte.test.mjs` D-020 : transport — une flotte chargée qui se pose sur une autre de mes planètes y dépose sa cargaison<br>`fleet.test.mjs` colonisation : le premier arrivé l’emporte, même si son téléphone passe après<br>`combat.test.mjs` attaques répétées sur un défenseur hors ligne : pas de butin créé | colonisation et combat déjà couverts ; transport ajouté |
+| D-021 | Recherche : un labo par race et un arbre de technologies par race | nouveau test | `decisions-planete.test.mjs` D-021 / D-031 : labo et chantier par race, 7 technologies et 4 vaisseaux par race<br>`decisions-planete.test.mjs` D-021 : une recherche à la fois, et elle vaut pour toutes les planètes |  |
+| D-022 | Combat sans arbitre : le téléphone de l'attaquant calcule | nouveau test | `decisions-flotte.test.mjs` D-022 : le défenseur n’applique ses pertes qu’en lisant le rapport de l’attaquant<br>`combat.test.mjs` attaques répétées sur un défenseur hors ligne : pas de butin créé<br>`combat.test.mjs` 70 attaques avant le retour du défenseur : chaque pillage est subi |  |
+| D-023 | Pousser directement sur `main`, sans pull request | non testable |  | façon de travailler (git) |
+| D-024 | Chercher les bugs par simulation sans navigateur (« swarm bug 1 ») | non testable |  | méthode (simulation par robots), appliquée |
+| D-025 | Cadrer par des questions avant de coder | non testable |  | façon de travailler |
+| D-026 | Le voyage spatial améliore la carte actuelle | nouveau test | `decisions-flotte.test.mjs` D-026 : les flottes voyagent sur la carte unique, pas au-delà | le choix « pas plusieurs systèmes » est un cadrage ; seule la borne de carte est testable |
+| D-027 | Voyager coûte du carburant | nouveau test | `decisions-flotte.test.mjs` D-027 : chaque case parcourue brûle du carburant |  |
+| D-028 | Flottes pilotées comme dans un jeu de stratégie en temps réel | nouveau test | `decisions-flotte.test.mjs` D-028 : changement de cap en route, arrêt, rappel et stationnement |  |
+| D-029 | Interception possible en route | nouveau test | `decisions-flotte.test.mjs` D-029 : le point d’interception est sur le trajet de la cible, avant son arrivée<br>`decisions-flotte.test.mjs` D-029 : une flotte en route est rattrapée et combattue avant d’arriver |  |
+| D-030 | Ordres, réservoir, rencontre, vision | nouveau test | `decisions-flotte.test.mjs` D-030 : un seul réservoir par flotte, la somme de ceux de ses vaisseaux<br>`decisions-flotte.test.mjs` D-030 : deux flottes ennemies qui se rencontrent ne combattent pas toutes seules, elles peuvent échanger<br>`decisions-flotte.test.mjs` D-030 : la portée de détection s’améliore avec la recherche | « toucher des cases » est de l'interface (non testable ici) |
+| D-031 | Échange, plein, panne, recherche de détection | nouveau test | `decisions-flotte.test.mjs` D-031 : un échange se fait par proposition puis accord<br>`decisions-flotte.test.mjs` D-031 : le plein se fait sur ses planètes, pas sur celle d’un autre<br>`decisions-flotte.test.mjs` D-031 : deux de mes flottes sur la même case se passent du carburant et fusionnent, pas à distance<br>`decisions-flotte.test.mjs` D-031 : une flotte à sec reste bloquée jusqu’à ce qu’on la secoure<br>`decisions-flotte.test.mjs` D-031 : une technologie de détection par race<br>`decisions-flotte.test.mjs` D-031 : le carburant s’échange comme les ressources<br>`fleet.test.mjs` flotte en panne à moins d’une demi-case de sa planète : elle peut faire le plein |  |
+| D-032 | Choix par défaut du voyage proposés par Claude | nouveau test | `decisions-flotte.test.mjs` D-032 : le carburant est pris dans l’énergie de la planète, et y retourne en se posant<br>`decisions-flotte.test.mjs` D-032 : on peut scinder une flotte en deux | partie « offre de 10 min » remplacée par D-034 ; partie « combat par l'attaquant » : voir D-022 |
+| D-033 | Ne pas corriger dans « swarm bug 1 » : envoyer le rapport à « swarm bug 2 » | non testable |  | méthode, appliquée |
+| D-034 | Offre d'échange de 5 min, non annulable | nouveau test | `decisions-flotte.test.mjs` D-034 : une offre vaut 5 min<br>`decisions-flotte.test.mjs` D-034 : acceptée juste avant 5 min elle vaut, juste après elle est refusée<br>`decisions-flotte.test.mjs` D-034 : une offre ne s’annule pas, et la flotte qui propose attend la réponse |  |
+| D-035 | Le voyage en 7 lots, commit et push après chaque lot | non testable |  | méthode (lots de commits), appliquée |
+| D-036 | Limites acceptées du pair à pair | nouveau test | `decisions-flotte.test.mjs` D-036 : seuls les vaisseaux posés défendent une planète, pas une flotte en orbite | « poursuite imprécise » et « deux combats si A et B s'attaquent » sont des limites acceptées, pas des garanties : non testables |
+| D-037 | Test par une équipe de 8 robots qui trouvent sans réparer (« swarm bug 2 ») | non testable |  | méthode (robots), appliquée |
+| D-038 | Consommation des machines doublée | nouveau test | `decisions-planete.test.mjs` D-038 : consommation des machines doublée (carburant par case) | les réservoirs (autonomie) relèvent de D-062, testé par dom-flotte |
+| D-039 | Le plein de carburant reste le défaut au décollage | non testable |  | le défaut est dans l'écran de décollage (js/app.js:1162, DOM) ; launch met 0 par défaut, comme le dit regles.md §8.2 |
+| D-040 | Corriger seulement la cause racine CR-1, avec un test | non testable |  | méthode ; le test de CR-1 relève du domaine flotte/planète |
+| D-041 | Corriger les bugs encore présents du rapport « swarm bug 1 » | non testable |  | méthode, appliquée |
+| D-042 | Ce qui n'est pas corrigé après les rapports du 28 au matin | non testable |  | décision de ne pas corriger ; les numéros B/E ne sont pas définis dans la doc. B5 (seuls les vaisseaux posés défendent) est couvert par le test D-036 |
+| D-043 | L'arbre des technologies sur une page à part | non testable |  | Page HTML hors du jeu, techtree.js touche le DOM au chargement ; seule vérification possible = lire l'import dans le source, sans valeur |
+| D-044 | Journal des ordres horodatés et moteur de rejeu | test existant | `replay.test.mjs` une partie rejouée depuis les journaux retombe sur les mêmes fiches |  |
+| D-045 | Les ordres refusés sont aussi notés | nouveau test | `decisions-reseau.test.mjs` D-045 : un ordre refusé est noté et date la fiche | Remarque : le commentaire de play() dans tests/replay.test.mjs dit « Les ordres refusés ne changent rien (ni journal) », contraire à D-045 et au code (commentaire de test, pas un écart doc≠code) |
+| D-046 | Découper les gros messages réseau en morceaux | test existant | `peer.test.mjs` un message de 600 000 caractères arrive entier, en morceaux de moins de 64 000 |  |
+| D-047 | Le replay sur une page à part (`replay.html`) | non testable |  | Page et bouton HTML (app.js/replay-view.js touchent le DOM) ; le moteur de rejeu est couvert par D-044 |
+| D-048 | L'arbre des technologies est un vrai graphe, avec tout | nouveau test | `decisions-planete.test.mjs` D-048 : l’arbre des technologies est un graphe avec bâtiments, technologies, vaisseaux et pouvoirs | fragile : importe js/techtree.js avec un faux DOM (document, location, history écrasés) ; tout nouvel appel DOM dans techtree.js peut le casser. Fonctionne car node --test isole chaque fichier |
+| D-049 | Chaque entrée du journal sait ce que le joueur avait reçu des autres | nouveau test | `decisions-reseau.test.mjs` D-049 : chaque entrée note ce que le joueur avait reçu des autres<br>`replay.test.mjs` partie coupée en deux puis recollée : chacun est rejoué avec ce qu’il savait |  |
+| D-050 | Journal plafonné à 1 500 entrées par joueur | nouveau test | `decisions-reseau.test.mjs` D-050 : journal plafonné à 1 500 entrées, les plus anciennes s’effacent<br>`replay.test.mjs` un journal tronqué est signalé | « ≈ 57 octets par entrée » : estimation, non testée |
+| D-051 | Fusionner `main` dans la branche avant de pousser | non testable |  | façon de travailler (git) |
+| D-052 | Des icônes à la place des abréviations de ressources | nouveau test | `decisions-reseau.test.mjs` D-052 : icônes de ressources nommées (survol et lecteur d’écran), couleur par ressource | « carburant en toutes lettres » : texte de app.js (DOM), non testé |
+| D-053 | Un soleil central de taille aléatoire, traversable | nouveau test | `decisions-planete.test.mjs` D-053 : le soleil 3 × 3 est décalé d’une demi-case, et les flottes le traversent en ligne droite<br>`rules.test.mjs` le soleil est au milieu de la carte, de 2 × 2 à 4 × 4, et aucune planète n’y est | « les autres planètes restent où elles étaient avant le soleil » non testé (il faudrait une carte sans soleil pour comparer) |
+| D-054 | Climat selon la distance au soleil (premiers chiffres) | non testable |  | remplacée : voir D-060 (climat). La forme générale (chaud près du centre) est protégée par tests/rules.test.mjs::plus une planète est près du soleil… ; la plage nourriture ×0,6–×1,3 vient de D-054, non modifiée par D-060 |
+| D-055 | Interface la plus condensée possible | non testable |  | Mise en page visuelle (DOM/CSS) |
+| D-056 | Des places sur les planètes, et des mini-planètes | nouveau test | `decisions-planete.test.mjs` D-056 : les petits corps ne servent pas de départ<br>`decisions-planete.test.mjs` D-056 : un astéroïde se colonise<br>`rules.test.mjs` chaque niveau de bâtiment prend une place : une planète pleine ne construit plus |  |
+| D-057 | Ce qui reste non corrigé après le premier tour de bugs | non testable |  | Ce n'est pas une règle mais un constat de bugs connus ; un test qui exige le bug bloquerait sa correction. Cas voisin couvert : tests/fleet.test.mjs::plusieurs attaquants qui se voient ne pillent pas plus que le stock du défenseur ; D-061 relève de dom-flotte |
+| D-058 | Places revues | nouveau test | `decisions-planete.test.mjs` D-058 : planètes 14–22 places, astéroïdes 7–10, comètes 6–8 avec des minéraux<br>`decisions-planete.test.mjs` D-058 : tirage uniforme des places (les bornes sortent aussi souvent que le reste)<br>`rules.test.mjs` les places viennent de la carte : les effacer ou un niveau négatif ne libère rien<br>`rules.test.mjs` une colonie humaine sur le plus petit corps garde des places libres |  |
+| D-059 | Limites d'affichage défensives | nouveau test | `decisions-flotte.test.mjs` D-059 : noms à 16 caractères et couleurs de joueur filtrées | « 118 k », Échap/fond pour fermer, boutons nommés : affichage (js/app.js), non testable en unitaire |
+| D-060 | Équilibrage des races (deuxième tour) | nouveau test | `decisions-planete.test.mjs` D-018 / D-060 : repousse des gisements ×10 (minéraux 150–450/min, nourriture 80–250/min)<br>`decisions-planete.test.mjs` D-060 : entrepôts hors du score, mine humaine 36, impôt 0,4 par habitant<br>`decisions-planete.test.mjs` D-060 : climat adouci (énergie ×0,8–×1,2, minéraux ×0,9–×1,1, nourriture ×0,6–×1,3)<br>`decisions-planete.test.mjs` D-060 : pouvoirs aliens (arrachement 40, transe 25 par psionique), transe refusée sur sol vide<br>`rules.test.mjs` plus une planète est près du soleil, plus elle est chaude, et son climat change la production |  |
+| D-061 | Règles anti-triche et tolérance d'horloge | nouveau test | `decisions-flotte.test.mjs` D-061 : une horloge en avance est tolérée jusqu’à un jour, pas au-delà<br>`decisions-flotte.test.mjs` D-061 : un échange accepté à temps mais su très en retard est conclu après coup depuis la planète mère<br>`fleet.test.mjs` poursuite mutuelle livrée des deux côtés en même temps : les pertes ne comptent qu’une fois<br>`fleet.test.mjs` une revanche plus tard entre les deux mêmes flottes est un vrai combat<br>`hostile.test.mjs` une installation datée de bien avant la mienne ne me prend pas ma planète |  |
+| D-062 | Pas d'attaque sans armes, pillage limité, coûts des vaisseaux | nouveau test | `decisions-flotte.test.mjs` D-062 : une flotte sans armes ne peut pas en prendre une autre en chasse<br>`decisions-flotte.test.mjs` D-062 : sans armes, pas de victoire, même contre personne<br>`decisions-flotte.test.mjs` D-062 : coûts des vaisseaux<br>`decisions-flotte.test.mjs` D-062 : machines +20 % d’autonomie (30 → 36 cases par plein)<br>`fleet.test.mjs` raids : pas d’attaque sans armes, et un seul pillage par planète toutes les 2 min | les points « laissés à Vincent » ne sont pas tranchés : pas de test |
+| D-063 | Un seul commit et une PR pour la session des icônes (PR #1) | non testable |  | façon de travailler (PR), appliquée |
+| D-064 | Icônes SVG maison, chacune avec un nom | nouveau test | `decisions-reseau.test.mjs` D-064 : chaque icône de la page existe, et un bouton sans texte porte un nom | ic() est aria-hidden : le nom est porté par le bouton (title + aria-label) ou par son texte ; le test vérifie index.html, pas les gabarits de app.js |
+| D-065 | Les questions d'explication vont dans des sessions filles en lecture seule | non testable |  | façon de travailler (sessions) |
+| D-066 | Historique des 10 dernières parties, sans confirmation avant « Créer » | nouveau test | `decisions-reseau.test.mjs` D-066 : 10 parties gardées, une nouvelle n’efface pas l’ancienne<br>`decisions-reseau.test.mjs` D-066 : l’identité est gardée par partie ; reprendre et oublier | « sans confirmation avant Créer » : bouton de app.js (DOM), non testé |
+| D-067 | Parallaxe : pas au doigt, mais à l'accéléromètre | nouveau test | `decisions-reseau.test.mjs` D-067 : le doigt ne bouge pas les étoiles, l’accéléromètre si | startGalaxy lancé dans un faux navigateur (doublures locales au fichier) |
+| D-068 | Accéléromètre sur iPhone | nouveau test | `decisions-reseau.test.mjs` D-068 : sur iPhone, l’autorisation « Mouvement » est demandée au premier tap ; fond fixe si « réduire les animations » | Repos qui s'adapte et lissage : comportement continu non testé ; vrai iPhone toujours non confirmé |
+| D-069 | Choix de race par icônes, Humains par défaut | non testable |  | interface seulement (js/app.js:395-432) ; app.js touche le DOM au chargement, pas importable en unitaire |
+| D-070 | « Biomasse » sur la planète, « Nourriture » chez le joueur | nouveau test | `decisions-planete.test.mjs` D-070 : « Nourriture » dans les stocks du joueur | moitié « Biomasse » (SOIL_NAMES, js/app.js:561) non-testable : app.js non importable |
+| D-071 | Une fenêtre « Joueurs » ouverte par le compteur 👥 | non testable |  | Fenêtre et boutons dans app.js/index.html (DOM) |
+| D-072 | Atténuer ce qu'on ne peut pas toucher sur la carte | non testable |  | Rendu visuel (canvas/CSS) |
+| D-073 | Blocs collants de l'écran planète | non testable |  | stackSticky mesure le DOM au défilement |
+| D-074 | Onglet « Pouvoirs » pour les Aliens seulement | nouveau test | `decisions-planete.test.mjs` D-074 : seuls les aliens ont des pouvoirs<br>`decisions-planete.test.mjs` D-048 : … (pas de bulle « pouvoir » hors aliens) | proxy : l'onglet lui-même (js/app.js:526-529) est non-testable (DOM) ; le test protège la règle sous-jacente usePower réservé aux aliens |
+| D-075 | Plus de barre du haut | non testable |  | Mise en page visuelle (index.html/CSS) |
+| D-076 | Un seul commit pour tout le design | non testable |  | façon de travailler (commit), appliquée |
+| D-077 | Évaluer le rythme du jeu avec 4 robots | non testable |  | méthode (robots), appliquée |
+| D-078 | Une partie dure 20 à 40 minutes, sans temps mort à la fin | non testable |  | en cours, branche non fusionnée : hors périmètre |
+| D-079 | Noter chaque demande et chaque décision dans `docs/`, règle dans `CLAUDE.md` | non testable |  | règle de documentation |
+| D-080 | Documenter avec une équipe de 8 sessions qui se contre-vérifient | non testable |  | méthode, appliquée |
+| D-081 | Les heures de la doc sont en UTC | non testable |  | convention de documentation |
+| D-082 | Chaque décision a un test, ou une raison de ne pas en avoir | non testable |  | règle de documentation et de tests (ce tableau) |

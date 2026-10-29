@@ -241,6 +241,9 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 06:35:38 | `1df29e6e` | `/swarm-it` « je voudrais que le projet soit documenté entierement, que chaque demande et decision qui ont ete prise et qui le seront dans l'avenir soient ecrite dans le projet » | Plan d'équipe de 8 sessions | (à venir) | D-079, D-080 |
 | 06:38:21 | `1df29e6e` | [Bouton] « Oui, lance » | `docs/` et `CLAUDE.md` écrits (cette doc) | (à venir) | D-080, D-081 |
 | 06:43:57 | `26f178b9` | « il faudrait qu'une partie dure entre 20min et 40min, qu'il n'y ait pas de temps mort, surtout à la fin » | **En cours, non commité** : `TEMPO = 2.5`, colonisation plus tôt, score de tout l'empire, fin de partie à 220 points ou 40 min, `tests/end.test.mjs` (branche `claude/swarm-it-game-pacing-1d4502`, 10 fichiers modifiés au 29/10) | — | D-078 |
+| 07:35:40 | `a961aeb5` | `/swarm-it` « https://github.com/VincentBee/astra/pull/2 vient d'être mergé et je voudrais m'assurer que les tests unitaires couvrent toutes les décisions qui ont été prises. » | Plan de 5 sessions proposé | — | D-082 |
+| 07:41:47 | `a961aeb5` | « fait une version 3 sessions » | 3 sessions par domaine (planète, flotte, réseau), chacune dans son worktree et son fichier de test, avec un contrôle par mutation | — | D-082 |
+| 08:43:08 | `a961aeb5` | [Bouton] « Oui, fusionne » | Branches fusionnées ; 74 nouveaux tests (109 en tout, tous verts) ; tableau [tests-decisions.md](../architecture/tests-decisions.md) ; un écart signalé (D-062, sonde machine) ; commentaire périmé de `tests/replay.test.mjs` corrigé | (ce commit) | D-082 |
 
 ### Travaux en cours au 2026-10-29
 
