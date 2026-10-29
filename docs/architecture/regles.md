@@ -701,6 +701,13 @@ Résultat : `tests 34, pass 34, fail 0`, environ 5,6 s (le rejeu d'une partie de
 | `tests/hostile.test.mjs` | 6 | Pair malveillant ou fiche abîmée : personne ne réécrit ma fiche ni un secret, ni ne date sa fiche loin dans le futur ; fiche abîmée sans plantage ; race ou identifiant spécial ; installation antidatée ; heure qui recule ; téléphone en avance reste visible. Une partie de ces tests passe par l'acceptation des fiches (mécanisme décrit dans reseau.md) |
 | `tests/replay.test.mjs` | 4 | Une partie de robots (construire, chercher, armer, décoller, attaquer, échanger) rejouée retombe sur les mêmes fiches ; partie coupée en deux puis recollée ; journal tronqué signalé ; copie pas à jour signalée |
 
+| `tests/decisions-planete.test.mjs` | 24 | Une règle par décision (D-002 → D-074) : vitesse, races, départ, gisements, prélèvement, labos, soleil, climat, places, équilibrage, pouvoirs |
+| `tests/decisions-flotte.test.mjs` | 30 | Une règle par décision (D-017 → D-062) : voyage, carburant, ordres, interception, échanges, anti-triche, armes et pillage |
+| `tests/decisions-reseau.test.mjs` | 20 | Une règle par décision (D-005 → D-068) : invitations, 8 joueurs, sauvegarde, rendez-vous, journal et rejeu, découpage, icônes, historique, parallaxe |
+
+Depuis le 2026-10-29 : `node --test tests/*.test.mjs` → `tests 109, pass 109, fail 0`. Le tableau
+décision → test est dans [tests-decisions.md](tests-decisions.md) (D-082).
+
 Plusieurs fichiers le disent : ces cas ont été **trouvés en faisant jouer des robots**
 (`tests/fleet.test.mjs:3`, `tests/hostile.test.mjs:3`).
 

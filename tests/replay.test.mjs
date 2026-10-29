@@ -13,7 +13,8 @@ const keys = (o) => Object.keys(o);
 /**
  * Un petit robot par joueur : à chaque tour, il essaie de construire,
  * chercher, armer des vaisseaux, faire décoller une flotte et l'envoyer
- * chez un autre joueur. Les ordres refusés ne changent rien (ni journal).
+ * chez un autre joueur. Les ordres refusés ne changent pas la partie, mais
+ * sont notés au journal (D-045).
  */
 function play(players, clock, sync, turns) {
   const share = (s) => {
