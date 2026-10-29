@@ -11,6 +11,9 @@ export const { Session } = await import('../js/session.js');
 export const game = await import('../js/game.js');
 export const fleet = await import('../js/fleet.js');
 
+// Pas de froid dans les parties de test (tests/end.test.mjs le règle) : elles ne finissent pas d'elles-mêmes.
+game.FROST.delayMs = Infinity;
+
 const RACES = ['human', 'machine', 'alien'];
 
 /**

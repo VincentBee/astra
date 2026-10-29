@@ -9,19 +9,21 @@ const { TECHS, SHIPS } = await import('../js/tech.js');
 
 const T0 = 10_000_000;
 const MIN = 60_000;
+/** Une heure de jeu, en ms réelles (D-083 : 1 / TEMPO minute). */
+const GH = MIN / game.TEMPO;
 const close = (a, b, eps = 1e-6) => assert.ok(Math.abs(a - b) < eps, `${a} ≠ ${b}`);
 
 /** Planète posée sur un monde de la carte `gtest` (gisements et climat compris). */
 const onWorld = (race, i = 0) => game.newPlanet(race, T0, game.planetsFor('gtest')[i]);
 
-test('D-002 : une heure de jeu dure une minute réelle (SPEED = 60)', () => {
-  assert.equal(game.SPEED, 60);
+test('D-002 (modifiée par D-083) : une heure de jeu dure 1 / TEMPO minute réelle (SPEED = 60 × TEMPO)', () => {
+  assert.equal(game.SPEED, 60 * game.TEMPO);
   // Planète sans gisement ni population : la production est linéaire.
   const p = game.newPlanet('machine', T0);
   const perHour = game.flows('machine', p.levels, 0, p.stock, 1).net.minerals;
   assert.ok(perHour > 0);
   const before = p.stock.minerals;
-  game.settle(p, T0 + MIN);
+  game.settle(p, T0 + GH);
   close(p.stock.minerals - before, perHour);
 });
 
@@ -77,7 +79,7 @@ test('D-016 : gisement vide = production de base ; sans exploitation, il remonte
   p.nature.minerals.regen = 5;
   close(game.stateAt(p, T0).prod.in.minerals, 5);
   const before = p.stock.minerals;
-  game.settle(p, T0 + 10 * MIN);
+  game.settle(p, T0 + 10 * GH);
   close(p.stock.minerals - before, 5 * 10);
   // Peu exploité : il se remplit, sans dépasser son maximum.
   const q = onWorld('machine');
@@ -140,7 +142,7 @@ test('D-019 : tout ce qui entre au stock sort du gisement, revenu de base compri
   const h = 10;
   const stock0 = p.stock.minerals;
   const soil0 = p.reserve.minerals;
-  game.settle(p, T0 + h * MIN);
+  game.settle(p, T0 + h * GH);
   const gained = p.stock.minerals - stock0;
   assert.ok(gained > 0);
   close(gained, soil0 + p.nature.minerals.regen * h - p.reserve.minerals, 1e-6);
@@ -237,7 +239,7 @@ test('D-053 : le soleil 3 × 3 est décalé d’une demi-case, et les flottes le
   assert.equal(fleet.moveTo(f, 'human', {}, { x: 19, y }, null, T0), null);
   assert.deepEqual(f.to, { x: 19, y });
   assert.equal(f.arrive - T0, fleet.tripMs({ x: 0, y }, { x: 19, y }, fleet.fleetSpeed('human', f.ships, {})));
-  close(f.arrive - T0, (19 / SHIPS.human.fighter.speed) * MIN, 1);
+  close(f.arrive - T0, ((19 / SHIPS.human.fighter.speed) * MIN) / game.TEMPO, 1); // vitesse en cases par heure de jeu (D-083)
 });
 
 test('D-056 : les petits corps ne servent pas de départ', () => {

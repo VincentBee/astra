@@ -1,7 +1,7 @@
 // Page « Technologies » (technologies.html), hors du jeu : le graphe de
 // chaque race (bâtiments, technologies, vaisseaux, pouvoirs), lu dans les
 // données du jeu.
-import { TECHS, SHIPS, SHIP_KEYS, techCost, researchDuration, shipUnlock } from './tech.js';
+import { TECHS, SHIPS, SHIP_KEYS, techCost, researchDuration, shipUnlock, TEMPO } from './tech.js';
 import { RACES, RACE_KEYS, resIcon, raceIcon, POWERS, POWER_KEYS, upgradeCost, buildDuration } from './game.js';
 
 const ROLES = { cargo: 'Cargo', fighter: 'Chasseur', heavy: 'Vaisseau lourd', colony: 'Colonisateur' };
@@ -234,7 +234,7 @@ function shipPanel(type) {
       <dt>Attaque</dt><dd>${s.attack}</dd>
       <dt>Coque</dt><dd>${s.hull}</dd>
       <dt>Soute</dt><dd>${num(s.cargo)}</dd>
-      <dt>Vitesse</dt><dd>${s.speed} cases/min</dd>
+      <dt>Vitesse</dt><dd>${+(s.speed * TEMPO).toFixed(1)} cases/min</dd>
       <dt>Autonomie</dt><dd>${Math.round(s.tank / s.burn)} cases</dd>
       <dt>Coût</dt><dd>${cost(s.cost)}</dd>
     </dl>`;

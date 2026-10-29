@@ -2,7 +2,7 @@
 
 Pour chaque décision de [decisions.md](../decisions.md), le test qui la protège, ou la raison
 pour laquelle il n'y en a pas (voir D-082). État au 2026-10-29 : `node --test tests/*.test.mjs` →
-109 tests, 109 réussis.
+119 tests, 119 réussis (après la fusion du rythme des parties, D-083 à D-097).
 
 - **nouveau test** : ajouté le 2026-10-29 dans `tests/decisions-planete.test.mjs` (24),
   `tests/decisions-flotte.test.mjs` (30) ou `tests/decisions-reseau.test.mjs` (20). Le nom de
@@ -31,7 +31,7 @@ que fait le code.
 | Décision | Titre | Couverture | Tests | Remarque |
 |---|---|---|---|---|
 | D-001 | Site statique, sans serveur de jeu, WebRTC après QR | non testable |  | Hébergement statique, service worker et vrai WebRTC/caméra : navigateur seulement. Les pièces internes (invitation à usage unique, accueil sans serveur) sont couvertes sous D-006/D-010. |
-| D-002 | Règles « port de `game.rs` », vitesse ×60 | nouveau test | `decisions-planete.test.mjs` D-002 : une heure de jeu dure une minute réelle (SPEED = 60) |  |
+| D-002 | Règles « port de `game.rs` », vitesse ×60 (modifiée par D-083) | nouveau test | `decisions-planete.test.mjs` D-002 (modifiée par D-083) : une heure de jeu dure 1 / TEMPO minute réelle | Les tests D-016, D-019, D-028, D-053 comptent aussi en heures de jeu (`MIN / TEMPO`) |
 | D-003 | Un maître du jeu (MJ) fait foi, réseau en étoile | non testable |  | remplacée par D-005 puis D-010 |
 | D-004 | Déplacements synchronisés par le MJ | non testable |  | remplacée par D-010 et D-017 |
 | D-005 | Relève du MJ | nouveau test | `decisions-reseau.test.mjs` D-005/D-010 : un joueur revient avec son secret, sans devenir un nouveau joueur | Relève du MJ et époques : remplacées par D-010, pas de test |
@@ -65,7 +65,7 @@ que fait le code.
 | D-033 | Ne pas corriger dans « swarm bug 1 » : envoyer le rapport à « swarm bug 2 » | non testable |  | méthode, appliquée |
 | D-034 | Offre d'échange de 5 min, non annulable | nouveau test | `decisions-flotte.test.mjs` D-034 : une offre vaut 5 min<br>`decisions-flotte.test.mjs` D-034 : acceptée juste avant 5 min elle vaut, juste après elle est refusée<br>`decisions-flotte.test.mjs` D-034 : une offre ne s’annule pas, et la flotte qui propose attend la réponse |  |
 | D-035 | Le voyage en 7 lots, commit et push après chaque lot | non testable |  | méthode (lots de commits), appliquée |
-| D-036 | Limites acceptées du pair à pair | nouveau test | `decisions-flotte.test.mjs` D-036 : seuls les vaisseaux posés défendent une planète, pas une flotte en orbite | « poursuite imprécise » et « deux combats si A et B s'attaquent » sont des limites acceptées, pas des garanties : non testables |
+| D-036 | Limites acceptées du pair à pair (modifiée par D-095) | nouveau test | `decisions-flotte.test.mjs` D-036 (modifiée par D-095) : une flotte en orbite ne défend pas la planète (planète sans bâtiment, donc sans défense propre) | « poursuite imprécise » et « deux combats si A et B s'attaquent » sont des limites acceptées, pas des garanties : non testables |
 | D-037 | Test par une équipe de 8 robots qui trouvent sans réparer (« swarm bug 2 ») | non testable |  | méthode (robots), appliquée |
 | D-038 | Consommation des machines doublée | nouveau test | `decisions-planete.test.mjs` D-038 : consommation des machines doublée (carburant par case) | les réservoirs (autonomie) relèvent de D-062, testé par dom-flotte |
 | D-039 | Le plein de carburant reste le défaut au décollage | non testable |  | le défaut est dans l'écran de décollage (js/app.js:1162, DOM) ; launch met 0 par défaut, comme le dit regles.md §8.2 |
@@ -107,8 +107,23 @@ que fait le code.
 | D-075 | Plus de barre du haut | non testable |  | Mise en page visuelle (index.html/CSS) |
 | D-076 | Un seul commit pour tout le design | non testable |  | façon de travailler (commit), appliquée |
 | D-077 | Évaluer le rythme du jeu avec 4 robots | non testable |  | méthode (robots), appliquée |
-| D-078 | Une partie dure 20 à 40 minutes, sans temps mort à la fin | non testable |  | en cours, branche non fusionnée : hors périmètre |
+| D-078 | Une partie dure 20 à 40 minutes, sans temps mort à la fin | non testable |  | objectif mesuré par simulation (`RAPPORT-RYTHME.md`), pas par un test ; réalisé par D-083 à D-097 |
 | D-079 | Noter chaque demande et chaque décision dans `docs/`, règle dans `CLAUDE.md` | non testable |  | règle de documentation |
 | D-080 | Documenter avec une équipe de 8 sessions qui se contre-vérifient | non testable |  | méthode, appliquée |
 | D-081 | Les heures de la doc sont en UTC | non testable |  | convention de documentation |
 | D-082 | Chaque décision a un test, ou une raison de ne pas en avoir | non testable |  | règle de documentation et de tests (ce tableau) |
+| D-083 | Un seul réglage de vitesse : `TEMPO = 2.5` | test existant | `decisions-planete.test.mjs` D-002 (modifiée par D-083) ; `rules.test.mjs` longue absence (pas d'intégration en heures de jeu) |  |
+| D-084 | Coloniser plus tôt (labo 2, ½ prix, colonisateur ×0,6) | non testable |  | valeurs d'équilibrage, sans test dédié (non confirmé par un test) |
+| D-085 | Le score compte tout l'empire | nouveau test | `end.test.mjs` le score compte toutes les planètes, les recherches et les vaisseaux |  |
+| D-086 | Fin par course à 220 points / 40 min | non testable |  | remplacée par D-088, retirée du code |
+| D-087 | Parties d'avant la course : ni fin ni froid | nouveau test | `end.test.mjs` une partie d'avant la course n'a ni froid ni fin |  |
+| D-088 | Le soleil s'éteint : froid du bord vers le soleil | nouveau test | `end.test.mjs` le froid prend d'abord les planètes loin du soleil |  |
+| D-089 | Sans planète éliminé, dernier en vie gagne, colonie qui remplace la planète mère | nouveau test | `end.test.mjs` planète mère gelée… puis élimination ; à deux, le dernier en vie gagne |  |
+| D-090 | Froid : 12 min, 24 min, `ease` 2 | non testable |  | valeurs d'équilibrage, mesurées par simulation |
+| D-091 | Prise avec un colonisateur | non testable |  | remplacée par D-092 ; `end.test.mjs` vérifie qu'un colonisateur seul ne prend rien |
+| D-092 | Conquête par le combat (ordre « Conquérir ») | nouveau test | `end.test.mjs` conquérir la planète mère… l'élimine ; l'ordre « attaquer » ne prend pas la planète |  |
+| D-093 | Bâtiments de défense par race | nouveau test | `end.test.mjs` la défense d'une planète vient de ses bâtiments, et de sa race | valeurs non équilibrées |
+| D-094 | Les défenses prennent une place | test existant | `rules.test.mjs` chaque niveau de bâtiment prend une place |  |
+| D-095 | La défense compte contre le pillage et se répare | nouveau test | `end.test.mjs` trop peu de vaisseaux d'attaque : les tourelles tiennent, ni prise ni pillage |  |
+| D-096 | Déconstruire un bâtiment | nouveau test | `rules.test.mjs` déconstruire un niveau rend la moitié de son prix et libère sa place à la fin |  |
+| D-097 | `FORMAT` 8 et cache v52 | non testable |  | version de format et de cache |

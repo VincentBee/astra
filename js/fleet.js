@@ -20,16 +20,17 @@
 // C'est le téléphone du propriétaire qui applique l'arrivée.
 
 import { distance, covers, settle, SOIL } from './game.js';
-import { SHIPS, SHIP_KEYS, shipStats } from './tech.js';
+import { SHIPS, SHIP_KEYS, shipStats, TEMPO } from './tech.js';
 
 export const MAX_FLEETS = 16;
 /** Un trajet dure au moins ce temps (ms), dès qu'il faut bouger. */
-const MIN_TRIP = 5_000;
+const MIN_TRIP = 2_000;
 
 export const ORDERS = {
   dock: { name: 'Se poser', verb: 'va se poser sur' },
   colonize: { name: 'Colonisation', verb: 'part coloniser' },
   attack: { name: 'Attaque', verb: 'attaque' },
+  conquer: { name: 'Conquête', verb: 'part conquérir' },
   chase: { name: 'Poursuite', verb: 'prend en chasse' },
 };
 
@@ -81,7 +82,7 @@ export function tripMs(from, to, speed) {
   const d = distance(from, to);
   if (!d) return 0;
   if (!speed) return Infinity;
-  return Math.max(MIN_TRIP, Math.round((d / speed) * 60_000));
+  return Math.max(MIN_TRIP, Math.round(((d / speed) * 60_000) / TEMPO));
 }
 
 /**
@@ -368,21 +369,27 @@ export function applyLosses(f, race, tech, lost, take, now) {
  * a, d : { race, ships, tech }. Renvoie { attLeft, defLeft, attLost, defLost, won }.
  */
 export function battle(a, d) {
-  const side = (x) => ({
-    race: x.race,
+  const side = (x) => {
     // Entiers positifs seulement : une fiche abîmée ne doit pas créer de vaisseaux.
-    n: Object.fromEntries(SHIP_KEYS.map((k) => [k, Math.max(0, Math.floor(Number(x.ships?.[k]) || 0))])),
-    st: Object.fromEntries(SHIP_KEYS.map((k) => [k, shipStats(x.race, k, x.tech)])),
-    dmg: Object.fromEntries(SHIP_KEYS.map((k) => [k, 0])),
-  });
+    const S = {
+      race: x.race,
+      n: Object.fromEntries(SHIP_KEYS.map((k) => [k, Math.max(0, Math.floor(Number(x.ships?.[k]) || 0))])),
+      st: Object.fromEntries(SHIP_KEYS.map((k) => [k, shipStats(x.race, k, x.tech)])),
+      dmg: Object.fromEntries(SHIP_KEYS.map((k) => [k, 0])),
+    };
+    // La défense d'une planète (ses bâtiments) se bat comme un seul gros vaisseau.
+    if (x.fort?.hull > 0) Object.assign(S, { n: { ...S.n, fort: 1 }, st: { ...S.st, fort: x.fort }, dmg: { ...S.dmg, fort: 0 } });
+    return S;
+  };
   const A = side(a);
   const D = side(d);
-  const firepower = (S) => SHIP_KEYS.reduce((t, k) => t + S.n[k] * S.st[k].attack, 0);
+  const keys = (S) => Object.keys(S.n);
+  const firepower = (S) => keys(S).reduce((t, k) => t + S.n[k] * S.st[k].attack, 0);
   const hitOn = (S, power) => {
-    const hulls = SHIP_KEYS.map((k) => S.n[k] * S.st[k].hull);
+    const hulls = keys(S).map((k) => S.n[k] * S.st[k].hull);
     const total = hulls.reduce((x, y) => x + y, 0);
     if (!total) return;
-    SHIP_KEYS.forEach((k, i) => {
+    keys(S).forEach((k, i) => {
       if (!S.n[k]) return;
       S.dmg[k] += (power * hulls[i]) / total;
       const dead = Math.min(S.n[k], Math.floor(S.dmg[k] / S.st[k].hull + 1e-9));
@@ -390,7 +397,7 @@ export function battle(a, d) {
       S.dmg[k] -= dead * S.st[k].hull;
     });
   };
-  const alive = (S) => SHIP_KEYS.some((k) => S.n[k] > 0);
+  const alive = (S) => keys(S).some((k) => S.n[k] > 0);
   for (let round = 0; round < 4 && alive(A) && alive(D); round++) {
     const pa = firepower(A);
     const pd = firepower(D);

@@ -35,7 +35,7 @@ Transcripts : `~/.claude/projects/-Users-vincent-Workspace-Personal-astra--claud
 | `f4afbcd0` | Design minimaliste et épuré | lancer-projet-local-40a514 | `claude/design-minimaliste-epure-57c084` | 2026-10-28 21:42 → 23:14 | `1eeb2c1` |
 | `f278ecb8` | Décrire le système de combat actuel (fille de `f4afbcd0`) | lancer-projet-local-40a514 | — | 2026-10-28 21:45 → 21:46 | aucun (lecture seule) |
 | `a090eacb` | Effet position et température sur les planètes (fille de `f4afbcd0`) | lancer-projet-local-40a514 | — | 2026-10-28 22:33 → 22:34 | aucun (lecture seule) |
-| `26f178b9` | Intensité et rythme du jeu | lancer-projet-local-cd6c4b | `claude/swarm-it-game-pacing-1d4502` | 2026-10-29 06:19 → (en cours) | aucun (travail non commité) |
+| `26f178b9` | Intensité et rythme du jeu | lancer-projet-local-cd6c4b | `claude/swarm-it-game-pacing-1d4502` | 2026-10-29 06:19 → (en cours) | `9b37782`, fusion de `main` `c702559`, déconstruction + doc |
 | `1df29e6e` | Documentation du projet (cette doc) | tech-tree-page-eba0b4 | `claude/swarm-it-documentation-790545` | 2026-10-29 06:35 → (en cours) | (à venir) |
 
 Faits du dépôt : 35 commits, tous sur `main`. Deux merges seulement : `49b2156` et `9ec0e0c` (PR #1,
@@ -240,14 +240,26 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 06:20:09 | `26f178b9` | [Bouton] « Oui, lance » | Rapport `RAPPORT-RYTHME.md` (non commité) : creux de 20–28 min avant la 1ʳᵉ colonie, puis plus rien à faire après 1 h 30–2 h ; le jeu manque de contenu de fin | — | D-077 |
 | 06:35:38 | `1df29e6e` | `/swarm-it` « je voudrais que le projet soit documenté entierement, que chaque demande et decision qui ont ete prise et qui le seront dans l'avenir soient ecrite dans le projet » | Plan d'équipe de 8 sessions | (à venir) | D-079, D-080 |
 | 06:38:21 | `1df29e6e` | [Bouton] « Oui, lance » | `docs/` et `CLAUDE.md` écrits (cette doc) | (à venir) | D-080, D-081 |
-| 06:43:57 | `26f178b9` | « il faudrait qu'une partie dure entre 20min et 40min, qu'il n'y ait pas de temps mort, surtout à la fin » | **En cours, non commité** : `TEMPO = 2.5`, colonisation plus tôt, score de tout l'empire, fin de partie à 220 points ou 40 min, `tests/end.test.mjs` (branche `claude/swarm-it-game-pacing-1d4502`, 10 fichiers modifiés au 29/10) | — | D-078 |
+| 06:43:57 | `26f178b9` | « il faudrait qu'une partie dure entre 20min et 40min qu'il n'y ai pas de temps mort, surtout a la fin » | `TEMPO = 2.5`, colonisation plus tôt, score de tout l'empire, fin à 220 points ou 40 min (simulée : 29-31 min) | `9b37782` | D-078, D-083 à D-087 |
+| 07:00:33 | `26f178b9` | « comment gagner une partie ? » | Réponse : premier à 220 points, sinon le meilleur à 40 min ; conseils (coloniser tôt, dépenser, attaquer) | — | D-086 |
+| 07:01:53 | `26f178b9` | « le chrono est une mauvaise idée, il faudrait un mechanisme qui force la fin, comme dans PUBG avec la map qui se reduit, mais la ce n'est pas possible, trouve des idées qui pourraient aller » | 4 idées : soleil qui gonfle (recommandé), bord qui se referme, galaxie qui s'épuise, merveille | — | D-088 |
+| 07:05:27 | `26f178b9` | « L'idée du soleil qui gonfle est bonne. Mais elle pousse les joueurs sur le bord de la map. Et ne les force pas à se combattre […] » | Proposition inverse : le soleil s'éteint, le froid se resserre vers le centre | — | D-088 |
+| 07:06:36 | `26f178b9` | « Comment prendre la planète de quelqu'un ? » | Réponse : impossible jusque-là ; proposition A (planète mère prenable) ou B | — | D-089 |
+| 07:07:31 | `26f178b9` | [Réponse] « a » | Froid, perte de planète, colonie qui remplace la planète mère, élimination, dernier en vie gagne ; prise avec colonisateur ; calibrage par robots (`ease` 2, fin 30-35 min) | `9b37782` | D-088 à D-091 |
 | 07:35:40 | `a961aeb5` | `/swarm-it` « https://github.com/VincentBee/astra/pull/2 vient d'être mergé et je voudrais m'assurer que les tests unitaires couvrent toutes les décisions qui ont été prises. » | Plan de 5 sessions proposé | — | D-082 |
 | 07:41:47 | `a961aeb5` | « fait une version 3 sessions » | 3 sessions par domaine (planète, flotte, réseau), chacune dans son worktree et son fichier de test, avec un contrôle par mutation | — | D-082 |
+| 07:51:28 | `26f178b9` | « Si une planète adverse a des bâtiments, c'est absurde de pouvoir la prendre avec un colonisateur. La conquête d'une planète ennemie doit se faire via un combat avec des vaisseaux d'attaque. » | Ordre « Conquérir », défense de la planète tirée de ses bâtiments | `9b37782` | D-092 |
 | 08:43:08 | `a961aeb5` | [Bouton] « Oui, fusionne » | Branches fusionnées ; 74 nouveaux tests (109 en tout, tous verts) ; tableau [tests-decisions.md](../architecture/tests-decisions.md) ; un écart signalé (D-062, sonde machine) ; commentaire périmé de `tests/replay.test.mjs` corrigé | (ce commit) | D-082 |
+| 08:45:07 | `26f178b9` | « rajoute des batiments de defences comme des bouclier ou des canons de defences ? differencs sur chaque race » | Canons et boucliers par race ; la défense compte aussi contre le pillage ; cache v52 | `9b37782` | D-093, D-095, D-097 |
+| 08:49:33 | `26f178b9` | [Bouton] « Oui, commite » | Commit sur `claude/swarm-it-game-pacing-1d4502` | `9b37782` | — |
+| 08:50:02 | `26f178b9` | « du coup est ce que les defences joue un role pour la prise des planete ? » | Réponse : oui, il faut tout abattre en un combat ; exemple chiffré | — | D-095 |
+| 08:50:27 | `26f178b9` | « est ce que les defences prennent une place sur la planete > » | Réponse : oui, une place par niveau | — | D-094 |
+| 08:51:37 | `26f178b9` | « il faut pouvoir deconstruire un batiment, et rajoute aussi de la documentation sur tout ca, j'ai merge de la doc sur master » | Fusion de `main` (doc) dans la branche ; déconstruction ; doc de tout le rythme (regles §4.1, §5.5, §9.2, §19 ; interface §12 ; décisions D-083 à D-097) | (ce commit) | D-096 |
+| 09:03:50 | `26f178b9` | [Bouton] « Créer la PR » | Fusion de `main` (tests des décisions, D-082 déjà pris) : mes décisions renumérotées D-083 à D-097 ; tests D-002, D-016, D-019, D-028, D-053 comptés en heures de jeu, D-036 sans défense de bâtiments ; D-002 et D-036 marquées « modifiée » ; tableau `tests-decisions.md` complété (119/119) ; pull request | (cette PR) | D-083 à D-097 |
 
 ### Travaux en cours au 2026-10-29
 
-- **Rythme des parties** (`26f178b9`) : non commité, non fusionné. La doc du code
-  ([architecture/](../architecture/)) décrit `1eeb2c1`, sans ces changements.
+- **Rythme des parties** (`26f178b9`) : commité sur `claude/swarm-it-game-pacing-1d4502`
+  (`9b37782` et suivants), pas encore fusionné dans `main`. La doc du code le décrit.
 - **Design épuré** (`f4afbcd0`) : session encore ouverte, mais son worktree n'a aucun changement
   non commité ; tout le travail est dans `1eeb2c1`.

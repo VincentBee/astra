@@ -144,7 +144,7 @@ test('D-028 : changement de cap en route, arrêt, rappel et stationnement', () =
   const { players: [A], clock } = newGame(1, ['human']);
   const id = park(A, { fighter: 2 }, {}, { x: 2, y: 5 }, 80);
   assert.ok(A.moveFleet(id, { x: 12, y: 5 }, 'move'));
-  clock.t += 40_000;
+  clock.t += 40_000 / game.TEMPO; // trajets TEMPO fois plus courts (D-083)
   const here = fleet.fleetPos(A.myFleet(id), clock.t);
   assert.ok(here.x > 3 && here.x < 11, 'en route');
   // Changement de cap : le nouveau trajet part de là où elle est.
@@ -333,12 +333,13 @@ test('D-034 : une offre ne s’annule pas, et la flotte qui propose attend la r�
 
 // ----- D-036 : limites acceptées du pair à pair -----------------------------------
 
-test('D-036 : seuls les vaisseaux posés défendent une planète, pas une flotte en orbite', () => {
+test('D-036 (modifiée par D-095) : une flotte en orbite ne défend pas la planète', () => {
   const { players: [A, B], clock, sync } = newGame(2, ['human', 'human']);
   const home = { ...P(B).home };
   const guard = park(B, { fighter: 10 }, {}, home, 100); // en orbite, pas posée
   const bp = P(B).planet;
-  Object.assign(bp, { ships: {}, stock: { ...bp.stock, minerals: 2000 } });
+  // Sans bâtiment : la planète n'a pas de défense propre (D-095), seuls ses vaisseaux posés la défendraient.
+  Object.assign(bp, { ships: {}, levels: {}, stock: { ...bp.stock, minerals: 2000 } });
   B.touch();
   sync(A, B);
   const id = park(A, { fighter: 3, cargo: 2 }, {}, home, 200);
