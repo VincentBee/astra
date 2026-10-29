@@ -67,10 +67,10 @@ Ordre conseillé pour arriver sur le projet : README racine → `reseau.md` §1-
 | `js/sky.js` | Soleil central de la carte | interface (et regles pour la carte) |
 | `js/galaxy.js` | Fond de galaxie en parallaxe | interface |
 | `js/icons.js` | Icônes SVG (31 tracés) | interface |
-| `tests/` | 9 fichiers `*.test.mjs` (45 tests, dont `end.test.mjs` : fin de partie) + `harness.mjs` | regles (règles), reseau (`peer`, `hostile`, `harness`) |
+| `tests/` | 12 fichiers `*.test.mjs` (119 tests, dont `end.test.mjs` : fin de partie) + `harness.mjs` | regles (règles), reseau (`peer`, `hostile`, `harness`), [tests-decisions](architecture/tests-decisions.md) (`decisions-*.test.mjs`) |
 
-Lancer les tests : `node --test tests/*.test.mjs` (45/45 réussis le 2026-10-29 avec le rythme ;
-35/35 au commit `1eeb2c1`). Attention :
+Lancer les tests : `node --test tests/*.test.mjs` (119/119 réussis le 2026-10-29 avec le rythme). Quel test
+protège quelle décision : [architecture/tests-decisions.md](architecture/tests-decisions.md). Attention :
 `node --test tests/` échoue (voir reseau.md §9).
 
 ## Problèmes connus (au 2026-10-29)
@@ -98,7 +98,7 @@ Relevés pendant l'écriture de cette doc. **Rien n'a été corrigé** : ni le c
 
 ## Travaux en cours
 
-- **Rythme des parties** (D-078, D-082 à D-096) : commité sur la branche
+- **Rythme des parties** (D-078, D-083 à D-097) : commité sur la branche
   `claude/swarm-it-game-pacing-1d4502`, **pas encore fusionné dans `main`**. Décrit dans
   `architecture/`. Non confirmé : l'activité des dernières minutes (les robots ne se battent
   pas) et l'équilibre des défenses.

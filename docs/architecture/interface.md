@@ -308,7 +308,7 @@ Les demandes de Vincent derrière l'interface sont datées dans [journal.md](../
 
 ## 12. Rythme des parties : ce qui s'affiche (2026-10-29)
 
-Ajouts de la session `26f178b9` (D-082 à D-095). Les règles sont dans [regles.md](regles.md) §4.1 et §19.
+Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.md](regles.md) §4.1 et §19.
 
 - **Bandeau de course** `#race` (`index.html`, sous `#lost`), rempli par `renderRace(now)` dans
   `renderLive` (chaque seconde) : avant le départ du froid « Le soleil s'éteint · dernier en vie

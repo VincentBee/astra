@@ -35,8 +35,8 @@ Aucune conversation ne les prouve.
 **D-002 — Règles « port de `game.rs` », vitesse ×60**
 - 2026-10-25 14:41. Choix : règles reprises d'un `game.rs` (origine inconnue, absent du dépôt),
   une heure de jeu = une minute réelle.
-- Qui : déduit. Source : README (`js/game.js`). Statut : en vigueur (`SPEED = 60`, voir
-  [regles.md](architecture/regles.md)) ; modifiée par D-078 si la branche du rythme est fusionnée.
+- Qui : déduit. Source : README (`js/game.js`). Statut : **modifiée par D-083** (`SPEED = 60 ×
+  TEMPO`, une heure de jeu = 24 s), voir [regles.md](architecture/regles.md) §4.1.
 
 **D-003 — Un maître du jeu (MJ) fait foi, réseau en étoile**
 - 2026-10-25 14:41. Choix : le téléphone du MJ garde l'état officiel.
@@ -278,7 +278,8 @@ Aucune conversation ne les prouve.
   combats ; seuls les vaisseaux posés défendent une planète.
 - Alternative : un arbitre (impossible sans serveur).
 - Qui : Claude, sans objection. Source : `PLAN-VOYAGE.md` § Choix par défaut, § Risques ; README
-  « Pas d'arbitre ». Statut : en vigueur.
+  « Pas d'arbitre ». Statut : en vigueur, **modifiée par D-095** : une planète se défend aussi
+  avec ses bâtiments (défense `fortOf`) ; une flotte en orbite ne défend toujours pas.
 
 **D-037 — Test par une équipe de 8 robots qui trouvent sans réparer (« swarm bug 2 »)**
 - 2026-10-27 23:29. Choix : 6 testeurs (économie, combat, flottes, règles, multi-node,
@@ -569,9 +570,9 @@ Aucune conversation ne les prouve.
   capMs: 40 min }` dans `js/game.js` (d'abord 400 points) ; `tests/end.test.mjs`.
 - Source : `26f178b9` 06:43:57 → 06:56:28.
 - Statut : en vigueur (objectif). Mise en œuvre commitée en `9b37782` (branche
-  `claude/swarm-it-game-pacing-1d4502`), détaillée en D-082 à D-095. La fin par points
-  (`GOAL`) est remplacée par le froid : voir D-085 → D-087. « Pas de temps mort à la fin »
-  reste **non confirmé** : les robots de simulation ne se battent pas (D-089).
+  `claude/swarm-it-game-pacing-1d4502`), détaillée en D-083 à D-097 (numéros décalés d’un cran à la fusion avec `main`, où D-082 était déjà pris). La fin par points
+  (`GOAL`) est remplacée par le froid : voir D-086 → D-088. « Pas de temps mort à la fin »
+  reste **non confirmé** : les robots de simulation ne se battent pas (D-090).
 
 **D-079 — Noter chaque demande et chaque décision dans `docs/`, règle dans `CLAUDE.md`**
 - 2026-10-29 06:35. Demande : « je voudrais que le projet soit documenté entierement, que chaque
@@ -595,7 +596,23 @@ Aucune conversation ne les prouve.
 - Alternative : heure de Paris. Qui : Claude (défaut, proposé par la session de vérification).
   Statut : en vigueur.
 
-**D-082 — Un seul réglage de vitesse : `TEMPO = 2.5`**
+**D-082 — Chaque décision a un test, ou une raison de ne pas en avoir**
+- 2026-10-29 07:35. Demande : « je voudrais m'assurer que les tests unitaires couvrent toutes les
+  décisions qui ont été prises ».
+- Choix : un tableau [architecture/tests-decisions.md](architecture/tests-decisions.md) donne,
+  pour chaque D-xxx, le test qui la protège ou la raison (remplacée, en cours, méthode,
+  navigateur seulement). Les nouveaux tests vont dans `tests/decisions-<domaine>.test.mjs`, leur
+  nom commence par le numéro de la décision, et ils vérifient **ce que dit la doc**, pas ce que
+  fait le code. Chaque test est contrôlé par mutation (on casse la règle, le test doit échouer).
+  Un écart doc ≠ code est signalé, pas corrigé dans les tests.
+- Méthode : 3 sessions `/swarm-it` par domaine (Vincent : « fait une version 3 sessions », au lieu
+  des 5 proposées) ; le coordinateur a intégré et refait 7 mutations lui-même.
+- Alternatives : 5 ou 8 sessions (vérificateur et intégrateur à part) ; ranger les tests dans les
+  fichiers existants.
+- Qui : Vincent (demande, nombre de sessions) ; méthode et rangement par Claude (défaut).
+  Source : `a961aeb5` 07:35:40 → 08:43:08. Statut : en vigueur.
+
+**D-083 — Un seul réglage de vitesse : `TEMPO = 2.5`**
 - 2026-10-29 06:44. Contexte : la production suit `SPEED`, mais les durées (chantiers,
   recherches, vaisseaux, trajets, pouvoirs, pillage) sont écrites en millisecondes ; n'accélérer
   que `SPEED` aurait rendu les chantiers dominants.
@@ -605,43 +622,43 @@ Aucune conversation ne les prouve.
 - Alternatives : augmenter `SPEED` seul ; baisser les coûts (mesuré : avance la fin, D-077).
 - Qui : Claude (après avis du conseiller). Source : `26f178b9`. Statut : en vigueur (`9b37782`).
 
-**D-083 — Coloniser plus tôt : labo 2, technologie à moitié prix, colonisateur ×0,6**
+**D-084 — Coloniser plus tôt : labo 2, technologie à moitié prix, colonisateur ×0,6**
 - 2026-10-29 06:52. Contexte : creux entre « planète mère pleine » et 1ʳᵉ colonie (D-077).
 - Choix : réglage testé par l'agent contradicteur (1ʳᵉ colonie à 31-34 min au lieu de 45, au
   tempo d'origine).
 - Alternatives : plus de places, revenu de base plus haut (presque sans effet).
 - Qui : Claude. Statut : en vigueur (`9b37782`).
 
-**D-084 — Le score compte tout l'empire**
+**D-085 — Le score compte tout l'empire**
 - 2026-10-29 06:55. Contexte : `score` ne comptait que les bâtiments de la planète mère ;
   coloniser ou s'armer ne rapportait rien.
 - Choix : `empireScore` = bâtiments de toutes les planètes (hors entrepôts) + recherches +
   vaisseaux, / 100.
-- Qui : Claude. Statut : en vigueur ; ne décide plus la victoire, seulement les égalités (D-087).
+- Qui : Claude. Statut : en vigueur ; ne décide plus la victoire, seulement les égalités (D-088).
 
-**D-085 — Fin par course : premier à 220 points, sinon le meilleur à 40 min** — remplacée par D-087
+**D-086 — Fin par course : premier à 220 points, sinon le meilleur à 40 min** — remplacée par D-088
 - 2026-10-29 06:56. Choix de Claude (400 points, puis 220 après simulation : fin à 29-31 min).
 - Alternative proposée à Vincent : un chrono fixe.
-- Statut : **remplacée par D-087** à 07:01 (« le chrono est une mauvaise idée »). `GOAL` retiré
+- Statut : **remplacée par D-088** à 07:01 (« le chrono est une mauvaise idée »). `GOAL` retiré
   du code avant le commit.
 
-**D-086 — Les parties d'avant la course n'ont ni fin ni froid**
+**D-087 — Les parties d'avant la course n'ont ni fin ni froid**
 - 2026-10-29 06:59. Contexte : avec la fin à 40 min après la première installation, toutes les
   vieilles sauvegardes auraient fini dès leur ouverture.
 - Choix : champ `since` écrit à l'installation ; sans `since`, pas de course.
 - Qui : Claude (signalé par le conseiller). Statut : en vigueur.
 
-**D-087 — Le soleil s'éteint : le froid se resserre du bord vers le soleil**
+**D-088 — Le soleil s'éteint : le froid se resserre du bord vers le soleil**
 - 2026-10-29 07:01-07:05. Demande : « il faudrait un mechanisme qui force la fin, comme dans
   PUBG avec la map qui se reduit ». Claude propose le soleil qui gonfle ; Vincent : « elle
   pousse les joueurs sur le bord de la map. Et ne les force pas à se combattre ». Claude propose
   alors le froid du bord vers le centre.
 - Choix : une planète que le froid atteint est perdue ; la zone vivable rétrécit vers le soleil.
-- Alternatives écartées : chrono (D-085), soleil qui gonfle, bord qui se referme (nébuleuse),
+- Alternatives écartées : chrono (D-086), soleil qui gonfle, bord qui se referme (nébuleuse),
   galaxie qui s'épuise, merveille à construire.
 - Qui : Vincent (direction), Claude (règle). Statut : en vigueur (`9b37782`).
 
-**D-088 — Sans planète, éliminé ; le dernier en vie gagne ; une colonie remplace la planète mère**
+**D-089 — Sans planète, éliminé ; le dernier en vie gagne ; une colonie remplace la planète mère**
 - 2026-10-29 07:07. Question de Claude : peut-on prendre la planète mère ? Réponse de Vincent :
   « a » (oui, élimination possible).
 - Choix : la plus vieille colonie en vie devient planète mère ; sans colonie, `out` ; fin quand
@@ -649,7 +666,7 @@ Aucune conversation ne les prouve.
 - Alternative écartée : B, seules les colonies se prennent.
 - Qui : Vincent. Statut : en vigueur.
 
-**D-089 — Réglage du froid : départ 12 min, durée 24 min, `ease` 2**
+**D-090 — Réglage du froid : départ 12 min, durée 24 min, `ease` 2**
 - 2026-10-29 07:40. Mesure avec les robots (qui fuient vers le soleil, sans se battre) :
   froid linéaire → les machines gèlent vers 19-21 min avant d'avoir colonisé ; `ease` 2 →
   toutes les races colonisent, fin à 30-35 min.
@@ -657,11 +674,11 @@ Aucune conversation ne les prouve.
   combat, **non mesuré**.
 - Qui : Claude. Statut : en vigueur, à recalibrer en jouant.
 
-**D-090 — Prendre une planète en gagnant avec un colonisateur** — remplacée par D-091
+**D-091 — Prendre une planète en gagnant avec un colonisateur** — remplacée par D-092
 - 2026-10-29 07:10. Choix de Claude. Remplacée à 07:51 : « c'est absurde de pouvoir la prendre
   avec un colonisateur ».
 
-**D-091 — Conquête par le combat : ordre « Conquérir »**
+**D-092 — Conquête par le combat : ordre « Conquérir »**
 - 2026-10-29 07:51. Demande : « La conquête d'une planète ennemie doit se faire via un combat
   avec des vaisseaux d'attaque. »
 - Choix : ordre `conquer` à côté d'`attack` ; il faut battre les vaisseaux posés et la défense
@@ -670,7 +687,7 @@ Aucune conversation ne les prouve.
   seulement piller).
 - Qui : Vincent (règle), Claude (ordre séparé). Statut : en vigueur (`9b37782`).
 
-**D-092 — Bâtiments de défense par race**
+**D-093 — Bâtiments de défense par race**
 - 2026-10-29 08:45. Demande : « rajoute des batiments de defences comme des bouclier ou des
   canons de defences ? differencs sur chaque race ».
 - Choix : humains canons ⚔ 12 ◇ 40 et bouclier ◇ 150 ; machines tourelles ⚔ 18 ◇ 15 et
@@ -678,25 +695,25 @@ Aucune conversation ne les prouve.
   bâtiments donnent ⚔ 2 ◇ 20 par niveau.
 - Qui : Vincent (demande), Claude (valeurs). Statut : en vigueur, **valeurs non équilibrées**.
 
-**D-093 — Les défenses prennent une place par niveau**
+**D-094 — Les défenses prennent une place par niveau**
 - 2026-10-29 08:45. Choix par défaut de Claude, expliqué à Vincent à 08:50 (pas contesté) :
   défendre, c'est moins produire.
 - Alternative : défenses hors du compte des places. Statut : en vigueur.
 
-**D-094 — La défense compte aussi contre le pillage, et se répare entre deux assauts**
+**D-095 — La défense compte aussi contre le pillage, et se répare entre deux assauts**
 - 2026-10-29 08:45. Choix de Claude : un seul combat (vaisseaux + défense) pour « Attaquer » et
   « Conquérir » ; la défense repart entière à chaque combat.
 - Alternative écartée : la défense seulement contre la conquête.
 - Statut : en vigueur.
 
-**D-095 — Déconstruire un bâtiment**
+**D-096 — Déconstruire un bâtiment**
 - 2026-10-29 08:51. Demande : « il faut pouvoir deconstruire un batiment ».
 - Choix : un niveau à la fois, dans le chantier, moitié du temps de construction, moitié du prix
   rendue tout de suite, place libérée à la fin ; bouton dans la carte dépliée, avec confirmation.
 - Alternatives : rembourser tout, ou rien ; déconstruire instantanément.
 - Qui : Vincent (demande), Claude (règle). Statut : en vigueur.
 
-**D-096 — `FORMAT` 8 et cache `astra-p2p-v52`**
+**D-097 — `FORMAT` 8 et cache `astra-p2p-v52`**
 - 2026-10-29. Choix de Claude : nouveaux champs de fiche (`since`, `out`, `over`, `capture`,
   `demolish`) ; un téléphone resté sur l'ancienne version est invité à recharger.
 - Statut : en vigueur.
