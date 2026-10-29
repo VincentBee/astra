@@ -141,9 +141,19 @@ recalcule depuis `gid` (`js/game.js:811-813`).
 
 ### 4.1 Vitesse
 
-`SPEED = 60` : une « heure » de jeu dure une minute réelle (`js/game.js:19-20`). Toutes les
-productions des races sont exprimées **par heure de jeu**, donc par minute réelle. Un pas de
-`ms` millisecondes vaut `h = ms / 3 600 000 × 60` heures de jeu (`js/game.js:484`).
+`SPEED = 60 × TEMPO` (`js/game.js`), avec `TEMPO = 2.5` défini dans `js/tech.js` (le seul
+module sans dépendance, pour éviter un import circulaire) et réexporté par `game.js` (D-082).
+Une « heure » de jeu dure donc 24 s réelles. Toutes les productions des races sont exprimées
+**par heure de jeu** ; l'interface les affiche par minute réelle en les multipliant par
+`TEMPO`. Un pas de `ms` millisecondes vaut `h = ms / 3 600 000 × SPEED` heures de jeu
+(`advance`).
+
+`TEMPO` divise aussi toutes les durées écrites en millisecondes : construction
+(`buildDuration`), recherche (`researchDuration`), vaisseaux (`shipDuration`), trajets
+(`tripMs`, `MIN_TRIP` 2 s), recharge et durée des pouvoirs aliens (`POWERS`), délai entre deux
+pillages (`RAID_COOLDOWN_MS`), et le pas d'intégration (2 h de jeu au plus, soit
+`120 000 / TEMPO` ms). Les délais des échanges (`js/trade.js`) ne changent pas : ce sont des
+temps de réponse humains.
 
 ### 4.2 Intégration par petits pas
 
@@ -237,14 +247,23 @@ gisement n'est pas vide ; ensuite pas plus que `réserve / h + regen`.
   `js/game.js:613-617`).
 - Durée : `max(4, round((minéraux + énergie) / 25))` secondes (`buildDuration`,
   `js/game.js:620-622`). La race et les niveaux ne changent pas la durée.
-- `startBuild` (`js/game.js:633-647`) : race choisie, bâtiment connu, **un seul chantier à la
-  fois**, une place libre (section 11.3), ressources suffisantes ; paye tout de suite.
+- `startBuild` : race choisie, bâtiment connu, **un seul chantier à la fois**, une place
+  libre (section 11.3), ressources suffisantes ; paye tout de suite.
+- **Déconstruire** (`startDemolish`, `js/game.js` ; ordre `Session.demolish`, D-095) : enlève
+  un niveau. Occupe le même chantier que les constructions, pendant **la moitié** du temps de
+  construction de ce niveau ; rend **tout de suite la moitié** de son coût ; le niveau (et sa
+  place) ne disparaît qu'à la fin du chantier. La file `queue` porte alors `demolish: true` ;
+  `stateAt` applique `levels[key] = job.level` comme pour une construction (le niveau baisse).
 - `covers` tolère 1e-9 d'écart d'arrondi (`js/game.js:624-626`).
 
 ### 5.6 Classement
 
-- `score` = ressources investies dans les bâtiments / 100, **sans les entrepôts**
-  (`js/game.js:751-763`).
+- `score` = ressources investies dans les bâtiments d'**une** planète / 100, **sans les
+  entrepôts**.
+- `empireScore` (`js/game.js`) = `score` de **toutes** les planètes du joueur + ressources
+  investies dans ses recherches + prix de ses vaisseaux, posés ou en vol, le tout / 100 (D-084).
+  `Session.scoreOf(p)` l'appelle ; c'est lui que le classement affiche. Il départage les joueurs
+  que le froid élimine en même temps (section 19).
 - `power` = population × `R.power` : un humain vaut 1, un psionique 120, une machine 0
   (`js/game.js:766-769`, valeurs `js/game.js:109`, `211`, `293`).
 
@@ -445,10 +464,15 @@ Une flotte qui attend la réponse à un échange est **bloquée** (`locked`,
 
 ### 9.2 Attaquer une planète (ordre `attack`)
 
-- Il faut une flotte armée (`js/session.js:1018-1019`).
-- À l'arrivée (`arrive`, `js/session.js:1642-1669`), le défenseur = **les vaisseaux posés sur
-  la planète** à l'heure d'arrivée (`def.ships`). Les flottes en orbite ne la défendent pas,
-  et une planète sans vaisseau posé n'a aucune défense. On retire aussi les combats que son téléphone n'a pas encore lus
+- Il faut une flotte armée. Deux ordres : `attack` (piller) et `conquer` (prendre la planète,
+  D-091) ; `ordersAt` propose les deux sur une planète adverse, avec la défense affichée
+  (« Conquérir Hadar · défense ⚔ 8 ◇ 80 »).
+- À l'arrivée (`arrive`), le défenseur = **les vaisseaux posés sur la planète** à l'heure
+  d'arrivée (`def.ships`) **et la défense de la planète** (`fortOf`, D-092, D-094), qui se bat
+  comme un seul gros vaisseau (champ `fort` de `battle`, qui l'ajoute aux vaisseaux du camp et
+  ne la compte pas dans les pertes). La défense est intacte à chaque assaut : il faut l'abattre
+  en un seul combat de 4 passes. Les flottes en orbite ne défendent pas. On retire aussi les
+  combats que son téléphone n'a pas encore lus
   (`defenseAt`, `js/session.js:1679-1691`). Sans ça, on pillerait le même stock et on tuerait
   les mêmes vaisseaux plusieurs fois.
 - Victoire → pillage (`plunder`, `js/fleet.js:416-425`) : jusqu'à **la moitié** des minéraux
@@ -457,8 +481,15 @@ Une flotte qui attend la réponse à un échange est **bloquée** (`locked`,
   `js/session.js:56`, `js/session.js:1650-1655`) : la mémoire `raided` est dans la fiche de
   l'attaquant, avec la clé `pid:planète`. Sans ça, des attaques en chaîne depuis l'orbite
   vidaient tout. Le combat a lieu quand même ; seul le butin est refusé.
-- J'écris un rapport `{ id, to, key, at, ships: pertes, take: butin }` dans mes `effects`
-  (`js/session.js:1657`). Les vaisseaux perdus emportent leur cargaison (`applyLosses`,
+- J'écris un rapport `{ id, to, key, at, ships: pertes, take: butin }` dans mes `effects`.
+- **Conquête** (`conquer` gagné, sur une case que le froid n'a pas prise) : le rapport porte en
+  plus `capture: true` et `cell`. `Session.capture` crée tout de suite une colonie neuve de ma
+  race sur la case (`newPlanet`, les bâtiments adverses sont perdus), avec les survivants, la
+  cargaison, le butin et le carburant ; la flotte s'y pose. `ownerAt` ne compte plus l'ancien
+  propriétaire dès que le rapport existe (même s'il ne l'a pas lu) ; `checkClaim` ne confond pas
+  cette perte avec une installation simultanée. Le téléphone du perdant, en lisant le rapport
+  (`applyEffects`, par la case et non la clé), appelle `losePlanet` (section 19).
+- Pas de colonisateur pour conquérir : il ne sert qu'aux planètes libres (D-091 remplace D-090). Les vaisseaux perdus emportent leur cargaison (`applyLosses`,
   `js/fleet.js:334-359`).
 
 ### 9.3 Combat entre flottes (ordre `chase`)
@@ -545,7 +576,8 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
 
 ### 11.3 Places
 
-- Chaque niveau de bâtiment occupe une place (`usedPlaces`, `js/game.js:974`). Une planète a
+- Chaque niveau de bâtiment occupe une place (`usedPlaces`), **défenses comprises** (D-093).
+  On peut déconstruire pour libérer une place (section 5.5). Une planète a
   de 14 à 22 places (`PLANET_PLACES`, `js/game.js:818`), un astéroïde 7 à 10, une comète 6 à 8.
 - `startBuild` refuse quand il n'y a plus de place (`js/game.js:640`).
 - **Les places viennent de la carte, pas de la fiche** : `Session.build` les recopie depuis
@@ -559,7 +591,9 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
 - **Propriétaire d'une case** : le premier installé, d'après `claimAt` (ou `rank`), départagé
   par identifiant à égalité (`ownerAt`, `js/session.js:775-788`). Même résultat sur tous les
   téléphones.
-- **Coloniser** : il faut un vaisseau colonisateur dans la flotte (`js/session.js:1023`). À
+- **Coloniser** : il faut un vaisseau colonisateur dans la flotte. La technologie de colonie
+  demande le labo 2 (et non plus 3), coûte la moitié d'avant, et le colonisateur 0,6 fois son
+  ancien prix (D-083). Une case déjà gelée ne se colonise pas. À
   l'arrivée (`js/session.js:1616-1640`), la colonie est créée avec la cargaison comme stock,
   le carburant restant comme énergie, les technologies de la mère, et les autres vaisseaux
   posés dessus ; le colonisateur est consommé.
@@ -637,7 +671,9 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
 
 | Quoi | Où | Valeur |
 |---|---|---|
-| Vitesse du jeu | `SPEED`, `js/game.js:20` | 60 (1 heure de jeu = 1 min) |
+| Vitesse du jeu | `TEMPO`, `js/tech.js` ; `SPEED = 60 × TEMPO`, `js/game.js` | 2,5 (1 heure de jeu = 24 s) |
+| Fin de partie (froid) | `FROST`, `js/game.js` | départ 12 min, durée 24 min, `ease` 2 |
+| Défense des planètes | `fortOf` et `buildings[k].defense`, `js/game.js` | ordinaire ⚔ 2 ◇ 20 par niveau ; défenses : section 19 |
 | Stocks et population de départ | `RACES[r].start`, `.pop`, `js/game.js:107-108`, `209-210`, `291-292` | voir code |
 | Coût des bâtiments | `buildings[k].base`, `.factor` | ex. Mine 60 × 1,5^niv |
 | Production et consommation | `rates`, `js/game.js:168-185`, `262-274`, `352-366` | coefficients de `curve` |
@@ -655,13 +691,6 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
 | Climat | `climateAt`, `js/game.js:888-890` | |
 | Mémoire des fiches | `MAX_ORDERS` 1 500, `MAX_EFFECTS` 300 (`js/session.js:62-72`) | |
 
-**En cours, pas encore sur `main` (29/10) :** une autre session règle le rythme des parties
-(branche `claude/swarm-it-game-pacing-1d4502`, rien de commité au moment de l'écriture, décision D-078). D'après
-le transcript de cette session, elle ajoute un `TEMPO` dans `js/tech.js`, une fin de partie (`GOAL` dans `js/game.js`)
-et un score de tout l'empire. Ce n'est **pas** l'état décrit ici ; cette doc sera à mettre à
-jour quand la branche sera fusionnée. (Non vérifié dans le code : ces changements ne sont pas
-dans ce dépôt.)
-
 Après un changement, la page `technologies.html` se met à jour toute seule (section 7.3).
 `GUIDE.md` et `README.md` contiennent des chiffres écrits à la main : à relire.
 
@@ -676,10 +705,14 @@ fiche de `b` (`tests/harness.mjs:20-35`).
 ### Commandes
 
 ```bash
-node --test
+node --test tests/*.test.mjs
 ```
 
-Résultat le 2026-10-29 (Node v24.14.1) : `tests 35, pass 35, fail 0`. Cette commande inclut
+Résultat le 2026-10-29 (Node v24.14.1) : `tests 45, pass 45, fail 0` (9 fichiers). Le harnais
+coupe le froid (`FROST.delayMs = Infinity`) : les parties de test ne finissent pas d'elles-mêmes ;
+`tests/end.test.mjs` le rallume test par test.
+
+Avant le tempo (au commit `1eeb2c1`) : `tests 35, pass 35, fail 0`. Cette commande inclut
 `tests/peer.test.mjs` (réseau, voir reseau.md).
 
 ```bash
@@ -693,7 +726,8 @@ Résultat : `tests 34, pass 34, fail 0`, environ 5,6 s (le rejeu d'une partie de
 
 | Fichier | Tests | Ce qui est vérifié |
 |---|---|---|
-| `tests/rules.test.mjs` | 10 | Heure qui recule puis revient : pas de double production ; longue absence ≈ passages toutes les heures (population à moins de 2 %) ; arrachement refusé sans payer ; clés héritées (`constructor`, `__proto__`) refusées ; effectifs négatifs ou fractionnaires au combat ; soleil au centre et sans planète ; climat et production ; une place par niveau ; places lues sur la carte ; une colonie humaine sur le plus petit corps garde des places |
+| `tests/end.test.mjs` | 10 | Score de tout l'empire ; le froid prend d'abord le bord ; planète mère gelée remplacée par la colonie la plus vieille, puis élimination ; à deux, le dernier en vie gagne même si l'autre est hors ligne, la fin se propage et bloque les ordres ; défense par race (`fortOf`) ; conquête qui élimine ; tourelles qui repoussent 3 frégates sans pillage ; colonisateur seul ou ordre « attaquer » ne prennent rien ; partie d'avant la course sans froid |
+| `tests/rules.test.mjs` | 11 | Déconstruire (moitié du prix rendue, place libérée à la fin) ; heure qui recule puis revient : pas de double production ; longue absence ≈ passages toutes les heures (population à moins de 2 %) ; arrachement refusé sans payer ; clés héritées (`constructor`, `__proto__`) refusées ; effectifs négatifs ou fractionnaires au combat ; soleil au centre et sans planète ; climat et production ; une place par niveau ; places lues sur la carte ; une colonie humaine sur le plus petit corps garde des places |
 | `tests/combat.test.mjs` | 4 | Attaques contre une planète : pas de butin créé avec un défenseur hors ligne ou plusieurs flottes arrivées ensemble ; 70 attaques avant le retour du défenseur ; les vaisseaux perdus emportent leur cargaison |
 | `tests/effects.test.mjs` | 1 | 5 joueurs, 4 attaquants × 70 combats : chaque perte subie une fois, puis rapports oubliés des deux côtés |
 | `tests/fleet.test.mjs` | 8 | Deux flottes sur la même cible ; poursuite mutuelle ; colonie qui encaisse les pertes ; premier arrivé à la colonisation ; plein en panne tout près ; plusieurs attaquants ne pillent pas plus que le stock ; revanche ; raids sans armes et un pillage par 2 min |
@@ -730,3 +764,71 @@ avec leur date et leur source.
    (`js/fleet.js:33`).
 6. `js/game.js:703-710` : trois commentaires de documentation empilés (ceux de `usePower` et
    de `liftGain` sont avant `LIFT_PER_PSI`).
+
+## 19. Fin de partie : le soleil s'éteint, la conquête, l'élimination
+
+Remplace le chrono et l'objectif de points (D-085, remplacée par D-087). Tout se calcule depuis
+l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbitre.
+
+### 19.1 Début de la course
+
+- `claimPlanet` écrit `p.since` (une seule fois) ; `Session.startedAt` = le plus petit `since`
+  des joueurs. Une partie d'avant la course n'a aucun `since` : ni froid, ni fin (D-086).
+
+### 19.2 Le froid (`FROST`, `frostAt`, `frostLine`, `sunDistance`, `js/game.js`)
+
+- `sunDistance(sun, c)` : distance `d` de la case au bord du soleil, et `far`, la plus grande
+  possible (la même mesure que le climat).
+- Le froid part du coin le plus loin `FROST.delayMs` (12 min) après le début et atteint le
+  soleil `FROST.durationMs` (24 min) plus tard. `frostAt(sun, start, c) = start + delay +
+  duration × (1 − d/far)^(1/ease)`. Avec `ease = 2`, il avance lentement puis de plus en plus
+  vite (D-089) : les planètes du bord tiennent assez longtemps pour qu'une race lente (machines)
+  ait le temps de coloniser.
+- `frostLine(sun, start, now)` : rayon autour du soleil où passe le froid (Infinity avant le
+  départ) ; la carte le dessine.
+- `Session.frostOf(cell)` : heure de gel d'une case dans cette partie.
+
+### 19.3 Perdre une planète (`losePlanet`, `freeze`, `js/session.js`)
+
+- À chaque `tick`, `freeze` prend mes planètes dont l'heure de gel est passée, la plus lointaine
+  d'abord.
+- Colonie perdue : retirée de `p.colonies`.
+- Planète mère perdue (gel ou conquête) : la **plus vieille colonie encore en vie** devient la
+  planète mère (`p.home`, `p.planet`, `p.claimAt` repris de la colonie, D-088). `backdated`
+  accepte ce changement de `home` daté d'avant (c'était une de mes colonies). Sans colonie :
+  `p.home = null`, `p.out = heure` : le joueur est **éliminé** (`canAct` faux, `claimPlanet`
+  refusé).
+
+### 19.4 Qui est en vie, qui gagne (`livePlanets`, `deadAt`, `ranking`, `checkOver`)
+
+- `livePlanets(p)` : planètes ni gelées, ni prises (d'après `ownerAt`).
+- `deadAt(p)` : `p.out` s'il existe ; sinon, si plus aucune planète n'est en vie, l'heure du
+  dernier gel (ou maintenant pour une prise). Calculable par **tous**, même si le joueur est
+  hors ligne.
+- `checkOver` : à plusieurs, la partie finit quand il reste **un seul** joueur en vie (ou
+  aucun : le dernier tombé gagne, puis le meilleur `empireScore`). Seul : quand le froid a tout
+  pris. Le téléphone qui le voit écrit `p.over = { at, winner }` dans sa fiche ;
+  `Session.over` prend la plus ancienne fin écrite par un joueur.
+- Partie finie : `tick` ne fait plus que lire les derniers rapports de combat ; tous les ordres
+  sont refusés (`canAct`).
+
+### 19.5 Défenses des planètes (`fortOf`, `js/game.js`, D-092)
+
+Chaque niveau de bâtiment ordinaire donne ⚔ 2 et ◇ 20. Bâtiments de défense, une place par
+niveau :
+
+| Race | Clé | Nom | Par niveau | Coût de base × facteur |
+|---|---|---|---|---|
+| Humains | `cannon` | Batterie de canons | ⚔ 12, ◇ 40 | 130 minéraux × 1,5 |
+| Humains | `shield` | Bouclier déflecteur | ◇ 150 | 140 minéraux × 1,5 |
+| Machines | `turret` | Tourelles automatiques | ⚔ 18, ◇ 15 | 90 min. + 30 én. × 1,45 |
+| Machines | `shield` | Blindage réactif | ◇ 90 | 90 min. + 30 én. × 1,45 |
+| Aliens | `spines` | Épines psioniques | ⚔ 8 + 1 par psionique, ◇ 60 | 200 min. + 40 × 1,6 |
+| Aliens | `dome` | Dôme psychique | ◇ 260 | 240 min. + 60 × 1,6 |
+
+Valeurs **non équilibrées** : les robots de simulation n'attaquent pas (non confirmé en jeu).
+
+### 19.6 Format
+
+`FORMAT = 8` (`js/session.js`) : nouveaux champs de fiche `since`, `out`, `over`, rapports
+`capture` / `cell`, file `queue.demolish`. Le service worker passe à `astra-p2p-v52`.

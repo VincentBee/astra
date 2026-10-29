@@ -2,6 +2,15 @@
 
 Principes, ordres de construction et pièges pour chaque race, puis les flottes et le voyage spatial (en fin de guide).
 
+## Comment se joue une partie (depuis le 29 octobre 2026)
+
+- **Une partie dure environ 30 à 35 minutes.** Le jeu va 2,5 fois plus vite qu’avant : les heures de jeu des ordres ci-dessous passent 2,5 fois plus vite. Ces ordres datent d’avant ce changement (**à refaire**).
+- **Le soleil s’éteint.** 12 minutes après la première installation, le froid part du bord de la carte et se resserre vers le soleil, lentement puis de plus en plus vite. Une planète qu’il atteint est perdue. La carte montre le cercle de froid, et le bandeau du haut le temps avant que ta planète gèle.
+- **Fuis vers le soleil.** Colonise des planètes plus proches du soleil (labo 2 suffit). Si ta planète mère gèle, ta plus vieille colonie encore en vie la remplace.
+- **Sans planète, tu es éliminé. Le dernier en vie gagne.**
+- **Conquérir** : sur une planète adverse, l’ordre « Conquérir » prend la planète si ta flotte abat ses vaisseaux posés **et** sa défense en un seul combat. « Attaquer » pille seulement. La défense vient des bâtiments : un peu pour chaque niveau, beaucoup avec les canons et boucliers de ta race (humains : canons et bouclier ; machines : tourelles et blindage, bon marché ; aliens : épines, plus fortes avec plus de psioniques, et dôme).
+- **Défendre prend de la place** : chaque niveau de défense occupe une place. Touche le nom d’un bâtiment pour le déplier et **déconstruire un niveau** : tu récupères la moitié de son prix et sa place.
+
 Les ordres viennent d’une recherche par simulation (règles de `js/game.js`) : on joue des milliers d’ordres possibles et on garde les meilleurs à un horizon donné, en écartant ceux qui provoquent une famine ou une panne juste après. Les heures sont approximatives : elles supposent qu’on lance chaque chantier dès qu’il est payable. « Le moins cher d’abord » sert de repère. **À refaire si l’équilibrage change.**
 
 > Ces ordres datent d’avant les gisements, la recherche et les vaisseaux : ils supposent une extraction sans limite et ne comptent ni labo ni chantier naval. Sur une planète au gisement maigre, l’extraction plafonne plus tôt.

@@ -5,8 +5,10 @@ le site est un dossier de fichiers statiques (HTML, CSS, JS sans framework ni bu
 téléphone garde une copie complète de la partie ; chaque joueur est le seul à écrire sa propre
 fiche.
 
-Cette doc décrit le code au commit `1eeb2c1` (2026-10-28 23:14:27 UTC). **Toutes les heures sont
-en UTC.**
+Cette doc décrit le code au commit `1eeb2c1` (2026-10-28 23:14:27 UTC), plus le rythme des
+parties (tempo, froid, conquête, défenses, déconstruction) ajouté le 2026-10-29 sur la branche
+`claude/swarm-it-game-pacing-1d4502` : [regles.md](architecture/regles.md) §4.1, §5.5, §9.2,
+§19 et [interface.md](architecture/interface.md) §12. **Toutes les heures sont en UTC.**
 
 ## Comment lire
 
@@ -21,6 +23,8 @@ en UTC.**
 | Lancer les tests | [architecture/reseau.md](architecture/reseau.md) §9 et [architecture/regles.md](architecture/regles.md) (tests) |
 | Savoir **ce que Vincent a demandé**, quand, et ce qui en est sorti | [historique/journal.md](historique/journal.md) |
 | Savoir **pourquoi** une chose est faite ainsi | [decisions.md](decisions.md) (D-001…) |
+| Comment finit une partie (froid, conquête, défenses, élimination) | [architecture/regles.md](architecture/regles.md) §19 |
+| L'analyse du rythme par les robots (moments morts, mesures) | [RAPPORT-RYTHME.md](../RAPPORT-RYTHME.md) |
 | Le plan du voyage spatial (flottes, carburant, échanges) | [PLAN-VOYAGE.md](../PLAN-VOYAGE.md) (§ Bilan en partie périmé, voir D-039) |
 | Les règles de travail pour Claude | [CLAUDE.md](../CLAUDE.md) |
 
@@ -40,6 +44,7 @@ Ordre conseillé pour arriver sur le projet : README racine → `reseau.md` §1-
 | `.nojekyll` | Fichier vide : dit à GitHub Pages de servir les fichiers tels quels, sans Jekyll (D-008) | ici |
 | `.gitignore` | Ignore seulement `.DS_Store` (fichiers du Finder macOS) | ici |
 | `README.md`, `GUIDE.md`, `PLAN-VOYAGE.md` | Présentation, guide des races, plan du voyage spatial | — |
+| `RAPPORT-RYTHME.md` | Analyse du rythme des parties par 4 agents et des robots (D-077), puis changements faits | — |
 | `CLAUDE.md` | Règles pour Claude : tenir le journal et les décisions | — |
 | `docs/` | Cette documentation | — |
 | `icons/` | Icônes de l'application (`icon.svg`, 192 et 512 px) | interface |
@@ -62,9 +67,10 @@ Ordre conseillé pour arriver sur le projet : README racine → `reseau.md` §1-
 | `js/sky.js` | Soleil central de la carte | interface (et regles pour la carte) |
 | `js/galaxy.js` | Fond de galaxie en parallaxe | interface |
 | `js/icons.js` | Icônes SVG (31 tracés) | interface |
-| `tests/` | 8 fichiers `*.test.mjs` (35 tests) + `harness.mjs` | regles (règles), reseau (`peer`, `hostile`, `harness`) |
+| `tests/` | 9 fichiers `*.test.mjs` (45 tests, dont `end.test.mjs` : fin de partie) + `harness.mjs` | regles (règles), reseau (`peer`, `hostile`, `harness`) |
 
-Lancer les tests : `node --test tests/*.test.mjs` (35/35 réussis le 2026-10-29). Attention :
+Lancer les tests : `node --test tests/*.test.mjs` (45/45 réussis le 2026-10-29 avec le rythme ;
+35/35 au commit `1eeb2c1`). Attention :
 `node --test tests/` échoue (voir reseau.md §9).
 
 ## Problèmes connus (au 2026-10-29)
@@ -90,11 +96,12 @@ Relevés pendant l'écriture de cette doc. **Rien n'a été corrigé** : ni le c
 6. **Nom et race du joueur plus affichés en jeu** depuis le retrait de la barre du haut (D-075) ;
    question restée sans réponse.
 
-## Travaux en cours, non décrits dans `architecture/`
+## Travaux en cours
 
-- **Rythme des parties** (20 à 40 min, fin de partie à 220 points) : branche
-  `claude/swarm-it-game-pacing-1d4502`, non commité, non fusionné (D-078). Quand ce sera fusionné,
-  mettre à jour `regles.md` (temps, score, fin de partie, tests).
+- **Rythme des parties** (D-078, D-082 à D-096) : commité sur la branche
+  `claude/swarm-it-game-pacing-1d4502`, **pas encore fusionné dans `main`**. Décrit dans
+  `architecture/`. Non confirmé : l'activité des dernières minutes (les robots ne se battent
+  pas) et l'équilibre des défenses.
 
 ## Comment cette doc a été faite
 

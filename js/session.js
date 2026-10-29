@@ -20,7 +20,7 @@
 import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity } from './save.js';
-import { newPlanet, settle, stateAt, startBuild, startResearch, startShips, usePower, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, sunFor, fortOf } from './game.js';
+import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, sunFor, fortOf } from './game.js';
 import { TECHS, SHIPS, shipStats, sightRange, TEMPO } from './tech.js';
 import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, salvage, applyLosses, parkedCell, fleetPos, fleetCargo, fleetTank, ORDERS, MAX_FLEETS } from './fleet.js';
 import { amounts, isEmpty, holdings, lacks, noRoom, take, put, outcome, OFFER_MS, MAX_OFFERS, GRACE_MS } from './trade.js';
@@ -1057,6 +1057,19 @@ export class Session {
     this.changed();
   }
 
+  /** Déconstruit un niveau d'un bâtiment, pour libérer sa place. */
+  demolish(key, where = 'home') {
+    if (!this.canAct) return;
+    const p = this.state.players[this.me];
+    const pl = this.myPlanet(where);
+    if (!pl) return;
+    const err = startDemolish(pl.planet, key, this.now());
+    if (err) return this.ontoast?.(err);
+    const b = RACES[p.race].buildings[key];
+    this.touch(this.addLog(`${p.name} déconstruit ${b.name} (niv. ${pl.planet.queue.level + 1} → ${pl.planet.queue.level}) sur ${pl.name}.`));
+    this.changed();
+  }
+
   /** Recherche : sur la planète mère, là où est le labo. */
   research(key) {
     if (!this.canAct) return;
@@ -1718,7 +1731,8 @@ export class Session {
       for (const d of settle(pl.planet, now)) {
         changed = true;
         const R = RACES[p.race];
-        if (d.kind === 'queue') this.addLog(`${p.name} termine ${R.buildings[d.key].name} niv. ${d.level} sur ${pl.name}.`);
+        if (d.kind === 'queue' && d.demolish) this.addLog(`${p.name} a déconstruit ${R.buildings[d.key].name} (niv. ${d.level}) sur ${pl.name}.`);
+        else if (d.kind === 'queue') this.addLog(`${p.name} termine ${R.buildings[d.key].name} niv. ${d.level} sur ${pl.name}.`);
         else if (d.kind === 'research') {
           techAt = Math.min(techAt, d.end);
           this.addLog(`${p.name} découvre ${TECHS[p.race][d.key].name} niv. ${d.level}.`);
@@ -2070,7 +2084,7 @@ function seenNews(state, me) {
  * (`tick`) qui ont fait avancer quelque chose (voir touch). Le reste de la partie vient des fiches des
  * autres, qui ont chacune leur journal.
  */
-export const ORDER_KINDS = ['chooseRace', 'claimPlanet', 'build', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'splitFleet', 'returnFleet', 'power'];
+export const ORDER_KINDS = ['chooseRace', 'claimPlanet', 'build', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'splitFleet', 'returnFleet', 'power'];
 for (const k of [...ORDER_KINDS, 'tick']) {
   const act = Session.prototype[k];
   Session.prototype[k] = function (...a) {

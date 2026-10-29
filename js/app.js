@@ -491,7 +491,7 @@ function buildStatic() {
       ${cardHead(b.name, `data-level="${k}"`)}
       <p class="cost mono" data-cost="${k}"></p>
       <button class="secondary small" data-build="${k}">${ic('up')}</button>
-      <p class="b-desc">${esc(b.desc)}</p>
+      <p class="b-desc">${esc(b.desc)} <button class="ghost small b-down" data-demolish="${k}">Déconstruire un niveau</button></p>
       <div class="card-bar" hidden><div class="bar-fill"></div></div>
     </article>`,
     )
@@ -747,6 +747,11 @@ function popText(race, pop) {
 $('buildings').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-build]');
   if (btn && !btn.disabled) session.build(btn.dataset.build, openKey);
+  const down = e.target.closest('[data-demolish]');
+  if (down && !down.disabled) {
+    const name = RACES[session.myRace].buildings[down.dataset.demolish].name;
+    if (confirm(`Déconstruire un niveau de ${name} ? Tu récupères la moitié de son prix et sa place.`)) session.demolish(down.dataset.demolish, openKey);
+  }
 });
 
 /** Rendu des parties qui changent avec l'état (joueurs, journal, demandes). */
@@ -1003,6 +1008,10 @@ function renderPlanet(me, now) {
     btn.title =
       s.queue?.key === k ? 'En chantier' : full ? 'Plus de place sur cette planète' : !covers(s.stock, cost) ? 'Ressources insuffisantes' : `Passer au niveau ${level + 1}`;
     btn.setAttribute('aria-label', `${R.buildings[k].name} : ${btn.title.toLowerCase()}`);
+    const down = q(`[data-demolish="${k}"]`);
+    down.disabled = !!s.queue || level < 1 || !session.canAct;
+    down.hidden = level < 1;
+    if (job?.demolish) setHtml(btn, `${ic('wait')}−${clock(Math.max(0, job.end - now))}`);
   }
 
   if (me.race === 'alien') {

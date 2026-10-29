@@ -146,3 +146,19 @@ test('une colonie humaine sur le plus petit corps garde des places libres', () =
     assert.ok(game.placesLeft(p) >= 2, `${b.label} : ${game.placesLeft(p)} place(s) libre(s)`);
   }
 });
+
+test('déconstruire un niveau rend la moitié de son prix et libère sa place à la fin', () => {
+  const p = planet('human');
+  p.places = game.usedPlaces(p.levels); // planète pleine
+  assert.equal(typeof game.startBuild(p, 'mine', T0), 'string', 'pleine : on ne bâtit plus');
+  const before = p.stock.minerals;
+  const cost = game.upgradeCost('human', 'mine', 3); // le 4ᵉ niveau
+  assert.equal(game.startDemolish(p, 'mine', T0), null);
+  assert.equal(p.stock.minerals, before + Math.floor(cost.minerals / 2), 'la moitié du prix revient tout de suite');
+  assert.equal(p.levels.mine, 4, 'le niveau tient jusqu’à la fin du chantier');
+  assert.equal(typeof game.startBuild(p, 'farm', T0), 'string', 'le chantier est occupé');
+  game.settle(p, p.queue.end);
+  assert.equal(p.levels.mine, 3);
+  assert.equal(game.placesLeft(p), 1, 'une place libre');
+  assert.equal(game.startDemolish(p, 'lab', p.at), 'Rien à déconstruire.');
+});

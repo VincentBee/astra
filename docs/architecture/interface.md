@@ -304,3 +304,34 @@ Les demandes de Vincent derrière l'interface sont datées dans [journal.md](../
 - À 375 px de large, le compteur de joueurs passe à la ligne sous le nom de la planète (capture 05).
 - `technologies.html` : style d'avant les angles droits, absente du cache hors ligne, aucun lien depuis le jeu.
 - Deux onglets de la même origine partagent le `localStorage` : pour tester à deux, changer d'origine ou de profil.
+- Un autre programme peut déjà écouter le port 8765 (une autre session) : le navigateur affiche alors une **autre version** du code. Vérifier avec `curl -s http://localhost:<port>/js/game.js` avant de conclure (piège rencontré le 2026-10-29, session `26f178b9`).
+
+## 12. Rythme des parties : ce qui s'affiche (2026-10-29)
+
+Ajouts de la session `26f178b9` (D-082 à D-095). Les règles sont dans [regles.md](regles.md) §4.1 et §19.
+
+- **Bandeau de course** `#race` (`index.html`, sous `#lost`), rempli par `renderRace(now)` dans
+  `renderLive` (chaque seconde) : avant le départ du froid « Le soleil s'éteint · dernier en vie
+  gagne · n en vie » ; ensuite « Ta planète la plus exposée gèle dans m:ss · va vers le
+  soleil » ; « Éliminé · encore n en vie » ; « Victoire ! » ou « X gagne. · partie finie ». Classe
+  `hot` (bordure orange) à moins de 3 min du gel, quand on est éliminé ou qu'un autre a gagné.
+  Caché pour une partie d'avant la course.
+- **Carte** : `drawFrost` voile en bleu tout ce qui est hors du cercle de froid (remplissage
+  `evenodd`) et trace le cercle en pointillés ; il s'arrête à l'heure de fin. Les planètes
+  gelées sont dessinées presque effacées (opacité 0,15). En-tête « éliminé » au lieu de « à
+  choisir » pour un joueur éliminé, et pas de bandeau « Choisis ta planète ».
+- **Liste des joueurs** : un joueur éliminé affiche « éliminé » et passe en bas ; les points
+  affichés sont `session.scoreOf(p)` (tout l'empire).
+- **Flottes** : sur une planète adverse, deux boutons « Attaquer X (joueur) » et « Conquérir X ·
+  défense ⚔ a ◇ c » (`ordersAt`). Une flotte en conquête est dessinée en rouge comme une attaque.
+- **Bâtiments** : les bâtiments de défense de la race apparaissent dans la liste comme les autres.
+  Carte dépliée (toucher le nom) : bouton « Déconstruire un niveau » (`data-demolish`), caché au
+  niveau 0, désactivé pendant un chantier ; une confirmation (`confirm`) rappelle qu'on récupère la
+  moitié du prix et la place. Pendant la déconstruction, le bouton du bâtiment affiche « −m:ss ».
+- **Débits** : tous les « / min » (ressources, gisements, réseau des machines, naissances) et les
+  vitesses « cases/min » (fiches de vaisseau, `technologies.html`) sont multipliés par `TEMPO`,
+  pour rester des minutes réelles. Recharge des pouvoirs en secondes.
+- Vérifié dans le navigateur intégré le 2026-10-29 : bandeau et compte à rebours, cercle qui se
+  resserre et planètes qui s'effacent, gel de la planète puis « Victoire ! » (froid accéléré à la
+  main), liste des bâtiments aliens avec épines et dôme, déconstruction (niveau 1 → 0, place
+  libérée). **Pas vérifié** : les boutons d'attaque et de conquête à deux joueurs réels.
