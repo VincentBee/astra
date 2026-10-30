@@ -309,6 +309,7 @@ button.close-btn svg { width: 18px; height: 18px; }
 .banner p { margin: 0; }
 .banner.warn { border-color: rgba(255, 179, 107, 0.5); margin-bottom: 10px; }
 .banner.race { margin-bottom: 10px; padding: 8px 14px; }
+.race-link { color: var(--accent); font-weight: 600; }
 .banner.race.hot { border-color: rgba(255, 179, 107, 0.8); }
 
 /* ----- Planète du joueur ----- */
@@ -319,6 +320,15 @@ button.close-btn svg { width: 18px; height: 18px; }
 .tile.empty .amount { color: var(--warn); }
 .planet-info { padding: 12px 14px; display: grid; gap: 10px; }
 .planet-info .b-desc { margin: 0; }
+.pi-yard { display: grid; gap: 8px; }
+.pi-yard .section-title, .pi-yard .hint { margin: 0; }
+.pi-ships { display: grid; gap: 6px; }
+.pi-ship { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 6px 0; border-top: 1px solid var(--line); }
+.pi-ship-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; min-width: 0; }
+.pi-ship .ship-actions { gap: 4px; flex-wrap: nowrap; }
+.pi-ship.affordable .cost { color: var(--ok); }
+.pi-ship [data-pinote] { flex-basis: 100%; }
+.pi-ship .ship-actions button { min-height: 34px; padding: 0 10px; font-size: 0.85rem; }
 #planet-info.sheet-panel { gap: 14px; }
 .climate { margin: 0; font: 0.8rem var(--mono); color: var(--muted); }
 .climate-name { font-weight: 700; }
@@ -343,6 +353,21 @@ button.close-btn svg { width: 18px; height: 18px; }
 .fi-fuel.low .hint { color: var(--warn); }
 #fleet-info .hint { margin: 0; }
 #fleets .player { cursor: pointer; }
+.map-fleets { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.mf {
+  display: grid; gap: 4px; align-content: start; min-height: 0; padding: 8px 10px; text-align: left;
+  border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 0;
+  background: var(--panel); color: var(--text); font: 0.78rem var(--mono); cursor: pointer;
+}
+.mf-top { display: flex; justify-content: space-between; gap: 6px; }
+.mf-clock { color: var(--muted); }
+.mf-ships { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.mf-ships span { display: inline-flex; align-items: center; gap: 3px; }
+.mf-ships .ic { width: 15px; height: 15px; }
+.mf-status { color: var(--muted); font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mf.hot { border-left-color: #ff7a93; }
+.mf.dry { opacity: 0.55; }
+.mf[aria-pressed='true'] { border-color: var(--text); background: var(--panel-2); }
 
 /* ----- Univers ----- */
 
@@ -453,6 +478,11 @@ button.close-btn svg { width: 18px; height: 18px; }
 .rp-controls input[type=range] { width: 100%; accent-color: var(--accent); }
 .rp-steps > button { flex: 1; min-height: 40px; font-size: 0.9rem; }
 .rp-h { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+.rp-score { padding: 10px; display: grid; gap: 8px; }
+.rp-score canvas { display: block; width: 100%; height: 180px; touch-action: none; cursor: crosshair; }
+.rp-score-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.85rem; }
+.rp-score-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.rp-score-legend .dot { width: 8px; height: 8px; }
 .rp-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 0.9rem; }
 .rp-log li { display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; gap: 8px; }
 .rp-log .dot { width: 8px; height: 8px; }
@@ -684,3 +714,11 @@ button.net-btn.slow { color: var(--warn); }
 /* Aide de la carte à gauche, à côté des coordonnées : sa bulle s'ouvre vers la droite. */
 .map-head > span:first-child { display: flex; align-items: center; gap: 8px; }
 .map-head .help-wrap .tooltip { right: auto; left: 0; }
+
+/* Fil de construction (D-101) : ce qui attend le chantier, avec l'heure estimée. */
+.plan { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 4px; }
+.plan-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid rgba(122, 162, 255, 0.25); background: rgba(122, 162, 255, 0.05); font-size: 0.85rem; }
+.plan-item .plan-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-item .plan-when { font-size: 0.74rem; color: var(--muted); white-space: nowrap; }
+.plan-item.blocked .plan-when { color: var(--warn); }
+.plan-item button { min-height: 30px; padding: 0 8px; }

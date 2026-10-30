@@ -32,6 +32,11 @@ const PATHS = {
   check: 'M5 12l5 5 9-10',
   invite: 'M9 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 20c0-3.9 3.1-7 7-7s7 3.1 7 7M19 8v6M16 11h6',
   trophy: 'M8 4h8v5a4 4 0 0 1-8 0zM8 6H4.5v1A3.5 3.5 0 0 0 8 10.5M16 6h3.5v1a3.5 3.5 0 0 1-3.5 3.5M12 13v4M9 17h6v3H9z',
+  // Vaisseaux, par type (SHIP_KEYS)
+  cargo: 'M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8',
+  fighter: 'M12 3l3 9 5 4H4l5-4zM9 20h6',
+  heavy: 'M12 2l7 5v9l-7 6-7-6V7zM12 8v8M8.5 10l3.5 2 3.5-2',
+  colony: 'M6 21V4h11l-2 4 2 4H6',
 };
 
 /** Icône à insérer en HTML, décorative : le bouton qui la porte se nomme lui-même. */

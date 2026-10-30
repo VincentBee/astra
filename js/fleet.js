@@ -34,6 +34,22 @@ export const ORDERS = {
   chase: { name: 'Poursuite', verb: 'prend en chasse' },
 };
 
+/**
+ * Comportement en voyage, à part de l'ordre : une flotte passive ne se bat que
+ * si on lui en donne l'ordre ; une flotte agressive combat toute flotte ennemie
+ * visible qu'elle touche (CONTACT), en route ou à l'arrêt, puis reprend son
+ * trajet. Sans champ `stance` (flottes d'avant), une flotte est passive.
+ */
+export const STANCES = {
+  passive: { name: 'Passive', hint: 'ne combat que sur ordre' },
+  aggressive: { name: 'Agressive', hint: 'combat toute flotte ennemie qu’elle croise' },
+};
+
+export const aggressive = (f) => f?.stance === 'aggressive';
+
+/** La flotte a-t-elle au moins un vaisseau armé ? */
+export const armed = (race, ships, tech) => Object.entries(ships || {}).some(([k, n]) => n > 0 && shipStats(race, k, tech).attack > 0);
+
 /** Distance (en cases) sous laquelle deux flottes se rencontrent. */
 export const CONTACT = 0.5;
 
@@ -41,9 +57,20 @@ export const countShips = (ships) => Object.values(ships || {}).reduce((a, b) =>
 
 /** Vitesse d'une flotte : celle de son vaisseau le plus lent (cases par minute). */
 export function fleetSpeed(race, ships, tech) {
+  const k = slowestShip(race, ships, tech);
+  return k ? shipStats(race, k, tech).speed : 0;
+}
+
+/** Type du vaisseau le plus lent de la flotte (celui qui fixe sa vitesse), ou null si elle est vide. */
+export function slowestShip(race, ships, tech) {
+  let slow = null;
   let v = Infinity;
-  for (const [k, n] of Object.entries(ships)) if (n > 0) v = Math.min(v, shipStats(race, k, tech).speed);
-  return Number.isFinite(v) ? v : 0;
+  for (const [k, n] of Object.entries(ships || {})) {
+    if (!(n > 0)) continue;
+    const sp = shipStats(race, k, tech).speed;
+    if (sp < v) [slow, v] = [k, sp];
+  }
+  return slow;
 }
 
 /** Capacité totale des soutes. */
@@ -112,7 +139,7 @@ export function launch(planet, { ships, cargo = {}, fuel = 0, at, origin, id }, 
   for (const [r, v] of Object.entries(load)) planet.stock[r] -= v;
   planet.stock.energy -= gas;
   const cell = { x: at.x, y: at.y };
-  const fleet = { id, ships: clean, cargo: load, fuel: gas, origin, from: cell, to: { ...cell }, depart: now, arrive: now, order: null };
+  const fleet = { id, ships: clean, cargo: load, fuel: gas, origin, from: cell, to: { ...cell }, depart: now, arrive: now, order: null, stance: 'passive' };
   return { fleet };
 }
 
@@ -253,7 +280,7 @@ export function transfer(a, b, race, part, now) {
  * case. Renvoie { error } ou { fleet }.
  */
 export function split(a, race, part, id, now) {
-  const b = { id, ships: {}, cargo: {}, fuel: 0, origin: a.origin, from: { ...a.to }, to: { ...a.to }, depart: now, arrive: now, order: null };
+  const b = { id, ships: {}, cargo: {}, fuel: 0, origin: a.origin, from: { ...a.to }, to: { ...a.to }, depart: now, arrive: now, order: null, stance: 'passive' };
   const error = transfer(a, b, race, part, now);
   return error ? { error } : { fleet: b };
 }
@@ -261,7 +288,7 @@ export function split(a, race, part, id, now) {
 /**
  * Fusionne la flotte `a` dans `b` : tout passe dans `b`, qui se souvient
  * des flottes absorbées (`absorbed`), pour que les dégâts visant `a`
- * l'atteignent quand même. `a` est à retirer par l'appelant.
+ * l'atteignent quand même. `b` garde son comportement. `a` est à retirer par l'appelant.
  */
 export function merge(a, b, race, now) {
   const fuel = fuelAt(a, race, now) + fuelAt(b, race, now);
@@ -311,6 +338,46 @@ export function intercept(f, race, tech, target, now) {
 
 /** Deux flottes au contact à `now`. */
 export const inContact = (a, b, now) => distance(fleetPos(a, now), fleetPos(b, now)) <= CONTACT;
+
+/**
+ * Premier instant de `]from, to]` où les flottes `a` et `b` entrent au
+ * contact (leur distance passe au-dessus puis à CONTACT ou moins), ou null.
+ * Sert quand aucun téléphone n'a regardé au bon moment (hors ligne, en
+ * arrière-plan). Un contact déjà en cours à `from` ne compte pas : il a été
+ * vu. Avant le départ de son segment, on ne sait pas où était une flotte :
+ * on ne cherche qu'à partir du plus tardif des deux départs.
+ */
+export function firstContact(a, b, from, to) {
+  const start = Math.max(from, a.depart, b.depart);
+  if (!(to > start)) return null;
+  const gap = (t) => distance(fleetPos(a, t), fleetPos(b, t));
+  // Les deux positions vont en ligne droite entre ces instants ; la distance
+  // (sans diagonale) aussi, sauf quand dx ou dy change de signe.
+  const knots = [start, to, a.arrive, b.arrive].filter((t) => t > start && t < to).sort((x, y) => x - y);
+  let t0 = start;
+  let out = gap(start) > CONTACT;
+  for (const t1 of [...new Set(knots), to]) {
+    const p0 = { a: fleetPos(a, t0), b: fleetPos(b, t0) };
+    const p1 = { a: fleetPos(a, t1), b: fleetPos(b, t1) };
+    const cuts = [t0, t1];
+    for (const k of ['x', 'y']) {
+      const d0 = p0.a[k] - p0.b[k];
+      const d1 = p1.a[k] - p1.b[k];
+      if (d0 * d1 < 0) cuts.push(t0 + ((t1 - t0) * d0) / (d0 - d1));
+    }
+    cuts.sort((x, y) => x - y);
+    for (let i = 1; i < cuts.length; i++) {
+      const u = cuts[i - 1];
+      const v = cuts[i];
+      const gu = gap(u);
+      const gv = gap(v);
+      if (out && gv <= CONTACT) return Math.min(to, Math.ceil(gu <= CONTACT ? u : u + ((v - u) * (gu - CONTACT)) / (gu - gv)));
+      if (gv > CONTACT) out = true;
+    }
+    t0 = t1;
+  }
+  return null;
+}
 
 /**
  * Butin sur une flotte vaincue : toute sa cargaison, dans la place qui

@@ -3,8 +3,8 @@
 // Rien n'est écrit : la sauvegarde et la partie en cours ne bougent pas.
 
 import { loadGame } from './save.js';
-import { replay, replayable } from './replay.js';
-import { RACES, raceIcon, UNIVERSE, planetsFor, stateAt, score, sameCell, sunFor } from './game.js';
+import { replay, replayable, scoreSeries } from './replay.js';
+import { RACES, raceIcon, UNIVERSE, planetsFor, stateAt, sameCell, sunFor } from './game.js';
 import { drawSun } from './sky.js';
 import { fleetPos, moving, countShips } from './fleet.js';
 
@@ -15,7 +15,7 @@ const MIN = 60_000;
 // Rien ne bouge sur la carte : on saute au prochain événement plutôt que d'attendre.
 const QUIET_S = 2;
 
-let film = null; // { frames, log, at: [index de la fiche de chaque joueur, par image], start, end }
+let film = null; // { frames, log, at: [index de la fiche de chaque joueur, par image], start, end, scores }
 let t = 0;
 let playing = false;
 let last = 0;
@@ -57,11 +57,16 @@ function load() {
       cur[f.pid] = i;
       at.push({ ...cur });
     });
-    film = { frames, log: r.log, at, start: frames[0].t, end: Math.max(frames[frames.length - 1].t, saved.savedAt || 0), gid: st.gid };
+    film = { frames, log: r.log, at, start: frames[0].t, end: Math.max(frames[frames.length - 1].t, saved.savedAt || 0), gid: st.gid, scores: scoreSeries(frames, st.gid) };
     const off = Object.values(st.players).filter((p) => r.faithful[p.id] === false);
     note(off.length ? `Replay approché : la fin ne retombe pas tout à fait sur la vraie partie pour ${off.map((p) => p.name).join(', ')}.` : '');
     $('rp-main').hidden = false;
     seek(film.start);
+    // Venu du bandeau « partie finie » : la courbe des points, à la fin de la partie.
+    if (location.hash === '#points') {
+      seek(film.end);
+      $('points').scrollIntoView();
+    }
   }, 30);
 }
 
@@ -108,6 +113,7 @@ function render() {
   $('rp-play').textContent = playing ? '❚❚' : '▶';
   $('rp-play').setAttribute('aria-label', playing ? 'Pause' : 'Lecture');
   drawMap(players);
+  drawScores();
   renderPlayers(players);
   renderLog();
 }
@@ -197,12 +203,100 @@ function drawMap(players) {
   }
 }
 
+/** Points d'un joueur à l'instant `time` (sa courbe est en escalier), null avant son arrivée. */
+function ptsAt(pid, time) {
+  let v = null;
+  for (const s of film.scores[pid] || []) {
+    if (s.t > time) break;
+    v = s.pts;
+  }
+  return v;
+}
+
+/** Graduation ronde au-dessus de `v` : 1, 2 ou 5 × 10ⁿ. */
+function niceMax(v) {
+  if (v <= 0) return 10;
+  const m = 10 ** Math.floor(Math.log10(v));
+  return [1, 2, 5, 10].map((k) => k * m).find((x) => x >= v);
+}
+
+/** Courbe des points de chaque joueur pendant toute la partie, avec un trait à l'instant affiché. */
+function drawScores() {
+  const canvas = $('rp-score');
+  const dpr = Math.min(3, window.devicePixelRatio || 1);
+  const cssW = canvas.clientWidth;
+  const cssH = canvas.clientHeight;
+  if (canvas.width !== Math.round(cssW * dpr) || canvas.height !== Math.round(cssH * dpr)) {
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cssW, cssH);
+  const pad = { l: 44, r: 8, t: 8, b: 8 };
+  const w = cssW - pad.l - pad.r;
+  const h = cssH - pad.t - pad.b;
+  const top = niceMax(Math.max(0, ...Object.values(film.scores).flat().map((s) => s.pts)));
+  const span = Math.max(1, film.end - film.start);
+  const X = (time) => pad.l + ((time - film.start) / span) * w;
+  const Y = (pts) => pad.t + h - (pts / top) * h;
+  // Grille discrète : 0, la moitié, le haut.
+  ctx.font = '11px ui-monospace, monospace';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for (const v of [0, top / 2, top]) {
+    ctx.strokeStyle = 'rgba(150,170,230,0.16)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pad.l, Math.round(Y(v)) + 0.5);
+    ctx.lineTo(pad.l + w, Math.round(Y(v)) + 0.5);
+    ctx.stroke();
+    ctx.fillStyle = '#8d95b3';
+    ctx.fillText(String(v), pad.l - 6, Y(v));
+  }
+  // Une courbe en escalier par joueur, à sa couleur, jusqu'à la fin de la partie.
+  const colors = Object.fromEntries(film.frames.map((f) => [f.pid, f.fiche.color]));
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  for (const [pid, line] of Object.entries(film.scores)) {
+    ctx.strokeStyle = colors[pid] || '#8d95b3';
+    ctx.beginPath();
+    line.forEach((s, i) => {
+      if (i === 0) ctx.moveTo(X(s.t), Y(s.pts));
+      else {
+        ctx.lineTo(X(s.t), Y(line[i - 1].pts));
+        ctx.lineTo(X(s.t), Y(s.pts));
+      }
+    });
+    ctx.lineTo(X(film.end), Y(line[line.length - 1].pts));
+    ctx.stroke();
+  }
+  // L'instant affiché.
+  ctx.strokeStyle = '#e8ebf7';
+  ctx.globalAlpha = 0.6;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(Math.round(X(t)) + 0.5, pad.t);
+  ctx.lineTo(Math.round(X(t)) + 0.5, pad.t + h);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  // Légende : nom et points à l'instant affiché (le texte reste à la couleur du texte).
+  // Dans l'ordre d'arrivée, comme la liste des joueurs : la légende ne saute pas pendant la lecture.
+  const names = Object.fromEntries(film.frames.map((f) => [f.pid, f.fiche.name]));
+  const rank = Object.fromEntries(film.frames.map((f) => [f.pid, f.fiche.rank]));
+  $('rp-score-legend').innerHTML = Object.keys(film.scores)
+    .sort((a, b) => rank[a] - rank[b])
+    .map((pid) => ({ pid, pts: ptsAt(pid, t) }))
+    .map(({ pid, pts }) => `<span><span class="dot" style="background:${esc(colors[pid] || '#8d95b3')}"></span> ${esc(names[pid])} <span class="mono">${pts == null ? '—' : `${pts} pts`}</span></span>`)
+    .join('');
+}
+
 function renderPlayers(players) {
   $('rp-players').innerHTML = players
     .sort((a, b) => a.rank - b.rank)
     .map((p) => {
       const R = RACES[p.race];
-      const planets = (p.planet ? 1 : 0) + Object.keys(p.colonies || {}).length;
+      const planets = (p.planet && p.home ? 1 : 0) + Object.keys(p.colonies || {}).length;
       const docked = countShips(p.planet?.ships || {}) + Object.values(p.colonies || {}).reduce((n, c) => n + countShips(c.ships || {}), 0);
       const flying = (p.fleets || []).reduce((n, f) => n + countShips(f.ships), 0);
       const s = p.planet ? stateAt(p.planet, Math.max(t, p.planet.at)) : null;
@@ -217,7 +311,7 @@ function renderPlayers(players) {
           <div class="p-name">${esc(p.name)}${R ? ` <span class="tag race-tag" style="--race:${R.color}">${raceIcon(p.race)} ${R.name}</span>` : ''}</div>
           <div class="p-sub mono">${esc(sub)}</div>
         </div>
-        <div class="p-score mono">${s ? `${score(p.race, s.levels)} pts` : ''}</div>
+        <div class="p-score mono">${p.race ? `${ptsAt(p.id, t) ?? 0} pts` : ''}</div>
       </div>`;
     })
     .join('');
@@ -285,6 +379,15 @@ $('rp-next').onclick = () => {
   playing = false;
   const i = frameAt(t);
   seek(film.frames[i + 1]?.t ?? film.end);
+};
+
+// Toucher la courbe : aller à ce moment de la partie.
+$('rp-score').onpointerdown = $('rp-score').onpointermove = (e) => {
+  if (!film || (e.type === 'pointermove' && !e.buttons)) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  const x = (e.clientX - r.left - 44) / Math.max(1, r.width - 52);
+  playing = false;
+  seek(film.start + Math.min(1, Math.max(0, x)) * (film.end - film.start));
 };
 
 window.addEventListener('resize', () => film && render());

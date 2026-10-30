@@ -20,9 +20,9 @@
 import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity } from './save.js';
-import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, sunFor, fortOf } from './game.js';
-import { TECHS, SHIPS, shipStats, sightRange, TEMPO } from './tech.js';
-import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, salvage, applyLosses, parkedCell, fleetPos, fleetCargo, fleetTank, ORDERS, MAX_FLEETS } from './fleet.js';
+import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, PLAN_MAX, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, sunFor, fortOf } from './game.js';
+import { TECHS, SHIPS, sightRange, TEMPO } from './tech.js';
+import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, firstContact, salvage, applyLosses, parkedCell, fleetPos, fleetCargo, fleetTank, ORDERS, MAX_FLEETS, STANCES, aggressive, armed } from './fleet.js';
 import { amounts, isEmpty, holdings, lacks, noRoom, take, put, outcome, OFFER_MS, MAX_OFFERS, GRACE_MS } from './trade.js';
 
 /** « de Beta », « d'Alpha ». */
@@ -133,6 +133,7 @@ export function normalize(p) {
   // Journal des ordres : { t, k, a?, ids?, s? } (heure, ordre ou « tick », arguments,
   // identifiants tirés, entrées des journaux des autres connues quand ce nombre a changé).
   if (!Array.isArray(p.orders)) p.orders = [];
+  if (p.deathPts !== undefined && !Number.isFinite(p.deathPts)) delete p.deathPts;
   return p;
 }
 
@@ -150,6 +151,8 @@ function planetOk(race, pl) {
   if (pl.climate !== undefined && !(isObj(pl.climate) && ['heat', 'energy', 'minerals', 'food'].every((k) => Number.isFinite(pl.climate[k])))) delete pl.climate;
   if (pl.places !== undefined && !(Number.isInteger(pl.places) && pl.places > 0)) delete pl.places;
   if (pl.queue && !(isObj(pl.queue) && race && Object.hasOwn(RACES[race].buildings, pl.queue.key))) pl.queue = null;
+  // Fil de construction : des noms de bâtiments de la race, PLAN_MAX au plus.
+  if (pl.plan !== undefined) pl.plan = Array.isArray(pl.plan) && race ? pl.plan.filter((k) => typeof k === 'string' && Object.hasOwn(RACES[race].buildings, k)).slice(0, PLAN_MAX) : [];
   // Niveaux : seulement les bâtiments de la race, en entiers positifs (un niveau négatif libérerait des places).
   if (race) pl.levels = Object.fromEntries(Object.keys(RACES[race].buildings).map((k) => [k, Math.max(0, Math.floor(Number(pl.levels[k]) || 0))]));
   return true;
@@ -765,12 +768,21 @@ export class Session {
     return seen.sort((a, b) => a.at - b.at || (a.winner < b.winner ? -1 : 1))[0];
   }
 
-  /** Classement : [{ id, pts, dead }], les vivants d'abord, puis les derniers tombés, puis les points. */
+  /**
+   * Classement : [{ id, pts, dead, best }], les vivants d'abord, puis les derniers tombés, puis
+   * les points. `pts` : ce que le joueur a maintenant (0 s'il a tout perdu). `best` départage :
+   * pour un joueur tombé, ses points juste avant sa chute (`deathPts`) ; une fiche qui n'a pas
+   * encore vu sa chute a encore ses planètes, donc ces mêmes points.
+   */
   ranking(now = this.now()) {
     return Object.values(this.state?.players || {})
       .filter((p) => p.race && p.planet)
-      .map((p) => ({ id: p.id, pts: this.scoreOf(p), dead: this.deadAt(p, now) }))
-      .sort((a, b) => (a.dead ?? Infinity) !== (b.dead ?? Infinity) ? (b.dead ?? Infinity) - (a.dead ?? Infinity) : b.pts - a.pts || (a.id < b.id ? -1 : 1));
+      .map((p) => {
+        const pts = this.scoreOf(p);
+        const dead = this.deadAt(p, now);
+        return { id: p.id, pts, dead, best: dead != null ? (p.deathPts ?? pts) : pts };
+      })
+      .sort((a, b) => (a.dead ?? Infinity) !== (b.dead ?? Infinity) ? (b.dead ?? Infinity) - (a.dead ?? Infinity) : b.best - a.best || (a.id < b.id ? -1 : 1));
   }
 
   /**
@@ -798,6 +810,8 @@ export class Session {
   losePlanet(p, key, at, why) {
     const pl = this.planetOf(p, key);
     if (!pl) return;
+    // Points d'avant la vague : toutes les planètes perdues à la même heure comptent dans `deathPts`.
+    if (this.wave?.pid !== p.id || this.wave.at !== at) this.wave = { pid: p.id, at, pts: this.scoreOf(p) };
     if (key !== 'home') {
       const colonies = { ...p.colonies };
       delete colonies[key];
@@ -812,6 +826,7 @@ export class Session {
     if (!next) {
       p.home = null;
       p.out = at;
+      p.deathPts = this.wave.pts;
       this.addLog(`${p.name} perd ${pl.name} (${why}) : plus aucune planète, ${p.name} est éliminé.`);
       this.ontoast?.(`${pl.name} perdue (${why}) : tu es éliminé.`);
       return;
@@ -1057,6 +1072,52 @@ export class Session {
     this.changed();
   }
 
+  /**
+   * Ajoute un bâtiment au fil de construction de la planète (D-105) : il se
+   * lancera tout seul, chantier libre, dès que le stock couvrira son prix.
+   */
+  planBuild(key, where = 'home') {
+    if (!this.canAct) return;
+    const p = this.state.players[this.me];
+    if (!p?.planet) return this.ontoast?.('Choisis d’abord ta race.');
+    const pl = this.myPlanet(where);
+    if (!pl) return;
+    const R = RACES[p.race];
+    if (!Object.hasOwn(R.buildings, key)) return this.ontoast?.('Bâtiment inconnu.');
+    const w = this.planets.find((x) => sameCell(x, pl.cell));
+    if (w?.places) pl.planet.places = Number.isFinite(pl.planet.places) ? w.places : Math.max(w.places, usedPlaces(pl.planet.levels));
+    // On compte à partir de maintenant : sinon le fil partirait de l'heure du dernier calcul.
+    for (const d of settle(pl.planet, this.now())) if (d.kind === 'start') this.addLog(`${p.name} lance ${R.buildings[d.key].name} niv. ${d.level} sur ${pl.name} (fil).`);
+    const plan = pl.planet.plan || [];
+    if (plan.length >= PLAN_MAX) return this.ontoast?.(`Le fil est plein (${PLAN_MAX} au plus).`);
+    // Places : celles déjà prises, le chantier en cours et ce qui attend déjà dans le fil.
+    const q = pl.planet.queue;
+    const taken = usedPlaces(pl.planet.levels) + (q ? (q.demolish ? -1 : 1) : 0) + plan.length;
+    if (Number.isFinite(pl.planet.places) && taken >= pl.planet.places) return this.ontoast?.(`Plus de place : les ${pl.planet.places} places de cette planète seront prises.`);
+    pl.planet.plan = [...plan, key];
+    this.touch(this.addLog(`${p.name} ajoute ${R.buildings[key].name} au fil de ${pl.name}.`));
+    this.changed();
+  }
+
+  /**
+   * Retire l'élément `index` du fil de construction, s'il s'agit bien de `key`
+   * (le fil a pu avancer entre l'affichage et le toucher).
+   */
+  unplan(key, index, where = 'home') {
+    if (!this.canAct) return;
+    const p = this.state.players[this.me];
+    const pl = this.myPlanet(where);
+    if (!pl) return;
+    const R = RACES[p.race];
+    for (const d of settle(pl.planet, this.now())) if (d.kind === 'start') this.addLog(`${p.name} lance ${R.buildings[d.key].name} niv. ${d.level} sur ${pl.name} (fil).`);
+    const plan = pl.planet.plan || [];
+    if (!Number.isInteger(index) || plan[index] !== key) return this.ontoast?.('Le fil a changé : déjà lancé ou retiré.');
+    plan.splice(index, 1);
+    pl.planet.plan = [...plan];
+    this.touch(this.addLog(`${p.name} retire ${R.buildings[key].name} du fil de ${pl.name}.`));
+    this.changed();
+  }
+
   /** Déconstruit un niveau d'un bâtiment, pour libérer sa place. */
   demolish(key, where = 'home') {
     if (!this.canAct) return;
@@ -1070,14 +1131,26 @@ export class Session {
     this.changed();
   }
 
-  /** Recherche : sur la planète mère, là où est le labo. */
-  research(key) {
+  /**
+   * Recherche : sur n'importe laquelle de mes planètes qui a un labo, avec le niveau de ce labo.
+   * Une recherche à la fois par planète, et pas la même technologie sur deux planètes à la fois.
+   */
+  research(key, where = 'home') {
     if (!this.canAct) return;
     const p = this.state.players[this.me];
     if (!p?.planet) return;
-    const err = startResearch(p.planet, key, this.now());
+    const pl = this.myPlanet(where);
+    if (!pl) return;
+    const other = this.planetsOf(p).find((x) => x.key !== pl.key && x.planet.research?.key === key);
+    if (other) return this.ontoast?.(`Cette technologie est déjà en recherche sur ${other.name}.`);
+    // La copie des technologies d'une colonie peut avoir un passage de retard : on part des plus hautes.
+    if (pl.key !== 'home' && Object.entries(p.planet.tech || {}).some(([k, n]) => n > (pl.planet.tech?.[k] || 0))) {
+      settle(pl.planet, this.now());
+      pl.planet.tech = maxTech(pl.planet.tech, p.planet.tech);
+    }
+    const err = startResearch(pl.planet, key, this.now());
     if (err) return this.ontoast?.(err);
-    this.touch(this.addLog(`${p.name} lance la recherche ${TECHS[p.race][key].name} niv. ${p.planet.research.level}.`));
+    this.touch(this.addLog(`${p.name} lance la recherche ${TECHS[p.race][key].name} niv. ${pl.planet.research.level} sur ${pl.name}.`));
     this.changed();
   }
 
@@ -1178,8 +1251,7 @@ export class Session {
       order = { kind, key: here.key };
     } else if (kind === 'attack' || kind === 'conquer') {
       if (!here || here.owner.id === this.me) return this.refuse('Aucune planète adverse ici.');
-      const armed = Object.entries(f.ships).some(([k, n]) => n && shipStats(p.race, k, p.planet.tech).attack > 0);
-      if (!armed) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas attaquer.');
+      if (!armed(p.race, f.ships, p.planet.tech)) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas attaquer.');
       order = { kind, pid: here.owner.id, key: here.key };
     } else if (kind === 'colonize') {
       if (!w || here) return this.refuse('Cette planète n’est pas libre.');
@@ -1205,6 +1277,24 @@ export class Session {
     const err = stopAt(f, p.race, p.planet.tech, this.now());
     if (err) return this.refuse(err);
     this.touch();
+    this.changed();
+    return true;
+  }
+
+  /** Comportement en voyage d'une de mes flottes : 'passive' ou 'aggressive' (STANCES). */
+  setFleetStance(id, stance) {
+    if (!this.canAct) return false;
+    const p = this.state.players[this.me];
+    const f = this.myFleet(id);
+    if (!f || !STANCES[stance]) return false;
+    if (stance === 'aggressive' && !armed(p.race, f.ships, p.planet.tech)) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas être agressive.');
+    if ((f.stance || 'passive') === stance) return false;
+    f.stance = stance;
+    this.tickLogs = []; // une flotte ennemie déjà au contact : le combat part avec ma fiche
+    this.engage(p, f, this.now());
+    const logs = this.tickLogs;
+    this.tickLogs = null;
+    this.touch(logs.length ? logs : null);
     this.changed();
     return true;
   }
@@ -1249,8 +1339,7 @@ export class Session {
     if (!f || !target) return this.refuse('Flotte introuvable.');
     if (this.locked(id)) return false;
     if (!this.sees(enemy, target, this.now())) return this.refuse('Cette flotte est hors de ta portée de détection.');
-    const armed = Object.entries(f.ships).some(([k, n]) => n && shipStats(p.race, k, p.planet.tech).attack > 0);
-    if (!armed) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas attaquer.');
+    if (!armed(p.race, f.ships, p.planet.tech)) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas attaquer.');
     // Ma copie de sa flotte ne change qu'une fois mon rapport lu par son téléphone : d'ici là, ce
     // que je vois est l'état d'avant le combat, et rejouer le combat compterait les pertes deux fois.
     const pendingHit = (p.effects || []).some((e) => e.to === pid && [target.id, ...(target.absorbed || [])].includes(e.fleet) && !enemy.applied?.includes(e.id));
@@ -1271,9 +1360,15 @@ export class Session {
    * vers le point d'interception quand la cible a changé de trajet (ou
    * quand j'y suis arrivé sans la trouver). Renvoie true si ma fiche a changé.
    */
-  pursue(p, f, now) {
+  pursue(p, f, now, from = now) {
     const enemy = this.state.players[f.order.pid];
     const target = this.fleetOf(enemy, f.order.fleet);
+    // Rencontre que personne n'a regardée à temps (hors ligne) : combat à l'heure de la rencontre.
+    const met = target && !inContact(f, target, now) && firstContact(f, target, from, now);
+    if (met && this.sees(enemy, target, met) && !this.pendingFight(p, f, enemy, target)) {
+      if (target.id !== f.order.fleet) f.order = { ...f.order, fleet: target.id };
+      return this.fight(p, f, enemy, target, met);
+    }
     if (!target || !this.sees(enemy, target, now)) {
       // Disparue (posée, détruite) ou sortie de ma portée de détection.
       f.order = null;
@@ -1301,6 +1396,36 @@ export class Session {
     return true;
   }
 
+  /**
+   * Flotte agressive, à chaque passage : combat contre la flotte ennemie
+   * visible la plus proche à son contact (la même règle que la poursuite),
+   * puis la flotte reprend son trajet et son ordre. Renvoie true si ma fiche a changé.
+   */
+  engage(p, f, now, from = now) {
+    if (!aggressive(f) || f.order?.kind === 'chase' || !armed(p.race, f.ships, p.planet.tech)) return false;
+    const eyes = this.eyes(now);
+    const pos = fleetPos(f, now);
+    let best = null;
+    let missed = null; // rencontre que personne n'a regardée à temps (hors ligne) : la plus ancienne
+    for (const enemy of Object.values(this.state.players)) {
+      if (enemy.id === this.me) continue;
+      for (const target of enemy.fleets || []) {
+        if (this.pendingFight(p, f, enemy, target)) continue;
+        if (!inContact(f, target, now)) {
+          const t = firstContact(f, target, from, now);
+          if (t && (!missed || t < missed.t) && this.sees(enemy, target, t)) missed = { enemy, target, t };
+          continue;
+        }
+        if (!this.sees(enemy, target, now, eyes)) continue;
+        const t = fleetPos(target, now);
+        const d = Math.hypot(t.x - pos.x, t.y - pos.y);
+        if (!best || d < best.d) best = { enemy, target, d };
+      }
+    }
+    if (best) return this.fight(p, f, best.enemy, best.target, now, true);
+    return missed ? this.fight(p, f, missed.enemy, missed.target, missed.t, true) : false;
+  }
+
   /** Un rapport de combat entre ma flotte `f` et sa flotte `target`, dans un sens ou dans l'autre, pas encore lu ? */
   pendingFight(p, f, enemy, target) {
     const ids = (x) => [x.id, ...(x.absorbed || [])];
@@ -1316,8 +1441,11 @@ export class Session {
    * Combat entre ma flotte et celle d'un autre joueur, au contact. Je
    * calcule avec ce que je sais de la sienne ; son téléphone appliquera ses
    * pertes en lisant mon rapport (un identifiant neuf par combat).
+   * `onward` : ma flotte (agressive) garde ensuite son trajet et son ordre.
    */
-  fight(p, f, enemy, target, now) {
+  fight(p, f, enemy, target, now, onward = false) {
+    // Combat dans le passé : le prochain passage cherche les autres rencontres à partir de là.
+    if (now < (this.scanAt ?? Infinity)) this.scanAt = now;
     const res = battle({ race: p.race, ships: f.ships, tech: p.planet.tech }, { race: enemy.race, ships: target.ships, tech: enemy.planet?.tech || {} });
     const take = res.won ? salvage(p.race, res.attLeft, target.cargo, f.cargo) : {};
     // Lui aussi a pu livrer ce combat de son côté, sans avoir encore lu mon rapport (poursuite
@@ -1340,12 +1468,12 @@ export class Session {
           : `${p.name} perd une flotte contre ${enemy.name}.`,
     );
     this.ontoast?.(res.won ? 'Flotte ennemie détruite !' : countShips(res.attLeft) ? 'Combat indécis.' : 'Flotte perdue.');
-    f.order = null;
+    if (!onward) f.order = null;
     if (!applyLosses(f, p.race, p.planet.tech, res.attLost, null, now)) {
       p.fleets = p.fleets.filter((x) => x.id !== f.id);
       return true;
     }
-    if (moving(f, now)) stopAt(f, p.race, p.planet.tech, now);
+    if (!onward && moving(f, now)) stopAt(f, p.race, p.planet.tech, now);
     f.cargo = Object.fromEntries(SOIL.map((r) => [r, (f.cargo?.[r] || 0) + (take[r] || 0)]));
     return true;
   }
@@ -1701,12 +1829,21 @@ export class Session {
    * calcule seul) : chantiers, recherches et vaisseaux terminés, arrivées de
    * mes flottes, et dégâts que d'autres m'ont infligés.
    */
+  /**
+   * `from` : depuis quand chercher les rencontres de flottes que personne n'a
+   * regardées (téléphones hors ligne, en arrière-plan) : le passage précédent
+   * (`scanAt`), ou au lancement la dernière modification de ma fiche. Notée
+   * dans le journal d'ordres : le rejeu cherche sur la même fenêtre.
+   */
   tick() {
     if (this.status !== 'playing' || !this.state) return;
     this.checkClaim();
     const p = this.state.players[this.me];
     if (!p?.planet) return;
     const now = this.now();
+    const from = Math.min(now, this.scanAt ?? p.actAt ?? now);
+    if (this.entry && from < now) this.entry.from = from;
+    this.scanAt = now;
     let changed = false;
     this.tickLogs = []; // entrées du journal de ce passage, envoyées avec ma fiche
     if (this.over) {
@@ -1717,35 +1854,54 @@ export class Session {
     }
     if (this.freeze(p, now)) changed = true;
     let techAt = now; // fin de la dernière recherche terminée depuis le passage précédent
+    let colonyTech = false; // une colonie a trouvé une technologie : les autres planètes la reçoivent
+    const R = RACES[p.race];
+    const report = (pl, d) => {
+      changed = true;
+      if (d.kind === 'start') this.addLog(`${p.name} lance ${R.buildings[d.key].name} niv. ${d.level} sur ${pl.name} (fil).`);
+      else if (d.kind === 'queue' && d.demolish) this.addLog(`${p.name} a déconstruit ${R.buildings[d.key].name} (niv. ${d.level}) sur ${pl.name}.`);
+      else if (d.kind === 'queue') this.addLog(`${p.name} termine ${R.buildings[d.key].name} niv. ${d.level} sur ${pl.name}.`);
+      else if (d.kind === 'research') {
+        techAt = Math.min(techAt, d.end);
+        // Trouvée dans une colonie : elle vaut aussi pour la planète mère, qui la donne aux autres.
+        if (pl.key !== 'home') {
+          settle(p.planet, d.end); // la planète mère profite du bonus à partir de la fin, pas avant
+          p.planet.tech = maxTech(p.planet.tech, { [d.key]: d.level });
+          colonyTech = true;
+        }
+        this.addLog(`${p.name} découvre ${TECHS[p.race][d.key].name} niv. ${d.level} sur ${pl.name}.`);
+        this.ontoast?.(`Recherche terminée : ${TECHS[p.race][d.key].name} niv. ${d.level}.`);
+      } else this.addLog(`${p.name} reçoit ${d.count} × ${SHIPS[p.race][d.type].name} sur ${pl.name}.`);
+    };
+    // Les technologies valent pour toutes mes planètes : chaque colonie en garde une copie, à
+    // partir de la fin de la recherche (et pas seulement du passage qui s'en aperçoit).
+    const shareTech = (pl) => {
+      if (pl.key === 'home' || sameTech(pl.planet.tech, p.planet.tech)) return;
+      for (const d of settle(pl.planet, Math.min(techAt, now))) report(pl, d);
+      p.planet.tech = maxTech(p.planet.tech, pl.planet.tech); // une recherche finie ici et pas encore partagée
+      pl.planet.tech = { ...p.planet.tech };
+      changed = true;
+    };
     // La planète mère d'abord (planetsOf la donne en premier) : ses recherches valent pour les colonies.
-    for (const pl of this.planetsOf(p)) {
-      // Les technologies valent pour toutes mes planètes : chaque colonie en garde une copie, à
-      // partir de la fin de la recherche (et pas seulement du passage qui s'en aperçoit).
-      if (pl.key !== 'home' && JSON.stringify(pl.planet.tech || {}) !== JSON.stringify(p.planet.tech || {})) {
-        settle(pl.planet, Math.min(techAt, now));
-        pl.planet.tech = { ...(p.planet.tech || {}) };
-        changed = true;
-      }
-      const due = ['queue', 'research', 'yard'].some((k) => pl.planet[k] && pl.planet[k].end <= now);
-      if (!due) continue;
-      for (const d of settle(pl.planet, now)) {
-        changed = true;
-        const R = RACES[p.race];
-        if (d.kind === 'queue' && d.demolish) this.addLog(`${p.name} a déconstruit ${R.buildings[d.key].name} (niv. ${d.level}) sur ${pl.name}.`);
-        else if (d.kind === 'queue') this.addLog(`${p.name} termine ${R.buildings[d.key].name} niv. ${d.level} sur ${pl.name}.`);
-        else if (d.kind === 'research') {
-          techAt = Math.min(techAt, d.end);
-          this.addLog(`${p.name} découvre ${TECHS[p.race][d.key].name} niv. ${d.level}.`);
-          this.ontoast?.(`Recherche terminée : ${TECHS[p.race][d.key].name} niv. ${d.level}.`);
-        } else this.addLog(`${p.name} reçoit ${d.count} × ${SHIPS[p.race][d.type].name} sur ${pl.name}.`);
-      }
+    const mine = this.planetsOf(p);
+    for (const pl of mine) {
+      shareTech(pl);
+      // Une fin de chantier, ou le fil de construction qui peut lancer le suivant.
+      const due = ['queue', 'research', 'yard'].some((k) => pl.planet[k] && pl.planet[k].end <= now) || (!pl.planet.queue && pl.planet.plan?.length && stateAt(pl.planet, now).done.length > 0);
+      if (due) for (const d of settle(pl.planet, now)) report(pl, d);
     }
+    // Une recherche finie dans une colonie : les planètes déjà passées la reçoivent aussi.
+    if (colonyTech) for (const pl of mine) shareTech(pl);
     // Les combats des autres d'abord : mes flottes agissent ensuite avec leurs vraies pertes.
     if (this.applyEffects(p, now)) changed = true;
     for (const f of [...(p.fleets || [])]) {
       if (f.order?.kind === 'chase') {
-        if (this.pursue(p, f, now)) changed = true;
-      } else if (f.order && !moving(f, now) && this.arrive(p, f)) changed = true;
+        if (this.pursue(p, f, now, from)) changed = true;
+        continue;
+      }
+      if (this.engage(p, f, now, from)) changed = true;
+      if (!p.fleets.includes(f)) continue; // détruite dans ce combat
+      if (f.order && !moving(f, now) && this.arrive(p, f)) changed = true;
     }
     if (this.settleOffers(p, now)) changed = true;
     if (this.refuseExpired(p, now)) changed = true;
@@ -2084,7 +2240,20 @@ function seenNews(state, me) {
  * (`tick`) qui ont fait avancer quelque chose (voir touch). Le reste de la partie vient des fiches des
  * autres, qui ont chacune leur journal.
  */
-export const ORDER_KINDS = ['chooseRace', 'claimPlanet', 'build', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'splitFleet', 'returnFleet', 'power'];
+/** Mêmes niveaux de technologies, quel que soit l'ordre des clés. */
+function sameTech(a, b) {
+  const keys = new Set([...Object.keys(a || {}), ...Object.keys(b || {})]);
+  return [...keys].every((k) => (Number(a?.[k]) || 0) === (Number(b?.[k]) || 0));
+}
+
+/** Les plus hauts niveaux de deux listes de technologies. */
+function maxTech(a, b) {
+  const out = { ...(a || {}) };
+  for (const [k, n] of Object.entries(b || {})) if ((Number(n) || 0) > (Number(out[k]) || 0)) out[k] = n;
+  return out;
+}
+
+export const ORDER_KINDS = ['chooseRace', 'claimPlanet', 'build', 'planBuild', 'unplan', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'setFleetStance', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'splitFleet', 'returnFleet', 'power'];
 for (const k of [...ORDER_KINDS, 'tick']) {
   const act = Session.prototype[k];
   Session.prototype[k] = function (...a) {

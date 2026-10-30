@@ -95,6 +95,7 @@ Créée par `newPlanet(race, now, world)` (`js/game.js:404-420`) :
 | `at` | heure (ms) à laquelle `stock`, `pop`, `reserve` sont vrais |
 | `levels` | `{ bâtiment: niveau }`, départ : `buildings[k].start` |
 | `queue` | chantier en cours `{ key, level, start, end }` ou `null` (`js/game.js:645`) |
+| `plan` | fil de construction : noms de bâtiments qui attendent le chantier, 8 au plus (D-105) ; absent sur une planète d'avant |
 | `research` | recherche en cours `{ key, level, start, end }` (`js/game.js:669`) |
 | `yard` | lot de vaisseaux en cours `{ type, count, start, end }` (`js/game.js:688`) |
 | `tech` | `{ technologie: niveau }` |
@@ -176,6 +177,13 @@ l'intègre par pas (`js/game.js:13-15`).
   niveau, nouvelle techno, nouveaux vaisseaux), puis on continue (`js/game.js:566-579`). À
   égalité d'heure, l'ordre est celui du nom de la file (`js/game.js:569`). Le résultat contient
   aussi `prod`, le rythme actuel pour l'affichage (`js/game.js:582`).
+- **Fil de construction** (`plan`, D-105) : à chaque tour de cette boucle, si le chantier est
+  libre, qu'il reste une place et qu'un bâtiment attend en tête du fil, `stateAt` avance
+  l'économie pas à pas (fonction `until`, les pas de `steps`) jusqu'à ce que le stock couvre son
+  prix, au plus jusqu'au prochain événement. Trouvé : il paye, remplit `queue`, retire la tête
+  du fil, et note `{ kind: 'start', … }` dans `done`. Le fil avance donc aussi pendant une
+  absence. `planForecast(planet, now)` refait ce calcul 10 min puis 6 h plus loin pour estimer
+  le début et la fin de chaque élément (affichage seulement).
 - `settle(planet, now)` (`js/game.js:591-607`) écrit cet état dans la planète. Seul le
   propriétaire l'appelle. **Une heure qui recule est ignorée** : `now = max(now, planet.at)`,
   et une heure invalide (`NaN`) ne fait rien (`js/game.js:592-594`).
@@ -190,7 +198,7 @@ l'intègre par pas (`js/game.js:13-15`).
 1. `checkClaim()` : rendre une planète ou une colonie prise avant moi (section 12).
 2. Pour chaque planète (la mère d'abord) : recopier les technologies de la mère dans les
    colonies, à partir de la fin de la recherche (`js/session.js:1554-1558`) ; puis `settle` si
-   une file est terminée, et écrire au journal (`js/session.js:1559-1570`). **`tick()` ne fait
+   une file est terminée **ou si le fil de construction peut lancer le suivant** (D-105), et écrire au journal (`js/session.js:1559-1570`). **`tick()` ne fait
    donc pas avancer `planet.at` toutes les 250 ms** : la fiche garde son ancien `at` (et son
    ancien stock) jusqu'à la fin d'une file ou au prochain ordre ; l'affichage passe par
    `stateAt`.
@@ -254,6 +262,11 @@ gisement n'est pas vide ; ensuite pas plus que `réserve / h + regen`.
   construction de ce niveau ; rend **tout de suite la moitié** de son coût ; le niveau (et sa
   place) ne disparaît qu'à la fin du chantier. La file `queue` porte alors `demolish: true` ;
   `stateAt` applique `levels[key] = job.level` comme pour une construction (le niveau baisse).
+- **Fil de construction** (D-105) : ordre `Session.planBuild(key, where)` (ajoute en fin de fil,
+  8 au plus, refusé si les places bâties + le chantier + le fil atteignent `places`) et
+  `Session.unplan(key, index, where)` (retire un élément, seulement si c'est bien `key` à cette place : le fil a pu avancer entre l'affichage et le toucher). Les deux font d'abord `settle`, pour que le
+  fil parte de maintenant. Le lancement automatique est décrit en §4.3. Un élément sans place
+  bloque le fil jusqu'à ce que le joueur le retire ou déconstruise.
 - `covers` tolère 1e-9 d'écart d'arrondi (`js/game.js:624-626`).
 
 ### 5.6 Classement
@@ -339,15 +352,21 @@ détection.
 
 ### 7.2 Règles de recherche
 
-- **Sur la planète mère seulement** : `Session.research` utilise `p.planet`
-  (`js/session.js:917-925`). Il faut un labo (`js/game.js:659-660`), une seule recherche à la
-  fois, et les prérequis (`techMissing`, `js/tech.js:274-284`).
+- **Sur toute planète qui a un labo** (D-098) : `Session.research(key, where)`
+  (`js/session.js:1077`) lance la recherche sur la planète `where`, avec `startResearch`
+  (`js/game.js:730`). Le labo **de cette planète** donne les prérequis (`techMissing`) et la
+  durée ; son stock paie. Une recherche à la fois par planète, et pas la même technologie sur
+  deux planètes à la fois (refus « déjà en recherche sur … »).
 - Coût : `floor(base × 1,7^niveau)` (`techCost`, `js/tech.js:259-265`).
+  Humains : surtout des minéraux, plus de la nourriture pour Agronomie et Arches coloniales
+  (D-099). Machines : minéraux + énergie. Aliens : minéraux + nourriture.
 - Durée : `max(8, round(total / (20 × (1 + 0,5 × (labo − 1)))))` secondes
   (`researchDuration`, `js/tech.js:268-271`).
-- Les technologies valent pour toutes mes planètes : chaque colonie en garde une copie,
-  remise à jour par `tick()` (`js/session.js:1552-1558`) et donnée à la fondation
-  (`js/session.js:1626`).
+- Les technologies valent pour toutes mes planètes : la planète mère tient la liste de
+  l'empire, chaque colonie en garde une copie, remise à jour par `tick()` (`shareTech`,
+  `js/session.js:1751`) et donnée à la fondation. Une recherche finie dans une colonie monte
+  d'abord dans la planète mère, puis un second passage la donne aux autres colonies
+  (`js/session.js:1766`).
 
 ### 7.3 Le graphe (`js/techtree.js`)
 
@@ -392,7 +411,9 @@ ouverts »).
 ### 8.3 Se déplacer (`moveTo`, `js/fleet.js:134-152`)
 
 - Vitesse de la flotte = celle de son vaisseau le plus lent (`fleetSpeed`,
-  `js/fleet.js:42-46`).
+  `js/fleet.js:42-46`), bonus de technologie compris. `slowestShip` (`js/fleet.js:48-57`) dit
+  lequel ; un type à 0 exemplaire ne compte pas, une flotte vide a une vitesse 0 et ne bouge pas.
+  Ajouter un seul vaisseau lent ralentit donc toute la flotte (D-101).
 - Durée : `max(5 s, distance / vitesse × 1 min)` (`tripMs`, `js/fleet.js:80-85`).
 - **Distance** : en nombre de pas, sans diagonale (Manhattan, `distance`,
   `js/game.js:782`). La position affichée, elle, est interpolée en ligne droite entre `from` et
@@ -508,6 +529,36 @@ Une flotte qui attend la réponse à un échange est **bloquée** (`locked`,
   servent à reconnaître que c'est le même combat, pour ne compter les pertes qu'une fois
   (`js/session.js:1160-1170`, `fleetHit` `js/session.js:1746-1770`). À plus de 30 min d'écart,
   ce n'est jamais le même combat (revanche) (`js/session.js:1754-1755`).
+
+### 9.3 bis Comportement en voyage : passif ou agressif (D-100)
+
+- Champ `stance` de la flotte : `'passive'` (défaut, `launch` et `split`) ou `'aggressive'`
+  (`STANCES`, `aggressive`, `armed`, `js/fleet.js`). Sans champ : passive.
+- `setFleetStance(id, stance)` (`js/session.js`, ordre noté au journal et rejoué) : refusé pour
+  une flotte sans armes ; si une flotte ennemie est déjà au contact, le combat a lieu tout de
+  suite.
+- `engage` (`js/session.js`), à chaque `tick`, pour chaque flotte agressive qui ne poursuit pas :
+  la flotte ennemie **visible** la plus proche **au contact** (`inContact`), sans combat en
+  attente de rapport (`pendingFight`), est combattue par `fight(…, onward = true)` : mêmes
+  calculs, butin et rapport que la poursuite, mais la flotte **garde son ordre et reprend son
+  trajet** (`applyLosses`). Puis l'arrivée éventuelle (`arrive`).
+- Deux flottes agressives qui se croisent livrent le même combat chacune de leur côté : comme
+  pour la poursuite mutuelle, les pertes ne comptent qu'une fois (`sim`, `ack`, `engaged`).
+- Une fois les rapports lus, si les deux flottes sont encore au contact, le combat recommence.
+- **Rencontres que personne n'a regardées** (D-109) : un téléphone hors ligne ou en arrière-plan
+  ne passe pas au bon moment. À chaque `tick`, `engage` et `pursue` cherchent aussi, depuis le
+  passage précédent (`scanAt`, en mémoire ; au lancement, `actAt` de ma fiche), le premier instant
+  où ma flotte **entre** au contact d'une flotte ennemie (`firstContact`, `js/fleet.js` : calcul
+  exact sur les deux segments, distance sans diagonale). Si la cible était visible à cet instant,
+  le combat a lieu **daté de la rencontre** (`fight(…, t)`), puis la flotte reprend sa route
+  (agressive) ou s'arrête là (poursuite). Le passage suivant repart de ce combat, pour trouver une
+  autre rencontre plus tard dans la même absence. La fenêtre est notée dans le journal d'ordres
+  (`from` de l'entrée `tick`) : le rejeu cherche sur la même.
+- Limites : un contact déjà en cours au début de la fenêtre ne compte pas (il a été vu) ; avant le
+  départ du segment actuel d'une flotte, on ne sait pas où elle était (l'ancien segment est
+  remplacé), donc une rencontre faite avant un changement de cap de la cible est perdue ; la
+  vue à l'instant de la rencontre compte mes flottes à leur position de ce moment-là sur leur
+  segment actuel.
 
 ### 9.4 Appliquer les dégâts reçus (`applyEffects`, `js/session.js:1697-1739`)
 
@@ -708,7 +759,7 @@ fiche de `b` (`tests/harness.mjs:20-35`).
 node --test tests/*.test.mjs
 ```
 
-Résultat le 2026-10-29 (Node v24.14.1), après fusion avec `main` : `tests 119, pass 119, fail 0` (12 fichiers, dont les `decisions-*.test.mjs` de D-082). Le harnais
+Résultat le 2026-10-30 (Node v24.14.1), avec la recherche en colonie (D-098) et le comportement en voyage (D-100) : `tests 125, pass 125, fail 0` (12 fichiers, dont les `decisions-*.test.mjs` de D-082). Le harnais
 coupe le froid (`FROST.delayMs = Infinity`) : les parties de test ne finissent pas d'elles-mêmes ;
 `tests/end.test.mjs` le rallume test par test.
 
@@ -730,7 +781,7 @@ Résultat : `tests 34, pass 34, fail 0`, environ 5,6 s (le rejeu d'une partie de
 | `tests/rules.test.mjs` | 11 | Déconstruire (moitié du prix rendue, place libérée à la fin) ; heure qui recule puis revient : pas de double production ; longue absence ≈ passages toutes les heures (population à moins de 2 %) ; arrachement refusé sans payer ; clés héritées (`constructor`, `__proto__`) refusées ; effectifs négatifs ou fractionnaires au combat ; soleil au centre et sans planète ; climat et production ; une place par niveau ; places lues sur la carte ; une colonie humaine sur le plus petit corps garde des places |
 | `tests/combat.test.mjs` | 4 | Attaques contre une planète : pas de butin créé avec un défenseur hors ligne ou plusieurs flottes arrivées ensemble ; 70 attaques avant le retour du défenseur ; les vaisseaux perdus emportent leur cargaison |
 | `tests/effects.test.mjs` | 1 | 5 joueurs, 4 attaquants × 70 combats : chaque perte subie une fois, puis rapports oubliés des deux côtés |
-| `tests/fleet.test.mjs` | 8 | Deux flottes sur la même cible ; poursuite mutuelle ; colonie qui encaisse les pertes ; premier arrivé à la colonisation ; plein en panne tout près ; plusieurs attaquants ne pillent pas plus que le stock ; revanche ; raids sans armes et un pillage par 2 min |
+| `tests/fleet.test.mjs` | 20 | Deux flottes sur la même cible ; poursuite mutuelle ; colonie qui encaisse les pertes ; premier arrivé à la colonisation ; plein en panne tout près ; plusieurs attaquants ne pillent pas plus que le stock ; revanche ; raids sans armes et un pillage par 2 min ; flotte agressive qui combat puis reprend sa route ; flotte passive qui croise sans combattre ; agressive à l'arrêt qui garde sa case ; deux agressives : pertes comptées une fois ; agressive refusée sans armes, vue par les autres, gardée à la fusion (D-100) ; vitesse du vaisseau le plus lent ; rencontres que personne n'a regardées : `firstContact`, agressive et poursuite hors ligne, pas de combat rejoué, pertes comptées une fois (D-109) |
 | `tests/colony.test.mjs` | 1 | Colonie perdue au recollage : vaisseaux et cargaison restent en orbite |
 | `tests/hostile.test.mjs` | 6 | Pair malveillant ou fiche abîmée : personne ne réécrit ma fiche ni un secret, ni ne date sa fiche loin dans le futur ; fiche abîmée sans plantage ; race ou identifiant spécial ; installation antidatée ; heure qui recule ; téléphone en avance reste visible. Une partie de ces tests passe par l'acceptation des fiches (mécanisme décrit dans reseau.md) |
 | `tests/replay.test.mjs` | 4 | Une partie de robots (construire, chercher, armer, décoller, attaquer, échanger) rejouée retombe sur les mêmes fiches ; partie coupée en deux puis recollée ; journal tronqué signalé ; copie pas à jour signalée |
@@ -763,7 +814,7 @@ avec leur date et leur source.
    fait pas ; le commentaire juste au-dessus du calcul (`js/game.js:523`) dit le contraire.
 3. `js/game.js:969` dit « de 12 à 22 places » ; `PLANET_PLACES` vaut `[14, 22]`
    (`js/game.js:818`, dont le commentaire explique que 12 était trop peu).
-4. `js/tech.js:217-218` : « un plein mène à 30 [cases] (machines) ». Seule la sonde
+4. `js/tech.js:224-226` : « un plein mène à 30 [cases] (machines) ». Seule la sonde
    réplicatrice fait 30 cases (90 / 3) ; les autres vaisseaux machines font 36. Le commentaire
    date du lot 7 (commit `a8a229d`) ; le commit `061744b` a donné +20 % d'autonomie aux
    machines (30 → 36) sans le mettre à jour.
@@ -805,6 +856,8 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
   accepte ce changement de `home` daté d'avant (c'était une de mes colonies). Sans colonie :
   `p.home = null`, `p.out = heure` : le joueur est **éliminé** (`canAct` faux, `claimPlanet`
   refusé).
+- `losePlanet` note les points de la vague (`this.wave` : joueur, heure, `scoreOf` avant la
+  première perte de cette heure). À l'élimination, ils vont dans `p.deathPts` (D-102).
 
 ### 19.4 Qui est en vie, qui gagne (`livePlanets`, `deadAt`, `ranking`, `checkOver`)
 
@@ -812,8 +865,12 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
 - `deadAt(p)` : `p.out` s'il existe ; sinon, si plus aucune planète n'est en vie, l'heure du
   dernier gel (ou maintenant pour une prise). Calculable par **tous**, même si le joueur est
   hors ligne.
+- `scoreOf(p)` : ce que le joueur possède **maintenant** ; tout perdu : 0 (hors flottes en vol).
+- `ranking` : `{ id, pts, dead, best }`. `best` départage les joueurs tombés à la même heure :
+  `deathPts` (points juste avant la chute), ou `scoreOf` si la fiche n'a pas encore vu la chute
+  (D-102).
 - `checkOver` : à plusieurs, la partie finit quand il reste **un seul** joueur en vie (ou
-  aucun : le dernier tombé gagne, puis le meilleur `empireScore`). Seul : quand le froid a tout
+  aucun : le dernier tombé gagne, puis le meilleur `best`). Seul : quand le froid a tout
   pris. Le téléphone qui le voit écrit `p.over = { at, winner }` dans sa fiche ;
   `Session.over` prend la plus ancienne fin écrite par un joueur.
 - Partie finie : `tick` ne fait plus que lire les derniers rapports de combat ; tous les ordres

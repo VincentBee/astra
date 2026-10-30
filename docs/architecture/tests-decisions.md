@@ -1,8 +1,8 @@
 # Tests et décisions
 
 Pour chaque décision de [decisions.md](../decisions.md), le test qui la protège, ou la raison
-pour laquelle il n'y en a pas (voir D-082). État au 2026-10-29 : `node --test tests/*.test.mjs` →
-120 tests, 120 réussis (après la fusion du rythme des parties, D-083 à D-097, et le réglage « Fond », D-098).
+pour laquelle il n'y en a pas (voir D-082). État au 2026-10-30 : `node --test tests/*.test.mjs` →
+145 tests, 145 réussis (avec la recherche en colonie, D-098, le coût en nourriture, D-099, le comportement en voyage, D-100, la vitesse de flotte, D-101, les points d'avant la chute, D-102 à D-104, le fil de construction, D-105, le chantier sur la carte, D-106, les rencontres hors ligne, D-109, et le réglage « Fond », D-110).
 
 - **nouveau test** : ajouté le 2026-10-29 dans `tests/decisions-planete.test.mjs` (24),
   `tests/decisions-flotte.test.mjs` (30) ou `tests/decisions-reseau.test.mjs` (20). Le nom de
@@ -127,5 +127,15 @@ que fait le code.
 | D-095 | La défense compte contre le pillage et se répare | nouveau test | `end.test.mjs` trop peu de vaisseaux d'attaque : les tourelles tiennent, ni prise ni pillage |  |
 | D-096 | Déconstruire un bâtiment | nouveau test | `rules.test.mjs` déconstruire un niveau rend la moitié de son prix et libère sa place à la fin |  |
 | D-097 | `FORMAT` 8 et cache v52 | non testable |  | version de format et de cache |
-| D-098 | Réglage « Fond » : animé, fixe ou aucun | nouveau test | `decisions-reseau.test.mjs` D-098 : réglage « Fond » — fixe = une image sans capteurs, aucun = pas d’étoiles | les listes de l'interface (DOM) et le coût réel : non testés |
-| D-099 | Cache v53 | non testable |  | version de cache |
+| D-098 | Recherche sur toute planète qui a un labo | nouveau test | `decisions-planete.test.mjs` D-098 : recherche sur toute planète qui a un labo, selon le niveau de ce labo |  |
+| D-099 | Agronomie et Arches coloniales humaines coûtent de la nourriture | nouveau test | `decisions-planete.test.mjs` D-099 : chez les humains, l'Agronomie et les Arches coloniales coûtent aussi de la nourriture | refus sans nourriture |
+| D-100 | Comportement en voyage : passif ou agressif | nouveau test | `fleet.test.mjs` flotte agressive : elle combat la flotte ennemie qu’elle croise, puis reprend sa route et son ordre<br>`fleet.test.mjs` flotte passive : elle croise une flotte ennemie sans combattre<br>`fleet.test.mjs` flotte agressive à l’arrêt : elle garde la case et combat celle qui passe<br>`fleet.test.mjs` deux flottes agressives qui se croisent : les pertes ne comptent qu’une fois<br>`fleet.test.mjs` comportement : refusé sans armes, vu par les autres, gardé par la flotte qui en absorbe une autre<br>`replay.test.mjs` (les robots changent le comportement) | le bouton de l'interface n'est pas testé (navigateur) |
+| D-101 | Vitesse de flotte = vaisseau le plus lent | testé | `tests/fleet.test.mjs` « une flotte va à la vitesse de son vaisseau le plus lent » | l'affichage (`speedText`) n'est pas testé |
+| D-102 | Points au présent ; mort simultanée départagée par les points d'avant la chute | nouveau test | `end.test.mjs` mort simultanée : le meilleur score d’avant la chute gagne, les points tombent à 0<br>`replay.test.mjs` courbe des points : elle retombe à 0… et le rejeu refait deathPts |  |
+| D-103 | Courbe des points dans le replay | nouveau test | `replay.test.mjs` courbe des points : elle suit le score de chaque joueur | le dessin est vérifié à l'œil dans le navigateur |
+| D-104 | Lien vers la courbe à la fin de la partie | non testable |  | interface : vérifié dans le navigateur (lien du bandeau, arrivée sur la courbe) |
+| D-105 | Fil de construction par planète | nouveau test | `plan.test.mjs` (7 tests : lancement à l'heure où le stock suffit, ordre gardé, `settle`, plus de place, estimation, ordres du joueur et rejeu fidèle, fil abîmé nettoyé) | la liste et le bouton × ne sont testés que dans le navigateur |
+| D-106 | Construire et faire décoller depuis la carte | nouveau test | `rules.test.mjs` D-106 : le plus grand lot de vaisseaux suit le stock, et le chantier l’accepte | la fiche et ses boutons ne sont pas testés (navigateur) |
+| D-109 | Combats de flottes quand aucun téléphone ne regarde | nouveau test | `fleet.test.mjs` firstContact : l’instant où deux flottes entrent au contact, jamais un contact déjà en cours<br>`fleet.test.mjs` hors ligne : la flotte agressive arrêtée combat celle qui est passée, à l’heure du passage<br>`fleet.test.mjs` hors ligne : une flotte passive laisse passer, sans combat<br>`fleet.test.mjs` hors ligne : la poursuite combat au point de rencontre, même si la cible est ensuite hors de vue<br>`fleet.test.mjs` hors ligne : un combat livré en ligne ne se rejoue pas au retour<br>`fleet.test.mjs` hors ligne tous les deux : deux flottes agressives qui se sont croisées, pertes comptées une fois<br>`replay.test.mjs` (la fenêtre est rejouée) | contrôle par mutation : `firstContact` qui ne trouve rien fait échouer 4 de ces tests |
+| D-110 | Réglage « Fond » : animé, fixe ou aucun | nouveau test | `decisions-reseau.test.mjs` D-110 : réglage « Fond » — fixe = une image sans capteurs, aucun = pas d’étoiles | les listes de l'interface (DOM) et le coût réel : non testés |
+| D-111 | Cache v61 | non testable |  | version de cache |

@@ -66,10 +66,10 @@ Ordre conseillé pour arriver sur le projet : README racine → `reseau.md` §1-
 | `js/replay-view.js` | Écran de `replay.html` | interface |
 | `js/sky.js` | Soleil central de la carte | interface (et regles pour la carte) |
 | `js/galaxy.js` | Fond de galaxie en parallaxe ; réglage « Fond » (animé, fixe, aucun) | interface |
-| `js/icons.js` | Icônes SVG (31 tracés) | interface |
-| `tests/` | 12 fichiers `*.test.mjs` (120 tests, dont `end.test.mjs` : fin de partie) + `harness.mjs` | regles (règles), reseau (`peer`, `hostile`, `harness`), [tests-decisions](architecture/tests-decisions.md) (`decisions-*.test.mjs`) |
+| `js/icons.js` | Icônes SVG (35 tracés) | interface |
+| `tests/` | 13 fichiers `*.test.mjs` (145 tests, dont `plan.test.mjs` : fil de construction, dont `end.test.mjs` : fin de partie) + `harness.mjs` | regles (règles), reseau (`peer`, `hostile`, `harness`), [tests-decisions](architecture/tests-decisions.md) (`decisions-*.test.mjs`) |
 
-Lancer les tests : `node --test tests/*.test.mjs` (120/120 réussis le 2026-10-30 avec le réglage « Fond »). Quel test
+Lancer les tests : `node --test tests/*.test.mjs` (145/145 réussis le 2026-10-30 avec le fil de construction, D-105, le chantier sur la carte, D-106, les rencontres hors ligne, D-109, et le réglage « Fond », D-110). Quel test
 protège quelle décision : [architecture/tests-decisions.md](architecture/tests-decisions.md). Attention :
 `node --test tests/` échoue (voir reseau.md §9).
 

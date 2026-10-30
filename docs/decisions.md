@@ -173,7 +173,8 @@ Aucune conversation ne les prouve.
 - Source : `aeb160d5` 22:13:26, bilan 2026-10-26 00:45:04 ; `1f11f6f`.
 - Statut : en vigueur, **modifiée par D-031** : une 7ᵉ technologie par race (détection : Radar
   profond, Réseau de capteurs, Clairvoyance) ajoutée le 2026-10-27 à 23:49:51 (`796e0ad`, vérifié
-  avec `git show`).
+  avec `git show`). **Modifiée par D-098** (2026-10-30) : la recherche n'est plus réservée à la
+  planète mère.
 
 **D-022 — Combat sans arbitre : le téléphone de l'attaquant calcule**
 - 2026-10-26 00:45. Contexte : aucun serveur pour arbitrer.
@@ -506,7 +507,7 @@ Aucune conversation ne les prouve.
 
 **D-068 — Accéléromètre sur iPhone**
 - 2026-10-28 22:17. Choix : autorisation « Mouvement » au premier tap ; position de repos qui
-  s'adapte ; mouvement lissé ; fond fixe si « réduire les animations » (modifiée par D-098 :
+  s'adapte ; mouvement lissé ; fond fixe si « réduire les animations » (modifiée par D-110 :
   ce fond fixe est désormais une seule image, et chacun peut le choisir).
 - Qui : Claude (défaut). Testé avec des événements simulés seulement (**non confirmé** sur un vrai
   iPhone). Source : `f4afbcd0` 22:15:08, 22:17:00. Statut : en vigueur.
@@ -665,7 +666,7 @@ Aucune conversation ne les prouve.
 - Choix : la plus vieille colonie en vie devient planète mère ; sans colonie, `out` ; fin quand
   il reste un joueur en vie (seul : quand le froid a tout pris) ; égalité au meilleur score.
 - Alternative écartée : B, seules les colonies se prennent.
-- Qui : Vincent. Statut : en vigueur.
+- Qui : Vincent. Statut : en vigueur, modifiée par D-102 (départage d'une mort simultanée).
 
 **D-090 — Réglage du froid : départ 12 min, durée 24 min, `ease` 2**
 - 2026-10-29 07:40. Mesure avec les robots (qui fuient vers le soleil, sans se battre) :
@@ -719,30 +720,193 @@ Aucune conversation ne les prouve.
   `demolish`) ; un téléphone resté sur l'ancienne version est invité à recharger.
 - Statut : en vigueur.
 
-**D-098 — Réglage « Fond » : étoiles animées, fixes ou absentes**
-- 2026-10-30. Contexte : Vincent demande d'estimer ce que coûte la parallaxe et de pouvoir la
-  retirer. Mesure (Chrome, téléphone simulé 390 × 844, densité 3, processeur ralenti × 4) : en
-  animé, 3 calques de 2 × 2 écrans ≈ 142 Mo de surface de calque (estimation : la part
-  réellement gardée en mémoire graphique dépend du navigateur, **non mesurée**), 3 images de
-  12 Mo, 103 ms de dessin au lancement, et jusqu'à 180 écritures de style par seconde tant que
-  le téléphone bouge (le ciel est recomposé à chaque image). En fixe : 1 image, 12 Mo, 38 ms,
-  rien ensuite. Sans étoiles : rien.
-- Choix : un réglage « Fond » (accueil et fenêtre Joueurs), gardé dans `astra.sky` :
-  `anime` (par défaut, comme avant), `fixe` (les 3 couches dans une seule image immobile, sans
-  capteurs), `aucun` (dégradé CSS seul). Changement immédiat, sans recharger. « Réduire les
-  animations » donne aussi le rendu fixe (une image au lieu de 3 calques). En animé, la
-  position est arrondie au pixel de l'écran : un tremblement plus petit ne redessine plus rien
-  (environ 2 fois moins d'écritures avec un capteur bruité simulé).
-- Alternatives écartées : retirer la parallaxe pour tous ; fixe par défaut ; détecter
-  « téléphone faible » ou « batterie faible » (pas d'API fiable sur iPhone).
-- Qui : Claude (défaut : animé reste le défaut, 3 choix). Source : session `0a3a42f6`.
-- Statut : en vigueur. Effet sur la batterie d'un vrai téléphone : **non confirmé**.
+**D-098 — Recherche sur toute planète qui a un labo**
+- 2026-10-30 10:29. Demande : « ce doit etre possible de faire une recherche sur n'importe quel
+  planet avec un labo, en accord avec le niveau du labo ». Modifie D-021 (planète mère seulement).
+- Choix : chaque planète avec un labo lance ses recherches ; les prérequis de labo et la durée
+  viennent du labo de cette planète, le prix est payé par son stock. Une recherche à la fois par
+  planète, et pas la même technologie sur deux planètes à la fois. Une technologie trouvée vaut
+  pour tout l'empire (la planète mère la reçoit, puis toutes les colonies).
+- Alternatives écartées : une seule recherche à la fois pour tout l'empire ; refuser la recherche
+  en colonie et seulement l'expliquer à l'écran.
+- Qui : Vincent (règle) ; Claude (une recherche par planète, même technologie interdite en
+  double). Pas de nouveau `FORMAT` (le champ `research` existait déjà sur chaque planète) ; cache
+  `astra-p2p-v53`.
+- Source : session `defa0982`. Statut : en vigueur.
 
-**D-099 — Cache `astra-p2p-v53`**
-- 2026-10-30. Choix de Claude : `index.html`, `style.css`, `js/app.js` et `js/galaxy.js`
-  changent ; nouvelle version de cache pour que les téléphones les récupèrent.
-- Statut : en vigueur.
+**D-099 — Des recherches humaines coûtent aussi de la nourriture**
+- 2026-10-30 10:53. Demande : « Certaines recherches devraient couter de la nouriture aussi ».
+  Session `074fcd56`.
+- Choix : chez les humains, **Agronomie** coûte 120 minéraux + 40 nourriture (au niveau 1) et
+  **Arches coloniales** 400 minéraux + 120 nourriture. Les deux touchent aux vivres et aux colons.
+  Les aliens payaient déjà leurs recherches en nourriture ; les machines n'en ont pas, rien ne
+  change pour elles. La nourriture compte dans la durée de recherche (un peu plus longue).
+  Cache `astra-p2p-v56` (v53 à v55 pris par D-098, D-100 et D-101).
+- Alternatives écartées : de la nourriture sur toutes les recherches humaines ; en ajouter aux
+  machines (elles n'en produisent pas).
+- Qui : Vincent (demande), Claude (lesquelles et combien). Statut : en vigueur.
 
+**D-100 — Comportement en voyage : passif ou agressif**
+- 2026-10-30 10:59. Demande : « Avoir des comportement de voyage: passif, agressif ».
+- Choix (Claude, par défaut) : un champ `stance` par flotte, à part de l'ordre (une flotte qui
+  va se poser peut être agressive). **Passive** (au décollage, à la scission, et pour les
+  flottes d'avant) : ne combat que sur ordre, comme avant. **Agressive** : à chaque passage,
+  combat la flotte ennemie visible la plus proche **au contact** (`CONTACT` = 0,5 case, la règle
+  de la poursuite), en route comme à l'arrêt (une flotte arrêtée garde sa case), puis **reprend
+  son trajet et son ordre**. Refusé pour une flotte sans armes. Une fusion garde le
+  comportement de la flotte qui reçoit. Elle n'attaque ni planètes ni vaisseaux posés : ça reste
+  « Attaquer » / « Conquérir ».
+- Alternatives écartées : poursuivre toute flotte ennemie vue dans le rayon de détection (plus
+  proche de ce qu'on attend d'« agressif », mais elle quitterait sa route ; suite possible) ;
+  s'arrêter après le combat comme la poursuite ; un mode « fuite » pour la flotte passive.
+- Limite **non confirmée** : comme la poursuite, le contact n'est regardé qu'à l'heure du
+  passage ; un téléphone en arrière-plan (passages ralentis) peut laisser deux flottes se
+  croiser sans combat.
+- Pas de nouveau `FORMAT` : un téléphone d'avant ignore le champ (ses flottes restent
+  passives) ; cache `astra-p2p-v54` (D-098 avait pris v53 ; D-099 est pris par la recette, pas encore fusionnée).
+- Qui : Vincent (demande), Claude (règle). Statut : en vigueur.
+
+**D-101 — Vitesse de flotte = vaisseau le plus lent, affichée au joueur**
+- 2026-10-30 10:54. Demande : « Notion de rapidite de flotte avec le vaiseau le plus lent ».
+- Contexte : la règle existait déjà dans le code (`fleetSpeed`, héritée du portage, D-002), mais le
+  joueur ne voyait ni la vitesse de sa flotte ni le vaisseau qui la freine.
+- Choix : garder la règle ; l'afficher à l'écran de décollage (« Vitesse 7,0 cases/min, celle du
+  plus lent : Colonisateur ») et dans la fiche de flotte ; test dédié ; cache `astra-p2p-v55`.
+- Alternatives écartées : vitesse moyenne pondérée ; vaisseaux rapides qui partent devant
+  (la flotte se scinderait d'elle-même).
+- Qui : Vincent (demande), Claude (affichage, maintien de la règle). Statut : en vigueur.
+
+**D-102 — Points : ce que le joueur a maintenant ; mort simultanée départagée par les points d'avant la chute** (modifie D-089)
+- 2026-10-30 11:47. Constat : quand les derniers joueurs gèlent à la même seconde, le vainqueur
+  était tiré par l'ordre des identifiants (tous à 0 point), et pas « au meilleur score » (D-089).
+  Demande : « il faut que les points reflete ce que le joueur possede a un instant T Si on détruit
+  tout ce que le joueur possède, alors il retombe à 0 points ».
+- Choix : `scoreOf` reste ce que le joueur possède **maintenant** (tout perdu : 0, sauf les
+  flottes encore en vol). Pour départager, `losePlanet` garde dans la fiche `deathPts` : les
+  points **juste avant la vague** de pertes qui l'élimine (toutes les planètes perdues à la même
+  heure comptent). `ranking` trie les joueurs tombés à la même heure par `deathPts` (ou par
+  `scoreOf` si leur fiche n'a pas encore vu la chute : elle a encore ses planètes, donc les mêmes
+  points).
+- Alternatives écartées : afficher un score figé à la mort (contraire à la demande) ; prendre
+  les points au moment de l'élimination seulement (une planète perdue juste avant, à la même
+  heure, ne compterait plus) ; changer le départage de `Session.over` (inutile si tous les
+  téléphones calculent le même gagnant).
+- Effet connu : le rejeu d'une **ancienne** sauvegarde où un joueur est éliminé dit « replay
+  approché » (la fiche rejouée a `deathPts`, l'ancienne non). Pas de nouveau `FORMAT` (un
+  téléphone d'avant ignore le champ, et départage comme avant) ; cache `astra-p2p-v57` (v55 et v56 pris par `main`).
+- Limite **non confirmée** : un téléphone dont la copie d'un rival est en retard (il n'a pas
+  reçu ses derniers chantiers) calcule pour lui moins de points et peut écrire un autre gagnant
+  à la même heure ; `Session.over` départage alors encore par l'ordre des identifiants.
+- Qui : Vincent (points au présent) ; Claude (`deathPts` pour départager). Source : session
+  `a7cb8a19`. Statut : en vigueur.
+
+**D-103 — Courbe des points de chaque joueur, dans le replay**
+- 2026-10-30 11:47. Demande : « Rajoute aussi un graphe qui montre l'évolution des points par
+  joueur durant la partie ».
+- Choix (Claude, par défaut) : une section « Points » dans `replay.html`, calculée à partir des
+  images du rejeu (`scoreSeries`, `js/replay.js`) : une courbe en escalier par joueur, à sa
+  couleur, un trait à l'instant affiché, la légende donne les points à cet instant ; toucher la
+  courbe y emmène le replay. Rien de nouveau n'est envoyé entre téléphones.
+- Alternatives écartées : noter les points dans la fiche pendant la partie pour une courbe en
+  direct (la fiche grossit et voyage à chaque changement, et le rejeu ne la referait pas) ; une
+  bibliothèque de graphiques (le projet n'a ni build ni dépendance).
+- Limite : une partie qui ne se rejoue pas (début du journal perdu) n'a pas de courbe.
+- Qui : Vincent (demande), Claude (forme). Source : session `a7cb8a19`. Statut : en vigueur.
+
+**D-104 — Lien vers la courbe des points à la fin de la partie**
+- 2026-10-30 12:13. Question de Claude : ajouter un lien vers la courbe dans le bandeau
+  « partie finie » ? Réponse de Vincent : « Oui, ajoute le lien ».
+- Choix : le bandeau de course, partie finie, ajoute « Voir la courbe des points »
+  (`replay.html#points`) ; le replay s'ouvre alors à la fin de la partie, sur la courbe. La partie
+  est déjà sauvegardée (`pagehide` appelle `save`), le replay lit cette sauvegarde.
+- Alternatives écartées : une courbe en direct dans l'écran de jeu (voir D-103) ; un lien aussi
+  pour un joueur éliminé en cours de partie (la partie n'est pas finie).
+- Qui : Vincent (lien), Claude (place et comportement). Cache `astra-p2p-v57`. Source : session
+  `a7cb8a19`. Statut : en vigueur.
+
+**D-105 — Fil de construction par planète**
+- 2026-10-30 12:24. Demande : « Je voudrais un système de fil de construction par planète.
+  Comme ça, dès que les ressources sont disponibles, cela lance la construction suivante. Avec
+  des estimations de quand elles le seront en fonction de la production. »
+- Choix (Claude, par défaut) :
+  - Un champ `plan` par planète : liste de noms de bâtiments, **8 au plus** (`PLAN_MAX`). Le
+    chantier reste unique (`queue`) ; le fil attend derrière.
+  - **Le lancement est calculé dans `stateAt`**, pas dans `tick()` : chantier libre, il reste une
+    place, et le stock couvre le prix du premier → il se lance à l'heure où le stock suffit (au
+    pas de calcul près, 1 s quand le jeu est ouvert, 48 s au plus après une longue absence). Le
+    fil avance donc **aussi téléphone fermé** : au retour, le rattrapage enchaîne tout. `tick()`
+    écrit (`settle`) dès qu'un lancement est dû, et le journal dit « … (fil) ».
+  - Un élément sans place reste en tête et bloque le fil (rien n'est jeté tout seul) ; le joueur
+    le retire avec ×.
+  - Deux nouveaux ordres, `planBuild` et `unplan` (journal, rejeu). **`build` ne change pas** :
+    un vieux journal contient des `build` refusés (chantier occupé), qui deviendraient des ajouts
+    au fil au rejeu. `planBuild` refuse si les places ne suffiront pas (bâties + chantier + fil).
+  - Interface : chantier occupé, fil non vide ou stock trop court, le bouton d'un bâtiment
+    devient « + niveau » et ajoute au fil ; sinon il construit tout de suite, comme avant.
+  - Estimations (`planForecast`, affichage seulement, rien dans la fiche) : le même `stateAt`,
+    projeté 10 min (à la seconde près) puis 6 h plus loin, avec la production d'aujourd'hui
+    (chantier, recherches et vaisseaux déjà lancés compris). Au-delà : « plus de 6 h », ou la
+    raison connue (« Plus de place », « Entrepôt trop petit »).
+- Alternatives écartées : lancer le suivant dans `tick()` seulement (plus simple, mais rien
+  n'avance téléphone fermé) ; faire de `build` un ajout au fil quand le chantier est occupé
+  (casse le rejeu des vieux journaux) ; jeter un élément bloqué ; un fil pour la recherche et le
+  chantier naval (pas demandé).
+- Limites **non confirmées** : l'estimation suppose que rien ne change (population qui grandit
+  ou meurt, ordres à venir, transe) ; un autre ordre qui dépense le stock (recherche, vaisseaux)
+  repousse le fil. Les autres joueurs voient le même calcul pour l'affichage, sans le vérifier.
+- Pas de nouveau `FORMAT` : un téléphone d'avant ignore `plan` (son fil ne se lance pas chez lui,
+  mais rien ne casse) ; cache `astra-p2p-v57` (v55 et v56 pris par D-101 et D-099 ; D-101 prise par la vitesse de flotte, d'où D-105).
+- Qui : Vincent (demande), Claude (règle). Statut : en vigueur.
+
+**D-106 — Construire et faire décoller des vaisseaux depuis la carte**
+- 2026-10-30 12:15. Demandes : « Je voudrais pouvoir créer des vaisseaux depuis la carte, en
+  fonction des capacités de production des planètes. », puis « il doit etre possible de faire
+  decoller des vaiseau depuis la carte ».
+- Choix (Claude, par défaut) :
+  - **Toucher une de mes planètes ouvre sa fiche sur la carte**, au lieu d'ouvrir directement
+    l'écran des bâtiments ; le bouton « Bâtiments » de la fiche y mène toujours (un toucher de
+    plus pour les bâtiments).
+  - La fiche a une partie **Chantier** : une ligne par vaisseau **déjà recherché** (les autres
+    sont cachés), avec son prix, sa durée par unité, ce qui est à quai, et **« jusqu'à N »** : le
+    plus grand lot que le stock de cette planète peut payer (`shipsAffordable`, au plus 50, la
+    taille maximale d'un lot). Boutons ×1, ×5 et ×N. Sans chantier naval, sans vaisseau
+    recherché, ou chantier occupé : une ligne l'explique.
+  - Bouton **Décoller** (s'il y a des vaisseaux à quai) : ouvre le formulaire de décollage
+    habituel pour **cette** planète (mère ou colonie) ; la flotte part en orbite et reste
+    sélectionnée sur la carte, comme avant.
+  - Même règle de bouton actif que l'onglet Flottes (`canBuildShips`), pour que les deux écrans
+    ne divergent pas. Aucune règle de jeu ne change : mêmes ordres `buildShips` et `takeOff`.
+- Alternatives écartées : un appui long sur sa planète pour la fiche (peu découvrable au
+  doigt) ; afficher aussi les vaisseaux pas encore recherchés (déjà dans l'onglet Flottes) ;
+  faire de chaque lot terminé une flotte en orbite (évoqué puis retiré par Vincent).
+- Pas de nouveau `FORMAT` ; cache `astra-p2p-v59` (D-101 à D-105 et les caches v55 à v58 pris par `main` pendant le travail : renumérotée D-106).
+- Qui : Vincent (demande), Claude (forme). Statut : en vigueur.
+
+**D-107 — Liste de mes flottes sous la carte, pour leur donner des ordres vite**
+- 2026-10-30 10:40. Demande : « Sur la map, avoir la list des flottes ppur leur donner des ordres
+  rapidement ».
+- Choix : une rangée de boutons (`#map-fleets`) juste sous la carte, au-dessus de la fiche de
+  flotte ; un bouton par flotte : nom, statut, compte à rebours ; bord rouge si attaque, conquête
+  ou poursuite ; grisé si à sec. Toucher = sélectionner (comme toucher le triangle) ; retoucher =
+  relâcher. La rangée défile sur le côté si elle déborde.
+- Alternatives : liste verticale (pousse la fiche de flotte loin sous la carte) ; fenêtre
+  `.sheet` (un toucher de plus) ; liste dans l'onglet Flottes de la planète (existe déjà, mais
+  oblige à quitter la carte).
+- Qui : Vincent (demande) ; forme choisie par Claude (défaut). Source : `1d5bf2da`. Statut :
+  **modifiée par D-108** (grille au lieu d'une rangée). Cache `astra-p2p-v60` (v53 à v59 pris sur `main`).
+
+**D-108 — La liste des flottes devient une grille, avec les vaisseaux en icônes**
+- 2026-10-30 11:20. Demande : « il faudrait plutôt une grille. Avec un bref récapitulatif du
+  contenu de la flotte avec des icônes et le nombre de vaisseaux correspondants ».
+- Choix : grille de cases (`auto-fill`, 150 px minimum : 2 colonnes sur un téléphone). Chaque
+  case : nom et compte à rebours, puis une icône par type de vaisseau avec son nombre (nom du
+  vaisseau en infobulle), puis le statut sur une ligne coupée par « … ». Quatre icônes ajoutées
+  à `js/icons.js` : `cargo` (caisse), `fighter` (chasseur), `heavy` (coque blindée), `colony`
+  (drapeau). La cargaison n'est pas montrée (la fiche de flotte la donne).
+- Alternatives : garder la rangée qui défile (on ne voyait qu'une flotte et demie) ; liste
+  verticale d'une colonne (prend plus de hauteur).
+- Qui : Vincent (grille, icônes, nombres) ; dessin des icônes et taille des cases par Claude
+  (défaut). Source : `1d5bf2da`. Statut : en vigueur.
 ---
 
 ## Annexe A — affirmations réfutées (retirées ou corrigées avant assemblage)
@@ -795,3 +959,44 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 | D-025 | hist-c D-C29 | D-052 | hist-a D-B1 | D-079 | demande du 29/10 (coordinateur) |
 | D-026 | hist-c D-C10 | D-053 | hist-a D-B2 | D-080 | plan `1df29e6e` |
 | D-027 | hist-c D-C11 | D-054 | hist-a D-B3 | D-081 | verif (fuseaux) |
+
+**D-109 — Combats de flottes quand aucun téléphone ne regarde**
+- 2026-10-30 11:25. Contexte : question « Si tous les joueurs sont hors ligne au moment du contact
+  des flottes, comment cela se passe-t-il ? » ; réponse : le contact n'était regardé qu'à l'heure
+  du passage, donc un croisement de flottes agressives était perdu, et une poursuite finissait en
+  « cible perdue de vue ». Puis « Oui, corrige ».
+- Choix : à chaque passage, chercher sur le trajet depuis le passage précédent le premier instant
+  où deux flottes entrent au contact (`firstContact`, calcul exact) et livrer le combat daté de cet
+  instant, si la cible était visible alors. Fenêtre notée dans le journal d'ordres pour le rejeu.
+- Choix de Claude, par défaut : seulement l'entrée au contact (un contact en cours a été vu) ; pas
+  de recherche avant le segment actuel de chaque flotte (l'ancien n'est plus connu) ; au lancement,
+  la fenêtre part de la dernière modification de ma fiche ; les pertes de la cible restent
+  appliquées par son téléphone à la lecture du rapport, comme avant.
+- Alternatives écartées : regarder à pas fixes sur l'absence (rate les croisements rapides, coûte
+  cher après des heures) ; garder l'historique des segments de chaque flotte (fiches plus lourdes).
+- Qui : Vincent (corriger), Claude (méthode). Source : session `e67321a7`. Statut : en vigueur.
+- Tests : `tests/fleet.test.mjs`, section « Rencontres que personne n'a regardées ».
+
+**D-110 — Réglage « Fond » : étoiles animées, fixes ou absentes**
+- 2026-10-30. Contexte : Vincent demande d'estimer ce que coûte la parallaxe et de pouvoir la
+  retirer. Mesure (Chrome, téléphone simulé 390 × 844, densité 3, processeur ralenti × 4) : en
+  animé, 3 calques de 2 × 2 écrans ≈ 142 Mo de surface de calque (estimation : la part
+  réellement gardée en mémoire graphique dépend du navigateur, **non mesurée**), 3 images de
+  12 Mo, 103 ms de dessin au lancement, et jusqu'à 180 écritures de style par seconde tant que
+  le téléphone bouge (le ciel est recomposé à chaque image). En fixe : 1 image, 12 Mo, 38 ms,
+  rien ensuite. Sans étoiles : rien.
+- Choix : un réglage « Fond » (accueil et fenêtre Joueurs), gardé dans `astra.sky` :
+  `anime` (par défaut, comme avant), `fixe` (les 3 couches dans une seule image immobile, sans
+  capteurs), `aucun` (dégradé CSS seul). Changement immédiat, sans recharger. « Réduire les
+  animations » donne aussi le rendu fixe (une image au lieu de 3 calques). En animé, la
+  position est arrondie au pixel de l'écran : un tremblement plus petit ne redessine plus rien
+  (environ 2 fois moins d'écritures avec un capteur bruité simulé).
+- Alternatives écartées : retirer la parallaxe pour tous ; fixe par défaut ; détecter
+  « téléphone faible » ou « batterie faible » (pas d'API fiable sur iPhone).
+- Qui : Claude (défaut : animé reste le défaut, 3 choix). Source : session `0a3a42f6`.
+- Statut : en vigueur. Effet sur la batterie d'un vrai téléphone : **non confirmé**.
+
+**D-111 — Cache `astra-p2p-v61`**
+- 2026-10-30. Choix de Claude : `index.html`, `style.css`, `js/app.js` et `js/galaxy.js`
+  changent ; nouvelle version de cache pour que les téléphones les récupèrent.
+- Statut : en vigueur.
