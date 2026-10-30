@@ -9,7 +9,7 @@ import {
 } from './game.js';
 import { drawSun } from './sky.js';
 import { ic, fillIcons } from './icons.js';
-import { startGalaxy } from './galaxy.js';
+import { startGalaxy, skyMode, setSkyMode } from './galaxy.js';
 import { TECHS, SHIPS, SHIP_KEYS, techCost, techMissing, researchDuration, shipUnlock, shipUnlocked, shipStats, shipDuration } from './tech.js';
 import { TRADE_RES, TRADE_NAMES } from './trade.js';
 import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fleetSpeed, slowestShip, fuelAt, moving, aggressive, armed } from './fleet.js';
@@ -147,6 +147,16 @@ $('btn-scan-cancel').onclick = () => scanAbort?.abort();
 try {
   $('name').value = localStorage.getItem('astra.name') || '';
 } catch {}
+
+// Réglages de l'appareil : une fenêtre, ouverte par la roue crantée (accueil et jeu).
+for (const btn of document.querySelectorAll('[data-settings]')) {
+  btn.onclick = () => {
+    $('sky').value = skyMode();
+    $('sheet-settings').hidden = false;
+  };
+}
+$('btn-settings-close').onclick = () => ($('sheet-settings').hidden = true);
+$('sky').onchange = () => setSkyMode($('sky').value);
 
 for (const el of document.querySelectorAll('[data-go]')) {
   el.onclick = () => {
@@ -1549,7 +1559,7 @@ function showView(view, key = openKey) {
   // Pas de barre du haut : le compteur de joueurs se range à droite de la première ligne de l'écran.
   // L'icône de diagnostic le suit, et sa liste se déplie sous cette même ligne.
   const head = document.querySelector(view === 'map' ? '.map-head' : '.planet-head');
-  (view === 'map' ? head.querySelector('.pi-head-right') : head).append($('btn-journal'), $('alerts-btn'), $('net'));
+  (view === 'map' ? head.querySelector('.pi-head-right') : head).append($('btn-journal'), $('alerts-btn'), $('btn-settings'), $('net'));
   head.append($('alerts-panel'));
   window.scrollTo(0, 0);
   if (view === 'map') {

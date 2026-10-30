@@ -94,7 +94,7 @@ Clés `localStorage` (l.13-16) :
 | `astra.identity` | mon identité dans la partie en cours `{ gid, pid, secret }` |
 | `astra.identities` | historique `{ gid: identité }` |
 
-Autres clés lues ailleurs : `astra.relays` (`js/config.js:18`), `astra.name` (`js/app.js:133`).
+Autres clés lues ailleurs : `astra.relays` (`js/config.js:18`), `astra.name` (`js/app.js:133`), `astra.sky` (réglage « Fond », `js/galaxy.js`, D-112).
 
 - `saveGame(me, state, journal)` l.37 (`journal` facultatif ; `Session.resume` et `onWelcome` le reprennent, même partie et même joueur), `loadGame()` l.44, `listGames()` l.58, `selectGame(gid)` l.65 (la remet en cours, avec son identité), `forgetGame(gid)` l.75, `saveIdentity(id)` l.99, `loadIdentity()` l.96, `describeSave(save)` l.138.
 - `js/replay-view.js:5` lit `loadGame()` : c'est pourquoi « Revoir » fait d'abord `selectGame(gid)` puis ouvre `replay.html` (`app.js:182-184`).
