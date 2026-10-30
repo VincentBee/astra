@@ -391,3 +391,22 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   vue planète avec la seule liste de la planète ; ferme remise → bandeau caché, icône orange
   « Énergie en baisse · vide dans 2 min ». **Pas vérifié** : aliens et machines dans le
   navigateur (couverts par les tests), plusieurs colonies à la fois.
+
+## 15. Alerte de flotte ennemie (2026-10-30, D-115)
+
+- `index.html` : `<button id="threat" class="banner threat">` juste sous `#race`, hors des onglets :
+  visible sur la carte comme sur l'écran d'une planète. Un toucher appelle `showView('map')`.
+- `renderThreat(now)` (`js/app.js`), appelé par `renderLive` (5 fois par seconde) : lit
+  `session.threats(now)` et montre la menace en tête : « N vaisseaux de X sur P dans S s »,
+  « … en orbite de P » (arrivée, combat pas encore réglé) ou « … en vue, à C cases de P » (ne
+  vise rien), puis « +N autres ». Caché s'il n'y a rien, ou en partie finie.
+- `Session.threats(now)` (`js/session.js`, à côté de `eyes`/`sees`) : flottes armées, adverses
+  (joueur pas éliminé), visibles ; triées cible d'abord (par heure d'arrivée), puis distance.
+- Carte (`drawMap`, boucle des flottes) : le nombre de vaisseaux en blanc, cerné de sombre, en
+  haut à droite du triangle de chaque flotte adverse visible. Pas sur mes flottes (leur grille
+  `#map-fleets` le montre déjà).
+- Style : `.banner.threat` (fond rouge pâle, bord `--danger`), après `.banner.race.hot`.
+- Vérifié dans le navigateur (vue 400 × 850, 2026-10-30) : un faux joueur ajouté par la console
+  avec une flotte de 12 en route pour conquérir ma planète et une de 7 arrêtée à côté : compte à
+  rebours qui descend, puis « en orbite », « +1 autre », chiffres 12 et 7 sur la carte. Pas
+  vérifié à deux vrais téléphones.

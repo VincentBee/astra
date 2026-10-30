@@ -142,3 +142,5 @@ que fait le code.
 | D-112 | Réglage « Fond » : animé, fixe ou aucun | nouveau test | `decisions-reseau.test.mjs` D-112 : réglage « Fond » — fixe = une image sans capteurs, aucun = pas d’étoiles | les listes de l'interface (DOM) et le coût réel : non testés |
 | D-113 | Cache v63 | non testable |  | version de cache |
 | D-114 | Une fenêtre « Réglages », ouverte par une roue crantée | test existant | `decisions-reseau.test.mjs` D-064 : chaque icône de la page existe, et un bouton sans texte porte un nom | la fenêtre et son ouverture (DOM) : vérifiées dans le navigateur seulement |
+| D-115 | Alerte de flotte ennemie (bandeau et effectif sur la carte) | nouveau test | `threat.test.mjs` une flotte armée qui vise ma planète : alerte avec compte à rebours<br>`threat.test.mjs` une flotte armée visible qui ne vise rien : signalée, sans compte à rebours, après les menaces directes<br>`threat.test.mjs` pas d’alerte pour une flotte sans armes, hors de vue, ou à moi | le bandeau et les chiffres sur la carte sont vérifiés dans le navigateur |
+| D-116 | Délai avant une frappe depuis l'orbite | non testable |  | ouvert, rien n'est codé |

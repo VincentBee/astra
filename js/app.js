@@ -940,6 +940,7 @@ function renderLive() {
   const me = st.players[session.me];
   const now = session.now();
   renderRace(now);
+  renderThreat(now);
   renderAlerts(me, now);
 
   {
@@ -1047,6 +1048,28 @@ function renderRace(now) {
   setHtml($('race-text'), html);
 }
 
+/**
+ * Bandeau rouge (D-115) : la flotte armée adverse la plus pressante, avec le
+ * compte à rebours si elle vise une de mes planètes ; il reste tant qu'elle
+ * est en vue. Un toucher montre la carte.
+ */
+function renderThreat(now) {
+  const el = $('threat');
+  const list = session.over ? [] : session.threats(now);
+  el.hidden = !list.length;
+  if (!list.length) return;
+  const [t] = list;
+  const who = `${t.n} vaisseau${t.n > 1 ? 'x' : ''} ${esc(de(t.p.name))}`;
+  const where = esc(t.target.name);
+  const cells = Math.max(1, Math.round(t.dist));
+  const what =
+    t.eta == null ? `${who} en vue, à ${cells} case${cells > 1 ? 's' : ''} ${esc(de(t.target.name))}`
+    : t.eta > 0 ? `${who} sur ${where} dans <span class="mono">${Math.ceil(t.eta / 1000)} s</span>`
+    : `${who} en orbite ${esc(de(t.target.name))}`;
+  const more = list.length > 1 ? ` <span class="hint">· +${list.length - 1} autre${list.length > 2 ? 's' : ''}</span>` : '';
+  setHtml($('threat-text'), `${ic('attack')} <strong>${what}</strong>${more}`);
+}
+$('threat').addEventListener('click', () => showView('map'));
 // Diagnostic des planètes : famine, panne d'énergie, stock vital qui baisse (D-111).
 let alertsNow = new Map(); // case « x:y » → { key, name, cell, list } : mes planètes à problème
 let alertsSeen = new Map(); // problème déjà annoncé → dernière fois vu (évite de répéter le toast)
@@ -1906,6 +1929,17 @@ function drawMap() {
     ctx.fill();
     ctx.restore();
     ctx.globalAlpha = 1;
+    if (p.id !== session.me) {
+      // Effectif des flottes adverses (D-115), en haut à droite du triangle.
+      ctx.font = `700 ${Math.max(9 * dpr, cell * 0.34)}px system-ui, sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.lineWidth = Math.max(2, cell * 0.08);
+      ctx.strokeStyle = 'rgba(5,8,18,0.9)';
+      ctx.fillStyle = '#ffffff';
+      const n = String(countShips(f.ships));
+      ctx.strokeText(n, cx + cell * 0.2, cy - cell * 0.14);
+      ctx.fillText(n, cx + cell * 0.2, cy - cell * 0.14);
+    }
   }
   // Case visée, en attente d'un choix (se poser, coloniser, attaquer…).
   if (pending) {
