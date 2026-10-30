@@ -42,6 +42,7 @@ function play(players, clock, sync, turns) {
         if (partner) act(s, () => s.proposeTrade({ fleet: f.id }, { pid: partner.pid, ...partner.ref }, { fuel: 1 }, {}));
       }
       for (const f of p.fleets || []) {
+        if (!s.locked(f.id)) act(s, () => s.setFleetStance(f.id, turn % 4 < 2 ? 'aggressive' : 'passive'));
         if (f.order || s.locked(f.id)) continue;
         // Une flotte sans armes ne peut pas attaquer : elle y va simplement (et peut y échanger).
         act(s, () => (turn % 3 === 2 ? s.returnFleet(f.id) : s.moveFleet(f.id, enemy.home, 'attack') || s.moveFleet(f.id, enemy.home, 'move')));
@@ -64,7 +65,7 @@ test('une partie rejouée depuis les journaux retombe sur les mêmes fiches', ()
   for (const s of players) sync(players[0], s);
 
   const kinds = new Set(Object.values(state.players).flatMap((p) => p.orders.map((o) => o.k)));
-  for (const k of ['chooseRace', 'claimPlanet', 'build', 'research', 'buildShips', 'takeOff', 'moveFleet', 'proposeTrade', 'answerTrade', 'tick']) assert.ok(kinds.has(k), `la partie contient des « ${k} »`);
+  for (const k of ['chooseRace', 'claimPlanet', 'build', 'research', 'buildShips', 'takeOff', 'moveFleet', 'setFleetStance', 'proposeTrade', 'answerTrade', 'tick']) assert.ok(kinds.has(k), `la partie contient des « ${k} »`);
   assert.ok(Object.values(state.players).some((p) => p.orders.some((o) => o.ids?.length)), 'des identifiants tirés sont notés');
 
   assert.equal(replayable(state).ok, true);
