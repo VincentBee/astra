@@ -263,3 +263,9 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
   (`9b37782` et suivants), pas encore fusionné dans `main`. La doc du code le décrit.
 - **Design épuré** (`f4afbcd0`) : session encore ouverte, mais son worktree n'a aucun changement
   non commité ; tout le travail est dans `1eeb2c1`.
+
+## 30 octobre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 10:40 | `1d5bf2da` | « Sur la map, avoir la list des flottes ppur leur donner des ordres rapidement » | Rangée `#map-fleets` sous la carte : un bouton par flotte (nom, statut, compte à rebours) ; toucher la sélectionne, retoucher la relâche ; testé dans le navigateur (3 flottes, envoi sur une case) ; cache v53 | (ce commit) | D-098 |

@@ -107,10 +107,12 @@
       </div>
       <div id="trades" class="trades" hidden></div>
       <div class="map-head">
-        <span><i data-ic="planet"></i> <strong id="my-coords" class="mono"></strong> <span class="help-wrap"><button id="btn-map-help" class="ghost help-btn" aria-expanded="false" aria-describedby="map-help" aria-label="Aide de la carte">?</button><span id="map-help" role="tooltip" class="tooltip">Touche une planète pour voir ses gisements, la tienne pour ouvrir ses bâtiments, une de tes flottes (triangle) pour la piloter. Planètes en pointillés : libres. Halo : ta portée de détection ; les flottes adverses n’apparaissent que dedans.</span></span></span>
+        <span><i data-ic="planet"></i> <strong id="my-coords" class="mono"></strong> <span class="help-wrap"><button id="btn-map-help" class="ghost help-btn" aria-expanded="false" aria-describedby="map-help" aria-label="Aide de la carte">?</button><span id="map-help" role="tooltip" class="tooltip">Touche une planète pour voir ses gisements, la tienne pour ouvrir ses bâtiments, une de tes flottes (triangle, ou son bouton sous la carte) pour la piloter. Planètes en pointillés : libres. Halo : ta portée de détection ; les flottes adverses n’apparaissent que dedans.</span></span></span>
         <span class="pi-head-right"></span>
       </div>
       <div class="map-wrap"><canvas id="map" aria-label="Carte de l'univers : touche une planète"></canvas></div>
+      <!-- Mes flottes : un toucher la sélectionne pour lui donner un ordre -->
+      <div id="map-fleets" class="map-fleets" role="group" aria-label="Mes flottes" hidden></div>
 
       <!-- Fiche de la planète touchée : devant la carte -->
       <div id="sheet-planet" class="sheet" hidden>

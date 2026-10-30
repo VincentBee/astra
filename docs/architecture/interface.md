@@ -80,6 +80,7 @@ Détail de `#screen-game` :
 | `#lost` (97-100) | Bandeau « Seul en ligne » + **Rejoindre** (rejoindre les autres par une nouvelle invitation). | `renderState` 762 (`session.alone`), `btn-rejoin` 286-289. |
 | `#view-universe` (102-148) | Vue carte : `#pick` (bandeau « Choisis ta planète »), `#trades` (offres d'échange), `.map-head` (coordonnées, aide `?`), `canvas#map`. | `drawMap` 1349-1538, `renderPick` 1876-1913, `renderTrades` 1777-1800. |
 | `#sheet-planet` (114-127) | Fiche de la planète touchée : nom, coordonnées, propriétaire, places, climat, gisements, **S'installer** ou **Bâtiments**. | `renderPick` 1876-1913, `btn-claim` 1922-1929, `btn-open-planet` 1275-1279, `closePlanetSheet` 1916-1920. |
+| `#map-fleets` (sous `canvas#map`) | Mes flottes en une rangée de boutons qui défile sur le côté : nom, statut, compte à rebours ; bord rouge si attaque/conquête/poursuite, grisé si à sec. Toucher = sélectionner la flotte (ouvre `#fleet-info`), retoucher = la relâcher (D-098). | `renderMapFleets`, appelé par `renderLive` ; le HTML n'est réécrit que si le statut change, le compte à rebours et `aria-pressed` sont mis à jour en place. |
 | `#fleet-info` (129-145) | Fiche de la flotte sélectionnée : vaisseaux, statut, carburant, choix d'ordres (`#fi-choice`), mes flottes à côté (`#fi-beside`), joueurs à côté (`#fi-partners`), boutons Arrêter / Rentrer / Se poser / Plein / Scinder / Fermer. | `renderFleetInfo` 1643-1687, handlers 1689-1714. |
 | `#view-planet` (150-199) | Vue planète : en-tête (retour, nom, climat), gisements `#soil-zone`, stocks `#resources`, onglets, puis les panneaux `data-pane`. | `renderPlanet` 869-988. |
 | `.tabs` (163-168) | Onglets Bâtiments / Pouvoirs (aliens seulement) / Recherche (planète mère seulement) / Flottes. | `showTab` 1241-1252, flèches clavier 1255-1262. |
@@ -204,6 +205,7 @@ Retour de la session vers l'interface : seulement deux rappels, `session.onchang
 
 Le point touché est converti en cases (pixels CSS / taille d'une case). Puis, dans l'ordre :
 1. **Une de mes flottes sous le doigt** (< 0,7 case, plus proche qu'une planète) → la sélectionner ; plusieurs flottes empilées : chaque toucher passe à la suivante (1592-1604). Si une flotte est déjà sélectionnée, seules celles de la case touchée comptent.
+   Autre façon de sélectionner : toucher la flotte dans la rangée `#map-fleets` sous la carte (D-098).
 2. **Une flotte sélectionnée** :
    - une flotte ennemie sous le doigt → `prey`, la fiche propose « Attaquer » (1607-1615) ;
    - sinon la case touchée : `session.ordersAt` ; un seul ordre possible sans panne → `moveFleet` direct ; sinon `pending` = la case, et la fiche affiche un bouton par ordre (1617-1625, rendu 1674-1681).

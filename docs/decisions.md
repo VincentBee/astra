@@ -718,6 +718,18 @@ Aucune conversation ne les prouve.
   `demolish`) ; un téléphone resté sur l'ancienne version est invité à recharger.
 - Statut : en vigueur.
 
+**D-098 — Liste de mes flottes sous la carte, pour leur donner des ordres vite**
+- 2026-10-30 10:40. Demande : « Sur la map, avoir la list des flottes ppur leur donner des ordres
+  rapidement ».
+- Choix : une rangée de boutons (`#map-fleets`) juste sous la carte, au-dessus de la fiche de
+  flotte ; un bouton par flotte : nom, statut, compte à rebours ; bord rouge si attaque, conquête
+  ou poursuite ; grisé si à sec. Toucher = sélectionner (comme toucher le triangle) ; retoucher =
+  relâcher. La rangée défile sur le côté si elle déborde.
+- Alternatives : liste verticale (pousse la fiche de flotte loin sous la carte) ; fenêtre
+  `.sheet` (un toucher de plus) ; liste dans l'onglet Flottes de la planète (existe déjà, mais
+  oblige à quitter la carte).
+- Qui : Vincent (demande) ; forme choisie par Claude (défaut). Source : `1d5bf2da`. Statut : en
+  vigueur. Cache `astra-p2p-v53`.
 ---
 
 ## Annexe A — affirmations réfutées (retirées ou corrigées avant assemblage)

@@ -343,6 +343,17 @@ button.close-btn svg { width: 18px; height: 18px; }
 .fi-fuel.low .hint { color: var(--warn); }
 #fleet-info .hint { margin: 0; }
 #fleets .player { cursor: pointer; }
+.map-fleets { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.mf {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 10px;
+  border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 0;
+  background: var(--panel); color: var(--text); font: 0.78rem var(--mono); cursor: pointer;
+}
+.mf span { color: var(--muted); }
+.mf .mf-clock:empty { display: none; }
+.mf.hot { border-left-color: #ff7a93; }
+.mf.dry { opacity: 0.55; }
+.mf[aria-pressed='true'] { border-color: var(--text); background: var(--panel-2); }
 
 /* ----- Univers ----- */
 

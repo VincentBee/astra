@@ -832,6 +832,7 @@ function renderLive() {
   } else if (currentView === 'planet') showView('map');
   renderPick(me, now);
   renderFleetInfo(me, now);
+  renderMapFleets(me, now);
   renderTrades(me, now);
   if (session.outdated && !warnedOutdated) {
     warnedOutdated = true;
@@ -1762,6 +1763,41 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
     $('fi-choice').dataset.html = html;
   }
 }
+
+/** Mes flottes sous la carte : un bouton par flotte, pour la sélectionner sans la chercher. */
+function renderMapFleets(me = session?.state?.players[session.me], now = session?.now()) {
+  const box = $('map-fleets');
+  const fleets = me?.fleets || [];
+  box.hidden = !fleets.length;
+  // Le statut change rarement, le compte à rebours chaque seconde : on ne réécrit le HTML que
+  // pour le premier (redessiner sous le doigt ferait rater le toucher), le reste en place.
+  const html = fleets
+    .map((f) => {
+      const hot = ['attack', 'conquer', 'chase'].includes(f.order?.kind);
+      const dry = fuelAt(f, me.race, now) < DRY;
+      return `<button class="mf${hot ? ' hot' : ''}${dry ? ' dry' : ''}" data-fleet="${esc(f.id)}"><strong>${esc(fleetName(f))}</strong> <span>${esc(fleetStatus(me.race, f, now))}</span> <span class="mf-clock"></span></button>`;
+    })
+    .join('');
+  if (box.dataset.html !== html) {
+    box.innerHTML = html;
+    box.dataset.html = html;
+  }
+  for (const b of box.children) {
+    const f = fleets.find((x) => x.id === b.dataset.fleet);
+    b.setAttribute('aria-pressed', String(b.dataset.fleet === selFleet));
+    b.lastElementChild.textContent = f && moving(f, now) ? clock(f.arrive - now) : '';
+  }
+}
+
+$('map-fleets').addEventListener('click', (e) => {
+  const id = e.target.closest('[data-fleet]')?.dataset.fleet;
+  if (!id) return;
+  selFleet = selFleet === id ? null : id; // retoucher la flotte choisie la relâche
+  pending = null;
+  prey = null;
+  renderFleetInfo();
+  renderMapFleets();
+});
 
 $('fi-choice').addEventListener('click', (e) => {
   if (e.target.closest('[data-fchase]') && prey) {
