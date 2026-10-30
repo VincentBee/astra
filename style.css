@@ -588,7 +588,8 @@ button.icon-only, .building > button, .ship-actions button, .fi-actions button, 
 .g-when { font-size: 0.75rem; color: var(--muted); }
 
 /* ----- Fond de galaxie (js/galaxy.js) -----
-   Une nébuleuse en dégradé, fixe ; par-dessus, trois couches d'étoiles en parallaxe. */
+   Une nébuleuse en dégradé, fixe ; par-dessus, trois couches d'étoiles en parallaxe
+   (ou une seule image immobile, ou rien : réglage « Fond »). */
 body {
   background:
     radial-gradient(120% 60% at 15% 85%, rgba(122, 92, 255, 0.18), transparent 60%),
@@ -599,6 +600,8 @@ body {
 }
 .galaxy { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
 .galaxy > div { position: absolute; top: 0; left: 0; width: 200%; height: 200%; background-repeat: repeat; will-change: transform; }
+/* Fond « fixe » : une seule image de la taille de l'écran, pas de calque animé. */
+.galaxy.still > div { width: 100%; height: 100%; will-change: auto; }
 .topbar { background: transparent; }
 
 /* ----- Choix de la race : trois icônes, une seule fiche ----- */

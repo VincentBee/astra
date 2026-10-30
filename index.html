@@ -33,7 +33,14 @@
         <button id="btn-create" class="primary"><i data-ic="plus"></i>Créer</button>
         <button id="btn-join" class="secondary"><i data-ic="join"></i>Rejoindre</button>
       </div>
-            <p id="home-note" class="note" hidden></p>
+      <p id="home-note" class="note" hidden></p>
+      <label class="field" for="sky-home">Fond
+        <select id="sky-home" data-sky>
+          <option value="anime">Étoiles animées (parallaxe)</option>
+          <option value="fixe">Étoiles fixes (économe)</option>
+          <option value="aucun">Sans étoiles (le plus économe)</option>
+        </select>
+      </label>
     </div>
   </section>
 
@@ -214,6 +221,13 @@
         <h3 class="section-title"><i data-ic="trophy"></i> Classement</h3>
         <div id="players" class="players"></div>
       </section>
+      <label class="field" for="sky-game">Fond
+        <select id="sky-game" data-sky>
+          <option value="anime">Étoiles animées (parallaxe)</option>
+          <option value="fixe">Étoiles fixes (économe)</option>
+          <option value="aucun">Sans étoiles (le plus économe)</option>
+        </select>
+      </label>
     </div>
   </div>
 

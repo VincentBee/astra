@@ -318,13 +318,14 @@ test('D-064 : chaque icône de la page existe, et un bouton sans texte porte un 
 // ----- D-067 / D-068 : parallaxe à l'accéléromètre
 
 /** Lance le fond étoilé dans un faux navigateur ; renvoie ses couches et ses écouteurs. */
-function galaxy({ still = false, ios = false } = {}) {
+function galaxy({ still = false, ios = false, mode = null } = {}) {
   const saved = {};
   const fakes = {
     document: {
-      createElement: () => ({ style: {}, setAttribute() {}, appendChild: (c) => c, getContext: () => ({ scale() {}, beginPath() {}, arc() {}, fill() {} }), toDataURL: () => 'data:' }),
-      body: { prepend() {} },
+      createElement: () => ({ style: {}, setAttribute() {}, remove() {}, appendChild: (c) => c, getContext: () => ({ scale() {}, beginPath() {}, arc() {}, fill() {} }), toDataURL: () => 'data:' }),
+      body: { prepend: () => (prepended.n += 1) },
     },
+    localStorage: { getItem: () => mode, setItem() {} },
     devicePixelRatio: 1,
     innerWidth: 400,
     innerHeight: 800,
@@ -336,6 +337,7 @@ function galaxy({ still = false, ios = false } = {}) {
   };
   const on = [];
   const perm = { n: 0 };
+  const prepended = { n: 0 };
   const divs = [];
   const make = fakes.document.createElement;
   fakes.document.createElement = (tag) => {
@@ -370,7 +372,7 @@ function galaxy({ still = false, ios = false } = {}) {
       for (const [k, d] of keep) d ? Object.defineProperty(globalThis, k, d) : delete globalThis[k];
     }
   };
-  return { layers, on, perm, fire: (t, e) => during(() => fire(t, e)), pos: () => layers.map((l) => l.style.transform) };
+  return { layers, on, perm, prepended: prepended.n, fire: (t, e) => during(() => fire(t, e)), pos: () => layers.map((l) => l.style.transform) };
 }
 
 test('D-067 : le doigt ne bouge pas les étoiles, l’accéléromètre si', () => {
@@ -397,4 +399,20 @@ test('D-068 : sur iPhone, l’autorisation « Mouvement » est demandée au prem
   const rest = still.pos();
   still.fire('devicemotion', { accelerationIncludingGravity: { x: 3, y: 3 } });
   assert.deepEqual(still.pos(), rest);
+});
+
+test('D-098 : réglage « Fond » — fixe = une image sans capteurs, aucun = pas d’étoiles', () => {
+  const anime = galaxy({ mode: 'anime' });
+  assert.equal(anime.layers.length, 3);
+  assert.ok(anime.on.some((h) => h.type === 'devicemotion'));
+
+  const fixe = galaxy({ mode: 'fixe' });
+  assert.equal(fixe.layers.length, 1, 'les trois couches dans une seule image');
+  assert.deepEqual(fixe.on.map((h) => h.type), ['resize'], 'ni défilement, ni capteur, ni souris');
+
+  const aucun = galaxy({ mode: 'aucun' });
+  assert.equal(aucun.prepended, 0, 'rien n’est ajouté à la page');
+  assert.equal(aucun.on.length, 0);
+
+  assert.equal(galaxy({ mode: 'n’importe quoi' }).layers.length, 3, 'valeur inconnue : animé');
 });

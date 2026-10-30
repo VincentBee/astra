@@ -506,7 +506,8 @@ Aucune conversation ne les prouve.
 
 **D-068 — Accéléromètre sur iPhone**
 - 2026-10-28 22:17. Choix : autorisation « Mouvement » au premier tap ; position de repos qui
-  s'adapte ; mouvement lissé ; fond fixe si « réduire les animations ».
+  s'adapte ; mouvement lissé ; fond fixe si « réduire les animations » (modifiée par D-098 :
+  ce fond fixe est désormais une seule image, et chacun peut le choisir).
 - Qui : Claude (défaut). Testé avec des événements simulés seulement (**non confirmé** sur un vrai
   iPhone). Source : `f4afbcd0` 22:15:08, 22:17:00. Statut : en vigueur.
 
@@ -716,6 +717,30 @@ Aucune conversation ne les prouve.
 **D-097 — `FORMAT` 8 et cache `astra-p2p-v52`**
 - 2026-10-29. Choix de Claude : nouveaux champs de fiche (`since`, `out`, `over`, `capture`,
   `demolish`) ; un téléphone resté sur l'ancienne version est invité à recharger.
+- Statut : en vigueur.
+
+**D-098 — Réglage « Fond » : étoiles animées, fixes ou absentes**
+- 2026-10-30. Contexte : Vincent demande d'estimer ce que coûte la parallaxe et de pouvoir la
+  retirer. Mesure (Chrome, téléphone simulé 390 × 844, densité 3, processeur ralenti × 4) : en
+  animé, 3 calques de 2 × 2 écrans ≈ 142 Mo de surface de calque (estimation : la part
+  réellement gardée en mémoire graphique dépend du navigateur, **non mesurée**), 3 images de
+  12 Mo, 103 ms de dessin au lancement, et jusqu'à 180 écritures de style par seconde tant que
+  le téléphone bouge (le ciel est recomposé à chaque image). En fixe : 1 image, 12 Mo, 38 ms,
+  rien ensuite. Sans étoiles : rien.
+- Choix : un réglage « Fond » (accueil et fenêtre Joueurs), gardé dans `astra.sky` :
+  `anime` (par défaut, comme avant), `fixe` (les 3 couches dans une seule image immobile, sans
+  capteurs), `aucun` (dégradé CSS seul). Changement immédiat, sans recharger. « Réduire les
+  animations » donne aussi le rendu fixe (une image au lieu de 3 calques). En animé, la
+  position est arrondie au pixel de l'écran : un tremblement plus petit ne redessine plus rien
+  (environ 2 fois moins d'écritures avec un capteur bruité simulé).
+- Alternatives écartées : retirer la parallaxe pour tous ; fixe par défaut ; détecter
+  « téléphone faible » ou « batterie faible » (pas d'API fiable sur iPhone).
+- Qui : Claude (défaut : animé reste le défaut, 3 choix). Source : session `0a3a42f6`.
+- Statut : en vigueur. Effet sur la batterie d'un vrai téléphone : **non confirmé**.
+
+**D-099 — Cache `astra-p2p-v53`**
+- 2026-10-30. Choix de Claude : `index.html`, `style.css`, `js/app.js` et `js/galaxy.js`
+  changent ; nouvelle version de cache pour que les téléphones les récupèrent.
 - Statut : en vigueur.
 
 ---

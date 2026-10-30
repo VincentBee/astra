@@ -8,7 +8,7 @@ import {
 } from './game.js';
 import { drawSun } from './sky.js';
 import { ic, fillIcons } from './icons.js';
-import { startGalaxy } from './galaxy.js';
+import { startGalaxy, skyMode, setSkyMode } from './galaxy.js';
 import { TECHS, SHIPS, SHIP_KEYS, techCost, techMissing, researchDuration, shipUnlock, shipUnlocked, shipStats, shipDuration } from './tech.js';
 import { TRADE_RES, TRADE_NAMES } from './trade.js';
 import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fuelAt, moving } from './fleet.js';
@@ -132,6 +132,16 @@ $('btn-scan-cancel').onclick = () => scanAbort?.abort();
 try {
   $('name').value = localStorage.getItem('astra.name') || '';
 } catch {}
+
+// Réglage « Fond » (accueil et fenêtre Joueurs) : les deux listes restent d'accord.
+const skySelects = document.querySelectorAll('[data-sky]');
+for (const sel of skySelects) {
+  sel.value = skyMode();
+  sel.addEventListener('change', () => {
+    setSkyMode(sel.value);
+    for (const other of skySelects) other.value = sel.value;
+  });
+}
 
 for (const el of document.querySelectorAll('[data-go]')) {
   el.onclick = () => {
