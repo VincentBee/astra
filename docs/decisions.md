@@ -173,7 +173,8 @@ Aucune conversation ne les prouve.
 - Source : `aeb160d5` 22:13:26, bilan 2026-10-26 00:45:04 ; `1f11f6f`.
 - Statut : en vigueur, **modifiée par D-031** : une 7ᵉ technologie par race (détection : Radar
   profond, Réseau de capteurs, Clairvoyance) ajoutée le 2026-10-27 à 23:49:51 (`796e0ad`, vérifié
-  avec `git show`).
+  avec `git show`). **Modifiée par D-098** (2026-10-30) : la recherche n'est plus réservée à la
+  planète mère.
 
 **D-022 — Combat sans arbitre : le téléphone de l'attaquant calcule**
 - 2026-10-26 00:45. Contexte : aucun serveur pour arbitrer.
@@ -717,6 +718,20 @@ Aucune conversation ne les prouve.
 - 2026-10-29. Choix de Claude : nouveaux champs de fiche (`since`, `out`, `over`, `capture`,
   `demolish`) ; un téléphone resté sur l'ancienne version est invité à recharger.
 - Statut : en vigueur.
+
+**D-098 — Recherche sur toute planète qui a un labo**
+- 2026-10-30 10:29. Demande : « ce doit etre possible de faire une recherche sur n'importe quel
+  planet avec un labo, en accord avec le niveau du labo ». Modifie D-021 (planète mère seulement).
+- Choix : chaque planète avec un labo lance ses recherches ; les prérequis de labo et la durée
+  viennent du labo de cette planète, le prix est payé par son stock. Une recherche à la fois par
+  planète, et pas la même technologie sur deux planètes à la fois. Une technologie trouvée vaut
+  pour tout l'empire (la planète mère la reçoit, puis toutes les colonies).
+- Alternatives écartées : une seule recherche à la fois pour tout l'empire ; refuser la recherche
+  en colonie et seulement l'expliquer à l'écran.
+- Qui : Vincent (règle) ; Claude (une recherche par planète, même technologie interdite en
+  double). Pas de nouveau `FORMAT` (le champ `research` existait déjà sur chaque planète) ; cache
+  `astra-p2p-v53`.
+- Source : session `defa0982`. Statut : en vigueur.
 
 ---
 
