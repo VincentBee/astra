@@ -2,7 +2,7 @@
 
 Pour chaque décision de [decisions.md](../decisions.md), le test qui la protège, ou la raison
 pour laquelle il n'y en a pas (voir D-082). État au 2026-10-30 : `node --test tests/*.test.mjs` →
-138 tests, 138 réussis (avec la recherche en colonie, D-098, le coût en nourriture, D-099, le comportement en voyage, D-100, la vitesse de flotte, D-101, les points d'avant la chute, D-102 à D-104, le fil de construction, D-105, et le chantier sur la carte, D-106).
+144 tests, 144 réussis (avec la recherche en colonie, D-098, le coût en nourriture, D-099, le comportement en voyage, D-100, la vitesse de flotte, D-101, les points d'avant la chute, D-102 à D-104, le fil de construction, D-105, le chantier sur la carte, D-106, et les rencontres hors ligne, D-109).
 
 - **nouveau test** : ajouté le 2026-10-29 dans `tests/decisions-planete.test.mjs` (24),
   `tests/decisions-flotte.test.mjs` (30) ou `tests/decisions-reseau.test.mjs` (20). Le nom de
@@ -136,3 +136,4 @@ que fait le code.
 | D-104 | Lien vers la courbe à la fin de la partie | non testable |  | interface : vérifié dans le navigateur (lien du bandeau, arrivée sur la courbe) |
 | D-105 | Fil de construction par planète | nouveau test | `plan.test.mjs` (7 tests : lancement à l'heure où le stock suffit, ordre gardé, `settle`, plus de place, estimation, ordres du joueur et rejeu fidèle, fil abîmé nettoyé) | la liste et le bouton × ne sont testés que dans le navigateur |
 | D-106 | Construire et faire décoller depuis la carte | nouveau test | `rules.test.mjs` D-106 : le plus grand lot de vaisseaux suit le stock, et le chantier l’accepte | la fiche et ses boutons ne sont pas testés (navigateur) |
+| D-109 | Combats de flottes quand aucun téléphone ne regarde | nouveau test | `fleet.test.mjs` firstContact : l’instant où deux flottes entrent au contact, jamais un contact déjà en cours<br>`fleet.test.mjs` hors ligne : la flotte agressive arrêtée combat celle qui est passée, à l’heure du passage<br>`fleet.test.mjs` hors ligne : une flotte passive laisse passer, sans combat<br>`fleet.test.mjs` hors ligne : la poursuite combat au point de rencontre, même si la cible est ensuite hors de vue<br>`fleet.test.mjs` hors ligne : un combat livré en ligne ne se rejoue pas au retour<br>`fleet.test.mjs` hors ligne tous les deux : deux flottes agressives qui se sont croisées, pertes comptées une fois<br>`replay.test.mjs` (la fenêtre est rejouée) | contrôle par mutation : `firstContact` qui ne trouve rien fait échouer 4 de ces tests |

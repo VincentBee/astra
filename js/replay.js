@@ -123,7 +123,10 @@ export function replay(state) {
     }
     s.at = e.t;
     s.replayIds = [...(e.ids || [])];
-    if (e.k === 'tick') s.tick();
+    if (e.k === 'tick') {
+      s.scanAt = e.from ?? e.t; // la fenêtre de recherche des rencontres de flottes du passage d'origine
+      s.tick();
+    }
     else if (typeof s[e.k] === 'function') s[e.k](...(e.a || []).map((v) => (v === null ? undefined : v)));
     s.replayIds = null;
     busy.delete(pid);

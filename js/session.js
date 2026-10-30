@@ -22,7 +22,7 @@ import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity } from './save.js';
 import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, PLAN_MAX, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, sunFor, fortOf } from './game.js';
 import { TECHS, SHIPS, sightRange, TEMPO } from './tech.js';
-import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, salvage, applyLosses, parkedCell, fleetPos, fleetCargo, fleetTank, ORDERS, MAX_FLEETS, STANCES, aggressive, armed } from './fleet.js';
+import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, firstContact, salvage, applyLosses, parkedCell, fleetPos, fleetCargo, fleetTank, ORDERS, MAX_FLEETS, STANCES, aggressive, armed } from './fleet.js';
 import { amounts, isEmpty, holdings, lacks, noRoom, take, put, outcome, OFFER_MS, MAX_OFFERS, GRACE_MS } from './trade.js';
 
 /** « de Beta », « d'Alpha ». */
@@ -1360,9 +1360,15 @@ export class Session {
    * vers le point d'interception quand la cible a changé de trajet (ou
    * quand j'y suis arrivé sans la trouver). Renvoie true si ma fiche a changé.
    */
-  pursue(p, f, now) {
+  pursue(p, f, now, from = now) {
     const enemy = this.state.players[f.order.pid];
     const target = this.fleetOf(enemy, f.order.fleet);
+    // Rencontre que personne n'a regardée à temps (hors ligne) : combat à l'heure de la rencontre.
+    const met = target && !inContact(f, target, now) && firstContact(f, target, from, now);
+    if (met && this.sees(enemy, target, met) && !this.pendingFight(p, f, enemy, target)) {
+      if (target.id !== f.order.fleet) f.order = { ...f.order, fleet: target.id };
+      return this.fight(p, f, enemy, target, met);
+    }
     if (!target || !this.sees(enemy, target, now)) {
       // Disparue (posée, détruite) ou sortie de ma portée de détection.
       f.order = null;
@@ -1395,21 +1401,29 @@ export class Session {
    * visible la plus proche à son contact (la même règle que la poursuite),
    * puis la flotte reprend son trajet et son ordre. Renvoie true si ma fiche a changé.
    */
-  engage(p, f, now) {
+  engage(p, f, now, from = now) {
     if (!aggressive(f) || f.order?.kind === 'chase' || !armed(p.race, f.ships, p.planet.tech)) return false;
     const eyes = this.eyes(now);
     const pos = fleetPos(f, now);
     let best = null;
+    let missed = null; // rencontre que personne n'a regardée à temps (hors ligne) : la plus ancienne
     for (const enemy of Object.values(this.state.players)) {
       if (enemy.id === this.me) continue;
       for (const target of enemy.fleets || []) {
-        if (!inContact(f, target, now) || !this.sees(enemy, target, now, eyes) || this.pendingFight(p, f, enemy, target)) continue;
+        if (this.pendingFight(p, f, enemy, target)) continue;
+        if (!inContact(f, target, now)) {
+          const t = firstContact(f, target, from, now);
+          if (t && (!missed || t < missed.t) && this.sees(enemy, target, t)) missed = { enemy, target, t };
+          continue;
+        }
+        if (!this.sees(enemy, target, now, eyes)) continue;
         const t = fleetPos(target, now);
         const d = Math.hypot(t.x - pos.x, t.y - pos.y);
         if (!best || d < best.d) best = { enemy, target, d };
       }
     }
-    return best ? this.fight(p, f, best.enemy, best.target, now, true) : false;
+    if (best) return this.fight(p, f, best.enemy, best.target, now, true);
+    return missed ? this.fight(p, f, missed.enemy, missed.target, missed.t, true) : false;
   }
 
   /** Un rapport de combat entre ma flotte `f` et sa flotte `target`, dans un sens ou dans l'autre, pas encore lu ? */
@@ -1430,6 +1444,8 @@ export class Session {
    * `onward` : ma flotte (agressive) garde ensuite son trajet et son ordre.
    */
   fight(p, f, enemy, target, now, onward = false) {
+    // Combat dans le passé : le prochain passage cherche les autres rencontres à partir de là.
+    if (now < (this.scanAt ?? Infinity)) this.scanAt = now;
     const res = battle({ race: p.race, ships: f.ships, tech: p.planet.tech }, { race: enemy.race, ships: target.ships, tech: enemy.planet?.tech || {} });
     const take = res.won ? salvage(p.race, res.attLeft, target.cargo, f.cargo) : {};
     // Lui aussi a pu livrer ce combat de son côté, sans avoir encore lu mon rapport (poursuite
@@ -1813,12 +1829,21 @@ export class Session {
    * calcule seul) : chantiers, recherches et vaisseaux terminés, arrivées de
    * mes flottes, et dégâts que d'autres m'ont infligés.
    */
+  /**
+   * `from` : depuis quand chercher les rencontres de flottes que personne n'a
+   * regardées (téléphones hors ligne, en arrière-plan) : le passage précédent
+   * (`scanAt`), ou au lancement la dernière modification de ma fiche. Notée
+   * dans le journal d'ordres : le rejeu cherche sur la même fenêtre.
+   */
   tick() {
     if (this.status !== 'playing' || !this.state) return;
     this.checkClaim();
     const p = this.state.players[this.me];
     if (!p?.planet) return;
     const now = this.now();
+    const from = Math.min(now, this.scanAt ?? p.actAt ?? now);
+    if (this.entry && from < now) this.entry.from = from;
+    this.scanAt = now;
     let changed = false;
     this.tickLogs = []; // entrées du journal de ce passage, envoyées avec ma fiche
     if (this.over) {
@@ -1871,10 +1896,10 @@ export class Session {
     if (this.applyEffects(p, now)) changed = true;
     for (const f of [...(p.fleets || [])]) {
       if (f.order?.kind === 'chase') {
-        if (this.pursue(p, f, now)) changed = true;
+        if (this.pursue(p, f, now, from)) changed = true;
         continue;
       }
-      if (this.engage(p, f, now)) changed = true;
+      if (this.engage(p, f, now, from)) changed = true;
       if (!p.fleets.includes(f)) continue; // détruite dans ce combat
       if (f.order && !moving(f, now) && this.arrive(p, f)) changed = true;
     }
