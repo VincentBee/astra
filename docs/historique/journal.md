@@ -277,6 +277,9 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 10:53:09 | `074fcd56` | « Certaines recherches devraient couter de la nouriture aussi » | Humains : Agronomie (+40 nourriture) et Arches coloniales (+120 nourriture) ; test D-099 | PR #7 | D-099 |
 | 11:00 | `074fcd56` | [Bouton] « Créer la PR » | PR #7 ; deux conflits avec `main` réglés par fusion (D-098 pris par `main`, puis cache v54 pris par D-100) | PR #7 | D-099 |
 | 12:30 | `074fcd56` | « rebase, puis merge » | Branche rebasée sur `main` (après la PR #8 : D-101, cache v55) en un seul commit ; cache v56 ; 127 tests verts ; PR #7 fusionnée | PR #7 | D-099 |
+| 11:47 | `a7cb8a19` | Tâche 1.1 « Corriger le vainqueur quand les derniers joueurs gèlent à la même seconde », puis « il faut que les points reflete ce que le joueur possede a un instant T Si on détruit tout ce que le joueur possède, alors il retombe à 0 points. Rajoute aussi un graphe qui montre l'évolution des points par joueur durant la partie. » | Points au présent (0 si tout est perdu) ; `deathPts` = points juste avant la chute, pour départager une mort simultanée ; section « Points » du replay (courbe par joueur, toucher pour y aller) ; 3 tests (128/128) ; vérifié dans le navigateur ; cache v55 | (ce commit) | D-102, D-103 |
+| 12:13 | `a7cb8a19` | [Bouton] « Oui, ajoute le lien » | Lien « Voir la courbe des points » dans le bandeau « partie finie » ; `replay.html#points` s'ouvre à la fin de la partie, sur la courbe ; vérifié dans le navigateur ; cache v56 | (ce commit) | D-104 |
+| 13:08 | `a7cb8a19` | [Bouton] « Créer la PR » | Fusion de `main` (vitesse de flotte D-101, nourriture D-099, cache v56) : mes décisions renumérotées D-102 à D-104, cache v57 ; tests 130/130 ; pull request | (cette PR) | D-102 à D-104 |
 
 ### Travaux en cours au 2026-10-29
 

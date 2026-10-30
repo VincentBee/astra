@@ -213,7 +213,7 @@ Le point touché est converti en cases (pixels CSS / taille d'une case). Puis, d
 
 ### 6.3 Carte du replay
 
-`js/replay-view.js:115-198` redessine une carte plus simple sur le même principe (fond, quadrillage, `drawSun`, planètes `planetsFor(gid)`, nom sous les planètes possédées, flottes en **losange**, décalées quand elles sont arrêtées).
+`js/replay-view.js:116-199` redessine une carte plus simple sur le même principe (fond, quadrillage, `drawSun`, planètes `planetsFor(gid)`, nom sous les planètes possédées, flottes en **losange**, décalées quand elles sont arrêtées).
 
 ## 7. Style
 
@@ -275,10 +275,11 @@ Rendu (`js/techtree.js`, la construction du graphe est décrite dans `regles.md`
 
 Écran « film » de la partie sauvegardée ; le moteur de rejeu (`js/replay.js`) est décrit dans `regles.md`. Rien n'est écrit : ni sauvegarde ni partie en cours ne changent (`js/replay-view.js:3`).
 
-- `load` (28-66) : `loadGame()` (la partie sélectionnée dans l'historique), titre = noms des joueurs, `replayable(st)` ; messages si la copie n'est pas à jour ou si le début du journal manque ; calcul `replay(st)` lancé après 30 ms pour laisser s'afficher « Calcul du replay… » ; signale un « replay approché » si la fin ne retombe pas sur la vraie partie.
+- `load` (28-67) : `loadGame()` (la partie sélectionnée dans l'historique), titre = noms des joueurs, `replayable(st)` ; messages si la copie n'est pas à jour ou si le début du journal manque ; calcul `replay(st)` lancé après 30 ms pour laisser s'afficher « Calcul du replay… » ; signale un « replay approché » si la fin ne retombe pas sur la vraie partie.
 - Index `film.at` : pour chaque image, où trouver la dernière fiche de chaque joueur (53-59). `frameAt` : recherche dichotomique (69-79).
-- Contrôles : lecture/pause (264-271), vitesse 1 min/s, 10 min/s (défaut), 1 h/s (`replay.html:35-39`), curseur sur 0-1000 (273-276), événement précédent/suivant (278-288). Pendant la lecture, si rien ne bouge et que le prochain événement est loin, on y saute (`QUIET_S`, 244-262).
-- `renderPlayers` (200-224) : planètes, vaisseaux, minéraux, score à l'instant affiché. `renderLog` (227-241) : les 40 dernières entrées jusqu'à cet instant, la plus récente en haut.
+- Contrôles : lecture/pause (353-360), vitesse 1 min/s, 10 min/s (défaut), 1 h/s (`replay.html:35-39`), curseur sur 0-1000 (362-365), événement précédent/suivant (367-377). Pendant la lecture, si rien ne bouge et que le prochain événement est loin, on y saute (`QUIET_S`, 333-351).
+- Section « Points » (`replay.html`, `#rp-score`, D-103) : `drawScores` (219-287) dessine sur un canvas la courbe en escalier de chaque joueur (`film.scores` = `scoreSeries(frames, gid)`, `js/replay.js`), à sa couleur, graduée 0 / moitié / haut, avec un trait à l'instant affiché ; `#rp-score-legend` donne nom et points à cet instant, dans l'ordre d'arrivée. Toucher ou glisser sur la courbe déplace le replay (380-386). Adresse `replay.html#points` (lien du bandeau de fin) : `load` se place à la fin de la partie et fait défiler jusqu'à la courbe.
+- `renderPlayers` (289-314) : planètes, vaisseaux, minéraux, points de l'empire à l'instant affiché (`ptsAt`, les mêmes que la courbe). `renderLog` (316-330) : les 40 dernières entrées jusqu'à cet instant, la plus récente en haut.
 
 ## 9. Vérification dans le navigateur (2026-10-29)
 
@@ -313,7 +314,8 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
 - **Bandeau de course** `#race` (`index.html`, sous `#lost`), rempli par `renderRace(now)` dans
   `renderLive` (chaque seconde) : avant le départ du froid « Le soleil s'éteint · dernier en vie
   gagne · n en vie » ; ensuite « Ta planète la plus exposée gèle dans m:ss · va vers le
-  soleil » ; « Éliminé · encore n en vie » ; « Victoire ! » ou « X gagne. · partie finie ». Classe
+  soleil » ; « Éliminé · encore n en vie » ; « Victoire ! » ou « X gagne. · partie finie », suivi du lien **Voir la courbe des points**
+  (`replay.html#points`, D-104). Classe
   `hot` (bordure orange) à moins de 3 min du gel, quand on est éliminé ou qu'un autre a gagné.
   Caché pour une partie d'avant la course.
 - **Carte** : `drawFrost` voile en bleu tout ce qui est hors du cercle de froid (remplissage

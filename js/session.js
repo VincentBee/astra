@@ -133,6 +133,7 @@ export function normalize(p) {
   // Journal des ordres : { t, k, a?, ids?, s? } (heure, ordre ou « tick », arguments,
   // identifiants tirés, entrées des journaux des autres connues quand ce nombre a changé).
   if (!Array.isArray(p.orders)) p.orders = [];
+  if (p.deathPts !== undefined && !Number.isFinite(p.deathPts)) delete p.deathPts;
   return p;
 }
 
@@ -765,12 +766,21 @@ export class Session {
     return seen.sort((a, b) => a.at - b.at || (a.winner < b.winner ? -1 : 1))[0];
   }
 
-  /** Classement : [{ id, pts, dead }], les vivants d'abord, puis les derniers tombés, puis les points. */
+  /**
+   * Classement : [{ id, pts, dead, best }], les vivants d'abord, puis les derniers tombés, puis
+   * les points. `pts` : ce que le joueur a maintenant (0 s'il a tout perdu). `best` départage :
+   * pour un joueur tombé, ses points juste avant sa chute (`deathPts`) ; une fiche qui n'a pas
+   * encore vu sa chute a encore ses planètes, donc ces mêmes points.
+   */
   ranking(now = this.now()) {
     return Object.values(this.state?.players || {})
       .filter((p) => p.race && p.planet)
-      .map((p) => ({ id: p.id, pts: this.scoreOf(p), dead: this.deadAt(p, now) }))
-      .sort((a, b) => (a.dead ?? Infinity) !== (b.dead ?? Infinity) ? (b.dead ?? Infinity) - (a.dead ?? Infinity) : b.pts - a.pts || (a.id < b.id ? -1 : 1));
+      .map((p) => {
+        const pts = this.scoreOf(p);
+        const dead = this.deadAt(p, now);
+        return { id: p.id, pts, dead, best: dead != null ? (p.deathPts ?? pts) : pts };
+      })
+      .sort((a, b) => (a.dead ?? Infinity) !== (b.dead ?? Infinity) ? (b.dead ?? Infinity) - (a.dead ?? Infinity) : b.best - a.best || (a.id < b.id ? -1 : 1));
   }
 
   /**
@@ -798,6 +808,8 @@ export class Session {
   losePlanet(p, key, at, why) {
     const pl = this.planetOf(p, key);
     if (!pl) return;
+    // Points d'avant la vague : toutes les planètes perdues à la même heure comptent dans `deathPts`.
+    if (this.wave?.pid !== p.id || this.wave.at !== at) this.wave = { pid: p.id, at, pts: this.scoreOf(p) };
     if (key !== 'home') {
       const colonies = { ...p.colonies };
       delete colonies[key];
@@ -812,6 +824,7 @@ export class Session {
     if (!next) {
       p.home = null;
       p.out = at;
+      p.deathPts = this.wave.pts;
       this.addLog(`${p.name} perd ${pl.name} (${why}) : plus aucune planète, ${p.name} est éliminé.`);
       this.ontoast?.(`${pl.name} perdue (${why}) : tu es éliminé.`);
       return;

@@ -665,7 +665,7 @@ Aucune conversation ne les prouve.
 - Choix : la plus vieille colonie en vie devient planète mère ; sans colonie, `out` ; fin quand
   il reste un joueur en vie (seul : quand le froid a tout pris) ; égalité au meilleur score.
 - Alternative écartée : B, seules les colonies se prennent.
-- Qui : Vincent. Statut : en vigueur.
+- Qui : Vincent. Statut : en vigueur, modifiée par D-102 (départage d'une mort simultanée).
 
 **D-090 — Réglage du froid : départ 12 min, durée 24 min, `ease` 2**
 - 2026-10-29 07:40. Mesure avec les robots (qui fuient vers le soleil, sans se battre) :
@@ -774,6 +774,54 @@ Aucune conversation ne les prouve.
 - Alternatives écartées : vitesse moyenne pondérée ; vaisseaux rapides qui partent devant
   (la flotte se scinderait d'elle-même).
 - Qui : Vincent (demande), Claude (affichage, maintien de la règle). Statut : en vigueur.
+
+**D-102 — Points : ce que le joueur a maintenant ; mort simultanée départagée par les points d'avant la chute** (modifie D-089)
+- 2026-10-30 11:47. Constat : quand les derniers joueurs gèlent à la même seconde, le vainqueur
+  était tiré par l'ordre des identifiants (tous à 0 point), et pas « au meilleur score » (D-089).
+  Demande : « il faut que les points reflete ce que le joueur possede a un instant T Si on détruit
+  tout ce que le joueur possède, alors il retombe à 0 points ».
+- Choix : `scoreOf` reste ce que le joueur possède **maintenant** (tout perdu : 0, sauf les
+  flottes encore en vol). Pour départager, `losePlanet` garde dans la fiche `deathPts` : les
+  points **juste avant la vague** de pertes qui l'élimine (toutes les planètes perdues à la même
+  heure comptent). `ranking` trie les joueurs tombés à la même heure par `deathPts` (ou par
+  `scoreOf` si leur fiche n'a pas encore vu la chute : elle a encore ses planètes, donc les mêmes
+  points).
+- Alternatives écartées : afficher un score figé à la mort (contraire à la demande) ; prendre
+  les points au moment de l'élimination seulement (une planète perdue juste avant, à la même
+  heure, ne compterait plus) ; changer le départage de `Session.over` (inutile si tous les
+  téléphones calculent le même gagnant).
+- Effet connu : le rejeu d'une **ancienne** sauvegarde où un joueur est éliminé dit « replay
+  approché » (la fiche rejouée a `deathPts`, l'ancienne non). Pas de nouveau `FORMAT` (un
+  téléphone d'avant ignore le champ, et départage comme avant) ; cache `astra-p2p-v57` (v55 et v56 pris par `main`).
+- Limite **non confirmée** : un téléphone dont la copie d'un rival est en retard (il n'a pas
+  reçu ses derniers chantiers) calcule pour lui moins de points et peut écrire un autre gagnant
+  à la même heure ; `Session.over` départage alors encore par l'ordre des identifiants.
+- Qui : Vincent (points au présent) ; Claude (`deathPts` pour départager). Source : session
+  `a7cb8a19`. Statut : en vigueur.
+
+**D-103 — Courbe des points de chaque joueur, dans le replay**
+- 2026-10-30 11:47. Demande : « Rajoute aussi un graphe qui montre l'évolution des points par
+  joueur durant la partie ».
+- Choix (Claude, par défaut) : une section « Points » dans `replay.html`, calculée à partir des
+  images du rejeu (`scoreSeries`, `js/replay.js`) : une courbe en escalier par joueur, à sa
+  couleur, un trait à l'instant affiché, la légende donne les points à cet instant ; toucher la
+  courbe y emmène le replay. Rien de nouveau n'est envoyé entre téléphones.
+- Alternatives écartées : noter les points dans la fiche pendant la partie pour une courbe en
+  direct (la fiche grossit et voyage à chaque changement, et le rejeu ne la referait pas) ; une
+  bibliothèque de graphiques (le projet n'a ni build ni dépendance).
+- Limite : une partie qui ne se rejoue pas (début du journal perdu) n'a pas de courbe.
+- Qui : Vincent (demande), Claude (forme). Source : session `a7cb8a19`. Statut : en vigueur.
+
+**D-104 — Lien vers la courbe des points à la fin de la partie**
+- 2026-10-30 12:13. Question de Claude : ajouter un lien vers la courbe dans le bandeau
+  « partie finie » ? Réponse de Vincent : « Oui, ajoute le lien ».
+- Choix : le bandeau de course, partie finie, ajoute « Voir la courbe des points »
+  (`replay.html#points`) ; le replay s'ouvre alors à la fin de la partie, sur la courbe. La partie
+  est déjà sauvegardée (`pagehide` appelle `save`), le replay lit cette sauvegarde.
+- Alternatives écartées : une courbe en direct dans l'écran de jeu (voir D-103) ; un lien aussi
+  pour un joueur éliminé en cours de partie (la partie n'est pas finie).
+- Qui : Vincent (lien), Claude (place et comportement). Cache `astra-p2p-v57`. Source : session
+  `a7cb8a19`. Statut : en vigueur.
 
 ---
 

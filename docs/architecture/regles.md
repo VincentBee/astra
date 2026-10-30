@@ -831,6 +831,8 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
   accepte ce changement de `home` daté d'avant (c'était une de mes colonies). Sans colonie :
   `p.home = null`, `p.out = heure` : le joueur est **éliminé** (`canAct` faux, `claimPlanet`
   refusé).
+- `losePlanet` note les points de la vague (`this.wave` : joueur, heure, `scoreOf` avant la
+  première perte de cette heure). À l'élimination, ils vont dans `p.deathPts` (D-102).
 
 ### 19.4 Qui est en vie, qui gagne (`livePlanets`, `deadAt`, `ranking`, `checkOver`)
 
@@ -838,8 +840,12 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
 - `deadAt(p)` : `p.out` s'il existe ; sinon, si plus aucune planète n'est en vie, l'heure du
   dernier gel (ou maintenant pour une prise). Calculable par **tous**, même si le joueur est
   hors ligne.
+- `scoreOf(p)` : ce que le joueur possède **maintenant** ; tout perdu : 0 (hors flottes en vol).
+- `ranking` : `{ id, pts, dead, best }`. `best` départage les joueurs tombés à la même heure :
+  `deathPts` (points juste avant la chute), ou `scoreOf` si la fiche n'a pas encore vu la chute
+  (D-102).
 - `checkOver` : à plusieurs, la partie finit quand il reste **un seul** joueur en vie (ou
-  aucun : le dernier tombé gagne, puis le meilleur `empireScore`). Seul : quand le froid a tout
+  aucun : le dernier tombé gagne, puis le meilleur `best`). Seul : quand le froid a tout
   pris. Le téléphone qui le voit écrit `p.over = { at, winner }` dans sa fiche ;
   `Session.over` prend la plus ancienne fin écrite par un joueur.
 - Partie finie : `tick` ne fait plus que lire les derniers rapports de combat ; tous les ordres
