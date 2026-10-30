@@ -1764,7 +1764,7 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
   }
 }
 
-/** Mes flottes sous la carte : un bouton par flotte, pour la sélectionner sans la chercher. */
+/** Mes flottes sous la carte, en grille : une case par flotte, pour la sélectionner sans la chercher. */
 function renderMapFleets(me = session?.state?.players[session.me], now = session?.now()) {
   const box = $('map-fleets');
   const fleets = me?.fleets || [];
@@ -1775,7 +1775,13 @@ function renderMapFleets(me = session?.state?.players[session.me], now = session
     .map((f) => {
       const hot = ['attack', 'conquer', 'chase'].includes(f.order?.kind);
       const dry = fuelAt(f, me.race, now) < DRY;
-      return `<button class="mf${hot ? ' hot' : ''}${dry ? ' dry' : ''}" data-fleet="${esc(f.id)}"><strong>${esc(fleetName(f))}</strong> <span>${esc(fleetStatus(me.race, f, now))}</span> <span class="mf-clock"></span></button>`;
+      const ships = SHIP_KEYS.filter((k) => f.ships[k])
+        .map((k) => `<span title="${esc(SHIPS[me.race][k].name)}">${ic(k)}${f.ships[k]}</span>`)
+        .join('');
+      return `<button class="mf${hot ? ' hot' : ''}${dry ? ' dry' : ''}" data-fleet="${esc(f.id)}">
+        <span class="mf-top"><strong>${esc(fleetName(f))}</strong><span class="mf-clock"></span></span>
+        <span class="mf-ships">${ships}</span>
+        <span class="mf-status">${esc(fleetStatus(me.race, f, now))}</span></button>`;
     })
     .join('');
   if (box.dataset.html !== html) {
@@ -1785,7 +1791,7 @@ function renderMapFleets(me = session?.state?.players[session.me], now = session
   for (const b of box.children) {
     const f = fleets.find((x) => x.id === b.dataset.fleet);
     b.setAttribute('aria-pressed', String(b.dataset.fleet === selFleet));
-    b.lastElementChild.textContent = f && moving(f, now) ? clock(f.arrive - now) : '';
+    b.querySelector('.mf-clock').textContent = f && moving(f, now) ? clock(f.arrive - now) : '';
   }
 }
 

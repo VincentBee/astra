@@ -343,14 +343,18 @@ button.close-btn svg { width: 18px; height: 18px; }
 .fi-fuel.low .hint { color: var(--warn); }
 #fleet-info .hint { margin: 0; }
 #fleets .player { cursor: pointer; }
-.map-fleets { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.map-fleets { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
 .mf {
-  flex: 0 0 auto; display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 10px;
+  display: grid; gap: 4px; align-content: start; min-height: 0; padding: 8px 10px; text-align: left;
   border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 0;
   background: var(--panel); color: var(--text); font: 0.78rem var(--mono); cursor: pointer;
 }
-.mf span { color: var(--muted); }
-.mf .mf-clock:empty { display: none; }
+.mf-top { display: flex; justify-content: space-between; gap: 6px; }
+.mf-clock { color: var(--muted); }
+.mf-ships { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.mf-ships span { display: inline-flex; align-items: center; gap: 3px; }
+.mf-ships .ic { width: 15px; height: 15px; }
+.mf-status { color: var(--muted); font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mf.hot { border-left-color: #ff7a93; }
 .mf.dry { opacity: 0.55; }
 .mf[aria-pressed='true'] { border-color: var(--text); background: var(--panel-2); }
