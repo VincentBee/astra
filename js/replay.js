@@ -13,6 +13,7 @@
 // `faithful` dit si la fin du rejeu retombe sur les fiches de la vraie partie.
 
 import { Session, normalize } from './session.js';
+import { empireScore, planetsFor } from './game.js';
 
 const copy = (x) => JSON.parse(JSON.stringify(x));
 
@@ -152,5 +153,32 @@ export function replay(state) {
 export function playersAt(frames, i) {
   const out = {};
   for (let j = 0; j <= i && j < frames.length; j++) out[frames[j].pid] = frames[j].fiche;
+  return out;
+}
+
+/**
+ * Points de l'empire d'une fiche, comme `Session.scoreOf` : la planète mère (si le joueur en a
+ * encore une), puis ses colonies. Tout perdu : 0 point.
+ */
+export function ficheScore(fiche, world) {
+  if (!fiche?.race) return 0;
+  const planets = [];
+  if (fiche.planet && fiche.home) planets.push(fiche.planet);
+  for (const [id, pl] of Object.entries(fiche.colonies || {})) if (world.some((w) => w.id === id)) planets.push(pl);
+  return empireScore(fiche.race, planets, fiche.fleets || []);
+}
+
+/**
+ * Courbe des points de chaque joueur pendant la partie : { pid: [{ t, pts }] }, un point à
+ * chaque entrée de son journal où ses points changent (et la première).
+ */
+export function scoreSeries(frames, gid) {
+  const world = planetsFor(gid);
+  const out = {};
+  for (const f of frames) {
+    const pts = ficheScore(f.fiche, world);
+    const line = (out[f.pid] ||= []);
+    if (!line.length || line[line.length - 1].pts !== pts) line.push({ t: f.t, pts });
+  }
   return out;
 }

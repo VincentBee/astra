@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame, game, clone } from './harness.mjs';
 
-const { replay, replayable, playersAt, comparable } = await import('../js/replay.js');
+const { replay, replayable, playersAt, comparable, scoreSeries } = await import('../js/replay.js');
 const { TECHS, SHIPS } = await import('../js/tech.js');
 
 const MIN = 60_000;
@@ -110,4 +110,41 @@ test('une copie pas encore à jour est signalée au lieu de faire planter le rej
   state.players.p0.orders.at(-1).s = { p1: state.players.p1.orders.length + 1 };
   assert.equal(replayable(state).stale, true);
   assert.equal(replayable(state).ok, false);
+});
+
+test('courbe des points : elle suit le score de chaque joueur', () => {
+  const { players, clock, sync } = newGame(2);
+  play(players, clock, sync, 20);
+  const state = clone(players[0].snapshot());
+  const series = scoreSeries(replay(state).frames, state.gid);
+  for (const s of players) assert.equal(series[s.me].at(-1).pts, s.scoreOf(s.state.players[s.me]), `points de ${s.name}`);
+  assert.ok(series.p0.length > 3, 'la courbe a plusieurs marches');
+});
+
+test('courbe des points : elle retombe à 0 quand le joueur a tout perdu, et le rejeu refait deathPts', () => {
+  // Le froid joue dès le début (le rejeu le recalcule avec le même réglage).
+  Object.assign(game.FROST, { delayMs: 0, durationMs: 10 * MIN });
+  try {
+    const { players: [A], clock } = newGame(1, ['human']);
+    A.build('mine');
+    clock.t += 2 * MIN;
+    A.tick();
+    const rich = A.scoreOf(A.state.players[A.me]);
+    assert.ok(rich > 0);
+    clock.t += 30 * MIN;
+    A.tick();
+    const p = A.state.players[A.me];
+    assert.ok(Number.isFinite(p.out), 'éliminé');
+    assert.equal(A.scoreOf(p), 0, 'plus rien : 0 point');
+    assert.equal(p.deathPts, rich, 'les points d’avant la chute sont gardés');
+    const state = clone(A.snapshot());
+    const r = replay(state);
+    const line = scoreSeries(r.frames, state.gid)[A.me];
+    assert.equal(line.at(-1).pts, 0);
+    assert.equal(Math.max(...line.map((x) => x.pts)), rich);
+    assert.equal(r.faithful[A.me], true);
+  } finally {
+    game.FROST.delayMs = Infinity;
+    game.FROST.durationMs = 24 * MIN;
+  }
 });

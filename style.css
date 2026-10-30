@@ -453,6 +453,11 @@ button.close-btn svg { width: 18px; height: 18px; }
 .rp-controls input[type=range] { width: 100%; accent-color: var(--accent); }
 .rp-steps > button { flex: 1; min-height: 40px; font-size: 0.9rem; }
 .rp-h { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+.rp-score { padding: 10px; display: grid; gap: 8px; }
+.rp-score canvas { display: block; width: 100%; height: 180px; touch-action: none; cursor: crosshair; }
+.rp-score-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.85rem; }
+.rp-score-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.rp-score-legend .dot { width: 8px; height: 8px; }
 .rp-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 0.9rem; }
 .rp-log li { display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; gap: 8px; }
 .rp-log .dot { width: 8px; height: 8px; }
