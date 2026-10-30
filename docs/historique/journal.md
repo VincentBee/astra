@@ -37,6 +37,7 @@ Transcripts : `~/.claude/projects/-Users-vincent-Workspace-Personal-astra--claud
 | `a090eacb` | Effet position et température sur les planètes (fille de `f4afbcd0`) | lancer-projet-local-40a514 | — | 2026-10-28 22:33 → 22:34 | aucun (lecture seule) |
 | `26f178b9` | Intensité et rythme du jeu | lancer-projet-local-cd6c4b | `claude/swarm-it-game-pacing-1d4502` | 2026-10-29 06:19 → (en cours) | `9b37782`, fusion de `main` `c702559`, déconstruction + doc |
 | `1df29e6e` | Documentation du projet (cette doc) | tech-tree-page-eba0b4 | `claude/swarm-it-documentation-790545` | 2026-10-29 06:35 → (en cours) | (à venir) |
+| `074fcd56` | Coût en nourriture des recherches | lancer-projet-local-cd6c4b | `claude/recherches-cout-nourriture-c71dbc` | 2026-10-30 10:53 → 10:58 | (ce commit) |
 
 Faits du dépôt : 35 commits, tous sur `main`. Deux merges seulement : `49b2156` et `9ec0e0c` (PR #1,
 la seule PR). Tout le reste a été poussé directement sur `main` (D-023).
@@ -273,6 +274,9 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 11:25 | `ef4e56a1` | [Bouton] « Créer la PR » | Ligne du journal ajoutée ; push de `claude/swarm-it-game-recipe-1cf190` ; pull request vers `main` | (cette PR) | D-100 |
 | 11:40 | `ef4e56a1` | [Auto-fix] conflit avec `main` | Fusion de `main` (recherche en colonie) : ma décision renumérotée D-100 (D-098 pris par `main`, D-099 par la recette), cache v54, tests 125/125 | (cette PR) | D-100 |
 | 11:35:03 | `359242b9` | Auto-fix : 2ᵉ conflit avec `main` | `main` a fusionné le comportement en voyage (D-100, cache v54) ; D-099 est réservée à la PR #7 (recherches et nourriture) : ma décision devient D-101, cache v55 | (cette PR) | D-101 |
+| 10:53:09 | `074fcd56` | « Certaines recherches devraient couter de la nouriture aussi » | Humains : Agronomie (+40 nourriture) et Arches coloniales (+120 nourriture) ; test D-099 | PR #7 | D-099 |
+| 11:00 | `074fcd56` | [Bouton] « Créer la PR » | PR #7 ; deux conflits avec `main` réglés par fusion (D-098 pris par `main`, puis cache v54 pris par D-100) | PR #7 | D-099 |
+| 12:30 | `074fcd56` | « rebase, puis merge » | Branche rebasée sur `main` (après la PR #8 : D-101, cache v55) en un seul commit ; cache v56 ; 127 tests verts ; PR #7 fusionnée | PR #7 | D-099 |
 
 ### Travaux en cours au 2026-10-29
 

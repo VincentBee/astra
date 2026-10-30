@@ -384,3 +384,19 @@ test('D-074 : seuls les aliens ont des pouvoirs', () => {
     assert.ok(game.usePower(p, 'lift', T0).error, r);
   }
 });
+
+test('D-099 : chez les humains, l’Agronomie et les Arches coloniales coûtent aussi de la nourriture', () => {
+  assert.deepEqual(TECHS.human.agro.base, { minerals: 120, food: 40 });
+  assert.deepEqual(TECHS.human.colonies.base, { minerals: 400, food: 120 });
+  for (const k of ['forage', 'propulsion', 'blindage', 'armement', 'radar']) {
+    assert.equal(TECHS.human[k].base.food, undefined, `${k} sans nourriture`);
+  }
+  const p = game.newPlanet('human', T0);
+  p.levels.lab = 1;
+  p.stock.minerals = 900;
+  p.stock.food = 0;
+  assert.match(game.startResearch(p, 'agro', T0), /insuffisantes/);
+  p.stock.food = 100;
+  assert.equal(game.startResearch(p, 'agro', T0), null);
+  close(p.stock.food, 60);
+});

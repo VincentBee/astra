@@ -345,6 +345,8 @@ détection.
   durée ; son stock paie. Une recherche à la fois par planète, et pas la même technologie sur
   deux planètes à la fois (refus « déjà en recherche sur … »).
 - Coût : `floor(base × 1,7^niveau)` (`techCost`, `js/tech.js:259-265`).
+  Humains : surtout des minéraux, plus de la nourriture pour Agronomie et Arches coloniales
+  (D-099). Machines : minéraux + énergie. Aliens : minéraux + nourriture.
 - Durée : `max(8, round(total / (20 × (1 + 0,5 × (labo − 1)))))` secondes
   (`researchDuration`, `js/tech.js:268-271`).
 - Les technologies valent pour toutes mes planètes : la planète mère tient la liste de
