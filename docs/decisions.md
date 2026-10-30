@@ -1045,7 +1045,8 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   12 Mo, 103 ms de dessin au lancement, et jusqu'à 180 écritures de style par seconde tant que
   le téléphone bouge (le ciel est recomposé à chaque image). En fixe : 1 image, 12 Mo, 38 ms,
   rien ensuite. Sans étoiles : rien.
-- Choix : un réglage « Fond » (accueil et fenêtre Joueurs), gardé dans `astra.sky` :
+- Choix : un réglage « Fond » (accueil et fenêtre Joueurs ; rangé dans la fenêtre Réglages par
+  D-114), gardé dans `astra.sky` :
   `anime` (par défaut, comme avant), `fixe` (les 3 couches dans une seule image immobile, sans
   capteurs), `aucun` (dégradé CSS seul). Changement immédiat, sans recharger. « Réduire les
   animations » donne aussi le rendu fixe (une image au lieu de 3 calques). En animé, la
@@ -1054,9 +1055,25 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Alternatives écartées : retirer la parallaxe pour tous ; fixe par défaut ; détecter
   « téléphone faible » ou « batterie faible » (pas d'API fiable sur iPhone).
 - Qui : Claude (défaut : animé reste le défaut, 3 choix). Source : session `0a3a42f6`.
-- Statut : en vigueur. Effet sur la batterie d'un vrai téléphone : **non confirmé**.
+- Statut : en vigueur, modifiée par D-114 (emplacement). Effet sur la batterie d'un vrai
+  téléphone : **non confirmé**.
 
 **D-113 — Cache `astra-p2p-v63`**
-- 2026-10-30. Choix de Claude : `index.html`, `style.css`, `js/app.js` et `js/galaxy.js`
-  changent ; nouvelle version de cache pour que les téléphones les récupèrent.
+- 2026-10-30. Choix de Claude : `index.html`, `style.css`, `js/app.js`, `js/galaxy.js` et
+  `js/icons.js` (D-114) changent ; nouvelle version de cache pour que les téléphones les récupèrent.
 - Statut : en vigueur.
+
+**D-114 — Une fenêtre « Réglages », ouverte par une roue crantée**
+- 2026-10-30 16:40. Demande de Vincent : « Les réglages utilisateurs doivent être bien rangés dans
+  l'application et ne pas prendre trop de place. Ils doivent être accessibles avec un icône de roue
+  crantée. »
+- Choix : une seule fenêtre `#sheet-settings` (comme les autres `.sheet`), avec le réglage « Fond »
+  (D-112) ; elle s'ouvre par une roue crantée (icône `gear`, sans texte) en haut à droite de
+  l'accueil et dans la rangée de boutons du jeu (entre le diagnostic et le compteur de joueurs).
+  Les deux listes « Fond » de l'accueil et de la fenêtre Joueurs sont retirées. Les futurs
+  réglages de l'appareil iront dans cette fenêtre.
+- Choix de Claude, par défaut : le dessin de la roue (8 dents, trou central) ; la place des
+  boutons ; la fenêtre en bas d'écran comme les autres.
+- Alternatives écartées : garder une liste sur chaque écran (prend de la place) ; mettre les
+  réglages dans la fenêtre Joueurs (mal rangé).
+- Qui : Vincent (demande), Claude (forme). Source : session `0a3a42f6`. Statut : en vigueur.

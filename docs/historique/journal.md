@@ -310,6 +310,7 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 14:02 | `0a3a42f6` | [Bouton] « Créer la PR » | Fusion de `main` (D-098 à D-109 et cache v60 déjà pris) : mes décisions deviennent D-110 (réglage « Fond ») et D-111 (cache v61), puis D-112 et D-113 (voir les lignes suivantes) ; pull request | (cette PR) | D-112, D-113 |
 | 16:26 | `0a3a42f6` | [Auto-fix] conflit avec `main` | `main` avait pris D-110 (carnet de combats) et le cache v61 : mes décisions deviennent D-111 (réglage « Fond ») et D-112 (cache v62) ; tests relancés | (cette PR) | D-112, D-113 |
 | 16:40 | `0a3a42f6` | [Auto-fix] 2ᵉ conflit avec `main` | `main` avait pris D-111 (alertes de famine) et le cache v62 : mes décisions deviennent D-112 (réglage « Fond ») et D-113 (cache v63) ; tests relancés | (cette PR) | D-112, D-113 |
+| 16:41 | `0a3a42f6` | « Les réglages utilisateurs doivent être bien rangés dans l'application et ne pas prendre trop de place. Ils doivent être accessibles avec un icône de roue crantée. » | Fenêtre « Réglages » (`#sheet-settings`) avec le réglage « Fond » ; roue crantée (icône `gear`) sur l'accueil et dans la rangée de boutons du jeu ; les deux listes « Fond » retirées ; vérifié dans Chrome (390 × 844) | (cette PR) | D-114 |
 
 ### Travaux en cours au 2026-10-29
 

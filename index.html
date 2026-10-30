@@ -19,6 +19,7 @@
   <section id="screen-home" class="screen">
     <div class="home">
       <header class="hero">
+        <button class="net-btn icon-only settings-btn" data-settings title="Réglages" aria-label="Réglages"><i data-ic="gear"></i></button>
         <h1>Astra</h1>
         <p>Conquête spatiale entre téléphones.</p>
       </header>
@@ -34,13 +35,6 @@
         <button id="btn-join" class="secondary"><i data-ic="join"></i>Rejoindre</button>
       </div>
       <p id="home-note" class="note" hidden></p>
-      <label class="field" for="sky-home">Fond
-        <select id="sky-home" data-sky>
-          <option value="anime">Étoiles animées (parallaxe)</option>
-          <option value="fixe">Étoiles fixes (économe)</option>
-          <option value="aucun">Sans étoiles (le plus économe)</option>
-        </select>
-      </label>
     </div>
   </section>
 
@@ -98,6 +92,7 @@
         <button id="btn-journal" class="net-btn" title="Journal : mes combats et ce qui me concerne" aria-label="Journal de mes combats">
           <i data-ic="journal"></i><span id="journal-count" class="j-count mono" hidden></span>
         </button>
+        <button id="btn-settings" class="net-btn icon-only" data-settings title="Réglages" aria-label="Réglages"><i data-ic="gear"></i></button>
         <button id="net" class="net-btn" title="Joueurs, classement, invitations" aria-label="Joueurs en ligne, classement et invitations">
           <i data-ic="users"></i><span id="net-count" class="mono"></span>
         </button>
@@ -237,8 +232,18 @@
         <h3 class="section-title"><i data-ic="trophy"></i> Classement</h3>
         <div id="players" class="players"></div>
       </section>
-      <label class="field" for="sky-game">Fond
-        <select id="sky-game" data-sky>
+    </div>
+  </div>
+
+  <!-- Réglages de l'appareil (D-114), ouverts par la roue crantée : accueil et jeu -->
+  <div id="sheet-settings" class="sheet" hidden>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="sheet-head">
+        <h2 id="settings-title">Réglages</h2>
+        <button id="btn-settings-close" class="icon-btn close-btn" title="Fermer" aria-label="Fermer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <label class="field" for="sky">Fond
+        <select id="sky">
           <option value="anime">Étoiles animées (parallaxe)</option>
           <option value="fixe">Étoiles fixes (économe)</option>
           <option value="aucun">Sans étoiles (le plus économe)</option>

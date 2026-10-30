@@ -111,6 +111,9 @@ details > button { width: 100%; }
   line-height: 1;
 }
 .hero p { color: var(--muted); margin: 10px 0 0; }
+/* Roue crantée des réglages (D-114) : discrète, en haut à droite de l'accueil. */
+.hero { position: relative; }
+.settings-btn { position: absolute; top: calc(-10vh + 4px); right: 0; color: var(--muted); }
 
 /* ----- Partie sauvegardée ----- */
 
@@ -671,6 +674,7 @@ button.net-btn {
   background: transparent; border-color: var(--line); color: var(--ok);
 }
 button.net-btn.slow { color: var(--warn); }
+button.net-btn.icon-only { padding: 0 10px; color: var(--muted); }
 .net-btn .ic { width: 18px; height: 18px; }
 
 /* Journal (D-110) : pastille des entrées neuves, combats en tête. */

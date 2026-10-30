@@ -141,3 +141,4 @@ que fait le code.
 | D-111 | Alertes de famine et de panne d'énergie | nouveau test | `alerts.test.mjs` (6 tests : aucune alerte au départ, famine humaine, panne alien, machines sans nourriture, déficit et temps avant d'être vide, pénuries d'abord) | interface (pastille, toast, bandeau, icône) : vérifiée dans le navigateur, pas de test automatique (app.js dépend du DOM) |
 | D-112 | Réglage « Fond » : animé, fixe ou aucun | nouveau test | `decisions-reseau.test.mjs` D-112 : réglage « Fond » — fixe = une image sans capteurs, aucun = pas d’étoiles | les listes de l'interface (DOM) et le coût réel : non testés |
 | D-113 | Cache v63 | non testable |  | version de cache |
+| D-114 | Une fenêtre « Réglages », ouverte par une roue crantée | test existant | `decisions-reseau.test.mjs` D-064 : chaque icône de la page existe, et un bouton sans texte porte un nom | la fenêtre et son ouverture (DOM) : vérifiées dans le navigateur seulement |
