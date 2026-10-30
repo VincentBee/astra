@@ -79,7 +79,7 @@ Détail de `#screen-game` :
 | `#net` (91-93) | Compteur de joueurs en ligne (vert, orange si un lien > 250 ms). `showView` le **déplace** dans la première ligne de la vue affichée (`js/app.js:1223`). Ouvre `#sheet-players`. | `renderLive` 811-821, clic 319-322. |
 | `#lost` (97-100) | Bandeau « Seul en ligne » + **Rejoindre** (rejoindre les autres par une nouvelle invitation). | `renderState` 762 (`session.alone`), `btn-rejoin` 286-289. |
 | `#view-universe` (102-148) | Vue carte : `#pick` (bandeau « Choisis ta planète »), `#trades` (offres d'échange), `.map-head` (coordonnées, aide `?`), `canvas#map`. | `drawMap` 1349-1538, `renderPick` 1876-1913, `renderTrades` 1777-1800. |
-| `#sheet-planet` (114-127) | Fiche de la planète touchée : nom, coordonnées, propriétaire, places, climat, gisements, **S'installer** ou **Bâtiments**. | `renderPick` 1876-1913, `btn-claim` 1922-1929, `btn-open-planet` 1275-1279, `closePlanetSheet` 1916-1920. |
+| `#sheet-planet` | Fiche de la planète touchée : nom, coordonnées, propriétaire, places, climat, gisements, **S'installer** ou **Bâtiments**. Sur une de mes planètes, partie **Chantier** (`#pi-yard`, D-106) : vaisseaux recherchés, prix, « jusqu'à N », boutons ×1 / ×5 / ×N, et **Décoller**. | `renderPick`, `renderPickYard`, écouteur de `#pi-ships`, `btn-pi-takeoff`, `btn-claim`, `btn-open-planet`, `closePlanetSheet`. |
 | `#fleet-info` (129-145) | Fiche de la flotte sélectionnée : vaisseaux, statut (avec la vitesse et, si la flotte mêle plusieurs types, le nom du plus lent : `speedText`), carburant, choix d'ordres (`#fi-choice`), mes flottes à côté (`#fi-beside`), joueurs à côté (`#fi-partners`), boutons Arrêter / Rentrer / Se poser / Plein / Passive-Agressive (`#btn-fi-stance`, icône d'attaque, pleine quand la flotte est agressive, cachée pour une flotte sans armes ; D-100) / Scinder / Fermer. Le statut finit par « · agressive » (`fleetStatus`). | `renderFleetInfo` 1643-1687, handlers 1689-1714. |
 | `#view-planet` (150-199) | Vue planète : en-tête (retour, nom, climat), gisements `#soil-zone`, stocks `#resources`, onglets, puis les panneaux `data-pane`. | `renderPlanet` 869-988. |
 | `.tabs` (163-168) | Onglets Bâtiments / Pouvoirs (aliens seulement) / Recherche (toute planète ; « 🔒 Il faut un labo » sans labo, technologie grisée si elle est en recherche sur une autre planète) / Flottes. | `showTab` 1241-1252, flèches clavier 1255-1262. |
@@ -174,7 +174,8 @@ Table des appels de l'interface vers la session :
 | S'installer sur une planète | 1924 | `claimPlanet` |
 | Bâtiment / recherche / vaisseaux / pouvoir | 749, 610, 614, 606 | `build` (ou `planBuild`, voir §13), `research`, `buildShips`, `power` |
 | Retirer un élément du fil de construction | `#plan` (× d'un élément) | `unplan` |
-| Décoller | 1187 | `takeOff` (renvoie l'id de la flotte, sélectionnée ensuite) |
+| Vaisseaux depuis la carte (D-106) | écouteur de `#pi-ships` | `buildShips(type, n, clé de la planète touchée)` ; ×N = `shipsAffordable` |
+| Décoller (onglet Flottes ou fiche de la carte) | `openFleetSheet(clé)`, `btn-fleet-go` | `takeOff(fleetKey, …)` (renvoie l'id de la flotte, sélectionnée ensuite) |
 | Envoyer une flotte sur une case | 1619-1623, 1697 | `ordersAt` (ordres possibles) puis `moveFleet` |
 | Poursuivre une flotte ennemie | 1691 | `chaseFleet` |
 | Arrêter / plein / rentrer / se poser | 1701-1708 | `stopFleet`, `refuelFleet`, `returnFleet`, `moveFleet(…, 'dock')` |
@@ -208,7 +209,7 @@ Le point touché est converti en cases (pixels CSS / taille d'une case). Puis, d
 2. **Une flotte sélectionnée** :
    - une flotte ennemie sous le doigt → `prey`, la fiche propose « Attaquer » (1607-1615) ;
    - sinon la case touchée : `session.ordersAt` ; un seul ordre possible sans panne → `moveFleet` direct ; sinon `pending` = la case, et la fiche affiche un bouton par ordre (1617-1625, rendu 1674-1681).
-3. **Sinon** : ma planète → vue planète (1633-1637) ; une autre planète → sa fiche (`selected`, 1638-1639) ; le vide → ferme la fiche.
+3. **Sinon** : une planète, à moi ou non → sa fiche (`selected`) ; pour la mienne, la fiche porte le chantier, « Décoller » et « Bâtiments » (D-106 ; avant, toucher ma planète ouvrait directement la vue planète) ; le vide → ferme la fiche.
 
 État de la carte, variables de module (1208-1214) : `currentView`, `openKey` (« home » ou id d'une colonie), `mapFrame`, `selected`, `selFleet`, `pending`, `prey`.
 

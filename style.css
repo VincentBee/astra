@@ -320,6 +320,15 @@ button.close-btn svg { width: 18px; height: 18px; }
 .tile.empty .amount { color: var(--warn); }
 .planet-info { padding: 12px 14px; display: grid; gap: 10px; }
 .planet-info .b-desc { margin: 0; }
+.pi-yard { display: grid; gap: 8px; }
+.pi-yard .section-title, .pi-yard .hint { margin: 0; }
+.pi-ships { display: grid; gap: 6px; }
+.pi-ship { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 6px 0; border-top: 1px solid var(--line); }
+.pi-ship-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; min-width: 0; }
+.pi-ship .ship-actions { gap: 4px; flex-wrap: nowrap; }
+.pi-ship.affordable .cost { color: var(--ok); }
+.pi-ship [data-pinote] { flex-basis: 100%; }
+.pi-ship .ship-actions button { min-height: 34px; padding: 0 10px; font-size: 0.85rem; }
 #planet-info.sheet-panel { gap: 14px; }
 .climate { margin: 0; font: 0.8rem var(--mono); color: var(--muted); }
 .climate-name { font-weight: 700; }

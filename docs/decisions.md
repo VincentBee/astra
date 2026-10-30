@@ -857,6 +857,29 @@ Aucune conversation ne les prouve.
   mais rien ne casse) ; cache `astra-p2p-v57` (v55 et v56 pris par D-101 et D-099 ; D-101 prise par la vitesse de flotte, d'où D-105).
 - Qui : Vincent (demande), Claude (règle). Statut : en vigueur.
 
+**D-106 — Construire et faire décoller des vaisseaux depuis la carte**
+- 2026-10-30 12:15. Demandes : « Je voudrais pouvoir créer des vaisseaux depuis la carte, en
+  fonction des capacités de production des planètes. », puis « il doit etre possible de faire
+  decoller des vaiseau depuis la carte ».
+- Choix (Claude, par défaut) :
+  - **Toucher une de mes planètes ouvre sa fiche sur la carte**, au lieu d'ouvrir directement
+    l'écran des bâtiments ; le bouton « Bâtiments » de la fiche y mène toujours (un toucher de
+    plus pour les bâtiments).
+  - La fiche a une partie **Chantier** : une ligne par vaisseau **déjà recherché** (les autres
+    sont cachés), avec son prix, sa durée par unité, ce qui est à quai, et **« jusqu'à N »** : le
+    plus grand lot que le stock de cette planète peut payer (`shipsAffordable`, au plus 50, la
+    taille maximale d'un lot). Boutons ×1, ×5 et ×N. Sans chantier naval, sans vaisseau
+    recherché, ou chantier occupé : une ligne l'explique.
+  - Bouton **Décoller** (s'il y a des vaisseaux à quai) : ouvre le formulaire de décollage
+    habituel pour **cette** planète (mère ou colonie) ; la flotte part en orbite et reste
+    sélectionnée sur la carte, comme avant.
+  - Même règle de bouton actif que l'onglet Flottes (`canBuildShips`), pour que les deux écrans
+    ne divergent pas. Aucune règle de jeu ne change : mêmes ordres `buildShips` et `takeOff`.
+- Alternatives écartées : un appui long sur sa planète pour la fiche (peu découvrable au
+  doigt) ; afficher aussi les vaisseaux pas encore recherchés (déjà dans l'onglet Flottes) ;
+  faire de chaque lot terminé une flotte en orbite (évoqué puis retiré par Vincent).
+- Pas de nouveau `FORMAT` ; cache `astra-p2p-v59` (D-101 à D-105 et les caches v55 à v58 pris par `main` pendant le travail : renumérotée D-106).
+- Qui : Vincent (demande), Claude (forme). Statut : en vigueur.
 
 ---
 

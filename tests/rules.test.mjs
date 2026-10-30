@@ -162,3 +162,24 @@ test('déconstruire un niveau rend la moitié de son prix et libère sa place à
   assert.equal(game.placesLeft(p), 1, 'une place libre');
   assert.equal(game.startDemolish(p, 'lab', p.at), 'Rien à déconstruire.');
 });
+
+test('D-106 : le plus grand lot de vaisseaux suit le stock, et le chantier l’accepte', async () => {
+  const { SHIPS, shipUnlock } = await import('../js/tech.js');
+  const { shipsAffordable, startShips, newPlanet } = game;
+  const p = newPlanet('human', T0);
+  p.levels.yard = 1;
+  const type = 'cargo';
+  if (shipUnlock('human', type)) p.tech = { ...p.tech, [shipUnlock('human', type).key]: shipUnlock('human', type).level };
+  const [r, v] = Object.entries(SHIPS.human[type].cost).find(([, x]) => x > 0);
+  const fill = () => { for (const k of Object.keys(p.stock)) p.stock[k] = 1e9; };
+  fill();
+  p.stock[r] = v * 3 + v / 2; // de quoi payer 3 vaisseaux et demi
+  assert.equal(shipsAffordable('human', type, p.stock), 3);
+  fill();
+  assert.equal(shipsAffordable('human', type, p.stock), 50, 'pas plus de 50 par lot');
+  assert.equal(shipsAffordable('human', 'inconnu', p.stock), 0);
+  assert.equal(shipsAffordable('human', type, {}), 0);
+  p.stock[r] = v * 3;
+  assert.equal(startShips(p, type, shipsAffordable('human', type, p.stock), T0), null);
+  assert.equal(p.yard.count, 3);
+});
