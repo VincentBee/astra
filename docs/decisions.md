@@ -148,7 +148,9 @@ Aucune conversation ne les prouve.
   - régénération des gisements baissée (minéraux 15–45/min, nourriture 8–25/min), nouvelles
     parties seulement ; anciennes planètes sans gisement : sans limite.
 - Qui : Claude (défaut). Source : `aeb160d5` 22:07:26, 22:11:44 ; `40cdb51`.
-- Statut : en vigueur, sauf la régénération, **modifiée par D-060** (gisements ×10).
+- Statut : en vigueur, sauf la régénération, **modifiée par D-060** (gisements ×10), et le journal
+  en console, **modifié par D-110** (journal visible dans le jeu ; la console n'en garde qu'une
+  copie pour déboguer).
 
 **D-019 — Tout ce qui est produit est pris à la planète**
 - 2026-10-25 22:10. Contexte : Claude avait laissé hors gisement le revenu de base, l'impôt
@@ -507,7 +509,7 @@ Aucune conversation ne les prouve.
 
 **D-068 — Accéléromètre sur iPhone**
 - 2026-10-28 22:17. Choix : autorisation « Mouvement » au premier tap ; position de repos qui
-  s'adapte ; mouvement lissé ; fond fixe si « réduire les animations » (modifiée par D-110 :
+  s'adapte ; mouvement lissé ; fond fixe si « réduire les animations » (modifiée par D-111 :
   ce fond fixe est désormais une seule image, et chacun peut le choisir).
 - Qui : Claude (défaut). Testé avec des événements simulés seulement (**non confirmé** sur un vrai
   iPhone). Source : `f4afbcd0` 22:15:08, 22:17:00. Statut : en vigueur.
@@ -977,7 +979,44 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Qui : Vincent (corriger), Claude (méthode). Source : session `e67321a7`. Statut : en vigueur.
 - Tests : `tests/fleet.test.mjs`, section « Rencontres que personne n'a regardées ».
 
-**D-110 — Réglage « Fond » : étoiles animées, fixes ou absentes**
+**D-110 — Rapport de combat et journal visibles dans le jeu ; messages à la file**
+- 2026-10-30 14:03. Contexte : tâche 1.4 collée par Vincent : pertes, butin et planètes perdues
+  n'étaient écrits que dans la console (D-018, décidé avant les combats) ; en jeu, un seul message
+  de 3,2 s, écrasé par le suivant (« tu es éliminé » aussi). Demandé : revoir D-018, un journal
+  dans le jeu filtré sur moi avec les combats en tête, un résumé « pendant ton absence », une file
+  de messages.
+- Choix :
+  - **Carnet de combats propre au téléphone** (`session.journal`, 100 entrées) : chaque combat vu
+    de mon côté (mes pertes, ses pertes, butin pris ou pillé, planète prise) et chaque planète
+    perdue, daté de l'heure du combat. Il est rangé avec la sauvegarde (`saveGame`), pas dans la
+    fiche : il ne part pas sur le réseau et le rejeu ne le touche pas. Écrit par la session
+    elle-même, donc aussi pendant le rattrapage à la reprise (avant que l'écran existe).
+  - **Les rapports `effects` portent `lost`** (pertes de l'attaquant) : le défenseur connaît ainsi
+    les pertes des deux côtés. Champ facultatif, sans changer `FORMAT` ; un rapport d'une ancienne
+    version donne « Ses pertes : ? ».
+  - **Fenêtre Journal** (bouton à côté du compteur de joueurs, pastille du nombre d'entrées non
+    lues) : « Combats et planètes » en tête, puis « Ce qui me concerne » = les lignes du journal
+    partagé qui me nomment (20 au plus).
+  - **Résumé « Pendant ton absence »** : la même fenêtre, limitée à ce qui est neuf, ouverte au
+    retour après 2 min ou plus d'absence (reprise d'une partie : tout le non-lu ; appli revenue au
+    premier plan : ce qui est arrivé depuis qu'elle a été cachée), seulement s'il y a un combat ou
+    une perte.
+  - **Messages à la file** : un à la fois, dans l'ordre, aucun n'en efface un autre ; 6 en attente
+    au plus ; doublons ignorés ; quand d'autres attendent, chacun reste au moins 2 s ; « tu es
+    éliminé » reste 8 s. Appli cachée : pas de message (le carnet garde l'essentiel).
+  - La console garde une copie du journal partagé, pour déboguer (D-018 modifiée).
+- Choix de Claude, par défaut : tout ce qui précède dans le détail (taille du carnet, 2 min, 6
+  messages, 8 s, filtre par le nom du joueur, une file plutôt qu'une pile de messages).
+- Alternatives écartées : afficher le journal partagé tel quel (40 lignes de tout le monde, texte
+  seul, coupé à 120 caractères, pas de pertes adverses) ; mettre le carnet dans la fiche (plus
+  lourde pour tous, inutile aux autres) ; plusieurs messages empilés à l'écran (cachent la carte).
+- Limites : le filtre « ce qui me concerne » cherche mon nom dans le texte (un autre nom qui
+  contient le mien passerait) ; l'ouverture au retour au premier plan n'a pas été testée dans le
+  navigateur (seulement la reprise d'une partie).
+- Qui : Vincent (demande), Claude (méthode). Source : session `caf0e31a`. Statut : en vigueur.
+- Tests : `tests/journal.test.mjs`.
+
+**D-111 — Réglage « Fond » : étoiles animées, fixes ou absentes**
 - 2026-10-30. Contexte : Vincent demande d'estimer ce que coûte la parallaxe et de pouvoir la
   retirer. Mesure (Chrome, téléphone simulé 390 × 844, densité 3, processeur ralenti × 4) : en
   animé, 3 calques de 2 × 2 écrans ≈ 142 Mo de surface de calque (estimation : la part
@@ -996,7 +1035,7 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Qui : Claude (défaut : animé reste le défaut, 3 choix). Source : session `0a3a42f6`.
 - Statut : en vigueur. Effet sur la batterie d'un vrai téléphone : **non confirmé**.
 
-**D-111 — Cache `astra-p2p-v61`**
+**D-112 — Cache `astra-p2p-v62`**
 - 2026-10-30. Choix de Claude : `index.html`, `style.css`, `js/app.js` et `js/galaxy.js`
   changent ; nouvelle version de cache pour que les téléphones les récupèrent.
 - Statut : en vigueur.

@@ -401,7 +401,7 @@ test('D-068 : sur iPhone, l’autorisation « Mouvement » est demandée au prem
   assert.deepEqual(still.pos(), rest);
 });
 
-test('D-110 : réglage « Fond » — fixe = une image sans capteurs, aucun = pas d’étoiles', () => {
+test('D-111 : réglage « Fond » — fixe = une image sans capteurs, aucun = pas d’étoiles', () => {
   const anime = galaxy({ mode: 'anime' });
   assert.equal(anime.layers.length, 3);
   assert.ok(anime.on.some((h) => h.type === 'devicemotion'));
