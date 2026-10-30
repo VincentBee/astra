@@ -2,7 +2,7 @@
 
 Pour chaque décision de [decisions.md](../decisions.md), le test qui la protège, ou la raison
 pour laquelle il n'y en a pas (voir D-082). État au 2026-10-30 : `node --test tests/*.test.mjs` →
-130 tests, 130 réussis (avec la recherche en colonie, D-098, le coût en nourriture, D-099, le comportement en voyage, D-100, la vitesse de flotte, D-101, et les points d'avant la chute, D-102 à D-104).
+138 tests, 138 réussis (avec la recherche en colonie, D-098, le coût en nourriture, D-099, le comportement en voyage, D-100, la vitesse de flotte, D-101, les points d'avant la chute, D-102 à D-104, le fil de construction, D-105, et le chantier sur la carte, D-106).
 
 - **nouveau test** : ajouté le 2026-10-29 dans `tests/decisions-planete.test.mjs` (24),
   `tests/decisions-flotte.test.mjs` (30) ou `tests/decisions-reseau.test.mjs` (20). Le nom de
@@ -135,3 +135,4 @@ que fait le code.
 | D-103 | Courbe des points dans le replay | nouveau test | `replay.test.mjs` courbe des points : elle suit le score de chaque joueur | le dessin est vérifié à l'œil dans le navigateur |
 | D-104 | Lien vers la courbe à la fin de la partie | non testable |  | interface : vérifié dans le navigateur (lien du bandeau, arrivée sur la courbe) |
 | D-105 | Fil de construction par planète | nouveau test | `plan.test.mjs` (7 tests : lancement à l'heure où le stock suffit, ordre gardé, `settle`, plus de place, estimation, ordres du joueur et rejeu fidèle, fil abîmé nettoyé) | la liste et le bouton × ne sont testés que dans le navigateur |
+| D-106 | Construire et faire décoller depuis la carte | nouveau test | `rules.test.mjs` D-106 : le plus grand lot de vaisseaux suit le stock, et le chantier l’accepte | la fiche et ses boutons ne sont pas testés (navigateur) |

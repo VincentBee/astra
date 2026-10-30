@@ -5,6 +5,7 @@ import { scanQr } from './scanner.js';
 import {
   RACES, RACE_KEYS, RES_INFO, resIcon, raceIcon, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
   powerReadyAt, powerCost, liftGain, fmt, UNIVERSE, SOIL, sameCell, sunFor, climateName, kindLabel, usedPlaces, TEMPO, frostLine, planForecast, PLAN_MAX,
+  shipsAffordable,
 } from './game.js';
 import { drawSun } from './sky.js';
 import { ic, fillIcons } from './icons.js';
@@ -521,6 +522,19 @@ function buildStatic() {
       <p class="ship-stats b-desc" data-sstats="${k}"></p>
       <div class="card-bar" hidden><div class="bar-fill"></div></div>
     </article>`;
+  }).join('');
+
+  // Chantier de la fiche planète, sur la carte : une ligne par vaisseau.
+  $('pi-ships').innerHTML = SHIP_KEYS.map((k) => {
+    const S = SHIPS[race][k];
+    return `<div class="pi-ship" data-piship="${k}">
+      <div class="pi-ship-main"><span class="p-name">${esc(S.name)}</span> <span class="cost mono" data-picost="${k}"></span> <span class="hint mono" data-pinote="${k}"></span></div>
+      <div class="ship-actions">
+        <button class="secondary small" data-pi-ship="${k}" data-n="1" aria-label="Construire 1 ${esc(S.name)}">×1</button>
+        <button class="secondary small" data-pi-ship="${k}" data-n="5" aria-label="Construire 5 ${esc(S.name)}">×5</button>
+        <button class="secondary small" data-pi-ship="${k}" data-n="max" aria-label="Construire autant de ${esc(S.name)} que possible">Max</button>
+      </div>
+    </div>`;
   }).join('');
 
   $('powers-zone').hidden = race !== 'alien';
@@ -1147,6 +1161,11 @@ function renderResearch(me, pl, s, now) {
 const statText = (st) =>
   `⚔ ${fmt(st.attack)} · ◇ ${fmt(st.hull)} · ▣ ${fmt(st.cargo)} · » ${(st.speed * TEMPO).toFixed(1).replace('.', ',')}`;
 
+/** Lot de `n` vaisseaux `k` qu'on peut lancer maintenant sur cette planète (état `s`) ? */
+function canBuildShips(me, s, k, n) {
+  return !!s.levels.yard && n >= 1 && shipUnlocked(me.race, k, s.tech) && !s.yard && n <= shipsAffordable(me.race, k, s.stock) && session.status === 'playing';
+}
+
 /** Chantier naval de la planète ouverte. */
 function renderYard(me, pl, s, now) {
   const yard = s.levels.yard || 0;
@@ -1171,11 +1190,7 @@ function renderYard(me, pl, s, now) {
     req.textContent = unlocked ? '' : `🔒 ${TECHS[me.race][u.key].name} ${u.level}`;
     setHtml(q(`[data-scost="${k}"]`), `${costText(S[k].cost)} · ${clock(shipDuration(me.race, k, 1, Math.max(1, yard)))}/u`);
     q(`[data-scard="${k}"]`).classList.toggle('locked', !unlocked);
-    for (const btn of document.querySelectorAll(`[data-ship="${k}"]`)) {
-      const n = Number(btn.dataset.n);
-      const cost = Object.fromEntries(Object.entries(S[k].cost).map(([r, v]) => [r, v * n]));
-      btn.disabled = !yard || !unlocked || !!s.yard || !covers(s.stock, cost) || session.status !== 'playing';
-    }
+    for (const btn of document.querySelectorAll(`[data-ship="${k}"]`)) btn.disabled = !canBuildShips(me, s, k, Number(btn.dataset.n));
   }
 }
 
@@ -1262,10 +1277,13 @@ function fleetChoice() {
   return { ships, cargo };
 }
 
-function openFleetSheet() {
+let fleetKey = 'home'; // planète d'où part la flotte du formulaire de décollage
+
+function openFleetSheet(key = openKey) {
   const me = session.state.players[session.me];
-  const pl = session.planetOf(me, openKey);
+  const pl = session.planetOf(me, key);
   if (!pl) return;
+  fleetKey = key;
   const s = stateAt(pl.planet, session.now());
   $('fleet-ships').innerHTML = SHIP_KEYS.filter((k) => s.ships[k])
     .map((k) => `<label>${esc(SHIPS[me.race][k].name)} (${s.ships[k]})<input type="number" inputmode="numeric" min="0" max="${s.ships[k]}" value="${s.ships[k]}" data-fship="${k}"></label>`)
@@ -1298,12 +1316,12 @@ function updateFleetSheet() {
   $('btn-fleet-go').disabled = !countShips(ships);
 }
 
-$('btn-send-fleet').onclick = openFleetSheet;
+$('btn-send-fleet').onclick = () => openFleetSheet(openKey);
 $('btn-fleet-close').onclick = () => ($('sheet-fleet').hidden = true);
 $('sheet-fleet').addEventListener('input', updateFleetSheet);
 $('btn-fleet-go').onclick = () => {
   const { ships, cargo } = fleetChoice();
-  const id = session.takeOff(openKey, ships, cargo, Math.floor(Number($('fleet-fuel').value) || 0));
+  const id = session.takeOff(fleetKey, ships, cargo, Math.floor(Number($('fleet-fuel').value) || 0));
   if (!id) return;
   $('sheet-fleet').hidden = true;
   // Direction la carte, flotte sélectionnée : il ne reste qu'à toucher une case.
@@ -1774,12 +1792,8 @@ $('map').addEventListener('click', (e) => {
     selected = null;
     return renderPick();
   }
+  // Une de mes planètes aussi : sa fiche s'ouvre sur la carte (chantier, décollage), « Bâtiments » mène à l'écran planète.
   const { w } = best;
-  if (w.owner?.id === session.me && w.pl) {
-    selected = null;
-    renderPick();
-    return showView('planet', w.pl.key);
-  }
   selected = { x: w.x, y: w.y };
   renderPick();
 });
@@ -2069,7 +2083,60 @@ function renderPick(me = session?.state?.players[session.me], now = session?.now
   $('btn-claim').innerHTML = `${ic('dock')}S'installer · ${esc(w.name)}`;
   $('btn-open-planet').hidden = o?.id !== session.me || !w.pl;
   $('btn-open-planet').dataset.key = w.pl?.key || 'home';
+  renderPickYard(me, o?.id === session.me && w.pl ? w.pl : null, s, now);
 }
+
+/** Chantier et décollage dans la fiche d'une de mes planètes, sur la carte. */
+function renderPickYard(me, pl, s, now) {
+  $('pi-yard').hidden = !pl || !s;
+  if (!pl || !s) return;
+  const yard = s.levels.yard || 0;
+  const busy = s.yard ? `En chantier : ${s.yard.count} × ${SHIPS[me.race][s.yard.type].name} · ${clock(Math.max(0, s.yard.end - now))}` : '';
+  $('pi-yard-hint').textContent = !yard ? `🔒 Il faut un ${RACES[me.race].buildings.yard.name}.` : busy;
+  $('pi-yard-hint').hidden = !$('pi-yard-hint').textContent;
+  $('pi-ships').hidden = !yard;
+  for (const k of SHIP_KEYS) {
+    const row = document.querySelector(`[data-piship="${k}"]`);
+    const unlocked = shipUnlocked(me.race, k, s.tech);
+    row.hidden = !unlocked; // seulement ce que cette planète sait construire
+    if (!unlocked) {
+      for (const btn of row.querySelectorAll('[data-pi-ship]')) btn.disabled = true;
+      continue;
+    }
+    const max = shipsAffordable(me.race, k, s.stock);
+    row.classList.toggle('affordable', max >= 1);
+    setHtml(document.querySelector(`[data-picost="${k}"]`), `${costText(SHIPS[me.race][k].cost)} · ${clock(shipDuration(me.race, k, 1, Math.max(1, yard)))}/u`);
+    document.querySelector(`[data-pinote="${k}"]`).textContent = [s.ships[k] ? `${s.ships[k]} à quai` : '', `jusqu’à ${max}`].filter(Boolean).join(' · ');
+    for (const btn of row.querySelectorAll('[data-pi-ship]')) {
+      const n = btn.dataset.n === 'max' ? max : Number(btn.dataset.n);
+      btn.disabled = !canBuildShips(me, s, k, n);
+      if (btn.dataset.n === 'max') btn.textContent = max ? `×${max}` : 'Max';
+    }
+  }
+  if (yard && !busy && !SHIP_KEYS.some((k) => shipUnlocked(me.race, k, s.tech))) {
+    $('pi-yard-hint').textContent = 'Aucun vaisseau recherché pour l’instant : lance une recherche.';
+    $('pi-yard-hint').hidden = false;
+  }
+  $('btn-pi-takeoff').hidden = !countShips(s.ships);
+  $('btn-pi-takeoff').dataset.key = pl.key;
+}
+
+$('pi-ships').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-pi-ship]');
+  const key = $('btn-open-planet').dataset.key;
+  if (!btn || btn.disabled || !session?.state) return;
+  const me = session.state.players[session.me];
+  const pl = session.planetOf(me, key);
+  if (!pl) return;
+  const n = btn.dataset.n === 'max' ? shipsAffordable(me.race, btn.dataset.piShip, stateAt(pl.planet, session.now()).stock) : Number(btn.dataset.n);
+  session.buildShips(btn.dataset.piShip, n, key);
+});
+$('btn-pi-takeoff').onclick = (e) => {
+  const key = e.currentTarget.dataset.key || 'home';
+  selected = null; // la fiche de la planète se ferme, le formulaire de décollage prend sa place
+  renderPick();
+  openFleetSheet(key);
+};
 
 /** Ferme la fiche de la planète : bouton Fermer, ou toucher le fond sombre autour. */
 function closePlanetSheet() {
