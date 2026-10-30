@@ -261,7 +261,8 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 
 | Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
 |---|---|---|---|---|---|
-| 10:40 (non confirmé) | `359242b9` | « Notion de rapidite de flotte avec le vaiseau le plus lent » | La règle existait déjà (`fleetSpeed`) ; ajout de `slowestShip`, affichage de la vitesse et du vaisseau le plus lent au décollage et dans la fiche de flotte, test dédié, cache v53 | (ce commit) | D-098 |
+| 10:40 (non confirmé) | `359242b9` | « Notion de rapidite de flotte avec le vaiseau le plus lent » | La règle existait déjà (`fleetSpeed`) ; ajout de `slowestShip`, affichage de la vitesse et du vaisseau le plus lent au décollage et dans la fiche de flotte, test dédié, cache v53 | `aaabe49` | D-098 |
+| 11:30:15 | `359242b9` | [Bouton] « Créer la PR » | Pull request vers `main` | (cette PR) | — |
 
 ### Travaux en cours au 2026-10-29
 
