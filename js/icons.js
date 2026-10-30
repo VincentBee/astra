@@ -31,6 +31,7 @@ const PATHS = {
   planet: 'M12 5a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM2.5 16.5c1.5 2 19-5.5 19-9.5',
   power: 'M12 3l2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2z',
   check: 'M5 12l5 5 9-10',
+  alert: 'M12 3 2 20h20zM12 10v4.5M12 17v.5',
   invite: 'M9 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 20c0-3.9 3.1-7 7-7s7 3.1 7 7M19 8v6M16 11h6',
   trophy: 'M8 4h8v5a4 4 0 0 1-8 0zM8 6H4.5v1A3.5 3.5 0 0 0 8 10.5M16 6h3.5v1a3.5 3.5 0 0 1-3.5 3.5M12 13v4M9 17h6v3H9z',
   // Vaisseaux, par type (SHIP_KEYS)

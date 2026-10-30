@@ -66,7 +66,7 @@ Quatre **écrans** (`<section class="screen">`), un seul visible à la fois via 
 
 | Élément (`index.html`) | Ce qu'on y voit | Fonctions de `js/app.js` |
 |---|---|---|
-| `#screen-home` (19-38) | Titre, historique des parties (`#saved`/`#games`), champ Nom, **Créer**, **Rejoindre**, note `#home-note`, liste **Fond** (`#sky-home`, D-111). | `showSaved` 153-172 (liste), clic sur la liste 174-190 (Reprendre → `Session.resume` ; Revoir → `replay.html` ; Oublier → `forgetGame`), `btn-create` 194-201, `btn-join` 203-206, `playerName` 89-100, `boot` 1935-1957. |
+| `#screen-home` (19-38) | Titre, historique des parties (`#saved`/`#games`), champ Nom, **Créer**, **Rejoindre**, note `#home-note`, liste **Fond** (`#sky-home`, D-112). | `showSaved` 153-172 (liste), clic sur la liste 174-190 (Reprendre → `Session.resume` ; Revoir → `replay.html` ; Oublier → `forgetGame`), `btn-create` 194-201, `btn-join` 203-206, `playerName` 89-100, `boot` 1935-1957. |
 | `#screen-join` (41-67) | Étape 1 : scanner ou coller l'invitation. Étape 2 : QR de la réponse, copier/partager, statut. `#join-error`. | `startJoin` 212-219, `useOffer` 236-258, `onSessionChange` 263-283, scanner 226-232. |
 | `#screen-race` (70-80) | 3 boutons de race (radiogroup), fiche de la race choisie, bouton Commencer/Rejoindre, ce qu'ont choisi les autres. | `showRace` 385-395, `updateRacePick` 398-410, `renderRaceOthers` 413-419, `btn-race` 428-432. |
 | `#screen-game` (83-200) | La partie. Deux **vues** : la carte (`#view-universe`) ou une planète (`#view-planet`). | `startGame` 436-447, `stopGame` 449-455, `showView` 1217-1229. |
@@ -98,7 +98,7 @@ Toutes se ferment par leur croix (`.close-btn`), un toucher sur le fond sombre o
 
 | Fenêtre | Ouverte par | Contenu / action | Code |
 |---|---|---|---|
-| `#sheet-players` (`index.html:203-216`) | `#net` | Détail réseau, **Inviter un joueur**, classement (`#players`), liste **Fond** (`#sky-game`, D-111). | 319-327 ; liste `renderState` 765-779 ; lignes `renderLive` 835-865 (score, `style.order` pour trier sans redessiner, 864). |
+| `#sheet-players` (`index.html:203-216`) | `#net` | Détail réseau, **Inviter un joueur**, classement (`#players`), liste **Fond** (`#sky-game`, D-112). | 319-327 ; liste `renderState` 765-779 ; lignes `renderLive` 835-865 (score, `style.order` pour trier sans redessiner, 864). |
 | `#sheet-invite` (219-248) | **Inviter un joueur** | QR de l'invitation + copier/partager ; scanner ou coller la réponse. | `openInviteSheet` 297-312, `useAnswer` 341-363, fermeture → `session.cancelInvite()` 328-331. |
 | `#sheet-fleet` (251-275) | **Décoller** (onglet Flottes) | Nombre de vaisseaux, cargaison, carburant ; calcule soutes, vitesse (et le vaisseau le plus lent, qui la fixe), réservoir, portée. | `openFleetSheet` 1147-1165, `updateFleetSheet` 1167-1180, `btn-fleet-go` 1185-1196. |
 | `#sheet-move` (278-295) | « Donner » (`#fi-beside`) ou **Scinder** | Vaisseaux, cargaison, carburant à passer à une autre flotte ou à une nouvelle. | `openMoveSheet` 1838-1860, `btn-move-go` 1864-1873. |
@@ -265,7 +265,7 @@ Le fichier est **en couches** : les sections de la fin redéfinissent celles du 
 - **Ressources et races** (`js/game.js:31-52`) : `resIcon(r, nom)` (cristal, feuille, éclair, buste ; classe `.ri ri-<r>` colorée par la variable de la ressource) et `raceIcon(r)` (casque, robot, alien ; classe `.rci`). Contrairement à `ic`, elles sont nommées (`role="img"`, `<title>`) pour les lecteurs d'écran.
 - **`js/sky.js`** : `drawSun(ctx, sun, cell)` ; disque en dégradé blanc → jaune → orange qui remplit son carré de `sun.size` cases, halo qui déborde (1,7 × le rayon). Position donnée par `sunFor(gid)` de `game.js` (voir `regles.md` pour l'effet du soleil sur le climat).
 - **`js/galaxy.js`** : `startGalaxy()` crée `div.galaxy` (fixe, `z-index: -1`) avec 3 couches d'étoiles (260/90/28 étoiles pour 400 × 800 px, densité constante), dessinées une fois en canvas puis posées en image de fond répétée (tuile = taille de l'écran). Graine fixe (`rng`) : le même ciel à chaque ouverture. 45 % des étoiles suivent une bande diagonale (« Voie lactée »). Parallaxe : défilement, souris, et inclinaison du téléphone (`devicemotion`, position de repos qui s'adapte ; permission demandée au premier toucher sur iPhone). Redessiné 150 ms après un redimensionnement. Sous les couches, la nébuleuse est un dégradé CSS du `body` (`style.css:589-596`). Chargé seulement par `index.html`.
-  - **Réglage « Fond »** (D-111) : `skyMode()` lit `localStorage['astra.sky']` (`anime` par défaut, `fixe`, `aucun`) ; `setSkyMode(m)` le garde et refait le fond tout de suite (l'ancien fond et ses écouteurs sont retirés par un `AbortController`). Les deux `select[data-sky]` (accueil, fenêtre Joueurs) sont branchés dans `app.js` et restent d'accord. `fixe` (ou « réduire les animations ») : `div.galaxy.still`, une seule image de la taille de l'écran avec les 3 couches, sans `will-change` ni capteurs. `aucun` : pas de `div.galaxy`, seul le dégradé reste. En animé, la translation est arrondie au pixel de l'écran et n'est écrite que si elle change.
+  - **Réglage « Fond »** (D-112) : `skyMode()` lit `localStorage['astra.sky']` (`anime` par défaut, `fixe`, `aucun`) ; `setSkyMode(m)` le garde et refait le fond tout de suite (l'ancien fond et ses écouteurs sont retirés par un `AbortController`). Les deux `select[data-sky]` (accueil, fenêtre Joueurs) sont branchés dans `app.js` et restent d'accord. `fixe` (ou « réduire les animations ») : `div.galaxy.still`, une seule image de la taille de l'écran avec les 3 couches, sans `will-change` ni capteurs. `aucun` : pas de `div.galaxy`, seul le dégradé reste. En animé, la translation est arrondie au pixel de l'écran et n'est écrite que si elle change.
   - **Coût mesuré** le 2026-10-30 (Chrome, 390 × 844, densité 3, processeur × 4) : animé = 3 calques de 2 × 2 écrans (≈ 142 Mo de surface, estimation), 3 images de 12 Mo, 103 ms de dessin, jusqu'à 180 écritures de style/s quand le téléphone bouge (≈ 120/s après l'arrondi) ; fixe = 1 image de 12 Mo, 38 ms, 0 ensuite ; aucun = 0. Effet réel sur la batterie : non confirmé.
 - **`icons/`** : favicon SVG et icônes PWA 192/512, cités par `index.html:11-12`, `manifest.json` et la liste de cache de `sw.js`.
 
@@ -364,3 +364,29 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
 - Style : `.plan`, `.plan-item` (bloqué : `.blocked`, heure en orange), fin de `style.css`.
 - Vérifié dans le navigateur (vue mobile 375 × 812, 2026-10-30) : ajout de 3 bâtiments, lancement
   automatique de la mine à l'heure annoncée, retrait par ×, rattrapage après rechargement.
+
+## 14. Alertes et diagnostic des planètes (2026-10-30, D-111)
+
+- `renderAlerts(me, now)`, appelé par `renderLive`, calcule `planetAlerts` sur
+  `session.livePlanets(me, now)` et range le résultat dans `alertsNow` (case « x:y » → planète et
+  problèmes). `drawMap` ne fait que lire `alertsNow` (`drawAlertDot`) : pas de `stateAt` à chaque
+  image.
+- **Pastille** sur mes planètes (et astéroïdes, comètes) de la carte : rouge qui pulse si
+  pénurie, orange si un stock vital baisse.
+- **Toast** à l'apparition d'un problème (`alertsSeen` : clé planète + ressource + type, oubliée
+  après 10 s d'absence). Les toasts passent à la file (D-110) : à la reprise, l'alerte et
+  « Partie reprise. » s'affichent l'un après l'autre.
+- **Bandeau** `#alert-line` (sous `#race`) : « Famine sur X · Panne d'énergie sur Y », pénuries
+  seulement, caché sinon.
+- **Icône** `#alerts-btn` (triangle `alert` de `js/icons.js`, nombre de problèmes) : grise si tout
+  va bien, orange, rouge si pénurie. `showView` la range entre `#btn-journal` et `#net` (à droite de `.map-head`, ou
+  dans `.planet-head`) et met `#alerts-panel` en fin de cette ligne (pleine largeur, `flex-wrap`).
+  Sur la carte, la liste couvre toutes mes planètes et le nom de chacune ouvre sa vue
+  (`[data-alert-go]`) ; sur une planète, seulement celle-ci. Temps « vide dans N min » arrondi à
+  la minute, pour que la liste ne soit pas réécrite sous le doigt.
+- Style : fin de `style.css` (`.alert-line`, `.alerts-btn`, `.alerts-panel`, `.alerts-list`).
+- Vérifié dans le navigateur (375 × 812, 2026-10-30), humains, ferme à 0 et stock vidé à la
+  main : toast « Famine sur Orion », bandeau, icône rouge « 1 », pastille, liste, toucher du nom →
+  vue planète avec la seule liste de la planète ; ferme remise → bandeau caché, icône orange
+  « Énergie en baisse · vide dans 2 min ». **Pas vérifié** : aliens et machines dans le
+  navigateur (couverts par les tests), plusieurs colonies à la fois.

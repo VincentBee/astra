@@ -509,7 +509,7 @@ Aucune conversation ne les prouve.
 
 **D-068 — Accéléromètre sur iPhone**
 - 2026-10-28 22:17. Choix : autorisation « Mouvement » au premier tap ; position de repos qui
-  s'adapte ; mouvement lissé ; fond fixe si « réduire les animations » (modifiée par D-111 :
+  s'adapte ; mouvement lissé ; fond fixe si « réduire les animations » (modifiée par D-112 :
   ce fond fixe est désormais une seule image, et chacun peut le choisir).
 - Qui : Claude (défaut). Testé avec des événements simulés seulement (**non confirmé** sur un vrai
   iPhone). Source : `f4afbcd0` 22:15:08, 22:17:00. Statut : en vigueur.
@@ -1015,8 +1015,29 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   navigateur (seulement la reprise d'une partie).
 - Qui : Vincent (demande), Claude (méthode). Source : session `caf0e31a`. Statut : en vigueur.
 - Tests : `tests/journal.test.mjs`.
+**D-111 — Alertes de famine et de panne d'énergie, et diagnostic des planètes**
+- 2026-10-30 14:11. Contexte : point 1.6 de la recette (`a-humain-01`, `a-alien-10`) : une
+  colonie qui meurt de faim ou manque d'énergie ne prévient pas, sauf si l'on est sur son écran.
+  Vincent ajoute une icône de diagnostic sur la carte (toutes les planètes, qui déroule les
+  problèmes au toucher) et la même sur la planète (cette planète seulement).
+- Choix : `planetAlerts(race, stateAt(...))` (`js/game.js`) donne, pour la nourriture et
+  l'énergie que la race utilise, une **pénurie** (`effF` ou `effE` < 1 : famine, panne) ou une
+  **baisse** (solde < −0,5 par heure de jeu, le seuil déjà utilisé par les tuiles, avec le temps
+  avant d'être vide). Sur mes planètes vivantes : pastille sur la carte, toast à l'apparition,
+  ligne dans un bandeau `#alert-line`, icône `#alerts-btn` qui suit le compteur de joueurs.
+- Choix de Claude, par défaut : pastille **rouge** pour une pénurie, **orange** pour une baisse
+  (un solde négatif avec un entrepôt plein est courant, ce serait du bruit en rouge) ; la ligne
+  du bandeau ne montre que les pénuries, de tout l'empire, dans les deux vues ; les minéraux ne
+  sont jamais vitaux ; le toast n'annonce que ce qui apparaît, un problème parti depuis moins de
+  10 s ne se réannonce pas ; à la reprise d'une partie, les problèmes déjà là sont annoncés une
+  fois (c'est la plainte d'origine) ; dans la liste de la carte, le nom de la planète ouvre sa vue.
+- Alternatives écartées : tout en rouge ; un toast à chaque passage (répète sans fin) ; une
+  ligne dans le bandeau du froid `#race` (caché dans les parties d'avant la course).
+- Qui : Vincent (demande, icône), Claude (seuils, couleurs, détails). Source : session
+  `b4653aec`. Statut : en vigueur.
+- Tests : `tests/alerts.test.mjs`.
 
-**D-111 — Réglage « Fond » : étoiles animées, fixes ou absentes**
+**D-112 — Réglage « Fond » : étoiles animées, fixes ou absentes**
 - 2026-10-30. Contexte : Vincent demande d'estimer ce que coûte la parallaxe et de pouvoir la
   retirer. Mesure (Chrome, téléphone simulé 390 × 844, densité 3, processeur ralenti × 4) : en
   animé, 3 calques de 2 × 2 écrans ≈ 142 Mo de surface de calque (estimation : la part
@@ -1035,7 +1056,7 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Qui : Claude (défaut : animé reste le défaut, 3 choix). Source : session `0a3a42f6`.
 - Statut : en vigueur. Effet sur la batterie d'un vrai téléphone : **non confirmé**.
 
-**D-112 — Cache `astra-p2p-v62`**
+**D-113 — Cache `astra-p2p-v63`**
 - 2026-10-30. Choix de Claude : `index.html`, `style.css`, `js/app.js` et `js/galaxy.js`
   changent ; nouvelle version de cache pour que les téléphones les récupèrent.
 - Statut : en vigueur.
