@@ -958,3 +958,20 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 | D-025 | hist-c D-C29 | D-052 | hist-a D-B1 | D-079 | demande du 29/10 (coordinateur) |
 | D-026 | hist-c D-C10 | D-053 | hist-a D-B2 | D-080 | plan `1df29e6e` |
 | D-027 | hist-c D-C11 | D-054 | hist-a D-B3 | D-081 | verif (fuseaux) |
+
+**D-109 — Combats de flottes quand aucun téléphone ne regarde**
+- 2026-10-30 11:25. Contexte : question « Si tous les joueurs sont hors ligne au moment du contact
+  des flottes, comment cela se passe-t-il ? » ; réponse : le contact n'était regardé qu'à l'heure
+  du passage, donc un croisement de flottes agressives était perdu, et une poursuite finissait en
+  « cible perdue de vue ». Puis « Oui, corrige ».
+- Choix : à chaque passage, chercher sur le trajet depuis le passage précédent le premier instant
+  où deux flottes entrent au contact (`firstContact`, calcul exact) et livrer le combat daté de cet
+  instant, si la cible était visible alors. Fenêtre notée dans le journal d'ordres pour le rejeu.
+- Choix de Claude, par défaut : seulement l'entrée au contact (un contact en cours a été vu) ; pas
+  de recherche avant le segment actuel de chaque flotte (l'ancien n'est plus connu) ; au lancement,
+  la fenêtre part de la dernière modification de ma fiche ; les pertes de la cible restent
+  appliquées par son téléphone à la lecture du rapport, comme avant.
+- Alternatives écartées : regarder à pas fixes sur l'absence (rate les croisements rapides, coûte
+  cher après des heures) ; garder l'historique des segments de chaque flotte (fiches plus lourdes).
+- Qui : Vincent (corriger), Claude (méthode). Source : session `e67321a7`. Statut : en vigueur.
+- Tests : `tests/fleet.test.mjs`, section « Rencontres que personne n'a regardées ».

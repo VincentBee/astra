@@ -545,8 +545,20 @@ Une flotte qui attend la réponse à un échange est **bloquée** (`locked`,
 - Deux flottes agressives qui se croisent livrent le même combat chacune de leur côté : comme
   pour la poursuite mutuelle, les pertes ne comptent qu'une fois (`sim`, `ack`, `engaged`).
 - Une fois les rapports lus, si les deux flottes sont encore au contact, le combat recommence.
-- Non confirmé : contact regardé seulement à l'heure du passage (comme `pursue`) ; un téléphone
-  en arrière-plan peut manquer un croisement rapide.
+- **Rencontres que personne n'a regardées** (D-109) : un téléphone hors ligne ou en arrière-plan
+  ne passe pas au bon moment. À chaque `tick`, `engage` et `pursue` cherchent aussi, depuis le
+  passage précédent (`scanAt`, en mémoire ; au lancement, `actAt` de ma fiche), le premier instant
+  où ma flotte **entre** au contact d'une flotte ennemie (`firstContact`, `js/fleet.js` : calcul
+  exact sur les deux segments, distance sans diagonale). Si la cible était visible à cet instant,
+  le combat a lieu **daté de la rencontre** (`fight(…, t)`), puis la flotte reprend sa route
+  (agressive) ou s'arrête là (poursuite). Le passage suivant repart de ce combat, pour trouver une
+  autre rencontre plus tard dans la même absence. La fenêtre est notée dans le journal d'ordres
+  (`from` de l'entrée `tick`) : le rejeu cherche sur la même.
+- Limites : un contact déjà en cours au début de la fenêtre ne compte pas (il a été vu) ; avant le
+  départ du segment actuel d'une flotte, on ne sait pas où elle était (l'ancien segment est
+  remplacé), donc une rencontre faite avant un changement de cap de la cible est perdue ; la
+  vue à l'instant de la rencontre compte mes flottes à leur position de ce moment-là sur leur
+  segment actuel.
 
 ### 9.4 Appliquer les dégâts reçus (`applyEffects`, `js/session.js:1697-1739`)
 
@@ -769,7 +781,7 @@ Résultat : `tests 34, pass 34, fail 0`, environ 5,6 s (le rejeu d'une partie de
 | `tests/rules.test.mjs` | 11 | Déconstruire (moitié du prix rendue, place libérée à la fin) ; heure qui recule puis revient : pas de double production ; longue absence ≈ passages toutes les heures (population à moins de 2 %) ; arrachement refusé sans payer ; clés héritées (`constructor`, `__proto__`) refusées ; effectifs négatifs ou fractionnaires au combat ; soleil au centre et sans planète ; climat et production ; une place par niveau ; places lues sur la carte ; une colonie humaine sur le plus petit corps garde des places |
 | `tests/combat.test.mjs` | 4 | Attaques contre une planète : pas de butin créé avec un défenseur hors ligne ou plusieurs flottes arrivées ensemble ; 70 attaques avant le retour du défenseur ; les vaisseaux perdus emportent leur cargaison |
 | `tests/effects.test.mjs` | 1 | 5 joueurs, 4 attaquants × 70 combats : chaque perte subie une fois, puis rapports oubliés des deux côtés |
-| `tests/fleet.test.mjs` | 13 | Deux flottes sur la même cible ; poursuite mutuelle ; colonie qui encaisse les pertes ; premier arrivé à la colonisation ; plein en panne tout près ; plusieurs attaquants ne pillent pas plus que le stock ; revanche ; raids sans armes et un pillage par 2 min ; flotte agressive qui combat puis reprend sa route ; flotte passive qui croise sans combattre ; agressive à l'arrêt qui garde sa case ; deux agressives : pertes comptées une fois ; agressive refusée sans armes, vue par les autres, gardée à la fusion (D-100) |
+| `tests/fleet.test.mjs` | 20 | Deux flottes sur la même cible ; poursuite mutuelle ; colonie qui encaisse les pertes ; premier arrivé à la colonisation ; plein en panne tout près ; plusieurs attaquants ne pillent pas plus que le stock ; revanche ; raids sans armes et un pillage par 2 min ; flotte agressive qui combat puis reprend sa route ; flotte passive qui croise sans combattre ; agressive à l'arrêt qui garde sa case ; deux agressives : pertes comptées une fois ; agressive refusée sans armes, vue par les autres, gardée à la fusion (D-100) ; vitesse du vaisseau le plus lent ; rencontres que personne n'a regardées : `firstContact`, agressive et poursuite hors ligne, pas de combat rejoué, pertes comptées une fois (D-109) |
 | `tests/colony.test.mjs` | 1 | Colonie perdue au recollage : vaisseaux et cargaison restent en orbite |
 | `tests/hostile.test.mjs` | 6 | Pair malveillant ou fiche abîmée : personne ne réécrit ma fiche ni un secret, ni ne date sa fiche loin dans le futur ; fiche abîmée sans plantage ; race ou identifiant spécial ; installation antidatée ; heure qui recule ; téléphone en avance reste visible. Une partie de ces tests passe par l'acceptation des fiches (mécanisme décrit dans reseau.md) |
 | `tests/replay.test.mjs` | 4 | Une partie de robots (construire, chercher, armer, décoller, attaquer, échanger) rejouée retombe sur les mêmes fiches ; partie coupée en deux puis recollée ; journal tronqué signalé ; copie pas à jour signalée |
