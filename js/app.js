@@ -5,7 +5,7 @@ import { scanQr } from './scanner.js';
 import {
   RACES, RACE_KEYS, RES_INFO, resIcon, raceIcon, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
   powerReadyAt, powerCost, liftGain, fmt, UNIVERSE, SOIL, sameCell, sunFor, climateName, kindLabel, usedPlaces, TEMPO, frostLine, planForecast, PLAN_MAX,
-  shipsAffordable,
+  shipsAffordable, planetAlerts,
 } from './game.js';
 import { drawSun } from './sky.js';
 import { ic, fillIcons } from './icons.js';
@@ -457,6 +457,7 @@ function startGame() {
   show('game');
   buildStatic();
   selected = null;
+  alertsSeen = new Map();
   showView('map');
   // Le rafraîchissement d'abord : un premier rendu qui échouerait ne doit pas figer l'écran.
   clearInterval(liveTimer);
@@ -929,6 +930,7 @@ function renderLive() {
   const me = st.players[session.me];
   const now = session.now();
   renderRace(now);
+  renderAlerts(me, now);
 
   {
     const online = session.peerCount;
@@ -1033,6 +1035,88 @@ function renderRace(now) {
   }
   el.classList.toggle('hot', hot);
   setHtml($('race-text'), html);
+}
+
+// Diagnostic des planètes : famine, panne d'énergie, stock vital qui baisse (D-111).
+let alertsNow = new Map(); // case « x:y » → { key, name, cell, list } : mes planètes à problème
+let alertsSeen = new Map(); // problème déjà annoncé → dernière fois vu (évite de répéter le toast)
+const cellKey = (c) => `${Math.round(c.x)}:${Math.round(c.y)}`;
+const ALERT_NAMES = {
+  short: { food: 'Famine', energy: 'Panne d’énergie' },
+  deficit: { food: 'Nourriture en baisse', energy: 'Énergie en baisse' },
+};
+function alertText(a) {
+  if (a.kind === 'short') return `${ALERT_NAMES.short[a.res]} · besoins couverts à ${Math.floor(a.eff * 100)} %`;
+  const min = Math.ceil(a.left / 60_000);
+  return `${ALERT_NAMES.deficit[a.res]} · vide dans ${min > 1 ? `${min} min` : 'moins d’une minute'}`;
+}
+
+/** Pastille sur la carte, toast à l'apparition, ligne dans le bandeau, icône et sa liste. */
+function renderAlerts(me, now) {
+  const all = new Map();
+  if (me?.planet && !me.out) {
+    for (const pl of session.livePlanets(me, now)) {
+      const list = planetAlerts(me.race, stateAt(pl.planet, now));
+      if (list.length) all.set(cellKey(pl.cell), { ...pl, list });
+    }
+  }
+  alertsNow = all;
+
+  // Toast : seulement ce qui vient d'apparaître. Un problème parti depuis moins de 10 s ne se réannonce pas.
+  const fresh = [];
+  for (const a of all.values()) {
+    for (const x of a.list) {
+      const k = `${a.key}:${x.res}:${x.kind}`;
+      if (!alertsSeen.has(k)) fresh.push(`${ALERT_NAMES[x.kind][x.res]} sur ${a.name}`);
+      alertsSeen.set(k, now);
+    }
+  }
+  for (const [k, t] of alertsSeen) if (now - t > 10_000) alertsSeen.delete(k);
+  if (fresh.length) toast(fresh.join(' · '));
+
+  // Bandeau : une ligne pour les pénuries, sur tout l'empire, quelle que soit la vue.
+  const shorts = [...all.values()].flatMap((a) => a.list.filter((x) => x.kind === 'short').map((x) => `<strong>${ALERT_NAMES.short[x.res]}</strong> sur ${esc(a.name)}`));
+  $('alert-line').hidden = !shorts.length;
+  setHtml($('alert-text'), shorts.join(' · '));
+
+  // Icône : toutes mes planètes sur la carte, seulement celle ouverte sur sa vue.
+  const onPlanet = currentView === 'planet';
+  const scope = [...all.values()].filter((a) => !onPlanet || a.key === openKey);
+  const n = scope.reduce((t, a) => t + a.list.length, 0);
+  const bad = scope.some((a) => a.list.some((x) => x.kind === 'short'));
+  const btn = $('alerts-btn');
+  btn.hidden = !me?.planet;
+  btn.classList.toggle('bad', bad);
+  btn.classList.toggle('warn', !bad && n > 0);
+  $('alerts-count').textContent = n || '';
+  const label = `${onPlanet ? 'Diagnostic de cette planète' : 'Diagnostic de toutes mes planètes'} : ${n ? `${n} problème${n > 1 ? 's' : ''}` : 'tout va bien'}`;
+  if (btn.title !== label) {
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+  }
+  if ($('alerts-panel').hidden) return;
+  const rows = scope.flatMap((a) =>
+    a.list.map(
+      (x) =>
+        `<li class="${x.kind}">${onPlanet ? '' : `<button class="ghost small" data-alert-go="${esc(a.key)}">${esc(a.name)}</button>`}<span>${alertText(x)}</span></li>`,
+    ),
+  );
+  setHtml($('alerts-list'), rows.join('') || `<li class="ok"><span>Tout va bien : nourriture et énergie couvertes${onPlanet ? '' : ' sur toutes tes planètes'}.</span></li>`);
+}
+
+/** Petit rond sur une de mes planètes à problème : rouge si pénurie, orange si le stock baisse. */
+function drawAlertDot(ctx, w, cx, cy, cell, pulse) {
+  const a = alertsNow.get(cellKey(w));
+  if (!a) return;
+  const short = a.list[0].kind === 'short';
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = short ? '#ff6b7a' : '#ffb36b';
+  ctx.strokeStyle = '#05070f';
+  ctx.lineWidth = Math.max(1, cell * 0.04);
+  ctx.beginPath();
+  ctx.arc(cx + cell * 0.4, cy - cell * 0.32, cell * (short ? 0.2 + 0.04 * pulse : 0.17), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
 }
 
 /** La planète ouverte (mère ou colonie) : ressources, population, chantiers, recherche, flottes. */
@@ -1463,7 +1547,10 @@ function showView(view, key = openKey) {
   $('view-universe').hidden = view !== 'map';
   $('view-planet').hidden = view !== 'planet';
   // Pas de barre du haut : le compteur de joueurs se range à droite de la première ligne de l'écran.
-  (view === 'map' ? document.querySelector('.map-head .pi-head-right') : document.querySelector('.planet-head')).append($('btn-journal'), $('net'));
+  // L'icône de diagnostic le suit, et sa liste se déplie sous cette même ligne.
+  const head = document.querySelector(view === 'map' ? '.map-head' : '.planet-head');
+  (view === 'map' ? head.querySelector('.pi-head-right') : head).append($('btn-journal'), $('alerts-btn'), $('net'));
+  head.append($('alerts-panel'));
   window.scrollTo(0, 0);
   if (view === 'map') {
     if (!mapFrame) mapFrame = requestAnimationFrame(drawMap);
@@ -1514,6 +1601,20 @@ $('btn-map-help').onclick = (e) => {
 };
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.help-wrap')) $('btn-map-help').setAttribute('aria-expanded', 'false');
+});
+$('alerts-btn').onclick = () => {
+  const open = $('alerts-panel').hidden;
+  $('alerts-panel').hidden = !open;
+  $('alerts-btn').setAttribute('aria-expanded', String(open));
+  delete $('alerts-list').dataset.html; // réécrire la liste tout de suite
+  renderLive();
+};
+$('alerts-list').addEventListener('click', (e) => {
+  const go = e.target.closest('[data-alert-go]');
+  if (!go) return;
+  selected = null;
+  renderPick();
+  showView('planet', go.dataset.alertGo);
 });
 $('btn-open-planet').onclick = (e) => {
   selected = null; // sinon la fiche se rouvrirait au retour sur la carte
@@ -1692,6 +1793,7 @@ function drawMap() {
         ctx.arc(cx, cy, cell * 0.4, 0, Math.PI * 2);
         ctx.stroke();
       }
+      if (mine) drawAlertDot(ctx, w, cx, cy, cell, pulse);
       continue;
     }
     ctx.beginPath();
@@ -1721,6 +1823,7 @@ function drawMap() {
       const label = o.name.length > 8 ? o.name.slice(0, 7) + '…' : o.name;
       ctx.fillText(label, cx, Math.max(cell * 0.4, cy - cell * 0.5));
     }
+    if (mine) drawAlertDot(ctx, w, cx, cy, cell, pulse);
   }
   ctx.globalAlpha = 1;
 

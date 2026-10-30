@@ -1014,3 +1014,24 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   navigateur (seulement la reprise d'une partie).
 - Qui : Vincent (demande), Claude (méthode). Source : session `caf0e31a`. Statut : en vigueur.
 - Tests : `tests/journal.test.mjs`.
+**D-111 — Alertes de famine et de panne d'énergie, et diagnostic des planètes**
+- 2026-10-30 14:11. Contexte : point 1.6 de la recette (`a-humain-01`, `a-alien-10`) : une
+  colonie qui meurt de faim ou manque d'énergie ne prévient pas, sauf si l'on est sur son écran.
+  Vincent ajoute une icône de diagnostic sur la carte (toutes les planètes, qui déroule les
+  problèmes au toucher) et la même sur la planète (cette planète seulement).
+- Choix : `planetAlerts(race, stateAt(...))` (`js/game.js`) donne, pour la nourriture et
+  l'énergie que la race utilise, une **pénurie** (`effF` ou `effE` < 1 : famine, panne) ou une
+  **baisse** (solde < −0,5 par heure de jeu, le seuil déjà utilisé par les tuiles, avec le temps
+  avant d'être vide). Sur mes planètes vivantes : pastille sur la carte, toast à l'apparition,
+  ligne dans un bandeau `#alert-line`, icône `#alerts-btn` qui suit le compteur de joueurs.
+- Choix de Claude, par défaut : pastille **rouge** pour une pénurie, **orange** pour une baisse
+  (un solde négatif avec un entrepôt plein est courant, ce serait du bruit en rouge) ; la ligne
+  du bandeau ne montre que les pénuries, de tout l'empire, dans les deux vues ; les minéraux ne
+  sont jamais vitaux ; le toast n'annonce que ce qui apparaît, un problème parti depuis moins de
+  10 s ne se réannonce pas ; à la reprise d'une partie, les problèmes déjà là sont annoncés une
+  fois (c'est la plainte d'origine) ; dans la liste de la carte, le nom de la planète ouvre sa vue.
+- Alternatives écartées : tout en rouge ; un toast à chaque passage (répète sans fin) ; une
+  ligne dans le bandeau du froid `#race` (caché dans les parties d'avant la course).
+- Qui : Vincent (demande, icône), Claude (seuils, couleurs, détails). Source : session
+  `b4653aec`. Statut : en vigueur.
+- Tests : `tests/alerts.test.mjs`.
