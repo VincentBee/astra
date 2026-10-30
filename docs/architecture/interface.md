@@ -54,7 +54,7 @@ Parcours qui marche avec l'interface actuelle (vérifié) :
 
 > Le pas à pas de `README.md:16-20` ne correspond plus aux libellés : « Créer une partie » est devenu « Créer », « Copier le lien » / « Copier la réponse » sont des boutons-icônes, « Il est à distance ? Colle la réponse reçue » est devenu « Coller une réponse », et l'invitation passe par le compteur de joueurs, pas par une icône « en haut à droite ».
 
-**Déboguer.** `window.astra.session` donne la session en cours dans la console (`js/app.js:45`). Le journal de la partie n'est pas affiché dans le jeu : chaque entrée est écrite une fois dans la console, `[Astra hh:mm:ss] texte` (`printLog`, `js/app.js:789-798`).
+**Déboguer.** `window.astra.session` donne la session en cours dans la console (`js/app.js:45`). Le journal partagé est aussi copié dans la console, chaque entrée une fois, `[Astra hh:mm:ss] texte` (`printLog`) ; dans le jeu, c'est la fenêtre Journal qui le montre (D-110).
 
 Les tests automatiques (`tests/*.test.mjs`) portent sur les règles et le réseau, pas sur l'interface : voir `regles.md` / `reseau.md`.
 
@@ -107,7 +107,9 @@ Toutes se ferment par leur croix (`.close-btn`), un toucher sur le fond sombre o
 ### 3.3 Couches fixes
 
 - `#scanner` (318-323) : caméra plein écran, `scan()` (`js/app.js:116-126`) appelle `scanQr` de `js/scanner.js` (voir `reseau.md`), **Annuler** abandonne via `AbortController`.
-- `#toast` (325) : message de 3,2 s, `toast()` (`js/app.js:60-66`). La session y écrit aussi via `session.ontoast`.
+- `#toast` : messages **à la file** (D-110), `toast(text, ms = 3200)` puis `nextToast()` : un à la fois, dans l'ordre ; 6 en attente au plus (les longs restent) ; un doublon de ce qui est affiché ou attend est ignoré ; d'autres attendent → au moins 2 s chacun. Appli cachée : ignoré. La session y écrit aussi via `session.ontoast` (« tu es éliminé » : 8 s).
+- `#btn-journal` (à gauche de `#net`, déplacé avec lui par `showView`) et `#sheet-journal` (D-110) : `openJournal(away)` montre « Combats et planètes » (le carnet `session.journal`, du plus récent au plus ancien ; bord vert gagné, rouge perdu ; ligne « Tes pertes · Ses pertes · Butin / Pillé » ; fond plus clair = pas encore lu), puis « Ce qui me concerne » (lignes du journal partagé qui contiennent mon nom, 20 au plus). Ouvrir marque tout lu (`session.markRead`). Pastille `#journal-count` = entrées non lues (mise à jour par `renderLive`).
+- Résumé « Pendant ton absence » : `showAbsence(gone)` ouvre la même fenêtre limitée au neuf si l'absence dépasse `AWAY_MS` (2 min) et qu'il y a du neuf. Appelé à la reprise d'une partie (absence = depuis `savedAt`, neuf = non lu) et 1 s après le retour au premier plan (`visibilitychange` ; neuf = noté depuis qu'elle a été cachée). Bouton « Tout le journal ».
 - Fond de galaxie : un `div.galaxy` inséré en tête de `<body>` par `startGalaxy()` (§7.4).
 
 ## 4. Le cycle de vie dans `app.js`
@@ -138,7 +140,7 @@ Toutes se ferment par leur croix (`.close-btn`), un toucher sur le fond sombre o
 | Rythme | Fonction | Ce qu'elle fait |
 |---|---|---|
 | Une fois par race | `buildStatic` (460-541) | Construit le HTML qui dépend de la race : tuiles de stocks, gisements, cartes de bâtiments, technologies, vaisseaux, pouvoirs. Refait si la race change (`builtFor`, 458 et 824). |
-| À chaque changement d'état (`session.onchange`) | `renderState` (753-783) | Identité, bandeau « Seul en ligne », liste des joueurs, journal en console, puis `renderLive`. |
+| À chaque changement d'état (`session.onchange`) | `renderState` (753-783) | Identité, bandeau « Seul en ligne », liste des joueurs, copie du journal en console, puis `renderLive`. |
 | 5 fois par seconde | `renderLive` (805-866) | Réseau, planète ouverte (`renderPlanet`), bandeau de choix (`renderPick`), fiche de flotte, échanges, avertissement de version (`session.outdated`, 830-833), lignes du classement. |
 | Chaque image (`requestAnimationFrame`) | `drawMap` (1349-1538) | La carte, seulement quand la vue carte est affichée (`showView` 1225-1227, `stopMap` 1231-1234). |
 
@@ -361,7 +363,7 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
 - Vérifié dans le navigateur (vue mobile 375 × 812, 2026-10-30) : ajout de 3 bâtiments, lancement
   automatique de la mine à l'heure annoncée, retrait par ×, rattrapage après rechargement.
 
-## 14. Alertes et diagnostic des planètes (2026-10-30, D-110)
+## 14. Alertes et diagnostic des planètes (2026-10-30, D-111)
 
 - `renderAlerts(me, now)`, appelé par `renderLive`, calcule `planetAlerts` sur
   `session.livePlanets(me, now)` et range le résultat dans `alertsNow` (case « x:y » → planète et
@@ -370,12 +372,12 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
 - **Pastille** sur mes planètes (et astéroïdes, comètes) de la carte : rouge qui pulse si
   pénurie, orange si un stock vital baisse.
 - **Toast** à l'apparition d'un problème (`alertsSeen` : clé planète + ressource + type, oubliée
-  après 10 s d'absence). À la reprise d'une partie, « Partie reprise. » est affiché avant le
-  premier rendu pour ne pas cacher l'alerte.
+  après 10 s d'absence). Les toasts passent à la file (D-110) : à la reprise, l'alerte et
+  « Partie reprise. » s'affichent l'un après l'autre.
 - **Bandeau** `#alert-line` (sous `#race`) : « Famine sur X · Panne d'énergie sur Y », pénuries
   seulement, caché sinon.
 - **Icône** `#alerts-btn` (triangle `alert` de `js/icons.js`, nombre de problèmes) : grise si tout
-  va bien, orange, rouge si pénurie. `showView` la range avec `#net` (à droite de `.map-head`, ou
+  va bien, orange, rouge si pénurie. `showView` la range entre `#btn-journal` et `#net` (à droite de `.map-head`, ou
   dans `.planet-head`) et met `#alerts-panel` en fin de cette ligne (pleine largeur, `flex-wrap`).
   Sur la carte, la liste couvre toutes mes planètes et le nom de chacune ouvre sa vue
   (`[data-alert-go]`) ; sur une planète, seulement celle-ci. Temps « vide dans N min » arrondi à
