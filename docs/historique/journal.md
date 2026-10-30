@@ -270,3 +270,4 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 |---|---|---|---|---|---|
 | 10:40 | `1d5bf2da` | « Sur la map, avoir la list des flottes ppur leur donner des ordres rapidement » | Rangée `#map-fleets` sous la carte : un bouton par flotte (nom, statut, compte à rebours) ; toucher la sélectionne, retoucher la relâche ; testé dans le navigateur (3 flottes, envoi sur une case) ; cache v53 | (ce commit) | D-098 |
 | 11:20 | `1d5bf2da` | « il faudrait plutôt une grille. Avec un bref récapitulatif du contenu de la flotte avec des icônes et le nombre de vaisseaux correspondants. » | `#map-fleets` devient une grille (2 colonnes sur téléphone) ; chaque case montre une icône par type de vaisseau et son nombre ; 4 icônes de vaisseaux ajoutées ; testé dans le navigateur | (ce commit) | D-099 |
+| 13:36 | `1d5bf2da` | [Bouton] « Oui, ouvre la PR » | Branche poussée, pull request ouverte avec capture et résultats des tests | (cette PR) | — |
