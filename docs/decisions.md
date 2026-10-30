@@ -718,6 +718,16 @@ Aucune conversation ne les prouve.
   `demolish`) ; un téléphone resté sur l'ancienne version est invité à recharger.
 - Statut : en vigueur.
 
+**D-098 — Vitesse de flotte = vaisseau le plus lent, affichée au joueur**
+- 2026-10-30 10:54. Demande : « Notion de rapidite de flotte avec le vaiseau le plus lent ».
+- Contexte : la règle existait déjà dans le code (`fleetSpeed`, héritée du portage, D-002), mais le
+  joueur ne voyait ni la vitesse de sa flotte ni le vaisseau qui la freine.
+- Choix : garder la règle ; l'afficher à l'écran de décollage (« Vitesse 7,0 cases/min, celle du
+  plus lent : Colonisateur ») et dans la fiche de flotte ; test dédié ; cache `astra-p2p-v53`.
+- Alternatives écartées : vitesse moyenne pondérée ; vaisseaux rapides qui partent devant
+  (la flotte se scinderait d'elle-même).
+- Qui : Vincent (demande), Claude (affichage, maintien de la règle). Statut : en vigueur.
+
 ---
 
 ## Annexe A — affirmations réfutées (retirées ou corrigées avant assemblage)

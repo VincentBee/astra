@@ -193,3 +193,18 @@ test('raids : pas d’attaque sans armes, et un seul pillage par planète toutes
   A.tick();
   assert.ok(looted() > once, 'un nouveau pillage après 2 min');
 });
+
+test('une flotte va à la vitesse de son vaisseau le plus lent', async () => {
+  const { fleetSpeed, slowestShip, tripMs } = await import('../js/fleet.js');
+  const mixed = { fighter: 5, colony: 1, cargo: 2 };
+  assert.equal(slowestShip('human', mixed, {}), 'colony');
+  assert.equal(fleetSpeed('human', mixed, {}), fleetSpeed('human', { colony: 1 }, {}));
+  assert.ok(fleetSpeed('human', mixed, {}) < fleetSpeed('human', { fighter: 5 }, {}));
+  // Un vaisseau à zéro exemplaire ne ralentit pas la flotte ; une flotte vide ne bouge pas.
+  assert.equal(slowestShip('human', { fighter: 5, colony: 0 }, {}), 'fighter');
+  assert.equal(slowestShip('human', {}, {}), null);
+  assert.equal(fleetSpeed('human', {}, {}), 0);
+  // Ajouter un seul vaisseau lent allonge tout le trajet.
+  const a = { x: 0, y: 0 }, b = { x: 12, y: 0 };
+  assert.ok(tripMs(a, b, fleetSpeed('human', mixed, {})) > tripMs(a, b, fleetSpeed('human', { fighter: 5 }, {})));
+});

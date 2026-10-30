@@ -80,7 +80,7 @@ Détail de `#screen-game` :
 | `#lost` (97-100) | Bandeau « Seul en ligne » + **Rejoindre** (rejoindre les autres par une nouvelle invitation). | `renderState` 762 (`session.alone`), `btn-rejoin` 286-289. |
 | `#view-universe` (102-148) | Vue carte : `#pick` (bandeau « Choisis ta planète »), `#trades` (offres d'échange), `.map-head` (coordonnées, aide `?`), `canvas#map`. | `drawMap` 1349-1538, `renderPick` 1876-1913, `renderTrades` 1777-1800. |
 | `#sheet-planet` (114-127) | Fiche de la planète touchée : nom, coordonnées, propriétaire, places, climat, gisements, **S'installer** ou **Bâtiments**. | `renderPick` 1876-1913, `btn-claim` 1922-1929, `btn-open-planet` 1275-1279, `closePlanetSheet` 1916-1920. |
-| `#fleet-info` (129-145) | Fiche de la flotte sélectionnée : vaisseaux, statut, carburant, choix d'ordres (`#fi-choice`), mes flottes à côté (`#fi-beside`), joueurs à côté (`#fi-partners`), boutons Arrêter / Rentrer / Se poser / Plein / Scinder / Fermer. | `renderFleetInfo` 1643-1687, handlers 1689-1714. |
+| `#fleet-info` (129-145) | Fiche de la flotte sélectionnée : vaisseaux, statut (avec la vitesse et, si la flotte mêle plusieurs types, le nom du plus lent : `speedText`), carburant, choix d'ordres (`#fi-choice`), mes flottes à côté (`#fi-beside`), joueurs à côté (`#fi-partners`), boutons Arrêter / Rentrer / Se poser / Plein / Scinder / Fermer. | `renderFleetInfo` 1643-1687, handlers 1689-1714. |
 | `#view-planet` (150-199) | Vue planète : en-tête (retour, nom, climat), gisements `#soil-zone`, stocks `#resources`, onglets, puis les panneaux `data-pane`. | `renderPlanet` 869-988. |
 | `.tabs` (163-168) | Onglets Bâtiments / Pouvoirs (aliens seulement) / Recherche (planète mère seulement) / Flottes. | `showTab` 1241-1252, flèches clavier 1255-1262. |
 | `[data-pane=power]` `#powers-zone` (170-173) | Pouvoirs aliens. | `buildStatic` 526-540, `renderPlanet` 966-982. |
@@ -99,7 +99,7 @@ Toutes se ferment par leur croix (`.close-btn`), un toucher sur le fond sombre o
 |---|---|---|---|
 | `#sheet-players` (`index.html:203-216`) | `#net` | Détail réseau, **Inviter un joueur**, classement (`#players`). | 319-327 ; liste `renderState` 765-779 ; lignes `renderLive` 835-865 (score, `style.order` pour trier sans redessiner, 864). |
 | `#sheet-invite` (219-248) | **Inviter un joueur** | QR de l'invitation + copier/partager ; scanner ou coller la réponse. | `openInviteSheet` 297-312, `useAnswer` 341-363, fermeture → `session.cancelInvite()` 328-331. |
-| `#sheet-fleet` (251-275) | **Décoller** (onglet Flottes) | Nombre de vaisseaux, cargaison, carburant ; calcule soutes, réservoir, portée. | `openFleetSheet` 1147-1165, `updateFleetSheet` 1167-1180, `btn-fleet-go` 1185-1196. |
+| `#sheet-fleet` (251-275) | **Décoller** (onglet Flottes) | Nombre de vaisseaux, cargaison, carburant ; calcule soutes, vitesse (et le vaisseau le plus lent, qui la fixe), réservoir, portée. | `openFleetSheet` 1147-1165, `updateFleetSheet` 1167-1180, `btn-fleet-go` 1185-1196. |
 | `#sheet-move` (278-295) | « Donner » (`#fi-beside`) ou **Scinder** | Vaisseaux, cargaison, carburant à passer à une autre flotte ou à une nouvelle. | `openMoveSheet` 1838-1860, `btn-move-go` 1864-1873. |
 | `#sheet-trade` (298-315) | Bouton échange d'un joueur sur la même case | « Je donne » / « Je demande ». | `openTradeSheet` 1746-1757, `btn-trade-go` 1768-1774. |
 

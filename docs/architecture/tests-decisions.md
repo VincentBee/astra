@@ -127,3 +127,4 @@ que fait le code.
 | D-095 | La défense compte contre le pillage et se répare | nouveau test | `end.test.mjs` trop peu de vaisseaux d'attaque : les tourelles tiennent, ni prise ni pillage |  |
 | D-096 | Déconstruire un bâtiment | nouveau test | `rules.test.mjs` déconstruire un niveau rend la moitié de son prix et libère sa place à la fin |  |
 | D-097 | `FORMAT` 8 et cache v52 | non testable |  | version de format et de cache |
+| D-098 | Vitesse de flotte = vaisseau le plus lent | testé | `tests/fleet.test.mjs` « une flotte va à la vitesse de son vaisseau le plus lent » | l'affichage (`speedText`) n'est pas testé |

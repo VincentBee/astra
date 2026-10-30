@@ -257,6 +257,12 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 08:51:37 | `26f178b9` | « il faut pouvoir deconstruire un batiment, et rajoute aussi de la documentation sur tout ca, j'ai merge de la doc sur master » | Fusion de `main` (doc) dans la branche ; déconstruction ; doc de tout le rythme (regles §4.1, §5.5, §9.2, §19 ; interface §12 ; décisions D-083 à D-097) | (ce commit) | D-096 |
 | 09:03:50 | `26f178b9` | [Bouton] « Créer la PR » | Fusion de `main` (tests des décisions, D-082 déjà pris) : mes décisions renumérotées D-083 à D-097 ; tests D-002, D-016, D-019, D-028, D-053 comptés en heures de jeu, D-036 sans défense de bâtiments ; D-002 et D-036 marquées « modifiée » ; tableau `tests-decisions.md` complété (119/119) ; pull request | (cette PR) | D-083 à D-097 |
 
+## 30 octobre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 10:40 (non confirmé) | `359242b9` | « Notion de rapidite de flotte avec le vaiseau le plus lent » | La règle existait déjà (`fleetSpeed`) ; ajout de `slowestShip`, affichage de la vitesse et du vaisseau le plus lent au décollage et dans la fiche de flotte, test dédié, cache v53 | (ce commit) | D-098 |
+
 ### Travaux en cours au 2026-10-29
 
 - **Rythme des parties** (`26f178b9`) : commité sur `claude/swarm-it-game-pacing-1d4502`
