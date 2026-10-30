@@ -502,7 +502,8 @@ Une flotte qui attend la réponse à un échange est **bloquée** (`locked`,
   `js/session.js:56`, `js/session.js:1650-1655`) : la mémoire `raided` est dans la fiche de
   l'attaquant, avec la clé `pid:planète`. Sans ça, des attaques en chaîne depuis l'orbite
   vidaient tout. Le combat a lieu quand même ; seul le butin est refusé.
-- J'écris un rapport `{ id, to, key, at, ships: pertes, take: butin }` dans mes `effects`.
+- J'écris un rapport `{ id, to, key, at, ships: pertes, lost: mes pertes, take: butin }` dans mes
+  `effects` (`lost` depuis D-110, pour le carnet du défenseur ; absent des anciens rapports).
 - **Conquête** (`conquer` gagné, sur une case que le froid n'a pas prise) : le rapport porte en
   plus `capture: true` et `cell`. `Session.capture` crée tout de suite une colonie neuve de ma
   race sur la case (`newPlanet`, les bâtiments adverses sont perdus), avec les survivants, la
@@ -524,7 +525,7 @@ Une flotte qui attend la réponse à un échange est **bloquée** (`locked`,
   (`js/fleet.js:291`).
 - `fight` (`js/session.js:1157-1188`) : victoire → `salvage`, **toute** la cargaison de la
   flotte vaincue dans la place libre (`js/fleet.js:318-326`). Rapport avec `fleet`, `by`,
-  `sim: true` et `ack`.
+  `sim: true`, `ack` et `lost` (mes pertes, D-110).
 - **Même combat livré des deux côtés** (poursuite mutuelle) : `engaged`, `ack` et `sim`
   servent à reconnaître que c'est le même combat, pour ne compter les pertes qu'une fois
   (`js/session.js:1160-1170`, `fleetHit` `js/session.js:1746-1770`). À plus de 30 min d'écart,
@@ -570,6 +571,22 @@ Une flotte qui attend la réponse à un échange est **bloquée** (`locked`,
 - Nettoyage : j'oublie mes rapports dès que leur cible les a appliqués ; j'oublie un
   identifiant appliqué quand son auteur a effacé le rapport (`js/session.js:1700-1705`,
   `js/session.js:1729-1737`).
+
+### 9.5 Carnet de combats (`Session.note`, D-110)
+
+- Chaque combat qui me concerne, vu de mon côté, s'inscrit dans `session.journal`
+  `{ n, read, list }` (100 entrées) : attaquant dans `fight`, `arrive` (attaque) et `capture` ;
+  défenseur dans `applyEffects` (planète attaquée ou prise) et `fleetHit` (flotte attaquée ou
+  détruite ; rien si c'est le même combat que le mien, déjà noté). `losePlanet` y ajoute la planète
+  perdue (prise, gel, élimination).
+- Une entrée : `{ n, at, kind: 'combat' | 'planet', tone: 'good' | 'bad' | 'even', text, who,
+  planet, capture, mine, theirs, loot, pillaged }` ; `mine`/`theirs` = vaisseaux perdus de chaque
+  côté (`theirs` = `null` si le rapport n'a pas `lost`) ; `loot` = ce que j'ai pris, `pillaged` =
+  ce qu'on m'a pris ; `at` = l'heure du combat (passée si calculée au retour, D-109).
+- Gardé dans la sauvegarde du téléphone (`saveGame(me, state, journal)`), repris par
+  `Session.resume` **avant** le rattrapage, et par `onWelcome` si c'est la même partie et le même
+  joueur. Jamais dans la fiche ni le journal d'ordres : rien à rejouer, rien à fusionner.
+  `markRead()` avance `read`. L'affichage est dans `interface.md`.
 
 ## 10. Échanges entre joueurs
 

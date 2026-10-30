@@ -38,6 +38,7 @@ Transcripts : `~/.claude/projects/-Users-vincent-Workspace-Personal-astra--claud
 | `26f178b9` | Intensité et rythme du jeu | lancer-projet-local-cd6c4b | `claude/swarm-it-game-pacing-1d4502` | 2026-10-29 06:19 → (en cours) | `9b37782`, fusion de `main` `c702559`, déconstruction + doc |
 | `1df29e6e` | Documentation du projet (cette doc) | tech-tree-page-eba0b4 | `claude/swarm-it-documentation-790545` | 2026-10-29 06:35 → (en cours) | (à venir) |
 | `074fcd56` | Coût en nourriture des recherches | lancer-projet-local-cd6c4b | `claude/recherches-cout-nourriture-c71dbc` | 2026-10-30 10:53 → 10:58 | (ce commit) |
+| `caf0e31a` | Rapport de combat et journal en jeu (tâche 1.4) | lancer-projet-local-40a514 | `claude/combat-report-in-game-log-68d066` | 2026-10-30 14:03 → (en cours) | (ce commit) |
 
 Faits du dépôt : 35 commits, tous sur `main`. Deux merges seulement : `49b2156` et `9ec0e0c` (PR #1,
 la seule PR). Tout le reste a été poussé directement sur `main` (D-023).
@@ -299,6 +300,8 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 13:33 | `e67321a7` | [Bouton] « Oui, commite » | Commit de mes seuls fichiers (rencontres hors ligne, D-109) ; le travail de la session `787cfd98` (D-099, `TODO-RECETTE.md`) laissé hors du commit | `1e9f655` | D-109 |
 | 13:45 | `e67321a7` | [Bouton] « Créer la PR » | La branche d'origine était déjà fusionnée (PR #6) et `main` avait pris D-100 à D-106 : nouvelle branche `claude/fleet-offline-contact` depuis `main`, commit repris, décision renumérotée D-107, conflits de doc résolus ; pull request | (cette PR) | D-109 |
 | 13:55 | `e67321a7` | « rebase et merge » | `main` avait pris D-107 et D-108 (grille des flottes) : rebase, ma décision devient D-109 ; tests relancés ; pull request #13 fusionnée | (cette PR) | D-109 |
+| 14:03 | `caf0e31a` | Tâche collée « 1.4 Ajouter un rapport de combat et un journal visibles dans le jeu » (revoir D-018 ; journal filtré sur moi, combats en tête ; résumé « pendant ton absence » ; file de toasts) | Carnet de combats sur le téléphone (`session.journal`, pertes des deux côtés grâce au champ `lost` des rapports) ; fenêtre Journal avec pastille ; résumé à la reprise ; messages à la file ; 3 tests (147/147) ; vérifié dans le navigateur (résumé, journal, file) ; cache v61 | (ce commit) | D-110 |
+| 14:18 | `caf0e31a` | [Bouton] « Oui, ouvre la PR » | Branche poussée, pull request ouverte avec captures et résultats des tests | (cette PR) | D-110 |
 
 ### Travaux en cours au 2026-10-29
 
