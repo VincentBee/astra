@@ -665,7 +665,7 @@ Aucune conversation ne les prouve.
 - Choix : la plus vieille colonie en vie devient planète mère ; sans colonie, `out` ; fin quand
   il reste un joueur en vie (seul : quand le froid a tout pris) ; égalité au meilleur score.
 - Alternative écartée : B, seules les colonies se prennent.
-- Qui : Vincent. Statut : en vigueur, modifiée par D-101 (départage d'une mort simultanée).
+- Qui : Vincent. Statut : en vigueur, modifiée par D-102 (départage d'une mort simultanée).
 
 **D-090 — Réglage du froid : départ 12 min, durée 24 min, `ease` 2**
 - 2026-10-29 07:40. Mesure avec les robots (qui fuient vers le soleil, sans se battre) :
@@ -733,6 +733,18 @@ Aucune conversation ne les prouve.
   `astra-p2p-v53`.
 - Source : session `defa0982`. Statut : en vigueur.
 
+**D-099 — Des recherches humaines coûtent aussi de la nourriture**
+- 2026-10-30 10:53. Demande : « Certaines recherches devraient couter de la nouriture aussi ».
+  Session `074fcd56`.
+- Choix : chez les humains, **Agronomie** coûte 120 minéraux + 40 nourriture (au niveau 1) et
+  **Arches coloniales** 400 minéraux + 120 nourriture. Les deux touchent aux vivres et aux colons.
+  Les aliens payaient déjà leurs recherches en nourriture ; les machines n'en ont pas, rien ne
+  change pour elles. La nourriture compte dans la durée de recherche (un peu plus longue).
+  Cache `astra-p2p-v56` (v53 à v55 pris par D-098, D-100 et D-101).
+- Alternatives écartées : de la nourriture sur toutes les recherches humaines ; en ajouter aux
+  machines (elles n'en produisent pas).
+- Qui : Vincent (demande), Claude (lesquelles et combien). Statut : en vigueur.
+
 **D-100 — Comportement en voyage : passif ou agressif**
 - 2026-10-30 10:59. Demande : « Avoir des comportement de voyage: passif, agressif ».
 - Choix (Claude, par défaut) : un champ `stance` par flotte, à part de l'ordre (une flotte qui
@@ -753,7 +765,17 @@ Aucune conversation ne les prouve.
   passives) ; cache `astra-p2p-v54` (D-098 avait pris v53 ; D-099 est pris par la recette, pas encore fusionnée).
 - Qui : Vincent (demande), Claude (règle). Statut : en vigueur.
 
-**D-101 — Points : ce que le joueur a maintenant ; mort simultanée départagée par les points d'avant la chute** (modifie D-089)
+**D-101 — Vitesse de flotte = vaisseau le plus lent, affichée au joueur**
+- 2026-10-30 10:54. Demande : « Notion de rapidite de flotte avec le vaiseau le plus lent ».
+- Contexte : la règle existait déjà dans le code (`fleetSpeed`, héritée du portage, D-002), mais le
+  joueur ne voyait ni la vitesse de sa flotte ni le vaisseau qui la freine.
+- Choix : garder la règle ; l'afficher à l'écran de décollage (« Vitesse 7,0 cases/min, celle du
+  plus lent : Colonisateur ») et dans la fiche de flotte ; test dédié ; cache `astra-p2p-v55`.
+- Alternatives écartées : vitesse moyenne pondérée ; vaisseaux rapides qui partent devant
+  (la flotte se scinderait d'elle-même).
+- Qui : Vincent (demande), Claude (affichage, maintien de la règle). Statut : en vigueur.
+
+**D-102 — Points : ce que le joueur a maintenant ; mort simultanée départagée par les points d'avant la chute** (modifie D-089)
 - 2026-10-30 11:47. Constat : quand les derniers joueurs gèlent à la même seconde, le vainqueur
   était tiré par l'ordre des identifiants (tous à 0 point), et pas « au meilleur score » (D-089).
   Demande : « il faut que les points reflete ce que le joueur possede a un instant T Si on détruit
@@ -770,14 +792,14 @@ Aucune conversation ne les prouve.
   téléphones calculent le même gagnant).
 - Effet connu : le rejeu d'une **ancienne** sauvegarde où un joueur est éliminé dit « replay
   approché » (la fiche rejouée a `deathPts`, l'ancienne non). Pas de nouveau `FORMAT` (un
-  téléphone d'avant ignore le champ, et départage comme avant) ; cache `astra-p2p-v55`.
+  téléphone d'avant ignore le champ, et départage comme avant) ; cache `astra-p2p-v57` (v55 et v56 pris par `main`).
 - Limite **non confirmée** : un téléphone dont la copie d'un rival est en retard (il n'a pas
   reçu ses derniers chantiers) calcule pour lui moins de points et peut écrire un autre gagnant
   à la même heure ; `Session.over` départage alors encore par l'ordre des identifiants.
 - Qui : Vincent (points au présent) ; Claude (`deathPts` pour départager). Source : session
   `a7cb8a19`. Statut : en vigueur.
 
-**D-102 — Courbe des points de chaque joueur, dans le replay**
+**D-103 — Courbe des points de chaque joueur, dans le replay**
 - 2026-10-30 11:47. Demande : « Rajoute aussi un graphe qui montre l'évolution des points par
   joueur durant la partie ».
 - Choix (Claude, par défaut) : une section « Points » dans `replay.html`, calculée à partir des
@@ -790,15 +812,15 @@ Aucune conversation ne les prouve.
 - Limite : une partie qui ne se rejoue pas (début du journal perdu) n'a pas de courbe.
 - Qui : Vincent (demande), Claude (forme). Source : session `a7cb8a19`. Statut : en vigueur.
 
-**D-103 — Lien vers la courbe des points à la fin de la partie**
+**D-104 — Lien vers la courbe des points à la fin de la partie**
 - 2026-10-30 12:13. Question de Claude : ajouter un lien vers la courbe dans le bandeau
   « partie finie » ? Réponse de Vincent : « Oui, ajoute le lien ».
 - Choix : le bandeau de course, partie finie, ajoute « Voir la courbe des points »
   (`replay.html#points`) ; le replay s'ouvre alors à la fin de la partie, sur la courbe. La partie
   est déjà sauvegardée (`pagehide` appelle `save`), le replay lit cette sauvegarde.
-- Alternatives écartées : une courbe en direct dans l'écran de jeu (voir D-102) ; un lien aussi
+- Alternatives écartées : une courbe en direct dans l'écran de jeu (voir D-103) ; un lien aussi
   pour un joueur éliminé en cours de partie (la partie n'est pas finie).
-- Qui : Vincent (lien), Claude (place et comportement). Cache `astra-p2p-v56`. Source : session
+- Qui : Vincent (lien), Claude (place et comportement). Cache `astra-p2p-v57`. Source : session
   `a7cb8a19`. Statut : en vigueur.
 
 ---

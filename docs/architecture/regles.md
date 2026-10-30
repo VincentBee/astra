@@ -345,6 +345,8 @@ détection.
   durée ; son stock paie. Une recherche à la fois par planète, et pas la même technologie sur
   deux planètes à la fois (refus « déjà en recherche sur … »).
 - Coût : `floor(base × 1,7^niveau)` (`techCost`, `js/tech.js:259-265`).
+  Humains : surtout des minéraux, plus de la nourriture pour Agronomie et Arches coloniales
+  (D-099). Machines : minéraux + énergie. Aliens : minéraux + nourriture.
 - Durée : `max(8, round(total / (20 × (1 + 0,5 × (labo − 1)))))` secondes
   (`researchDuration`, `js/tech.js:268-271`).
 - Les technologies valent pour toutes mes planètes : la planète mère tient la liste de
@@ -396,7 +398,9 @@ ouverts »).
 ### 8.3 Se déplacer (`moveTo`, `js/fleet.js:134-152`)
 
 - Vitesse de la flotte = celle de son vaisseau le plus lent (`fleetSpeed`,
-  `js/fleet.js:42-46`).
+  `js/fleet.js:42-46`), bonus de technologie compris. `slowestShip` (`js/fleet.js:48-57`) dit
+  lequel ; un type à 0 exemplaire ne compte pas, une flotte vide a une vitesse 0 et ne bouge pas.
+  Ajouter un seul vaisseau lent ralentit donc toute la flotte (D-101).
 - Durée : `max(5 s, distance / vitesse × 1 min)` (`tripMs`, `js/fleet.js:80-85`).
 - **Distance** : en nombre de pas, sans diagonale (Manhattan, `distance`,
   `js/game.js:782`). La position affichée, elle, est interpolée en ligne droite entre `from` et
@@ -828,7 +832,7 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
   `p.home = null`, `p.out = heure` : le joueur est **éliminé** (`canAct` faux, `claimPlanet`
   refusé).
 - `losePlanet` note les points de la vague (`this.wave` : joueur, heure, `scoreOf` avant la
-  première perte de cette heure). À l'élimination, ils vont dans `p.deathPts` (D-101).
+  première perte de cette heure). À l'élimination, ils vont dans `p.deathPts` (D-102).
 
 ### 19.4 Qui est en vie, qui gagne (`livePlanets`, `deadAt`, `ranking`, `checkOver`)
 
@@ -839,7 +843,7 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
 - `scoreOf(p)` : ce que le joueur possède **maintenant** ; tout perdu : 0 (hors flottes en vol).
 - `ranking` : `{ id, pts, dead, best }`. `best` départage les joueurs tombés à la même heure :
   `deathPts` (points juste avant la chute), ou `scoreOf` si la fiche n'a pas encore vu la chute
-  (D-101).
+  (D-102).
 - `checkOver` : à plusieurs, la partie finit quand il reste **un seul** joueur en vie (ou
   aucun : le dernier tombé gagne, puis le meilleur `best`). Seul : quand le froid a tout
   pris. Le téléphone qui le voit écrit `p.over = { at, winner }` dans sa fiche ;

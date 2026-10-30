@@ -80,7 +80,7 @@ Détail de `#screen-game` :
 | `#lost` (97-100) | Bandeau « Seul en ligne » + **Rejoindre** (rejoindre les autres par une nouvelle invitation). | `renderState` 762 (`session.alone`), `btn-rejoin` 286-289. |
 | `#view-universe` (102-148) | Vue carte : `#pick` (bandeau « Choisis ta planète »), `#trades` (offres d'échange), `.map-head` (coordonnées, aide `?`), `canvas#map`. | `drawMap` 1349-1538, `renderPick` 1876-1913, `renderTrades` 1777-1800. |
 | `#sheet-planet` (114-127) | Fiche de la planète touchée : nom, coordonnées, propriétaire, places, climat, gisements, **S'installer** ou **Bâtiments**. | `renderPick` 1876-1913, `btn-claim` 1922-1929, `btn-open-planet` 1275-1279, `closePlanetSheet` 1916-1920. |
-| `#fleet-info` (129-145) | Fiche de la flotte sélectionnée : vaisseaux, statut, carburant, choix d'ordres (`#fi-choice`), mes flottes à côté (`#fi-beside`), joueurs à côté (`#fi-partners`), boutons Arrêter / Rentrer / Se poser / Plein / Passive-Agressive (`#btn-fi-stance`, icône d'attaque, pleine quand la flotte est agressive, cachée pour une flotte sans armes ; D-100) / Scinder / Fermer. Le statut finit par « · agressive » (`fleetStatus`). | `renderFleetInfo` 1643-1687, handlers 1689-1714. |
+| `#fleet-info` (129-145) | Fiche de la flotte sélectionnée : vaisseaux, statut (avec la vitesse et, si la flotte mêle plusieurs types, le nom du plus lent : `speedText`), carburant, choix d'ordres (`#fi-choice`), mes flottes à côté (`#fi-beside`), joueurs à côté (`#fi-partners`), boutons Arrêter / Rentrer / Se poser / Plein / Passive-Agressive (`#btn-fi-stance`, icône d'attaque, pleine quand la flotte est agressive, cachée pour une flotte sans armes ; D-100) / Scinder / Fermer. Le statut finit par « · agressive » (`fleetStatus`). | `renderFleetInfo` 1643-1687, handlers 1689-1714. |
 | `#view-planet` (150-199) | Vue planète : en-tête (retour, nom, climat), gisements `#soil-zone`, stocks `#resources`, onglets, puis les panneaux `data-pane`. | `renderPlanet` 869-988. |
 | `.tabs` (163-168) | Onglets Bâtiments / Pouvoirs (aliens seulement) / Recherche (toute planète ; « 🔒 Il faut un labo » sans labo, technologie grisée si elle est en recherche sur une autre planète) / Flottes. | `showTab` 1241-1252, flèches clavier 1255-1262. |
 | `[data-pane=power]` `#powers-zone` (170-173) | Pouvoirs aliens. | `buildStatic` 526-540, `renderPlanet` 966-982. |
@@ -99,7 +99,7 @@ Toutes se ferment par leur croix (`.close-btn`), un toucher sur le fond sombre o
 |---|---|---|---|
 | `#sheet-players` (`index.html:203-216`) | `#net` | Détail réseau, **Inviter un joueur**, classement (`#players`). | 319-327 ; liste `renderState` 765-779 ; lignes `renderLive` 835-865 (score, `style.order` pour trier sans redessiner, 864). |
 | `#sheet-invite` (219-248) | **Inviter un joueur** | QR de l'invitation + copier/partager ; scanner ou coller la réponse. | `openInviteSheet` 297-312, `useAnswer` 341-363, fermeture → `session.cancelInvite()` 328-331. |
-| `#sheet-fleet` (251-275) | **Décoller** (onglet Flottes) | Nombre de vaisseaux, cargaison, carburant ; calcule soutes, réservoir, portée. | `openFleetSheet` 1147-1165, `updateFleetSheet` 1167-1180, `btn-fleet-go` 1185-1196. |
+| `#sheet-fleet` (251-275) | **Décoller** (onglet Flottes) | Nombre de vaisseaux, cargaison, carburant ; calcule soutes, vitesse (et le vaisseau le plus lent, qui la fixe), réservoir, portée. | `openFleetSheet` 1147-1165, `updateFleetSheet` 1167-1180, `btn-fleet-go` 1185-1196. |
 | `#sheet-move` (278-295) | « Donner » (`#fi-beside`) ou **Scinder** | Vaisseaux, cargaison, carburant à passer à une autre flotte ou à une nouvelle. | `openMoveSheet` 1838-1860, `btn-move-go` 1864-1873. |
 | `#sheet-trade` (298-315) | Bouton échange d'un joueur sur la même case | « Je donne » / « Je demande ». | `openTradeSheet` 1746-1757, `btn-trade-go` 1768-1774. |
 
@@ -278,7 +278,7 @@ Rendu (`js/techtree.js`, la construction du graphe est décrite dans `regles.md`
 - `load` (28-67) : `loadGame()` (la partie sélectionnée dans l'historique), titre = noms des joueurs, `replayable(st)` ; messages si la copie n'est pas à jour ou si le début du journal manque ; calcul `replay(st)` lancé après 30 ms pour laisser s'afficher « Calcul du replay… » ; signale un « replay approché » si la fin ne retombe pas sur la vraie partie.
 - Index `film.at` : pour chaque image, où trouver la dernière fiche de chaque joueur (53-59). `frameAt` : recherche dichotomique (69-79).
 - Contrôles : lecture/pause (353-360), vitesse 1 min/s, 10 min/s (défaut), 1 h/s (`replay.html:35-39`), curseur sur 0-1000 (362-365), événement précédent/suivant (367-377). Pendant la lecture, si rien ne bouge et que le prochain événement est loin, on y saute (`QUIET_S`, 333-351).
-- Section « Points » (`replay.html`, `#rp-score`, D-102) : `drawScores` (219-287) dessine sur un canvas la courbe en escalier de chaque joueur (`film.scores` = `scoreSeries(frames, gid)`, `js/replay.js`), à sa couleur, graduée 0 / moitié / haut, avec un trait à l'instant affiché ; `#rp-score-legend` donne nom et points à cet instant, dans l'ordre d'arrivée. Toucher ou glisser sur la courbe déplace le replay (380-386). Adresse `replay.html#points` (lien du bandeau de fin) : `load` se place à la fin de la partie et fait défiler jusqu'à la courbe.
+- Section « Points » (`replay.html`, `#rp-score`, D-103) : `drawScores` (219-287) dessine sur un canvas la courbe en escalier de chaque joueur (`film.scores` = `scoreSeries(frames, gid)`, `js/replay.js`), à sa couleur, graduée 0 / moitié / haut, avec un trait à l'instant affiché ; `#rp-score-legend` donne nom et points à cet instant, dans l'ordre d'arrivée. Toucher ou glisser sur la courbe déplace le replay (380-386). Adresse `replay.html#points` (lien du bandeau de fin) : `load` se place à la fin de la partie et fait défiler jusqu'à la courbe.
 - `renderPlayers` (289-314) : planètes, vaisseaux, minéraux, points de l'empire à l'instant affiché (`ptsAt`, les mêmes que la courbe). `renderLog` (316-330) : les 40 dernières entrées jusqu'à cet instant, la plus récente en haut.
 
 ## 9. Vérification dans le navigateur (2026-10-29)
@@ -315,7 +315,7 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   `renderLive` (chaque seconde) : avant le départ du froid « Le soleil s'éteint · dernier en vie
   gagne · n en vie » ; ensuite « Ta planète la plus exposée gèle dans m:ss · va vers le
   soleil » ; « Éliminé · encore n en vie » ; « Victoire ! » ou « X gagne. · partie finie », suivi du lien **Voir la courbe des points**
-  (`replay.html#points`, D-103). Classe
+  (`replay.html#points`, D-104). Classe
   `hot` (bordure orange) à moins de 3 min du gel, quand on est éliminé ou qu'un autre a gagné.
   Caché pour une partie d'avant la course.
 - **Carte** : `drawFrost` voile en bleu tout ce qui est hors du cercle de froid (remplissage

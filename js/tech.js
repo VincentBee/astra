@@ -34,7 +34,7 @@ export const TECHS = {
       desc: '+10 % de nourriture par niveau.',
       max: 5,
       req: { lab: 1 },
-      base: { minerals: 120 },
+      base: { minerals: 120, food: 40 },
       bonus: { food: 0.1 },
     },
     propulsion: {
@@ -69,7 +69,7 @@ export const TECHS = {
       desc: 'Débloque l’arche, qui fonde une colonie sur une planète libre.',
       max: 1,
       req: { lab: 2, propulsion: 2 },
-      base: { minerals: 400 },
+      base: { minerals: 400, food: 120 },
       unlock: { colony: 1 },
     },
     radar: {

@@ -57,9 +57,20 @@ export const countShips = (ships) => Object.values(ships || {}).reduce((a, b) =>
 
 /** Vitesse d'une flotte : celle de son vaisseau le plus lent (cases par minute). */
 export function fleetSpeed(race, ships, tech) {
+  const k = slowestShip(race, ships, tech);
+  return k ? shipStats(race, k, tech).speed : 0;
+}
+
+/** Type du vaisseau le plus lent de la flotte (celui qui fixe sa vitesse), ou null si elle est vide. */
+export function slowestShip(race, ships, tech) {
+  let slow = null;
   let v = Infinity;
-  for (const [k, n] of Object.entries(ships)) if (n > 0) v = Math.min(v, shipStats(race, k, tech).speed);
-  return Number.isFinite(v) ? v : 0;
+  for (const [k, n] of Object.entries(ships || {})) {
+    if (!(n > 0)) continue;
+    const sp = shipStats(race, k, tech).speed;
+    if (sp < v) [slow, v] = [k, sp];
+  }
+  return slow;
 }
 
 /** Capacité totale des soutes. */
