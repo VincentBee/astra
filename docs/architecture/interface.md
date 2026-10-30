@@ -172,7 +172,8 @@ Table des appels de l'interface vers la session :
 | Inviter / accepter / annuler | 304, 346, 329 | `openInvite`, `acceptAnswer`, `cancelInvite` |
 | Choisir sa race | 430 | `chooseRace` |
 | S'installer sur une planète | 1924 | `claimPlanet` |
-| Bâtiment / recherche / vaisseaux / pouvoir | 749, 610, 614, 606 | `build`, `research`, `buildShips`, `power` |
+| Bâtiment / recherche / vaisseaux / pouvoir | 749, 610, 614, 606 | `build` (ou `planBuild`, voir §13), `research`, `buildShips`, `power` |
+| Retirer un élément du fil de construction | `#plan` (× d'un élément) | `unplan` |
 | Décoller | 1187 | `takeOff` (renvoie l'id de la flotte, sélectionnée ensuite) |
 | Envoyer une flotte sur une case | 1619-1623, 1697 | `ordersAt` (ordres possibles) puis `moveFleet` |
 | Poursuivre une flotte ennemie | 1691 | `chaseFleet` |
@@ -337,3 +338,22 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   resserre et planètes qui s'effacent, gel de la planète puis « Victoire ! » (froid accéléré à la
   main), liste des bâtiments aliens avec épines et dôme, déconstruction (niveau 1 → 0, place
   libérée). **Pas vérifié** : les boutons d'attaque et de conquête à deux joueurs réels.
+
+## 13. Fil de construction (2026-10-30, D-105)
+
+- `index.html` : `<ol id="plan" class="plan">` au-dessus de `#buildings`, caché quand le fil est
+  vide.
+- Bouton d'un bâtiment (`[data-build]`, `renderPlanet`) : `data-mode="now"` (icône ↑) quand le
+  chantier est libre, le fil vide et le stock suffisant → `session.build` ; sinon
+  `data-mode="plan"` (icône +) → `session.planBuild`. Le niveau affiché est celui du prochain
+  ajout (chantier et fil compris), comme le prix. Désactivé si les places ne suffiront pas ou si
+  le fil est plein. Le compte à rebours du chantier passe dans l'étiquette de niveau
+  (« niv 2 → 3 · 0:04 ») : le bouton reste libre pour ajouter.
+- `renderPlan` : une ligne par élément, « 1. Mine niv 5 ≈ dans 0:07 → fini dans 0:09 » et un
+  bouton × (`[data-unplan]` + `data-key` : la session refuse si le fil a bougé entre-temps). L'estimation (`planForecast`) est recalculée au plus une fois par
+  seconde (cache sur l'heure de la fiche, le fil et les fins de files). La structure de la liste
+  n'est réécrite que quand le fil change ; les heures sont mises à jour à part, pour que le ×
+  ne soit pas remplacé sous le doigt toutes les secondes (bug vu pendant le test).
+- Style : `.plan`, `.plan-item` (bloqué : `.blocked`, heure en orange), fin de `style.css`.
+- Vérifié dans le navigateur (vue mobile 375 × 812, 2026-10-30) : ajout de 3 bâtiments, lancement
+  automatique de la mine à l'heure annoncée, retrait par ×, rattrapage après rechargement.
