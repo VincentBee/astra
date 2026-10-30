@@ -360,3 +360,29 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
 - Style : `.plan`, `.plan-item` (bloqué : `.blocked`, heure en orange), fin de `style.css`.
 - Vérifié dans le navigateur (vue mobile 375 × 812, 2026-10-30) : ajout de 3 bâtiments, lancement
   automatique de la mine à l'heure annoncée, retrait par ×, rattrapage après rechargement.
+
+## 14. Alertes et diagnostic des planètes (2026-10-30, D-110)
+
+- `renderAlerts(me, now)`, appelé par `renderLive`, calcule `planetAlerts` sur
+  `session.livePlanets(me, now)` et range le résultat dans `alertsNow` (case « x:y » → planète et
+  problèmes). `drawMap` ne fait que lire `alertsNow` (`drawAlertDot`) : pas de `stateAt` à chaque
+  image.
+- **Pastille** sur mes planètes (et astéroïdes, comètes) de la carte : rouge qui pulse si
+  pénurie, orange si un stock vital baisse.
+- **Toast** à l'apparition d'un problème (`alertsSeen` : clé planète + ressource + type, oubliée
+  après 10 s d'absence). À la reprise d'une partie, « Partie reprise. » est affiché avant le
+  premier rendu pour ne pas cacher l'alerte.
+- **Bandeau** `#alert-line` (sous `#race`) : « Famine sur X · Panne d'énergie sur Y », pénuries
+  seulement, caché sinon.
+- **Icône** `#alerts-btn` (triangle `alert` de `js/icons.js`, nombre de problèmes) : grise si tout
+  va bien, orange, rouge si pénurie. `showView` la range avec `#net` (à droite de `.map-head`, ou
+  dans `.planet-head`) et met `#alerts-panel` en fin de cette ligne (pleine largeur, `flex-wrap`).
+  Sur la carte, la liste couvre toutes mes planètes et le nom de chacune ouvre sa vue
+  (`[data-alert-go]`) ; sur une planète, seulement celle-ci. Temps « vide dans N min » arrondi à
+  la minute, pour que la liste ne soit pas réécrite sous le doigt.
+- Style : fin de `style.css` (`.alert-line`, `.alerts-btn`, `.alerts-panel`, `.alerts-list`).
+- Vérifié dans le navigateur (375 × 812, 2026-10-30), humains, ferme à 0 et stock vidé à la
+  main : toast « Famine sur Orion », bandeau, icône rouge « 1 », pastille, liste, toucher du nom →
+  vue planète avec la seule liste de la planète ; ferme remise → bandeau caché, icône orange
+  « Énergie en baisse · vide dans 2 min ». **Pas vérifié** : aliens et machines dans le
+  navigateur (couverts par les tests), plusieurs colonies à la fois.

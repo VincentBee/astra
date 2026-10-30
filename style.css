@@ -719,3 +719,26 @@ button.net-btn.slow { color: var(--warn); }
 .plan-item .plan-when { font-size: 0.74rem; color: var(--muted); white-space: nowrap; }
 .plan-item.blocked .plan-when { color: var(--warn); }
 .plan-item button { min-height: 30px; padding: 0 8px; }
+
+/* ----- Diagnostic des planètes (D-110) ----- */
+/* Ligne du bandeau : pénuries de tout l'empire. */
+.banner.alert-line { margin-bottom: 10px; padding: 8px 14px; border-color: rgba(255, 107, 122, 0.7); }
+.banner.alert-line strong { color: var(--danger); }
+/* Icône : suit le compteur de joueurs (showView) ; grise si tout va bien. */
+button.alerts-btn {
+  min-height: 40px; padding: 0 10px; gap: 4px;
+  background: transparent; border-color: var(--line); color: var(--muted);
+}
+button.alerts-btn.warn { color: var(--warn); }
+button.alerts-btn.bad { color: var(--danger); border-color: rgba(255, 107, 122, 0.6); }
+.alerts-btn .ic, .map-head .alerts-btn .ic { width: 18px; height: 18px; color: inherit; }
+.alerts-btn .mono:empty { display: none; }
+.map-head, .planet-head { flex-wrap: wrap; }
+/* Liste dépliée : une ligne entière sous l'en-tête. */
+.alerts-panel { flex-basis: 100%; background: var(--panel-2); border: 1px solid var(--line); padding: 6px 10px; }
+.alerts-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 0.85rem; }
+.alerts-list li { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.alerts-list li.short span { color: var(--danger); }
+.alerts-list li.deficit span { color: var(--warn); }
+.alerts-list li.ok span { color: var(--ok); }
+.alerts-list button { min-height: 32px; padding: 0 8px; font-weight: 600; }

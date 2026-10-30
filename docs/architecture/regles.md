@@ -236,6 +236,12 @@ Le revenu de base (`mineralsBase`) n'est pas multiplié par les bonus : seul le 
 `extract` (`js/game.js:431-435`) : on obtient ce que veulent les bâtiments tant que le
 gisement n'est pas vide ; ensuite pas plus que `réserve / h + regen`.
 
+**Alertes** (D-110) : `planetAlerts(race, s)` (`js/game.js`, juste après `flows`) lit `s.prod`
+d'un `stateAt`. Pour la nourriture et l'énergie que la race utilise (les machines : énergie
+seule) : `short` si `effF` / `effE` < 1, sinon `deficit` si le solde est sous −0,5 par heure de
+jeu, avec `left` = millisecondes réelles avant que le stock soit vide. Pénuries d'abord.
+Tests : `tests/alerts.test.mjs`. L'affichage est dans [interface.md](interface.md) §14.
+
 ### 5.3 Un pas (`advance`)
 
 - Stock : `stock + net × h`, jamais négatif. Un entrepôt plein ne déborde pas mais n'est pas
