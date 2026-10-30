@@ -1179,6 +1179,27 @@ export class Session {
     return (this.state.players[this.me]?.fleets || []).find((f) => f.id === id) || null;
   }
 
+  /**
+   * Ce que ma flotte `id` trouverait sur la planète `key` de `enemy` si elle
+   * l'attaquait maintenant : { fort, ships, odds }. `ships` : les vaisseaux
+   * posés, ou null hors de ma détection. `odds` vient de `battle` joué avec ce
+   * que je vois (win, unsure, lose) : une estimation, la planète peut bâtir ou
+   * recevoir des renforts avant l'arrivée.
+   */
+  assaultView(id, enemy, key) {
+    const me = this.state.players[this.me];
+    const f = this.myFleet(id);
+    const pl = this.planetOf(enemy, key);
+    const now = this.now();
+    const def = this.defenseAt(me, enemy, pl, now);
+    const fort = fortOf(enemy.race, def.levels, def.pop);
+    const seen = this.seesCell(pl.cell, now);
+    const res = battle({ race: me.race, ships: f.ships, tech: me.planet.tech }, { race: enemy.race, ships: seen ? def.ships : {}, tech: def.tech, fort });
+    // Gagné en perdant plus de la moitié de la flotte, ou sans voir ses vaisseaux : rien n'est sûr.
+    const odds = !res.won ? 'lose' : !seen || countShips(res.attLeft) * 2 < countShips(f.ships) ? 'unsure' : 'win';
+    return { fort, ships: seen ? def.ships : null, odds };
+  }
+
   /** Mes planètes et celles des autres sur une case : [{ owner, key, name }]. */
   planetsAt(cell) {
     const out = [];
@@ -1202,11 +1223,13 @@ export class Session {
     const out = [];
     if (here?.owner.id === this.me) out.push({ kind: 'dock', label: `Se poser sur ${here.name}` });
     else if (here) {
-      out.push({ kind: 'attack', label: `Attaquer ${here.name} (${here.owner.name})` });
-      const pl = this.planetOf(here.owner, here.key);
-      const st = pl && stateAt(pl.planet, this.now());
-      const fort = fortOf(here.owner.race, st?.levels, st?.pop);
-      out.push({ kind: 'conquer', label: `Conquérir ${here.name} · défense ⚔ ${fort.attack} ◇ ${fort.hull}` });
+      // Les deux ordres livrent le même combat : défense de la planète et vaisseaux posés.
+      const a = this.assaultView(id, here.owner, here.key);
+      const ships = a.ships === null ? '? vaisseaux' : `${shipsText(countShips(a.ships))} posé${countShips(a.ships) > 1 ? 's' : ''}`;
+      const odds = { win: 'victoire probable', unsure: 'victoire incertaine', lose: 'bataille perdue' }[a.odds];
+      const tail = ` · défense ⚔ ${a.fort.attack} ◇ ${a.fort.hull} + ${ships} · ${odds}`;
+      out.push({ kind: 'attack', label: `Attaquer ${here.name} (${here.owner.name})${tail}`, odds: a.odds });
+      out.push({ kind: 'conquer', label: `Conquérir ${here.name}${tail}`, odds: a.odds });
     }
     else if (w && f.ships.colony) out.push({ kind: 'colonize', label: `Coloniser ${w.name}` });
     out.push({ kind: 'move', label: w || here ? 'Juste y aller (orbite)' : 'Y aller' });
@@ -1327,7 +1350,11 @@ export class Session {
   /** Une flotte est-elle visible de mon téléphone ? (les miennes, toujours) */
   sees(owner, f, now, eyes = this.eyes(now)) {
     if (owner?.id === this.me) return true;
-    const pos = fleetPos(f, now);
+    return this.seesCell(fleetPos(f, now), now, eyes);
+  }
+
+  /** Un point de la carte est-il dans ma détection ? */
+  seesCell(pos, now, eyes = this.eyes(now)) {
     return eyes.some((e) => Math.hypot(pos.x - e.x, pos.y - e.y) <= e.r + 1e-9);
   }
 

@@ -333,8 +333,10 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   choisir » pour un joueur éliminé, et pas de bandeau « Choisis ta planète ».
 - **Liste des joueurs** : un joueur éliminé affiche « éliminé » et passe en bas ; les points
   affichés sont `session.scoreOf(p)` (tout l'empire).
-- **Flottes** : sur une planète adverse, deux boutons « Attaquer X (joueur) » et « Conquérir X ·
-  défense ⚔ a ◇ c » (`ordersAt`). Une flotte en conquête est dessinée en rouge comme une attaque.
+- **Flottes** : sur une planète adverse, deux boutons « Attaquer X (joueur) » et « Conquérir X »,
+  suivis tous deux de « · défense ⚔ a ◇ c + N vaisseaux posés · victoire probable » (`ordersAt`,
+  `assaultView`, D-115) : « + ? vaisseaux » hors de ma détection ; issue « victoire probable »,
+  « victoire incertaine » ou « bataille perdue ». Une flotte en conquête est dessinée en rouge comme une attaque.
 - **Bâtiments** : les bâtiments de défense de la race apparaissent dans la liste comme les autres.
   Carte dépliée (toucher le nom) : bouton « Déconstruire un niveau » (`data-demolish`), caché au
   niveau 0, désactivé pendant un chantier ; une confirmation (`confirm`) rappelle qu'on récupère la
