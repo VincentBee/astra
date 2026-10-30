@@ -67,9 +67,9 @@ Ordre conseillé pour arriver sur le projet : README racine → `reseau.md` §1-
 | `js/sky.js` | Soleil central de la carte | interface (et regles pour la carte) |
 | `js/galaxy.js` | Fond de galaxie en parallaxe | interface |
 | `js/icons.js` | Icônes SVG (35 tracés) | interface |
-| `tests/` | 12 fichiers `*.test.mjs` (119 tests, dont `end.test.mjs` : fin de partie) + `harness.mjs` | regles (règles), reseau (`peer`, `hostile`, `harness`), [tests-decisions](architecture/tests-decisions.md) (`decisions-*.test.mjs`) |
+| `tests/` | 13 fichiers `*.test.mjs` (138 tests, dont `plan.test.mjs` : fil de construction, dont `end.test.mjs` : fin de partie) + `harness.mjs` | regles (règles), reseau (`peer`, `hostile`, `harness`), [tests-decisions](architecture/tests-decisions.md) (`decisions-*.test.mjs`) |
 
-Lancer les tests : `node --test tests/*.test.mjs` (119/119 réussis le 2026-10-29 avec le rythme). Quel test
+Lancer les tests : `node --test tests/*.test.mjs` (138/138 réussis le 2026-10-30 avec le fil de construction, D-105, et le chantier sur la carte, D-106). Quel test
 protège quelle décision : [architecture/tests-decisions.md](architecture/tests-decisions.md). Attention :
 `node --test tests/` échoue (voir reseau.md §9).
 

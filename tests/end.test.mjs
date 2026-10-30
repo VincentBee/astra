@@ -136,3 +136,30 @@ test('une partie d’avant la course n’a ni froid ni fin', () => {
   assert.equal(A.startedAt, null);
   assert.ok(me(A).home, 'la planète mère n’a pas gelé');
 });
+
+test('mort simultanée : le meilleur score d’avant la chute gagne, les points tombent à 0', () => {
+  frost();
+  const { players: [A, B], clock, sync } = newGame(2, ['human', 'machine']);
+  // Tout l'anneau gèle à la même heure. B (p1, après A dans l'ordre des noms) est le plus riche,
+  // mais grâce à sa colonie : sa planète mère seule vaut moins que celle de A.
+  const T = clock.t + 60_000;
+  for (const s of [A, B]) s.frostOf = () => T;
+  Object.assign(me(A).planet.levels, { mine: 6 });
+  me(B).colonies = { [B.planets[5].id]: { ...game.newPlanet('machine', clock.t, B.planets[5]), levels: { drill: 12 }, claimAt: clock.t } };
+  B.touch();
+  sync(A, B);
+  const rich = B.scoreOf(me(B));
+  assert.ok(rich > A.scoreOf(me(A)), 'B mène');
+  assert.ok(game.empireScore('machine', [me(B).planet]) < A.scoreOf(me(A)), 'sa planète mère seule ne suffit pas');
+  clock.t = T + 1;
+  A.tick(); // A voit sa chute, et la fiche de B pas encore à jour
+  assert.equal(A.scoreOf(me(A)), 0, 'A a tout perdu : 0 point');
+  assert.equal(A.over?.winner, B.me);
+  B.tick();
+  assert.equal(B.scoreOf(me(B)), 0, 'B aussi');
+  assert.equal(me(B).deathPts, rich, 'B garde ses points d’avant la chute');
+  sync(A, B);
+  sync(B, A);
+  assert.equal(B.over?.winner, B.me);
+  assert.equal(A.over?.winner, B.me);
+});

@@ -4,14 +4,15 @@ import { inviteLink, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
 import {
   RACES, RACE_KEYS, RES_INFO, resIcon, raceIcon, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
-  powerReadyAt, powerCost, liftGain, fmt, UNIVERSE, SOIL, sameCell, sunFor, climateName, kindLabel, usedPlaces, TEMPO, frostLine,
+  powerReadyAt, powerCost, liftGain, fmt, UNIVERSE, SOIL, sameCell, sunFor, climateName, kindLabel, usedPlaces, TEMPO, frostLine, planForecast, PLAN_MAX,
+  shipsAffordable,
 } from './game.js';
 import { drawSun } from './sky.js';
 import { ic, fillIcons } from './icons.js';
 import { startGalaxy } from './galaxy.js';
 import { TECHS, SHIPS, SHIP_KEYS, techCost, techMissing, researchDuration, shipUnlock, shipUnlocked, shipStats, shipDuration } from './tech.js';
 import { TRADE_RES, TRADE_NAMES } from './trade.js';
-import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fuelAt, moving } from './fleet.js';
+import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fleetSpeed, slowestShip, fuelAt, moving, aggressive, armed } from './fleet.js';
 
 fillIcons(); // les icônes du HTML statique, avant tout le reste
 startGalaxy();
@@ -523,6 +524,19 @@ function buildStatic() {
     </article>`;
   }).join('');
 
+  // Chantier de la fiche planète, sur la carte : une ligne par vaisseau.
+  $('pi-ships').innerHTML = SHIP_KEYS.map((k) => {
+    const S = SHIPS[race][k];
+    return `<div class="pi-ship" data-piship="${k}">
+      <div class="pi-ship-main"><span class="p-name">${esc(S.name)}</span> <span class="cost mono" data-picost="${k}"></span> <span class="hint mono" data-pinote="${k}"></span></div>
+      <div class="ship-actions">
+        <button class="secondary small" data-pi-ship="${k}" data-n="1" aria-label="Construire 1 ${esc(S.name)}">×1</button>
+        <button class="secondary small" data-pi-ship="${k}" data-n="5" aria-label="Construire 5 ${esc(S.name)}">×5</button>
+        <button class="secondary small" data-pi-ship="${k}" data-n="max" aria-label="Construire autant de ${esc(S.name)} que possible">Max</button>
+      </div>
+    </div>`;
+  }).join('');
+
   $('powers-zone').hidden = race !== 'alien';
   // Les pouvoirs ont leur onglet, chez les aliens seulement.
   $('tab-power').hidden = race !== 'alien';
@@ -607,7 +621,7 @@ $('powers').addEventListener('click', (e) => {
 });
 $('techs').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-research]');
-  if (btn && !btn.disabled) session.research(btn.dataset.research);
+  if (btn && !btn.disabled) session.research(btn.dataset.research, openKey);
 });
 $('ships').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-ship]');
@@ -746,7 +760,10 @@ function popText(race, pop) {
 
 $('buildings').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-build]');
-  if (btn && !btn.disabled) session.build(btn.dataset.build, openKey);
+  if (btn && !btn.disabled) {
+    if (btn.dataset.mode === 'now') session.build(btn.dataset.build, openKey);
+    else session.planBuild(btn.dataset.build, openKey);
+  }
   const down = e.target.closest('[data-demolish]');
   if (down && !down.disabled) {
     const name = RACES[session.myRace].buildings[down.dataset.demolish].name;
@@ -893,7 +910,7 @@ function renderRace(now) {
   if (over) {
     const mine = over.winner === session.me;
     hot = !mine;
-    html = `<strong>${mine ? 'Victoire !' : `${esc(players[over.winner].name)} gagne.`}</strong> <span class="hint">· partie finie</span>`;
+    html = `<strong>${mine ? 'Victoire !' : `${esc(players[over.winner].name)} gagne.`}</strong> <span class="hint">· partie finie ·</span> <a href="replay.html#points" class="race-link">Voir la courbe des points</a>`;
   } else if (me?.out) {
     hot = true;
     const alive = session.ranking(now).filter((r) => r.dead == null).length;
@@ -992,28 +1009,43 @@ function renderPlanet(me, now) {
   const full = !!planet.places && used >= planet.places;
   $('places').textContent = planet.places ? `${used} / ${planet.places} places` : '';
   $('places').classList.toggle('full', full);
+  // Fil de construction (D-105) : chantier occupé ou stock trop court, le bouton ajoute au fil.
+  const plan = s.plan || [];
+  const busy = !!s.queue || plan.length > 0;
+  // Places une fois tout fini : chantier en cours et fil compris.
+  const taken = used + (s.queue ? (s.queue.demolish ? -1 : 1) : 0) + plan.length;
+  const noRoom = !!planet.places && taken >= planet.places;
   for (const k of Object.keys(R.buildings)) {
     const level = s.levels[k] || 0;
-    const cost = upgradeCost(me.race, k, level);
+    // Niveau du prochain ajout : celui en chantier et ceux qui attendent déjà dans le fil.
+    const next = level + (s.queue?.key === k ? (s.queue.demolish ? -1 : 1) : 0) + plan.filter((x) => x === k).length;
+    const cost = upgradeCost(me.race, k, next);
     const ok = covers(s.stock, cost) && !full;
-    q(`[data-level="${k}"]`).textContent = `niv ${level}`;
+    const direct = !busy && ok;
+    const job = s.queue?.key === k ? s.queue : null;
+    q(`[data-level="${k}"]`).textContent = job ? `niv ${level} → ${job.level} · ${clock(Math.max(0, job.end - now))}` : `niv ${level}`;
     setHtml(q(`[data-cost="${k}"]`), `${costText(cost)} · ${buildDuration(me.race, s.levels, cost) / 1000} s`);
     const card = q(`[data-card="${k}"]`);
-    card.classList.toggle('affordable', ok && !s.queue);
-    card.classList.toggle('building-now', s.queue?.key === k);
+    card.classList.toggle('affordable', direct);
+    card.classList.toggle('building-now', !!job);
     const btn = q(`[data-build="${k}"]`);
-    btn.disabled = !!s.queue || !ok || session.status !== 'playing';
-    const job = s.queue?.key === k ? s.queue : null;
+    btn.dataset.mode = direct ? 'now' : 'plan';
+    btn.disabled = noRoom || plan.length >= PLAN_MAX || session.status !== 'playing';
     cardProgress(card, job, now);
-    setHtml(btn, job ? `${ic('wait')}${clock(Math.max(0, job.end - now))}` : `${ic('up')}${level + 1}`);
-    btn.title =
-      s.queue?.key === k ? 'En chantier' : full ? 'Plus de place sur cette planète' : !covers(s.stock, cost) ? 'Ressources insuffisantes' : `Passer au niveau ${level + 1}`;
+    setHtml(btn, direct ? `${ic('up')}${next + 1}` : `${ic('plus')}${next + 1}`);
+    btn.title = noRoom
+      ? 'Plus de place sur cette planète'
+      : plan.length >= PLAN_MAX
+        ? `Fil plein (${PLAN_MAX} au plus)`
+        : direct
+          ? `Passer au niveau ${next + 1}`
+          : `Ajouter le niveau ${next + 1} au fil : il se lancera dès que possible`;
     btn.setAttribute('aria-label', `${R.buildings[k].name} : ${btn.title.toLowerCase()}`);
     const down = q(`[data-demolish="${k}"]`);
     down.disabled = !!s.queue || level < 1 || !session.canAct;
     down.hidden = level < 1;
-    if (job?.demolish) setHtml(btn, `${ic('wait')}−${clock(Math.max(0, job.end - now))}`);
   }
+  renderPlan(me, pl, planet, now);
 
   if (me.race === 'alien') {
     const trance = Math.max(0, (planet.trance || 0) - now);
@@ -1039,6 +1071,48 @@ function renderPlanet(me, now) {
   renderPartners($('planet-partners'), { planet: pl.key });
 }
 
+/**
+ * Fil de construction de la planète ouverte, avec l'heure estimée de début
+ * et de fin de chaque bâtiment (planForecast, recalculée une fois par seconde).
+ */
+let planCache = { key: '', list: [] };
+function renderPlan(me, pl, planet, now) {
+  const el = $('plan');
+  const key = [pl.key, planet.at, JSON.stringify(planet.plan || []), planet.queue?.end, planet.research?.end, planet.yard?.end, Math.floor(now / 1000)].join('|');
+  if (planCache.key !== key) planCache = { key, list: planForecast(planet, now) };
+  const list = planCache.list;
+  el.hidden = !list.length;
+  const R = RACES[me.race];
+  const when = (f) => {
+    if (f.start == null) return f.why || 'plus de 6 h';
+    const start = f.start <= now ? 'maintenant' : `dans ${clock(f.start - now)}`;
+    return `${start} → fini dans ${clock(Math.max(0, f.end - now))}`;
+  };
+  // La structure ne change qu'avec le fil (les boutons restent sous le doigt) ; les heures, à chaque tic.
+  setHtml(
+    el,
+    list
+      .map(
+        (f, i) => `<li class="plan-item">
+      <span class="plan-name">${i + 1}. ${esc(R.buildings[f.key].short || R.buildings[f.key].name)} <span class="level mono">niv ${f.level}</span></span>
+      <span class="plan-when mono" title="Estimation, si la production reste la même"></span>
+      <button class="ghost small" data-unplan="${i}" data-key="${f.key}" title="Retirer du fil" aria-label="Retirer ${esc(R.buildings[f.key].name)} du fil"${session.canAct ? '' : ' disabled'}>${ic('close')}</button>
+    </li>`,
+      )
+      .join(''),
+  );
+  el.querySelectorAll('.plan-item').forEach((li, i) => {
+    const f = list[i];
+    li.classList.toggle('blocked', f.start == null);
+    li.querySelector('.plan-when').textContent = `${f.start == null ? '' : '≈ '}${when(f)}`;
+  });
+}
+
+$('plan').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-unplan]');
+  if (btn && !btn.disabled) session.unplan(btn.dataset.key, Number(btn.dataset.unplan), openKey);
+});
+
 /** Chantier, recherche ou vaisseaux en cours : la barre de progression s'affiche sur la carte concernée. */
 function cardProgress(card, job, now) {
   const bar = card.querySelector('.card-bar');
@@ -1048,16 +1122,12 @@ function cardProgress(card, job, now) {
   bar.firstElementChild.style.width = `${Math.min(100, (1 - left / Math.max(1, job.end - job.start)) * 100)}%`;
 }
 
-/** Arbre des technologies : sur la planète mère seulement, avec un labo. */
+/** Arbre des technologies : sur toute planète qui a un labo, avec le niveau de ce labo. */
 function renderResearch(me, pl, s, now) {
-  const home = pl.key === 'home';
-  $('research-zone').hidden = !home;
-  // Pas de recherche dans une colonie : son onglet disparaît.
-  $('tab-research').hidden = !home;
-  if (!home && $('view-planet').dataset.tab === 'research') showTab('build', false);
-  if (home && $('view-planet').dataset.tab !== chosenTab) showTab(chosenTab, false); // retour d'une colonie
-  if (!home) return;
   const lab = s.levels.lab || 0;
+  // Recherches lancées sur mes autres planètes : la même technologie ne peut pas y être lancée ici.
+  const elsewhere = {};
+  for (const x of session.planetsOf(me)) if (x.key !== pl.key && x.planet.research) elsewhere[x.planet.research.key] = x.name;
   const T = TECHS[me.race];
   const labName = RACES[me.race].buildings.lab.name;
   $('research-hint').textContent = lab ? '' : `🔒 Il faut un ${labName}.`;
@@ -1075,14 +1145,15 @@ function renderResearch(me, pl, s, now) {
     req.textContent = miss ? `🔒 ${miss}` : '';
     setHtml(q(`[data-tcost="${k}"]`), maxed ? 'Niveau maximum' : `${costText(cost)} · ${clock(researchDuration(cost, Math.max(1, lab)))}`);
     q(`[data-tcard="${k}"]`).classList.toggle('locked', !!miss && !maxed);
-    q(`[data-tcard="${k}"]`).classList.toggle('affordable', ok && !s.research);
+    const there = elsewhere[k];
+    q(`[data-tcard="${k}"]`).classList.toggle('affordable', ok && !s.research && !there);
     q(`[data-tcard="${k}"]`).classList.toggle('building-now', s.research?.key === k);
     const btn = q(`[data-research="${k}"]`);
-    btn.disabled = !ok || !!s.research || session.status !== 'playing';
+    btn.disabled = !ok || !!s.research || !!there || session.status !== 'playing';
     const job = s.research?.key === k ? s.research : null;
     cardProgress(q(`[data-tcard="${k}"]`), job, now);
     setHtml(btn, job ? `${ic('wait')}${clock(Math.max(0, job.end - now))}` : maxed ? ic('done') : `${ic('up')}${level + 1}`);
-    btn.title = s.research?.key === k ? 'En cours' : maxed ? 'Terminé' : miss ? `Il faut : ${miss}` : !ok ? 'Ressources insuffisantes' : `Rechercher le niveau ${level + 1}`;
+    btn.title = s.research?.key === k ? 'En cours' : maxed ? 'Terminé' : there ? `En recherche sur ${there}` : miss ? `Il faut : ${miss}` : !ok ? 'Ressources insuffisantes' : `Rechercher le niveau ${level + 1}`;
     btn.setAttribute('aria-label', `${t.name} : ${btn.title.toLowerCase()}`);
   }
 }
@@ -1090,6 +1161,11 @@ function renderResearch(me, pl, s, now) {
 /** « ⚔ 12 · ◇ 30 · ▣ 50 · » 7,0 » : attaque, coque, soute, vitesse (cases/min). */
 const statText = (st) =>
   `⚔ ${fmt(st.attack)} · ◇ ${fmt(st.hull)} · ▣ ${fmt(st.cargo)} · » ${(st.speed * TEMPO).toFixed(1).replace('.', ',')}`;
+
+/** Lot de `n` vaisseaux `k` qu'on peut lancer maintenant sur cette planète (état `s`) ? */
+function canBuildShips(me, s, k, n) {
+  return !!s.levels.yard && n >= 1 && shipUnlocked(me.race, k, s.tech) && !s.yard && n <= shipsAffordable(me.race, k, s.stock) && session.status === 'playing';
+}
 
 /** Chantier naval de la planète ouverte. */
 function renderYard(me, pl, s, now) {
@@ -1115,11 +1191,7 @@ function renderYard(me, pl, s, now) {
     req.textContent = unlocked ? '' : `🔒 ${TECHS[me.race][u.key].name} ${u.level}`;
     setHtml(q(`[data-scost="${k}"]`), `${costText(S[k].cost)} · ${clock(shipDuration(me.race, k, 1, Math.max(1, yard)))}/u`);
     q(`[data-scard="${k}"]`).classList.toggle('locked', !unlocked);
-    for (const btn of document.querySelectorAll(`[data-ship="${k}"]`)) {
-      const n = Number(btn.dataset.n);
-      const cost = Object.fromEntries(Object.entries(S[k].cost).map(([r, v]) => [r, v * n]));
-      btn.disabled = !yard || !unlocked || !!s.yard || !covers(s.stock, cost) || session.status !== 'playing';
-    }
+    for (const btn of document.querySelectorAll(`[data-ship="${k}"]`)) btn.disabled = !canBuildShips(me, s, k, Number(btn.dataset.n));
   }
 }
 
@@ -1148,6 +1220,15 @@ const cellName = (cell) => mapPlanets().find((w) => sameCell(w, cell))?.name || 
 /** « carburant 34 / 40 » */
 const fuelText = (race, f, now) => `carburant ${Math.floor(fuelAt(f, race, now))} / ${fleetTank(race, f.ships)}`;
 
+/** « vitesse 7,0 cases/min, celle du Cargo » : la flotte va au pas de son vaisseau le plus lent. */
+function speedText(race, ships, tech) {
+  const slow = slowestShip(race, ships, tech);
+  if (!slow) return '';
+  const v = (fleetSpeed(race, ships, tech) * TEMPO).toFixed(1).replace('.', ',');
+  const kinds = SHIP_KEYS.filter((k) => ships[k] > 0).length;
+  return `vitesse ${v} cases/min${kinds > 1 ? `, celle du plus lent : ${SHIPS[race][slow].name}` : ''}`;
+}
+
 /** « 3 × Frégate, 1 × Cargo · 200 ◆ », en HTML. */
 function shipsLine(race, f) {
   const ships = SHIP_KEYS.filter((k) => f.ships[k]).map((k) => `${f.ships[k]} × ${esc(SHIPS[race][k].name)}`).join(', ');
@@ -1172,8 +1253,9 @@ function fleetStatus(race, f, now) {
     const foe = session.state.players[f.order.pid];
     return `Poursuite d’une flotte ${foe ? de(foe.name) : 'ennemie'}`;
   }
-  if (moving(f, now)) return `${f.order ? ORDERS[f.order.kind]?.name || 'Ordre' : 'Déplacement'} → ${where}`;
-  return mapPlanets().some((w) => sameCell(w, f.to)) ? `En orbite ${de(where)}` : `Stationne en ${where}`;
+  const hawk = aggressive(f) ? ' · agressive' : '';
+  if (moving(f, now)) return `${f.order ? ORDERS[f.order.kind]?.name || 'Ordre' : 'Déplacement'} → ${where}${hawk}`;
+  return `${mapPlanets().some((w) => sameCell(w, f.to)) ? `En orbite ${de(where)}` : `Stationne en ${where}`}${hawk}`;
 }
 
 $('fleets').addEventListener('click', (e) => {
@@ -1196,10 +1278,13 @@ function fleetChoice() {
   return { ships, cargo };
 }
 
-function openFleetSheet() {
+let fleetKey = 'home'; // planète d'où part la flotte du formulaire de décollage
+
+function openFleetSheet(key = openKey) {
   const me = session.state.players[session.me];
-  const pl = session.planetOf(me, openKey);
+  const pl = session.planetOf(me, key);
   if (!pl) return;
+  fleetKey = key;
   const s = stateAt(pl.planet, session.now());
   $('fleet-ships').innerHTML = SHIP_KEYS.filter((k) => s.ships[k])
     .map((k) => `<label>${esc(SHIPS[me.race][k].name)} (${s.ships[k]})<input type="number" inputmode="numeric" min="0" max="${s.ships[k]}" value="${s.ships[k]}" data-fship="${k}"></label>`)
@@ -1219,7 +1304,8 @@ function openFleetSheet() {
 function updateFleetSheet() {
   const me = session.state.players[session.me];
   const { ships } = fleetChoice();
-  $('fleet-room').textContent = `Soutes : ${fmt(fleetCargo(me.race, ships))}`;
+  const speed = speedText(me.race, ships, me.planet.tech);
+  $('fleet-room').textContent = `Soutes : ${fmt(fleetCargo(me.race, ships))}${speed ? ` · ${speed[0].toUpperCase()}${speed.slice(1)}` : ''}`;
   const tank = fleetTank(me.race, ships);
   const burn = fleetBurn(me.race, ships);
   const input = $('fleet-fuel');
@@ -1231,12 +1317,12 @@ function updateFleetSheet() {
   $('btn-fleet-go').disabled = !countShips(ships);
 }
 
-$('btn-send-fleet').onclick = openFleetSheet;
+$('btn-send-fleet').onclick = () => openFleetSheet(openKey);
 $('btn-fleet-close').onclick = () => ($('sheet-fleet').hidden = true);
 $('sheet-fleet').addEventListener('input', updateFleetSheet);
 $('btn-fleet-go').onclick = () => {
   const { ships, cargo } = fleetChoice();
-  const id = session.takeOff(openKey, ships, cargo, Math.floor(Number($('fleet-fuel').value) || 0));
+  const id = session.takeOff(fleetKey, ships, cargo, Math.floor(Number($('fleet-fuel').value) || 0));
   if (!id) return;
   $('sheet-fleet').hidden = true;
   // Direction la carte, flotte sélectionnée : il ne reste qu'à toucher une case.
@@ -1288,7 +1374,7 @@ function stopMap() {
 $('btn-back-map').onclick = () => showView('map');
 
 /** Onglet de l'écran planète : bâtiments, pouvoirs (aliens), recherche ou flottes. */
-/** Onglet choisi par le joueur (une colonie sans recherche peut en afficher un autre un moment). */
+/** Onglet choisi par le joueur (un changement forcé peut en afficher un autre un moment). */
 let chosenTab = 'build';
 function showTab(tab, persist = true) {
   $('view-planet').dataset.tab = tab;
@@ -1297,7 +1383,7 @@ function showTab(tab, persist = true) {
     b.setAttribute('aria-selected', String(b.dataset.tabBtn === tab));
     b.tabIndex = b.dataset.tabBtn === tab ? 0 : -1;
   }
-  if (!persist) return; // changement forcé (colonie sans recherche) : l'onglet choisi reste mémorisé
+  if (!persist) return; // changement forcé : l'onglet choisi reste mémorisé
   try {
     localStorage.setItem('astra.tab', tab);
   } catch {}
@@ -1707,12 +1793,8 @@ $('map').addEventListener('click', (e) => {
     selected = null;
     return renderPick();
   }
+  // Une de mes planètes aussi : sa fiche s'ouvre sur la carte (chantier, décollage), « Bâtiments » mène à l'écran planète.
   const { w } = best;
-  if (w.owner?.id === session.me && w.pl) {
-    selected = null;
-    renderPick();
-    return showView('planet', w.pl.key);
-  }
   selected = { x: w.x, y: w.y };
   renderPick();
 });
@@ -1733,7 +1815,8 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
   $('fi-where').textContent = `[${Math.round(pos.x)}:${Math.round(pos.y)}]`;
   setHtml($('fi-ships'), shipsLine(me.race, f));
   $('fi-name').textContent = fleetName(f);
-  $('fi-status').textContent = `${fleetStatus(me.race, f, now)}${go ? ` · ${clock(f.arrive - now)}` : ''}`;
+  const speed = speedText(me.race, f.ships, me.planet.tech);
+  $('fi-status').textContent = `${fleetStatus(me.race, f, now)}${go ? ` · ${clock(f.arrive - now)}` : ''}${speed ? ` · ${speed}` : ''}`;
   const here = !go && session.planetsAt(f.to)[0];
   const fuel = fuelAt(f, me.race, now);
   const tank = fleetTank(me.race, f.ships);
@@ -1747,6 +1830,12 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
   $('btn-fi-return').hidden = !!mine && here.key === 'home'; // déjà chez elle
   $('btn-fi-refuel').hidden = !mine || fuel >= tank - 0.5;
   $('btn-fi-split').hidden = go || countShips(f.ships) < 2;
+  const hawk = aggressive(f);
+  const stance = $('btn-fi-stance');
+  stance.hidden = !hawk && !armed(me.race, f.ships, me.planet?.tech);
+  stance.className = `${hawk ? 'primary' : 'secondary'} small icon-only`;
+  stance.setAttribute('aria-pressed', String(hawk));
+  stance.title = hawk ? 'Agressive : combat toute flotte ennemie qu’elle croise. Toucher pour la rendre passive' : 'Passive : ne combat que sur ordre. Toucher pour la rendre agressive';
   renderBeside(me, f, now);
   renderPartners($('fi-partners'), go ? null : { fleet: f.id });
   const choice = pending ? session.ordersAt(selFleet, pending) : [];
@@ -1818,6 +1907,13 @@ $('fi-choice').addEventListener('click', (e) => {
   renderFleetInfo();
 });
 $('btn-fi-stop').onclick = () => session.stopFleet(selFleet) && renderFleetInfo();
+$('btn-fi-stance').onclick = () => {
+  const f = session.myFleet(selFleet);
+  if (f && session.setFleetStance(selFleet, aggressive(f) ? 'passive' : 'aggressive')) {
+    toast(`Flotte ${aggressive(f) ? 'agressive : elle combattra toute flotte ennemie qu’elle croise' : 'passive : elle ne combattra que sur ordre'}.`);
+    renderFleetInfo();
+  }
+};
 $('btn-fi-refuel').onclick = () => session.refuelFleet(selFleet) && renderFleetInfo();
 $('btn-fi-return').onclick = () => session.returnFleet(selFleet) && renderFleetInfo();
 $('btn-fi-dock').onclick = () => {
@@ -2029,7 +2125,60 @@ function renderPick(me = session?.state?.players[session.me], now = session?.now
   $('btn-claim').innerHTML = `${ic('dock')}S'installer · ${esc(w.name)}`;
   $('btn-open-planet').hidden = o?.id !== session.me || !w.pl;
   $('btn-open-planet').dataset.key = w.pl?.key || 'home';
+  renderPickYard(me, o?.id === session.me && w.pl ? w.pl : null, s, now);
 }
+
+/** Chantier et décollage dans la fiche d'une de mes planètes, sur la carte. */
+function renderPickYard(me, pl, s, now) {
+  $('pi-yard').hidden = !pl || !s;
+  if (!pl || !s) return;
+  const yard = s.levels.yard || 0;
+  const busy = s.yard ? `En chantier : ${s.yard.count} × ${SHIPS[me.race][s.yard.type].name} · ${clock(Math.max(0, s.yard.end - now))}` : '';
+  $('pi-yard-hint').textContent = !yard ? `🔒 Il faut un ${RACES[me.race].buildings.yard.name}.` : busy;
+  $('pi-yard-hint').hidden = !$('pi-yard-hint').textContent;
+  $('pi-ships').hidden = !yard;
+  for (const k of SHIP_KEYS) {
+    const row = document.querySelector(`[data-piship="${k}"]`);
+    const unlocked = shipUnlocked(me.race, k, s.tech);
+    row.hidden = !unlocked; // seulement ce que cette planète sait construire
+    if (!unlocked) {
+      for (const btn of row.querySelectorAll('[data-pi-ship]')) btn.disabled = true;
+      continue;
+    }
+    const max = shipsAffordable(me.race, k, s.stock);
+    row.classList.toggle('affordable', max >= 1);
+    setHtml(document.querySelector(`[data-picost="${k}"]`), `${costText(SHIPS[me.race][k].cost)} · ${clock(shipDuration(me.race, k, 1, Math.max(1, yard)))}/u`);
+    document.querySelector(`[data-pinote="${k}"]`).textContent = [s.ships[k] ? `${s.ships[k]} à quai` : '', `jusqu’à ${max}`].filter(Boolean).join(' · ');
+    for (const btn of row.querySelectorAll('[data-pi-ship]')) {
+      const n = btn.dataset.n === 'max' ? max : Number(btn.dataset.n);
+      btn.disabled = !canBuildShips(me, s, k, n);
+      if (btn.dataset.n === 'max') btn.textContent = max ? `×${max}` : 'Max';
+    }
+  }
+  if (yard && !busy && !SHIP_KEYS.some((k) => shipUnlocked(me.race, k, s.tech))) {
+    $('pi-yard-hint').textContent = 'Aucun vaisseau recherché pour l’instant : lance une recherche.';
+    $('pi-yard-hint').hidden = false;
+  }
+  $('btn-pi-takeoff').hidden = !countShips(s.ships);
+  $('btn-pi-takeoff').dataset.key = pl.key;
+}
+
+$('pi-ships').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-pi-ship]');
+  const key = $('btn-open-planet').dataset.key;
+  if (!btn || btn.disabled || !session?.state) return;
+  const me = session.state.players[session.me];
+  const pl = session.planetOf(me, key);
+  if (!pl) return;
+  const n = btn.dataset.n === 'max' ? shipsAffordable(me.race, btn.dataset.piShip, stateAt(pl.planet, session.now()).stock) : Number(btn.dataset.n);
+  session.buildShips(btn.dataset.piShip, n, key);
+});
+$('btn-pi-takeoff').onclick = (e) => {
+  const key = e.currentTarget.dataset.key || 'home';
+  selected = null; // la fiche de la planète se ferme, le formulaire de décollage prend sa place
+  renderPick();
+  openFleetSheet(key);
+};
 
 /** Ferme la fiche de la planète : bouton Fermer, ou toucher le fond sombre autour. */
 function closePlanetSheet() {

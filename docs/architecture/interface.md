@@ -79,11 +79,11 @@ Détail de `#screen-game` :
 | `#net` (91-93) | Compteur de joueurs en ligne (vert, orange si un lien > 250 ms). `showView` le **déplace** dans la première ligne de la vue affichée (`js/app.js:1223`). Ouvre `#sheet-players`. | `renderLive` 811-821, clic 319-322. |
 | `#lost` (97-100) | Bandeau « Seul en ligne » + **Rejoindre** (rejoindre les autres par une nouvelle invitation). | `renderState` 762 (`session.alone`), `btn-rejoin` 286-289. |
 | `#view-universe` (102-148) | Vue carte : `#pick` (bandeau « Choisis ta planète »), `#trades` (offres d'échange), `.map-head` (coordonnées, aide `?`), `canvas#map`. | `drawMap` 1349-1538, `renderPick` 1876-1913, `renderTrades` 1777-1800. |
-| `#sheet-planet` (114-127) | Fiche de la planète touchée : nom, coordonnées, propriétaire, places, climat, gisements, **S'installer** ou **Bâtiments**. | `renderPick` 1876-1913, `btn-claim` 1922-1929, `btn-open-planet` 1275-1279, `closePlanetSheet` 1916-1920. |
-| `#map-fleets` (sous `canvas#map`) | Mes flottes en grille (2 colonnes sur téléphone). Une case par flotte : nom, compte à rebours, une icône par type de vaisseau avec son nombre, statut ; bord rouge si attaque/conquête/poursuite, grisée si à sec. Toucher = sélectionner la flotte (ouvre `#fleet-info`), retoucher = la relâcher (D-098, D-099). | `renderMapFleets`, appelé par `renderLive` ; le HTML n'est réécrit que si le contenu ou le statut change, le compte à rebours et `aria-pressed` sont mis à jour en place. |
-| `#fleet-info` (129-145) | Fiche de la flotte sélectionnée : vaisseaux, statut, carburant, choix d'ordres (`#fi-choice`), mes flottes à côté (`#fi-beside`), joueurs à côté (`#fi-partners`), boutons Arrêter / Rentrer / Se poser / Plein / Scinder / Fermer. | `renderFleetInfo` 1643-1687, handlers 1689-1714. |
+| `#sheet-planet` | Fiche de la planète touchée : nom, coordonnées, propriétaire, places, climat, gisements, **S'installer** ou **Bâtiments**. Sur une de mes planètes, partie **Chantier** (`#pi-yard`, D-106) : vaisseaux recherchés, prix, « jusqu'à N », boutons ×1 / ×5 / ×N, et **Décoller**. | `renderPick`, `renderPickYard`, écouteur de `#pi-ships`, `btn-pi-takeoff`, `btn-claim`, `btn-open-planet`, `closePlanetSheet`. |
+| `#map-fleets` (sous `canvas#map`) | Mes flottes en grille (2 colonnes sur téléphone). Une case par flotte : nom, compte à rebours, une icône par type de vaisseau avec son nombre, statut ; bord rouge si attaque/conquête/poursuite, grisée si à sec. Toucher = sélectionner la flotte (ouvre `#fleet-info`), retoucher = la relâcher (D-107, D-108). | `renderMapFleets`, appelé par `renderLive` ; le HTML n'est réécrit que si le contenu ou le statut change, le compte à rebours et `aria-pressed` sont mis à jour en place. |
+| `#fleet-info` (129-145) | Fiche de la flotte sélectionnée : vaisseaux, statut (avec la vitesse et, si la flotte mêle plusieurs types, le nom du plus lent : `speedText`), carburant, choix d'ordres (`#fi-choice`), mes flottes à côté (`#fi-beside`), joueurs à côté (`#fi-partners`), boutons Arrêter / Rentrer / Se poser / Plein / Passive-Agressive (`#btn-fi-stance`, icône d'attaque, pleine quand la flotte est agressive, cachée pour une flotte sans armes ; D-100) / Scinder / Fermer. Le statut finit par « · agressive » (`fleetStatus`). | `renderFleetInfo` 1643-1687, handlers 1689-1714. |
 | `#view-planet` (150-199) | Vue planète : en-tête (retour, nom, climat), gisements `#soil-zone`, stocks `#resources`, onglets, puis les panneaux `data-pane`. | `renderPlanet` 869-988. |
-| `.tabs` (163-168) | Onglets Bâtiments / Pouvoirs (aliens seulement) / Recherche (planète mère seulement) / Flottes. | `showTab` 1241-1252, flèches clavier 1255-1262. |
+| `.tabs` (163-168) | Onglets Bâtiments / Pouvoirs (aliens seulement) / Recherche (toute planète ; « 🔒 Il faut un labo » sans labo, technologie grisée si elle est en recherche sur une autre planète) / Flottes. | `showTab` 1241-1252, flèches clavier 1255-1262. |
 | `[data-pane=power]` `#powers-zone` (170-173) | Pouvoirs aliens. | `buildStatic` 526-540, `renderPlanet` 966-982. |
 | `[data-pane=build]` (175-178) | Bâtiments + compteur de places `#places`. | `buildStatic` 488-498, `renderPlanet` 942-964. |
 | `[data-pane=research]` `#research-zone` (180-184) | Technologies. | `buildStatic` 500-510, `renderResearch` 1000-1036. |
@@ -100,7 +100,7 @@ Toutes se ferment par leur croix (`.close-btn`), un toucher sur le fond sombre o
 |---|---|---|---|
 | `#sheet-players` (`index.html:203-216`) | `#net` | Détail réseau, **Inviter un joueur**, classement (`#players`). | 319-327 ; liste `renderState` 765-779 ; lignes `renderLive` 835-865 (score, `style.order` pour trier sans redessiner, 864). |
 | `#sheet-invite` (219-248) | **Inviter un joueur** | QR de l'invitation + copier/partager ; scanner ou coller la réponse. | `openInviteSheet` 297-312, `useAnswer` 341-363, fermeture → `session.cancelInvite()` 328-331. |
-| `#sheet-fleet` (251-275) | **Décoller** (onglet Flottes) | Nombre de vaisseaux, cargaison, carburant ; calcule soutes, réservoir, portée. | `openFleetSheet` 1147-1165, `updateFleetSheet` 1167-1180, `btn-fleet-go` 1185-1196. |
+| `#sheet-fleet` (251-275) | **Décoller** (onglet Flottes) | Nombre de vaisseaux, cargaison, carburant ; calcule soutes, vitesse (et le vaisseau le plus lent, qui la fixe), réservoir, portée. | `openFleetSheet` 1147-1165, `updateFleetSheet` 1167-1180, `btn-fleet-go` 1185-1196. |
 | `#sheet-move` (278-295) | « Donner » (`#fi-beside`) ou **Scinder** | Vaisseaux, cargaison, carburant à passer à une autre flotte ou à une nouvelle. | `openMoveSheet` 1838-1860, `btn-move-go` 1864-1873. |
 | `#sheet-trade` (298-315) | Bouton échange d'un joueur sur la même case | « Je donne » / « Je demande ». | `openTradeSheet` 1746-1757, `btn-trade-go` 1768-1774. |
 
@@ -173,8 +173,10 @@ Table des appels de l'interface vers la session :
 | Inviter / accepter / annuler | 304, 346, 329 | `openInvite`, `acceptAnswer`, `cancelInvite` |
 | Choisir sa race | 430 | `chooseRace` |
 | S'installer sur une planète | 1924 | `claimPlanet` |
-| Bâtiment / recherche / vaisseaux / pouvoir | 749, 610, 614, 606 | `build`, `research`, `buildShips`, `power` |
-| Décoller | 1187 | `takeOff` (renvoie l'id de la flotte, sélectionnée ensuite) |
+| Bâtiment / recherche / vaisseaux / pouvoir | 749, 610, 614, 606 | `build` (ou `planBuild`, voir §13), `research`, `buildShips`, `power` |
+| Retirer un élément du fil de construction | `#plan` (× d'un élément) | `unplan` |
+| Vaisseaux depuis la carte (D-106) | écouteur de `#pi-ships` | `buildShips(type, n, clé de la planète touchée)` ; ×N = `shipsAffordable` |
+| Décoller (onglet Flottes ou fiche de la carte) | `openFleetSheet(clé)`, `btn-fleet-go` | `takeOff(fleetKey, …)` (renvoie l'id de la flotte, sélectionnée ensuite) |
 | Envoyer une flotte sur une case | 1619-1623, 1697 | `ordersAt` (ordres possibles) puis `moveFleet` |
 | Poursuivre une flotte ennemie | 1691 | `chaseFleet` |
 | Arrêter / plein / rentrer / se poser | 1701-1708 | `stopFleet`, `refuelFleet`, `returnFleet`, `moveFleet(…, 'dock')` |
@@ -205,17 +207,17 @@ Retour de la session vers l'interface : seulement deux rappels, `session.onchang
 
 Le point touché est converti en cases (pixels CSS / taille d'une case). Puis, dans l'ordre :
 1. **Une de mes flottes sous le doigt** (< 0,7 case, plus proche qu'une planète) → la sélectionner ; plusieurs flottes empilées : chaque toucher passe à la suivante (1592-1604). Si une flotte est déjà sélectionnée, seules celles de la case touchée comptent.
-   Autre façon de sélectionner : toucher la flotte dans la grille `#map-fleets` sous la carte (D-098, D-099).
+   Autre façon de sélectionner : toucher la flotte dans la grille `#map-fleets` sous la carte (D-107, D-108).
 2. **Une flotte sélectionnée** :
    - une flotte ennemie sous le doigt → `prey`, la fiche propose « Attaquer » (1607-1615) ;
    - sinon la case touchée : `session.ordersAt` ; un seul ordre possible sans panne → `moveFleet` direct ; sinon `pending` = la case, et la fiche affiche un bouton par ordre (1617-1625, rendu 1674-1681).
-3. **Sinon** : ma planète → vue planète (1633-1637) ; une autre planète → sa fiche (`selected`, 1638-1639) ; le vide → ferme la fiche.
+3. **Sinon** : une planète, à moi ou non → sa fiche (`selected`) ; pour la mienne, la fiche porte le chantier, « Décoller » et « Bâtiments » (D-106 ; avant, toucher ma planète ouvrait directement la vue planète) ; le vide → ferme la fiche.
 
 État de la carte, variables de module (1208-1214) : `currentView`, `openKey` (« home » ou id d'une colonie), `mapFrame`, `selected`, `selFleet`, `pending`, `prey`.
 
 ### 6.3 Carte du replay
 
-`js/replay-view.js:115-198` redessine une carte plus simple sur le même principe (fond, quadrillage, `drawSun`, planètes `planetsFor(gid)`, nom sous les planètes possédées, flottes en **losange**, décalées quand elles sont arrêtées).
+`js/replay-view.js:116-199` redessine une carte plus simple sur le même principe (fond, quadrillage, `drawSun`, planètes `planetsFor(gid)`, nom sous les planètes possédées, flottes en **losange**, décalées quand elles sont arrêtées).
 
 ## 7. Style
 
@@ -257,7 +259,7 @@ Le fichier est **en couches** : les sections de la fin redéfinissent celles du 
 
 ### 7.4 Icônes et fond
 
-- **`js/icons.js`** : 35 tracés (dont les 4 vaisseaux `cargo`, `fighter`, `heavy`, `colony`, D-099) 24 × 24 (`PATHS`). `ic(nom)` renvoie un `<svg class="ic" aria-hidden="true">` pour le HTML généré ; `fillIcons()` remplace chaque `<i data-ic="nom"></i>` du HTML statique (appelé au tout début de `app.js`). Style `.ic` : trait 1,6, `stroke-linecap: square`, couleur du texte (`style.css:559`). Ajouter une icône = ajouter un tracé dans `PATHS`.
+- **`js/icons.js`** : 35 tracés (dont les 4 vaisseaux `cargo`, `fighter`, `heavy`, `colony`, D-108) 24 × 24 (`PATHS`). `ic(nom)` renvoie un `<svg class="ic" aria-hidden="true">` pour le HTML généré ; `fillIcons()` remplace chaque `<i data-ic="nom"></i>` du HTML statique (appelé au tout début de `app.js`). Style `.ic` : trait 1,6, `stroke-linecap: square`, couleur du texte (`style.css:559`). Ajouter une icône = ajouter un tracé dans `PATHS`.
 - **Ressources et races** (`js/game.js:31-52`) : `resIcon(r, nom)` (cristal, feuille, éclair, buste ; classe `.ri ri-<r>` colorée par la variable de la ressource) et `raceIcon(r)` (casque, robot, alien ; classe `.rci`). Contrairement à `ic`, elles sont nommées (`role="img"`, `<title>`) pour les lecteurs d'écran.
 - **`js/sky.js`** : `drawSun(ctx, sun, cell)` ; disque en dégradé blanc → jaune → orange qui remplit son carré de `sun.size` cases, halo qui déborde (1,7 × le rayon). Position donnée par `sunFor(gid)` de `game.js` (voir `regles.md` pour l'effet du soleil sur le climat).
 - **`js/galaxy.js`** : `startGalaxy()` crée `div.galaxy` (fixe, `z-index: -1`) avec 3 couches d'étoiles (260/90/28 étoiles pour 400 × 800 px, densité constante), dessinées une fois en canvas puis posées en image de fond répétée (tuile = taille de l'écran). Graine fixe (`rng`) : le même ciel à chaque ouverture. 45 % des étoiles suivent une bande diagonale (« Voie lactée »). Parallaxe : défilement, souris, et inclinaison du téléphone (`devicemotion`, position de repos qui s'adapte ; permission demandée au premier toucher sur iPhone). Redessiné 150 ms après un redimensionnement. Sous les couches, la nébuleuse est un dégradé CSS du `body` (`style.css:589-596`). Chargé seulement par `index.html`.
@@ -277,10 +279,11 @@ Rendu (`js/techtree.js`, la construction du graphe est décrite dans `regles.md`
 
 Écran « film » de la partie sauvegardée ; le moteur de rejeu (`js/replay.js`) est décrit dans `regles.md`. Rien n'est écrit : ni sauvegarde ni partie en cours ne changent (`js/replay-view.js:3`).
 
-- `load` (28-66) : `loadGame()` (la partie sélectionnée dans l'historique), titre = noms des joueurs, `replayable(st)` ; messages si la copie n'est pas à jour ou si le début du journal manque ; calcul `replay(st)` lancé après 30 ms pour laisser s'afficher « Calcul du replay… » ; signale un « replay approché » si la fin ne retombe pas sur la vraie partie.
+- `load` (28-67) : `loadGame()` (la partie sélectionnée dans l'historique), titre = noms des joueurs, `replayable(st)` ; messages si la copie n'est pas à jour ou si le début du journal manque ; calcul `replay(st)` lancé après 30 ms pour laisser s'afficher « Calcul du replay… » ; signale un « replay approché » si la fin ne retombe pas sur la vraie partie.
 - Index `film.at` : pour chaque image, où trouver la dernière fiche de chaque joueur (53-59). `frameAt` : recherche dichotomique (69-79).
-- Contrôles : lecture/pause (264-271), vitesse 1 min/s, 10 min/s (défaut), 1 h/s (`replay.html:35-39`), curseur sur 0-1000 (273-276), événement précédent/suivant (278-288). Pendant la lecture, si rien ne bouge et que le prochain événement est loin, on y saute (`QUIET_S`, 244-262).
-- `renderPlayers` (200-224) : planètes, vaisseaux, minéraux, score à l'instant affiché. `renderLog` (227-241) : les 40 dernières entrées jusqu'à cet instant, la plus récente en haut.
+- Contrôles : lecture/pause (353-360), vitesse 1 min/s, 10 min/s (défaut), 1 h/s (`replay.html:35-39`), curseur sur 0-1000 (362-365), événement précédent/suivant (367-377). Pendant la lecture, si rien ne bouge et que le prochain événement est loin, on y saute (`QUIET_S`, 333-351).
+- Section « Points » (`replay.html`, `#rp-score`, D-103) : `drawScores` (219-287) dessine sur un canvas la courbe en escalier de chaque joueur (`film.scores` = `scoreSeries(frames, gid)`, `js/replay.js`), à sa couleur, graduée 0 / moitié / haut, avec un trait à l'instant affiché ; `#rp-score-legend` donne nom et points à cet instant, dans l'ordre d'arrivée. Toucher ou glisser sur la courbe déplace le replay (380-386). Adresse `replay.html#points` (lien du bandeau de fin) : `load` se place à la fin de la partie et fait défiler jusqu'à la courbe.
+- `renderPlayers` (289-314) : planètes, vaisseaux, minéraux, points de l'empire à l'instant affiché (`ptsAt`, les mêmes que la courbe). `renderLog` (316-330) : les 40 dernières entrées jusqu'à cet instant, la plus récente en haut.
 
 ## 9. Vérification dans le navigateur (2026-10-29)
 
@@ -315,7 +318,8 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
 - **Bandeau de course** `#race` (`index.html`, sous `#lost`), rempli par `renderRace(now)` dans
   `renderLive` (chaque seconde) : avant le départ du froid « Le soleil s'éteint · dernier en vie
   gagne · n en vie » ; ensuite « Ta planète la plus exposée gèle dans m:ss · va vers le
-  soleil » ; « Éliminé · encore n en vie » ; « Victoire ! » ou « X gagne. · partie finie ». Classe
+  soleil » ; « Éliminé · encore n en vie » ; « Victoire ! » ou « X gagne. · partie finie », suivi du lien **Voir la courbe des points**
+  (`replay.html#points`, D-104). Classe
   `hot` (bordure orange) à moins de 3 min du gel, quand on est éliminé ou qu'un autre a gagné.
   Caché pour une partie d'avant la course.
 - **Carte** : `drawFrost` voile en bleu tout ce qui est hors du cercle de froid (remplissage
@@ -337,3 +341,22 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   resserre et planètes qui s'effacent, gel de la planète puis « Victoire ! » (froid accéléré à la
   main), liste des bâtiments aliens avec épines et dôme, déconstruction (niveau 1 → 0, place
   libérée). **Pas vérifié** : les boutons d'attaque et de conquête à deux joueurs réels.
+
+## 13. Fil de construction (2026-10-30, D-105)
+
+- `index.html` : `<ol id="plan" class="plan">` au-dessus de `#buildings`, caché quand le fil est
+  vide.
+- Bouton d'un bâtiment (`[data-build]`, `renderPlanet`) : `data-mode="now"` (icône ↑) quand le
+  chantier est libre, le fil vide et le stock suffisant → `session.build` ; sinon
+  `data-mode="plan"` (icône +) → `session.planBuild`. Le niveau affiché est celui du prochain
+  ajout (chantier et fil compris), comme le prix. Désactivé si les places ne suffiront pas ou si
+  le fil est plein. Le compte à rebours du chantier passe dans l'étiquette de niveau
+  (« niv 2 → 3 · 0:04 ») : le bouton reste libre pour ajouter.
+- `renderPlan` : une ligne par élément, « 1. Mine niv 5 ≈ dans 0:07 → fini dans 0:09 » et un
+  bouton × (`[data-unplan]` + `data-key` : la session refuse si le fil a bougé entre-temps). L'estimation (`planForecast`) est recalculée au plus une fois par
+  seconde (cache sur l'heure de la fiche, le fil et les fins de files). La structure de la liste
+  n'est réécrite que quand le fil change ; les heures sont mises à jour à part, pour que le ×
+  ne soit pas remplacé sous le doigt toutes les secondes (bug vu pendant le test).
+- Style : `.plan`, `.plan-item` (bloqué : `.blocked`, heure en orange), fin de `style.css`.
+- Vérifié dans le navigateur (vue mobile 375 × 812, 2026-10-30) : ajout de 3 bâtiments, lancement
+  automatique de la mine à l'heure annoncée, retrait par ×, rattrapage après rechargement.
