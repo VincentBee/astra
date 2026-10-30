@@ -398,7 +398,7 @@ ouverts »).
 - Vitesse de la flotte = celle de son vaisseau le plus lent (`fleetSpeed`,
   `js/fleet.js:42-46`), bonus de technologie compris. `slowestShip` (`js/fleet.js:48-57`) dit
   lequel ; un type à 0 exemplaire ne compte pas, une flotte vide a une vitesse 0 et ne bouge pas.
-  Ajouter un seul vaisseau lent ralentit donc toute la flotte (D-099).
+  Ajouter un seul vaisseau lent ralentit donc toute la flotte (D-101).
 - Durée : `max(5 s, distance / vitesse × 1 min)` (`tripMs`, `js/fleet.js:80-85`).
 - **Distance** : en nombre de pas, sans diagonale (Manhattan, `distance`,
   `js/game.js:782`). La position affichée, elle, est interpolée en ligne droite entre `from` et
@@ -514,6 +514,24 @@ Une flotte qui attend la réponse à un échange est **bloquée** (`locked`,
   servent à reconnaître que c'est le même combat, pour ne compter les pertes qu'une fois
   (`js/session.js:1160-1170`, `fleetHit` `js/session.js:1746-1770`). À plus de 30 min d'écart,
   ce n'est jamais le même combat (revanche) (`js/session.js:1754-1755`).
+
+### 9.3 bis Comportement en voyage : passif ou agressif (D-100)
+
+- Champ `stance` de la flotte : `'passive'` (défaut, `launch` et `split`) ou `'aggressive'`
+  (`STANCES`, `aggressive`, `armed`, `js/fleet.js`). Sans champ : passive.
+- `setFleetStance(id, stance)` (`js/session.js`, ordre noté au journal et rejoué) : refusé pour
+  une flotte sans armes ; si une flotte ennemie est déjà au contact, le combat a lieu tout de
+  suite.
+- `engage` (`js/session.js`), à chaque `tick`, pour chaque flotte agressive qui ne poursuit pas :
+  la flotte ennemie **visible** la plus proche **au contact** (`inContact`), sans combat en
+  attente de rapport (`pendingFight`), est combattue par `fight(…, onward = true)` : mêmes
+  calculs, butin et rapport que la poursuite, mais la flotte **garde son ordre et reprend son
+  trajet** (`applyLosses`). Puis l'arrivée éventuelle (`arrive`).
+- Deux flottes agressives qui se croisent livrent le même combat chacune de leur côté : comme
+  pour la poursuite mutuelle, les pertes ne comptent qu'une fois (`sim`, `ack`, `engaged`).
+- Une fois les rapports lus, si les deux flottes sont encore au contact, le combat recommence.
+- Non confirmé : contact regardé seulement à l'heure du passage (comme `pursue`) ; un téléphone
+  en arrière-plan peut manquer un croisement rapide.
 
 ### 9.4 Appliquer les dégâts reçus (`applyEffects`, `js/session.js:1697-1739`)
 
@@ -714,7 +732,7 @@ fiche de `b` (`tests/harness.mjs:20-35`).
 node --test tests/*.test.mjs
 ```
 
-Résultat le 2026-10-29 (Node v24.14.1), après fusion avec `main` : `tests 119, pass 119, fail 0` (12 fichiers, dont les `decisions-*.test.mjs` de D-082). Le harnais
+Résultat le 2026-10-30 (Node v24.14.1), avec la recherche en colonie (D-098) et le comportement en voyage (D-100) : `tests 125, pass 125, fail 0` (12 fichiers, dont les `decisions-*.test.mjs` de D-082). Le harnais
 coupe le froid (`FROST.delayMs = Infinity`) : les parties de test ne finissent pas d'elles-mêmes ;
 `tests/end.test.mjs` le rallume test par test.
 
@@ -736,7 +754,7 @@ Résultat : `tests 34, pass 34, fail 0`, environ 5,6 s (le rejeu d'une partie de
 | `tests/rules.test.mjs` | 11 | Déconstruire (moitié du prix rendue, place libérée à la fin) ; heure qui recule puis revient : pas de double production ; longue absence ≈ passages toutes les heures (population à moins de 2 %) ; arrachement refusé sans payer ; clés héritées (`constructor`, `__proto__`) refusées ; effectifs négatifs ou fractionnaires au combat ; soleil au centre et sans planète ; climat et production ; une place par niveau ; places lues sur la carte ; une colonie humaine sur le plus petit corps garde des places |
 | `tests/combat.test.mjs` | 4 | Attaques contre une planète : pas de butin créé avec un défenseur hors ligne ou plusieurs flottes arrivées ensemble ; 70 attaques avant le retour du défenseur ; les vaisseaux perdus emportent leur cargaison |
 | `tests/effects.test.mjs` | 1 | 5 joueurs, 4 attaquants × 70 combats : chaque perte subie une fois, puis rapports oubliés des deux côtés |
-| `tests/fleet.test.mjs` | 8 | Deux flottes sur la même cible ; poursuite mutuelle ; colonie qui encaisse les pertes ; premier arrivé à la colonisation ; plein en panne tout près ; plusieurs attaquants ne pillent pas plus que le stock ; revanche ; raids sans armes et un pillage par 2 min |
+| `tests/fleet.test.mjs` | 13 | Deux flottes sur la même cible ; poursuite mutuelle ; colonie qui encaisse les pertes ; premier arrivé à la colonisation ; plein en panne tout près ; plusieurs attaquants ne pillent pas plus que le stock ; revanche ; raids sans armes et un pillage par 2 min ; flotte agressive qui combat puis reprend sa route ; flotte passive qui croise sans combattre ; agressive à l'arrêt qui garde sa case ; deux agressives : pertes comptées une fois ; agressive refusée sans armes, vue par les autres, gardée à la fusion (D-100) |
 | `tests/colony.test.mjs` | 1 | Colonie perdue au recollage : vaisseaux et cargaison restent en orbite |
 | `tests/hostile.test.mjs` | 6 | Pair malveillant ou fiche abîmée : personne ne réécrit ma fiche ni un secret, ni ne date sa fiche loin dans le futur ; fiche abîmée sans plantage ; race ou identifiant spécial ; installation antidatée ; heure qui recule ; téléphone en avance reste visible. Une partie de ces tests passe par l'acceptation des fiches (mécanisme décrit dans reseau.md) |
 | `tests/replay.test.mjs` | 4 | Une partie de robots (construire, chercher, armer, décoller, attaquer, échanger) rejouée retombe sur les mêmes fiches ; partie coupée en deux puis recollée ; journal tronqué signalé ; copie pas à jour signalée |
@@ -769,7 +787,7 @@ avec leur date et leur source.
    fait pas ; le commentaire juste au-dessus du calcul (`js/game.js:523`) dit le contraire.
 3. `js/game.js:969` dit « de 12 à 22 places » ; `PLANET_PLACES` vaut `[14, 22]`
    (`js/game.js:818`, dont le commentaire explique que 12 était trop peu).
-4. `js/tech.js:217-218` : « un plein mène à 30 [cases] (machines) ». Seule la sonde
+4. `js/tech.js:224-226` : « un plein mène à 30 [cases] (machines) ». Seule la sonde
    réplicatrice fait 30 cases (90 / 3) ; les autres vaisseaux machines font 36. Le commentaire
    date du lot 7 (commit `a8a229d`) ; le commit `061744b` a donné +20 % d'autonomie aux
    machines (30 → 36) sans le mettre à jour.

@@ -34,6 +34,22 @@ export const ORDERS = {
   chase: { name: 'Poursuite', verb: 'prend en chasse' },
 };
 
+/**
+ * Comportement en voyage, à part de l'ordre : une flotte passive ne se bat que
+ * si on lui en donne l'ordre ; une flotte agressive combat toute flotte ennemie
+ * visible qu'elle touche (CONTACT), en route ou à l'arrêt, puis reprend son
+ * trajet. Sans champ `stance` (flottes d'avant), une flotte est passive.
+ */
+export const STANCES = {
+  passive: { name: 'Passive', hint: 'ne combat que sur ordre' },
+  aggressive: { name: 'Agressive', hint: 'combat toute flotte ennemie qu’elle croise' },
+};
+
+export const aggressive = (f) => f?.stance === 'aggressive';
+
+/** La flotte a-t-elle au moins un vaisseau armé ? */
+export const armed = (race, ships, tech) => Object.entries(ships || {}).some(([k, n]) => n > 0 && shipStats(race, k, tech).attack > 0);
+
 /** Distance (en cases) sous laquelle deux flottes se rencontrent. */
 export const CONTACT = 0.5;
 
@@ -123,7 +139,7 @@ export function launch(planet, { ships, cargo = {}, fuel = 0, at, origin, id }, 
   for (const [r, v] of Object.entries(load)) planet.stock[r] -= v;
   planet.stock.energy -= gas;
   const cell = { x: at.x, y: at.y };
-  const fleet = { id, ships: clean, cargo: load, fuel: gas, origin, from: cell, to: { ...cell }, depart: now, arrive: now, order: null };
+  const fleet = { id, ships: clean, cargo: load, fuel: gas, origin, from: cell, to: { ...cell }, depart: now, arrive: now, order: null, stance: 'passive' };
   return { fleet };
 }
 
@@ -264,7 +280,7 @@ export function transfer(a, b, race, part, now) {
  * case. Renvoie { error } ou { fleet }.
  */
 export function split(a, race, part, id, now) {
-  const b = { id, ships: {}, cargo: {}, fuel: 0, origin: a.origin, from: { ...a.to }, to: { ...a.to }, depart: now, arrive: now, order: null };
+  const b = { id, ships: {}, cargo: {}, fuel: 0, origin: a.origin, from: { ...a.to }, to: { ...a.to }, depart: now, arrive: now, order: null, stance: 'passive' };
   const error = transfer(a, b, race, part, now);
   return error ? { error } : { fleet: b };
 }
@@ -272,7 +288,7 @@ export function split(a, race, part, id, now) {
 /**
  * Fusionne la flotte `a` dans `b` : tout passe dans `b`, qui se souvient
  * des flottes absorbées (`absorbed`), pour que les dégâts visant `a`
- * l'atteignent quand même. `a` est à retirer par l'appelant.
+ * l'atteignent quand même. `b` garde son comportement. `a` est à retirer par l'appelant.
  */
 export function merge(a, b, race, now) {
   const fuel = fuelAt(a, race, now) + fuelAt(b, race, now);

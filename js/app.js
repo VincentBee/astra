@@ -11,7 +11,7 @@ import { ic, fillIcons } from './icons.js';
 import { startGalaxy } from './galaxy.js';
 import { TECHS, SHIPS, SHIP_KEYS, techCost, techMissing, researchDuration, shipUnlock, shipUnlocked, shipStats, shipDuration } from './tech.js';
 import { TRADE_RES, TRADE_NAMES } from './trade.js';
-import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fleetSpeed, slowestShip, fuelAt, moving } from './fleet.js';
+import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fleetSpeed, slowestShip, fuelAt, moving, aggressive, armed } from './fleet.js';
 
 fillIcons(); // les icônes du HTML statique, avant tout le reste
 startGalaxy();
@@ -1177,8 +1177,9 @@ function fleetStatus(race, f, now) {
     const foe = session.state.players[f.order.pid];
     return `Poursuite d’une flotte ${foe ? de(foe.name) : 'ennemie'}`;
   }
-  if (moving(f, now)) return `${f.order ? ORDERS[f.order.kind]?.name || 'Ordre' : 'Déplacement'} → ${where}`;
-  return mapPlanets().some((w) => sameCell(w, f.to)) ? `En orbite ${de(where)}` : `Stationne en ${where}`;
+  const hawk = aggressive(f) ? ' · agressive' : '';
+  if (moving(f, now)) return `${f.order ? ORDERS[f.order.kind]?.name || 'Ordre' : 'Déplacement'} → ${where}${hawk}`;
+  return `${mapPlanets().some((w) => sameCell(w, f.to)) ? `En orbite ${de(where)}` : `Stationne en ${where}`}${hawk}`;
 }
 
 $('fleets').addEventListener('click', (e) => {
@@ -1754,6 +1755,12 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
   $('btn-fi-return').hidden = !!mine && here.key === 'home'; // déjà chez elle
   $('btn-fi-refuel').hidden = !mine || fuel >= tank - 0.5;
   $('btn-fi-split').hidden = go || countShips(f.ships) < 2;
+  const hawk = aggressive(f);
+  const stance = $('btn-fi-stance');
+  stance.hidden = !hawk && !armed(me.race, f.ships, me.planet?.tech);
+  stance.className = `${hawk ? 'primary' : 'secondary'} small icon-only`;
+  stance.setAttribute('aria-pressed', String(hawk));
+  stance.title = hawk ? 'Agressive : combat toute flotte ennemie qu’elle croise. Toucher pour la rendre passive' : 'Passive : ne combat que sur ordre. Toucher pour la rendre agressive';
   renderBeside(me, f, now);
   renderPartners($('fi-partners'), go ? null : { fleet: f.id });
   const choice = pending ? session.ordersAt(selFleet, pending) : [];
@@ -1784,6 +1791,13 @@ $('fi-choice').addEventListener('click', (e) => {
   renderFleetInfo();
 });
 $('btn-fi-stop').onclick = () => session.stopFleet(selFleet) && renderFleetInfo();
+$('btn-fi-stance').onclick = () => {
+  const f = session.myFleet(selFleet);
+  if (f && session.setFleetStance(selFleet, aggressive(f) ? 'passive' : 'aggressive')) {
+    toast(`Flotte ${aggressive(f) ? 'agressive : elle combattra toute flotte ennemie qu’elle croise' : 'passive : elle ne combattra que sur ordre'}.`);
+    renderFleetInfo();
+  }
+};
 $('btn-fi-refuel').onclick = () => session.refuelFleet(selFleet) && renderFleetInfo();
 $('btn-fi-return').onclick = () => session.returnFleet(selFleet) && renderFleetInfo();
 $('btn-fi-dock').onclick = () => {

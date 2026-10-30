@@ -733,12 +733,32 @@ Aucune conversation ne les prouve.
   `astra-p2p-v53`.
 - Source : session `defa0982`. Statut : en vigueur.
 
-**D-099 — Vitesse de flotte = vaisseau le plus lent, affichée au joueur**
+**D-100 — Comportement en voyage : passif ou agressif**
+- 2026-10-30 10:59. Demande : « Avoir des comportement de voyage: passif, agressif ».
+- Choix (Claude, par défaut) : un champ `stance` par flotte, à part de l'ordre (une flotte qui
+  va se poser peut être agressive). **Passive** (au décollage, à la scission, et pour les
+  flottes d'avant) : ne combat que sur ordre, comme avant. **Agressive** : à chaque passage,
+  combat la flotte ennemie visible la plus proche **au contact** (`CONTACT` = 0,5 case, la règle
+  de la poursuite), en route comme à l'arrêt (une flotte arrêtée garde sa case), puis **reprend
+  son trajet et son ordre**. Refusé pour une flotte sans armes. Une fusion garde le
+  comportement de la flotte qui reçoit. Elle n'attaque ni planètes ni vaisseaux posés : ça reste
+  « Attaquer » / « Conquérir ».
+- Alternatives écartées : poursuivre toute flotte ennemie vue dans le rayon de détection (plus
+  proche de ce qu'on attend d'« agressif », mais elle quitterait sa route ; suite possible) ;
+  s'arrêter après le combat comme la poursuite ; un mode « fuite » pour la flotte passive.
+- Limite **non confirmée** : comme la poursuite, le contact n'est regardé qu'à l'heure du
+  passage ; un téléphone en arrière-plan (passages ralentis) peut laisser deux flottes se
+  croiser sans combat.
+- Pas de nouveau `FORMAT` : un téléphone d'avant ignore le champ (ses flottes restent
+  passives) ; cache `astra-p2p-v54` (D-098 avait pris v53 ; D-099 est pris par la recette, pas encore fusionnée).
+- Qui : Vincent (demande), Claude (règle). Statut : en vigueur.
+
+**D-101 — Vitesse de flotte = vaisseau le plus lent, affichée au joueur**
 - 2026-10-30 10:54. Demande : « Notion de rapidite de flotte avec le vaiseau le plus lent ».
 - Contexte : la règle existait déjà dans le code (`fleetSpeed`, héritée du portage, D-002), mais le
   joueur ne voyait ni la vitesse de sa flotte ni le vaisseau qui la freine.
 - Choix : garder la règle ; l'afficher à l'écran de décollage (« Vitesse 7,0 cases/min, celle du
-  plus lent : Colonisateur ») et dans la fiche de flotte ; test dédié ; cache `astra-p2p-v54`.
+  plus lent : Colonisateur ») et dans la fiche de flotte ; test dédié ; cache `astra-p2p-v55`.
 - Alternatives écartées : vitesse moyenne pondérée ; vaisseaux rapides qui partent devant
   (la flotte se scinderait d'elle-même).
 - Qui : Vincent (demande), Claude (affichage, maintien de la règle). Statut : en vigueur.
