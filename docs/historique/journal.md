@@ -270,6 +270,7 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 11:25 | `ef4e56a1` | [Bouton] « Créer la PR » | Ligne du journal ajoutée ; push de `claude/swarm-it-game-recipe-1cf190` ; pull request vers `main` | (cette PR) | D-100 |
 | 11:40 | `ef4e56a1` | [Auto-fix] conflit avec `main` | Fusion de `main` (recherche en colonie) : ma décision renumérotée D-100 (D-098 pris par `main`, D-099 par la recette), cache v54, tests 125/125 | (cette PR) | D-100 |
 | 11:47 | `a7cb8a19` | Tâche 1.1 « Corriger le vainqueur quand les derniers joueurs gèlent à la même seconde », puis « il faut que les points reflete ce que le joueur possede a un instant T Si on détruit tout ce que le joueur possède, alors il retombe à 0 points. Rajoute aussi un graphe qui montre l'évolution des points par joueur durant la partie. » | Points au présent (0 si tout est perdu) ; `deathPts` = points juste avant la chute, pour départager une mort simultanée ; section « Points » du replay (courbe par joueur, toucher pour y aller) ; 3 tests (128/128) ; vérifié dans le navigateur ; cache v55 | (ce commit) | D-101, D-102 |
+| 12:13 | `a7cb8a19` | [Bouton] « Oui, ajoute le lien » | Lien « Voir la courbe des points » dans le bandeau « partie finie » ; `replay.html#points` s'ouvre à la fin de la partie, sur la courbe ; vérifié dans le navigateur ; cache v56 | (ce commit) | D-103 |
 
 ### Travaux en cours au 2026-10-29
 

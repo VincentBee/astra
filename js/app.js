@@ -892,7 +892,7 @@ function renderRace(now) {
   if (over) {
     const mine = over.winner === session.me;
     hot = !mine;
-    html = `<strong>${mine ? 'Victoire !' : `${esc(players[over.winner].name)} gagne.`}</strong> <span class="hint">· partie finie</span>`;
+    html = `<strong>${mine ? 'Victoire !' : `${esc(players[over.winner].name)} gagne.`}</strong> <span class="hint">· partie finie ·</span> <a href="replay.html#points" class="race-link">Voir la courbe des points</a>`;
   } else if (me?.out) {
     hot = true;
     const alive = session.ranking(now).filter((r) => r.dead == null).length;

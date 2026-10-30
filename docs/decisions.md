@@ -790,6 +790,17 @@ Aucune conversation ne les prouve.
 - Limite : une partie qui ne se rejoue pas (début du journal perdu) n'a pas de courbe.
 - Qui : Vincent (demande), Claude (forme). Source : session `a7cb8a19`. Statut : en vigueur.
 
+**D-103 — Lien vers la courbe des points à la fin de la partie**
+- 2026-10-30 12:13. Question de Claude : ajouter un lien vers la courbe dans le bandeau
+  « partie finie » ? Réponse de Vincent : « Oui, ajoute le lien ».
+- Choix : le bandeau de course, partie finie, ajoute « Voir la courbe des points »
+  (`replay.html#points`) ; le replay s'ouvre alors à la fin de la partie, sur la courbe. La partie
+  est déjà sauvegardée (`pagehide` appelle `save`), le replay lit cette sauvegarde.
+- Alternatives écartées : une courbe en direct dans l'écran de jeu (voir D-102) ; un lien aussi
+  pour un joueur éliminé en cours de partie (la partie n'est pas finie).
+- Qui : Vincent (lien), Claude (place et comportement). Cache `astra-p2p-v56`. Source : session
+  `a7cb8a19`. Statut : en vigueur.
+
 ---
 
 ## Annexe A — affirmations réfutées (retirées ou corrigées avant assemblage)

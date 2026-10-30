@@ -62,6 +62,11 @@ function load() {
     note(off.length ? `Replay approché : la fin ne retombe pas tout à fait sur la vraie partie pour ${off.map((p) => p.name).join(', ')}.` : '');
     $('rp-main').hidden = false;
     seek(film.start);
+    // Venu du bandeau « partie finie » : la courbe des points, à la fin de la partie.
+    if (location.hash === '#points') {
+      seek(film.end);
+      $('points').scrollIntoView();
+    }
   }, 30);
 }
 
