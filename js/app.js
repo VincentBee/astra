@@ -607,7 +607,7 @@ $('powers').addEventListener('click', (e) => {
 });
 $('techs').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-research]');
-  if (btn && !btn.disabled) session.research(btn.dataset.research);
+  if (btn && !btn.disabled) session.research(btn.dataset.research, openKey);
 });
 $('ships').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-ship]');
@@ -1047,16 +1047,12 @@ function cardProgress(card, job, now) {
   bar.firstElementChild.style.width = `${Math.min(100, (1 - left / Math.max(1, job.end - job.start)) * 100)}%`;
 }
 
-/** Arbre des technologies : sur la planète mère seulement, avec un labo. */
+/** Arbre des technologies : sur toute planète qui a un labo, avec le niveau de ce labo. */
 function renderResearch(me, pl, s, now) {
-  const home = pl.key === 'home';
-  $('research-zone').hidden = !home;
-  // Pas de recherche dans une colonie : son onglet disparaît.
-  $('tab-research').hidden = !home;
-  if (!home && $('view-planet').dataset.tab === 'research') showTab('build', false);
-  if (home && $('view-planet').dataset.tab !== chosenTab) showTab(chosenTab, false); // retour d'une colonie
-  if (!home) return;
   const lab = s.levels.lab || 0;
+  // Recherches lancées sur mes autres planètes : la même technologie ne peut pas y être lancée ici.
+  const elsewhere = {};
+  for (const x of session.planetsOf(me)) if (x.key !== pl.key && x.planet.research) elsewhere[x.planet.research.key] = x.name;
   const T = TECHS[me.race];
   const labName = RACES[me.race].buildings.lab.name;
   $('research-hint').textContent = lab ? '' : `🔒 Il faut un ${labName}.`;
@@ -1074,14 +1070,15 @@ function renderResearch(me, pl, s, now) {
     req.textContent = miss ? `🔒 ${miss}` : '';
     setHtml(q(`[data-tcost="${k}"]`), maxed ? 'Niveau maximum' : `${costText(cost)} · ${clock(researchDuration(cost, Math.max(1, lab)))}`);
     q(`[data-tcard="${k}"]`).classList.toggle('locked', !!miss && !maxed);
-    q(`[data-tcard="${k}"]`).classList.toggle('affordable', ok && !s.research);
+    const there = elsewhere[k];
+    q(`[data-tcard="${k}"]`).classList.toggle('affordable', ok && !s.research && !there);
     q(`[data-tcard="${k}"]`).classList.toggle('building-now', s.research?.key === k);
     const btn = q(`[data-research="${k}"]`);
-    btn.disabled = !ok || !!s.research || session.status !== 'playing';
+    btn.disabled = !ok || !!s.research || !!there || session.status !== 'playing';
     const job = s.research?.key === k ? s.research : null;
     cardProgress(q(`[data-tcard="${k}"]`), job, now);
     setHtml(btn, job ? `${ic('wait')}${clock(Math.max(0, job.end - now))}` : maxed ? ic('done') : `${ic('up')}${level + 1}`);
-    btn.title = s.research?.key === k ? 'En cours' : maxed ? 'Terminé' : miss ? `Il faut : ${miss}` : !ok ? 'Ressources insuffisantes' : `Rechercher le niveau ${level + 1}`;
+    btn.title = s.research?.key === k ? 'En cours' : maxed ? 'Terminé' : there ? `En recherche sur ${there}` : miss ? `Il faut : ${miss}` : !ok ? 'Ressources insuffisantes' : `Rechercher le niveau ${level + 1}`;
     btn.setAttribute('aria-label', `${t.name} : ${btn.title.toLowerCase()}`);
   }
 }
@@ -1297,7 +1294,7 @@ function stopMap() {
 $('btn-back-map').onclick = () => showView('map');
 
 /** Onglet de l'écran planète : bâtiments, pouvoirs (aliens), recherche ou flottes. */
-/** Onglet choisi par le joueur (une colonie sans recherche peut en afficher un autre un moment). */
+/** Onglet choisi par le joueur (un changement forcé peut en afficher un autre un moment). */
 let chosenTab = 'build';
 function showTab(tab, persist = true) {
   $('view-planet').dataset.tab = tab;
@@ -1306,7 +1303,7 @@ function showTab(tab, persist = true) {
     b.setAttribute('aria-selected', String(b.dataset.tabBtn === tab));
     b.tabIndex = b.dataset.tabBtn === tab ? 0 : -1;
   }
-  if (!persist) return; // changement forcé (colonie sans recherche) : l'onglet choisi reste mémorisé
+  if (!persist) return; // changement forcé : l'onglet choisi reste mémorisé
   try {
     localStorage.setItem('astra.tab', tab);
   } catch {}

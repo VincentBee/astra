@@ -1070,14 +1070,26 @@ export class Session {
     this.changed();
   }
 
-  /** Recherche : sur la planète mère, là où est le labo. */
-  research(key) {
+  /**
+   * Recherche : sur n'importe laquelle de mes planètes qui a un labo, avec le niveau de ce labo.
+   * Une recherche à la fois par planète, et pas la même technologie sur deux planètes à la fois.
+   */
+  research(key, where = 'home') {
     if (!this.canAct) return;
     const p = this.state.players[this.me];
     if (!p?.planet) return;
-    const err = startResearch(p.planet, key, this.now());
+    const pl = this.myPlanet(where);
+    if (!pl) return;
+    const other = this.planetsOf(p).find((x) => x.key !== pl.key && x.planet.research?.key === key);
+    if (other) return this.ontoast?.(`Cette technologie est déjà en recherche sur ${other.name}.`);
+    // La copie des technologies d'une colonie peut avoir un passage de retard : on part des plus hautes.
+    if (pl.key !== 'home' && Object.entries(p.planet.tech || {}).some(([k, n]) => n > (pl.planet.tech?.[k] || 0))) {
+      settle(pl.planet, this.now());
+      pl.planet.tech = maxTech(pl.planet.tech, p.planet.tech);
+    }
+    const err = startResearch(pl.planet, key, this.now());
     if (err) return this.ontoast?.(err);
-    this.touch(this.addLog(`${p.name} lance la recherche ${TECHS[p.race][key].name} niv. ${p.planet.research.level}.`));
+    this.touch(this.addLog(`${p.name} lance la recherche ${TECHS[p.race][key].name} niv. ${pl.planet.research.level} sur ${pl.name}.`));
     this.changed();
   }
 
@@ -1717,29 +1729,42 @@ export class Session {
     }
     if (this.freeze(p, now)) changed = true;
     let techAt = now; // fin de la dernière recherche terminée depuis le passage précédent
+    let colonyTech = false; // une colonie a trouvé une technologie : les autres planètes la reçoivent
+    const R = RACES[p.race];
+    const report = (pl, d) => {
+      changed = true;
+      if (d.kind === 'queue' && d.demolish) this.addLog(`${p.name} a déconstruit ${R.buildings[d.key].name} (niv. ${d.level}) sur ${pl.name}.`);
+      else if (d.kind === 'queue') this.addLog(`${p.name} termine ${R.buildings[d.key].name} niv. ${d.level} sur ${pl.name}.`);
+      else if (d.kind === 'research') {
+        techAt = Math.min(techAt, d.end);
+        // Trouvée dans une colonie : elle vaut aussi pour la planète mère, qui la donne aux autres.
+        if (pl.key !== 'home') {
+          settle(p.planet, d.end); // la planète mère profite du bonus à partir de la fin, pas avant
+          p.planet.tech = maxTech(p.planet.tech, { [d.key]: d.level });
+          colonyTech = true;
+        }
+        this.addLog(`${p.name} découvre ${TECHS[p.race][d.key].name} niv. ${d.level} sur ${pl.name}.`);
+        this.ontoast?.(`Recherche terminée : ${TECHS[p.race][d.key].name} niv. ${d.level}.`);
+      } else this.addLog(`${p.name} reçoit ${d.count} × ${SHIPS[p.race][d.type].name} sur ${pl.name}.`);
+    };
+    // Les technologies valent pour toutes mes planètes : chaque colonie en garde une copie, à
+    // partir de la fin de la recherche (et pas seulement du passage qui s'en aperçoit).
+    const shareTech = (pl) => {
+      if (pl.key === 'home' || sameTech(pl.planet.tech, p.planet.tech)) return;
+      for (const d of settle(pl.planet, Math.min(techAt, now))) report(pl, d);
+      p.planet.tech = maxTech(p.planet.tech, pl.planet.tech); // une recherche finie ici et pas encore partagée
+      pl.planet.tech = { ...p.planet.tech };
+      changed = true;
+    };
     // La planète mère d'abord (planetsOf la donne en premier) : ses recherches valent pour les colonies.
-    for (const pl of this.planetsOf(p)) {
-      // Les technologies valent pour toutes mes planètes : chaque colonie en garde une copie, à
-      // partir de la fin de la recherche (et pas seulement du passage qui s'en aperçoit).
-      if (pl.key !== 'home' && JSON.stringify(pl.planet.tech || {}) !== JSON.stringify(p.planet.tech || {})) {
-        settle(pl.planet, Math.min(techAt, now));
-        pl.planet.tech = { ...(p.planet.tech || {}) };
-        changed = true;
-      }
+    const mine = this.planetsOf(p);
+    for (const pl of mine) {
+      shareTech(pl);
       const due = ['queue', 'research', 'yard'].some((k) => pl.planet[k] && pl.planet[k].end <= now);
-      if (!due) continue;
-      for (const d of settle(pl.planet, now)) {
-        changed = true;
-        const R = RACES[p.race];
-        if (d.kind === 'queue' && d.demolish) this.addLog(`${p.name} a déconstruit ${R.buildings[d.key].name} (niv. ${d.level}) sur ${pl.name}.`);
-        else if (d.kind === 'queue') this.addLog(`${p.name} termine ${R.buildings[d.key].name} niv. ${d.level} sur ${pl.name}.`);
-        else if (d.kind === 'research') {
-          techAt = Math.min(techAt, d.end);
-          this.addLog(`${p.name} découvre ${TECHS[p.race][d.key].name} niv. ${d.level}.`);
-          this.ontoast?.(`Recherche terminée : ${TECHS[p.race][d.key].name} niv. ${d.level}.`);
-        } else this.addLog(`${p.name} reçoit ${d.count} × ${SHIPS[p.race][d.type].name} sur ${pl.name}.`);
-      }
+      if (due) for (const d of settle(pl.planet, now)) report(pl, d);
     }
+    // Une recherche finie dans une colonie : les planètes déjà passées la reçoivent aussi.
+    if (colonyTech) for (const pl of mine) shareTech(pl);
     // Les combats des autres d'abord : mes flottes agissent ensuite avec leurs vraies pertes.
     if (this.applyEffects(p, now)) changed = true;
     for (const f of [...(p.fleets || [])]) {
@@ -2084,6 +2109,19 @@ function seenNews(state, me) {
  * (`tick`) qui ont fait avancer quelque chose (voir touch). Le reste de la partie vient des fiches des
  * autres, qui ont chacune leur journal.
  */
+/** Mêmes niveaux de technologies, quel que soit l'ordre des clés. */
+function sameTech(a, b) {
+  const keys = new Set([...Object.keys(a || {}), ...Object.keys(b || {})]);
+  return [...keys].every((k) => (Number(a?.[k]) || 0) === (Number(b?.[k]) || 0));
+}
+
+/** Les plus hauts niveaux de deux listes de technologies. */
+function maxTech(a, b) {
+  const out = { ...(a || {}) };
+  for (const [k, n] of Object.entries(b || {})) if ((Number(n) || 0) > (Number(out[k]) || 0)) out[k] = n;
+  return out;
+}
+
 export const ORDER_KINDS = ['chooseRace', 'claimPlanet', 'build', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'splitFleet', 'returnFleet', 'power'];
 for (const k of [...ORDER_KINDS, 'tick']) {
   const act = Session.prototype[k];

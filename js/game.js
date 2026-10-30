@@ -154,7 +154,7 @@ export const RACES = {
         name: 'Laboratoire de recherche',
         short: 'Labo',
         start: 0,
-        desc: 'Ouvre la recherche sur la planète mère. Chaque niveau l’accélère et ouvre des technologies.',
+        desc: 'Ouvre la recherche sur cette planète. Chaque niveau l’accélère et ouvre des technologies.',
         base: { minerals: 200, energy: 0 },
         factor: 1.8,
       },
@@ -266,7 +266,7 @@ export const RACES = {
         name: 'Matrice de recherche',
         short: 'Matrice',
         start: 0,
-        desc: 'Ouvre la recherche sur la planète mère. Chaque niveau l’accélère et ouvre des technologies.',
+        desc: 'Ouvre la recherche sur cette planète. Chaque niveau l’accélère et ouvre des technologies.',
         base: { minerals: 180, energy: 70 },
         factor: 1.8,
       },
@@ -374,7 +374,7 @@ export const RACES = {
         name: 'Bassin de songe',
         short: 'Bassin',
         start: 0,
-        desc: 'Les psioniques y rêvent les technologies, sur la planète mère. Chaque niveau accélère la recherche.',
+        desc: 'Les psioniques y rêvent les technologies. Chaque niveau accélère la recherche.',
         base: { minerals: 220, energy: 50 },
         factor: 1.8,
       },
@@ -723,10 +723,10 @@ export function startDemolish(planet, key, now) {
 }
 
 // ---------------------------------------------------------------------------
-// Recherche (planète mère) et chantier naval
+// Recherche et chantier naval (sur toute planète qui a le bâtiment)
 // ---------------------------------------------------------------------------
 
-/** Lance une recherche sur la planète mère. Renvoie une erreur lisible ou null. */
+/** Lance une recherche sur cette planète, avec son labo. Renvoie une erreur lisible ou null. */
 export function startResearch(planet, key, now) {
   const T = own(TECHS[planet.race], key);
   if (!T) return 'Technologie inconnue.';

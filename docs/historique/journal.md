@@ -261,8 +261,12 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 
 | Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
 |---|---|---|---|---|---|
-| 10:40 (non confirmé) | `359242b9` | « Notion de rapidite de flotte avec le vaiseau le plus lent » | La règle existait déjà (`fleetSpeed`) ; ajout de `slowestShip`, affichage de la vitesse et du vaisseau le plus lent au décollage et dans la fiche de flotte, test dédié, cache v53 | `aaabe49` | D-098 |
+| 10:24:11 | `defa0982` | « On ne peut pas faire de recherche sur les colonies » | Réponse : c'est la règle D-021 (planète mère seulement) ; deux options proposées | — | D-021 |
+| 10:29:38 | `defa0982` | « je veux changer la regle, ce doit etre possible de faire une recherche sur n'importe quel planet avec un labo, en accord avec le niveau du labo » | Recherche sur toute planète avec un labo (son niveau, son stock), une par planète, pas la même technologie en double, partage à tout l'empire ; onglet Recherche dans les colonies ; test D-098 ; cache v53 | (ce commit) | D-098 |
+| 10:52:06 | `defa0982` | [Bouton] « Créer la PR » | Commit et pull request | (cette PR) | D-098 |
+| 10:40 (non confirmé) | `359242b9` | « Notion de rapidite de flotte avec le vaiseau le plus lent » | La règle existait déjà (`fleetSpeed`) ; ajout de `slowestShip`, affichage de la vitesse et du vaisseau le plus lent au décollage et dans la fiche de flotte, test dédié, cache v54 | `aaabe49` | D-099 |
 | 11:30:15 | `359242b9` | [Bouton] « Créer la PR » | Pull request vers `main` | (cette PR) | — |
+| 11:31:10 | `359242b9` | Auto-fix : conflit avec `main` | `main` avait déjà pris D-098 (recherche en colonie) et le cache v53 : ma décision devient D-099, cache v54 | (cette PR) | D-099 |
 
 ### Travaux en cours au 2026-10-29
 

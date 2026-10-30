@@ -2,7 +2,7 @@
 
 Pour chaque décision de [decisions.md](../decisions.md), le test qui la protège, ou la raison
 pour laquelle il n'y en a pas (voir D-082). État au 2026-10-29 : `node --test tests/*.test.mjs` →
-119 tests, 119 réussis (après la fusion du rythme des parties, D-083 à D-097).
+119 tests, 119 réussis (après la fusion du rythme des parties, D-083 à D-097). Le 2026-10-30 : 120 tests, 120 réussis (D-098).
 
 - **nouveau test** : ajouté le 2026-10-29 dans `tests/decisions-planete.test.mjs` (24),
   `tests/decisions-flotte.test.mjs` (30) ou `tests/decisions-reseau.test.mjs` (20). Le nom de
@@ -127,4 +127,5 @@ que fait le code.
 | D-095 | La défense compte contre le pillage et se répare | nouveau test | `end.test.mjs` trop peu de vaisseaux d'attaque : les tourelles tiennent, ni prise ni pillage |  |
 | D-096 | Déconstruire un bâtiment | nouveau test | `rules.test.mjs` déconstruire un niveau rend la moitié de son prix et libère sa place à la fin |  |
 | D-097 | `FORMAT` 8 et cache v52 | non testable |  | version de format et de cache |
-| D-098 | Vitesse de flotte = vaisseau le plus lent | testé | `tests/fleet.test.mjs` « une flotte va à la vitesse de son vaisseau le plus lent » | l'affichage (`speedText`) n'est pas testé |
+| D-098 | Recherche sur toute planète qui a un labo | nouveau test | `decisions-planete.test.mjs` D-098 : recherche sur toute planète qui a un labo, selon le niveau de ce labo |  |
+| D-099 | Vitesse de flotte = vaisseau le plus lent | testé | `tests/fleet.test.mjs` « une flotte va à la vitesse de son vaisseau le plus lent » | l'affichage (`speedText`) n'est pas testé |
