@@ -396,7 +396,9 @@ ouverts »).
 ### 8.3 Se déplacer (`moveTo`, `js/fleet.js:134-152`)
 
 - Vitesse de la flotte = celle de son vaisseau le plus lent (`fleetSpeed`,
-  `js/fleet.js:42-46`).
+  `js/fleet.js:42-46`), bonus de technologie compris. `slowestShip` (`js/fleet.js:48-57`) dit
+  lequel ; un type à 0 exemplaire ne compte pas, une flotte vide a une vitesse 0 et ne bouge pas.
+  Ajouter un seul vaisseau lent ralentit donc toute la flotte (D-101).
 - Durée : `max(5 s, distance / vitesse × 1 min)` (`tripMs`, `js/fleet.js:80-85`).
 - **Distance** : en nombre de pas, sans diagonale (Manhattan, `distance`,
   `js/game.js:782`). La position affichée, elle, est interpolée en ligne droite entre `from` et

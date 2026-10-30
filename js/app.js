@@ -11,7 +11,7 @@ import { ic, fillIcons } from './icons.js';
 import { startGalaxy } from './galaxy.js';
 import { TECHS, SHIPS, SHIP_KEYS, techCost, techMissing, researchDuration, shipUnlock, shipUnlocked, shipStats, shipDuration } from './tech.js';
 import { TRADE_RES, TRADE_NAMES } from './trade.js';
-import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fuelAt, moving, aggressive, armed } from './fleet.js';
+import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fleetSpeed, slowestShip, fuelAt, moving, aggressive, armed } from './fleet.js';
 
 fillIcons(); // les icônes du HTML statique, avant tout le reste
 startGalaxy();
@@ -1144,6 +1144,15 @@ const cellName = (cell) => mapPlanets().find((w) => sameCell(w, cell))?.name || 
 /** « carburant 34 / 40 » */
 const fuelText = (race, f, now) => `carburant ${Math.floor(fuelAt(f, race, now))} / ${fleetTank(race, f.ships)}`;
 
+/** « vitesse 7,0 cases/min, celle du Cargo » : la flotte va au pas de son vaisseau le plus lent. */
+function speedText(race, ships, tech) {
+  const slow = slowestShip(race, ships, tech);
+  if (!slow) return '';
+  const v = (fleetSpeed(race, ships, tech) * TEMPO).toFixed(1).replace('.', ',');
+  const kinds = SHIP_KEYS.filter((k) => ships[k] > 0).length;
+  return `vitesse ${v} cases/min${kinds > 1 ? `, celle du plus lent : ${SHIPS[race][slow].name}` : ''}`;
+}
+
 /** « 3 × Frégate, 1 × Cargo · 200 ◆ », en HTML. */
 function shipsLine(race, f) {
   const ships = SHIP_KEYS.filter((k) => f.ships[k]).map((k) => `${f.ships[k]} × ${esc(SHIPS[race][k].name)}`).join(', ');
@@ -1216,7 +1225,8 @@ function openFleetSheet() {
 function updateFleetSheet() {
   const me = session.state.players[session.me];
   const { ships } = fleetChoice();
-  $('fleet-room').textContent = `Soutes : ${fmt(fleetCargo(me.race, ships))}`;
+  const speed = speedText(me.race, ships, me.planet.tech);
+  $('fleet-room').textContent = `Soutes : ${fmt(fleetCargo(me.race, ships))}${speed ? ` · ${speed[0].toUpperCase()}${speed.slice(1)}` : ''}`;
   const tank = fleetTank(me.race, ships);
   const burn = fleetBurn(me.race, ships);
   const input = $('fleet-fuel');
@@ -1730,7 +1740,8 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
   $('fi-where').textContent = `[${Math.round(pos.x)}:${Math.round(pos.y)}]`;
   setHtml($('fi-ships'), shipsLine(me.race, f));
   $('fi-name').textContent = fleetName(f);
-  $('fi-status').textContent = `${fleetStatus(me.race, f, now)}${go ? ` · ${clock(f.arrive - now)}` : ''}`;
+  const speed = speedText(me.race, f.ships, me.planet.tech);
+  $('fi-status').textContent = `${fleetStatus(me.race, f, now)}${go ? ` · ${clock(f.arrive - now)}` : ''}${speed ? ` · ${speed}` : ''}`;
   const here = !go && session.planetsAt(f.to)[0];
   const fuel = fuelAt(f, me.race, now);
   const tank = fleetTank(me.race, f.ships);
