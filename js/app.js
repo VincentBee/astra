@@ -57,13 +57,27 @@ function show(screen) {
   window.scrollTo(0, 0);
 }
 
-let toastTimer;
-function toast(text) {
+/**
+ * Messages en bas de l'écran, à la file : un à la fois, dans l'ordre, aucun
+ * n'en efface un autre (D-110). Des messages attendent : chacun reste moins
+ * longtemps. Appli cachée : rien n'est montré, le journal garde les combats.
+ */
+const toasts = [];
+let toastTimer = null;
+function toast(text, ms = 3200) {
+  if (document.visibilityState === 'hidden') return;
+  if (toasts.some((t) => t.text === text) || (toastTimer && $('toast').textContent === text)) return;
+  toasts.push({ text, ms });
+  if (toasts.length > 6) toasts.splice(Math.max(0, toasts.findIndex((t) => t.ms <= 3200)), 1); // les longs (élimination) restent
+  if (!toastTimer) nextToast();
+}
+function nextToast() {
   const t = $('toast');
-  t.textContent = text;
-  t.hidden = false;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (t.hidden = true), 3200);
+  const next = toasts.shift();
+  t.hidden = !next;
+  if (!next) return (toastTimer = null);
+  t.textContent = next.text;
+  toastTimer = setTimeout(nextToast, toasts.length ? Math.max(2000, next.ms / 2) : next.ms);
 }
 
 async function copy(text, okMessage) {
@@ -188,6 +202,10 @@ $('games').addEventListener('click', (e) => {
   session.onchange = onSessionChange;
   startGame();
   toast('Partie reprise.');
+  // Les combats rattrapés à la reprise ont été notés avant que l'écran existe, ceux d'avant la
+  // fermeture (appli en arrière-plan) n'ont pas été lus : le résumé montre tout ce qui n'est pas lu.
+  awayFrom = saved.journal?.read || 0;
+  showAbsence(Date.now() - saved.savedAt);
 });
 
 window.addEventListener('pagehide', () => session?.save?.());
@@ -805,8 +823,9 @@ function renderState() {
 }
 
 /**
- * Journal de la partie : il n'est pas affiché dans le jeu, on l'écrit dans
- * la console du navigateur (chaque entrée une seule fois, dans l'ordre).
+ * Journal partagé de la partie, copié aussi dans la console du navigateur
+ * (chaque entrée une seule fois, dans l'ordre) pour déboguer. Dans le jeu,
+ * c'est la fenêtre Journal qui le montre (D-110, plus haut).
  */
 const printed = new Set();
 function printLog(log) {
@@ -818,6 +837,86 @@ function printLog(log) {
     console.info(`[Astra ${time(l.at)}] ${l.text}`);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Journal en jeu (D-110) : mes combats vus de mon côté (carnet du téléphone),
+// puis les lignes du journal partagé qui me nomment.
+// ---------------------------------------------------------------------------
+
+/** Absence au-delà de laquelle le retour ouvre le résumé « pendant ton absence ». */
+const AWAY_MS = 2 * 60_000;
+let awayFrom = 0; // numéro de la dernière entrée du carnet quand je suis parti
+let hiddenAt = 0;
+
+function when(at) {
+  const d = new Date(at);
+  const hm = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  return d.toDateString() === new Date().toDateString() ? hm : `${d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} ${hm}`;
+}
+
+/** « Tes pertes : 3 · Ses pertes : 4 · Butin : 173 minéraux » (pertes adverses inconnues : ancien rapport). */
+function reportDetail(e) {
+  if (e.kind !== 'combat') return '';
+  const n = (v) => (v == null ? '?' : v);
+  const parts = [`Tes pertes : ${n(e.mine)}`, `Ses pertes : ${n(e.theirs)}`];
+  if (e.loot) parts.push(`Butin : ${e.loot}`);
+  if (e.pillaged) parts.push(`Pillé : ${e.pillaged}`);
+  return parts.join(' · ');
+}
+
+/** Ouvre le journal ; `away` : seulement ce qui est arrivé pendant mon absence. */
+function openJournal(away = null) {
+  const j = session.journal || { n: 0, read: 0, list: [] };
+  const read = j.read;
+  const me = session.state.players[session.me];
+  const fights = j.list.filter((e) => !away || e.n > away.n).sort((a, b) => b.at - a.at || b.n - a.n);
+  $('journal-title').textContent = away ? 'Pendant ton absence' : 'Journal';
+  $('journal-away').hidden = !away;
+  if (away) $('journal-away').textContent = `Absent ${away.text}.`;
+  $('journal-fights').innerHTML = fights.length
+    ? fights
+        .map((e) => {
+          const detail = reportDetail(e);
+          return `<li class="${esc(e.tone || '')}${e.n > read ? ' new' : ''}"><span class="j-time mono">${when(e.at)}</span><strong>${esc(e.text)}</strong>${detail ? `<div class="j-detail mono">${esc(detail)}</div>` : ''}</li>`;
+        })
+        .join('')
+    : '<li class="j-empty">Aucun combat pour l’instant.</li>';
+  const events = (session.state.log || [])
+    .filter((l) => me && l.text.includes(me.name) && (!away || l.at >= away.since))
+    .sort((a, b) => b.at - a.at)
+    .slice(0, 20);
+  $('journal-events').innerHTML = events.length
+    ? events.map((l) => `<li><span class="j-time mono">${when(l.at)}</span>${esc(l.text)}</li>`).join('')
+    : '<li class="j-empty">Rien de neuf.</li>';
+  $('btn-journal-all').hidden = !away;
+  $('sheet-journal').hidden = false;
+  session.markRead();
+}
+
+/** Au retour (reprise ou appli revenue au premier plan) : le résumé, s'il y a du neuf. */
+function showAbsence(gone) {
+  const j = session?.journal;
+  if (!session?.state || gone < AWAY_MS || !j || !j.list.some((e) => e.n > awayFrom)) return;
+  const min = Math.round(gone / 60_000);
+  const text = min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}`;
+  openJournal({ n: awayFrom, since: Date.now() - gone, text });
+}
+
+$('btn-journal').onclick = () => openJournal();
+$('btn-journal-all').onclick = () => openJournal();
+$('btn-journal-close').onclick = () => ($('sheet-journal').hidden = true);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    hiddenAt = Date.now();
+    awayFrom = session?.journal?.n || 0;
+    return;
+  }
+  if (!hiddenAt) return;
+  const gone = Date.now() - hiddenAt;
+  hiddenAt = 0;
+  // Le rattrapage tourne au passage suivant (toutes les 250 ms) : on lui laisse le temps.
+  setTimeout(() => showAbsence(gone), 1000);
+});
 
 function routeLabel(route) {
   return { host: 'réseau local', srflx: 'direct', prflx: 'direct', relay: 'relais' }[route] || '';
@@ -841,6 +940,12 @@ function renderLive() {
       ? `${online + 1} joueurs en ligne${worst != null ? ` · ${worst} ms` : ''}`
       : 'Seul en ligne';
     $('net-detail').className = 'net' + (worst != null && worst > 250 ? ' slow' : '');
+  }
+  {
+    const j = session.journal;
+    const fresh = j ? j.n - j.read : 0;
+    $('journal-count').hidden = !fresh;
+    $('journal-count').textContent = fresh > 9 ? '9+' : fresh;
   }
 
   if (me?.planet) {
@@ -1358,7 +1463,7 @@ function showView(view, key = openKey) {
   $('view-universe').hidden = view !== 'map';
   $('view-planet').hidden = view !== 'planet';
   // Pas de barre du haut : le compteur de joueurs se range à droite de la première ligne de l'écran.
-  (view === 'map' ? document.querySelector('.map-head .pi-head-right') : document.querySelector('.planet-head')).append($('net'));
+  (view === 'map' ? document.querySelector('.map-head .pi-head-right') : document.querySelector('.planet-head')).append($('btn-journal'), $('net'));
   window.scrollTo(0, 0);
   if (view === 'map') {
     if (!mapFrame) mapFrame = requestAnimationFrame(drawMap);

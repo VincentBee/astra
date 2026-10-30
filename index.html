@@ -88,6 +88,9 @@
         <span id="me-role" class="badge"></span>
       </div>
       <div class="top-right">
+        <button id="btn-journal" class="net-btn" title="Journal : mes combats et ce qui me concerne" aria-label="Journal de mes combats">
+          <i data-ic="journal"></i><span id="journal-count" class="j-count mono" hidden></span>
+        </button>
         <button id="net" class="net-btn" title="Joueurs, classement, invitations" aria-label="Joueurs en ligne, classement et invitations">
           <i data-ic="users"></i><span id="net-count" class="mono"></span>
         </button>
@@ -224,6 +227,26 @@
         <h3 class="section-title"><i data-ic="trophy"></i> Classement</h3>
         <div id="players" class="players"></div>
       </section>
+    </div>
+  </div>
+
+  <!-- Journal : mes combats en tête, puis ce qui me concerne (D-110) -->
+  <div id="sheet-journal" class="sheet" hidden>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="journal-title">
+      <div class="sheet-head">
+        <h2 id="journal-title">Journal</h2>
+        <button id="btn-journal-close" class="icon-btn close-btn" title="Fermer" aria-label="Fermer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <p id="journal-away" class="hint" hidden></p>
+      <section>
+        <h3 class="section-title"><i data-ic="attack"></i> Combats et planètes</h3>
+        <ul id="journal-fights" class="journal"></ul>
+      </section>
+      <section>
+        <h3 class="section-title"><i data-ic="journal"></i> Ce qui me concerne</h3>
+        <ul id="journal-events" class="journal"></ul>
+      </section>
+      <button id="btn-journal-all" class="secondary" hidden>Tout le journal</button>
     </div>
   </div>
 
