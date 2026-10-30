@@ -301,6 +301,7 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 13:45 | `e67321a7` | [Bouton] « Créer la PR » | La branche d'origine était déjà fusionnée (PR #6) et `main` avait pris D-100 à D-106 : nouvelle branche `claude/fleet-offline-contact` depuis `main`, commit repris, décision renumérotée D-107, conflits de doc résolus ; pull request | (cette PR) | D-109 |
 | 13:55 | `e67321a7` | « rebase et merge » | `main` avait pris D-107 et D-108 (grille des flottes) : rebase, ma décision devient D-109 ; tests relancés ; pull request #13 fusionnée | (cette PR) | D-109 |
 | 14:03 | `caf0e31a` | Tâche collée « 1.4 Ajouter un rapport de combat et un journal visibles dans le jeu » (revoir D-018 ; journal filtré sur moi, combats en tête ; résumé « pendant ton absence » ; file de toasts) | Carnet de combats sur le téléphone (`session.journal`, pertes des deux côtés grâce au champ `lost` des rapports) ; fenêtre Journal avec pastille ; résumé à la reprise ; messages à la file ; 3 tests (147/147) ; vérifié dans le navigateur (résumé, journal, file) ; cache v61 | (ce commit) | D-110 |
+| 14:18 | `caf0e31a` | [Bouton] « Oui, ouvre la PR » | Branche poussée, pull request ouverte avec captures et résultats des tests | (cette PR) | D-110 |
 
 ### Travaux en cours au 2026-10-29
 
