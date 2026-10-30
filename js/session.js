@@ -61,6 +61,8 @@ const RAID_COOLDOWN_MS = (2 * 60_000) / TEMPO;
  * revient jamais.
  */
 const MAX_EFFECTS = 300;
+/** Entrées gardées dans mon carnet (combats et planètes perdues, sur ce téléphone seulement). */
+const JOURNAL_MAX = 100;
 const HEARTBEAT_MS = 1500;
 // Sans nouvelles depuis ce délai, la connexion est considérée perdue (un
 // écran verrouillé quelques secondes ne doit pas faire sortir de la partie).
@@ -240,6 +242,7 @@ export class Session {
     s.me = saved.me;
     s.state = clean(saved.state);
     s.status = 'playing';
+    s.journal = saved.journal || null; // avant le rattrapage : les combats de l'absence s'y inscrivent
     s.refreshOnline();
     s.start();
     s.tick();
@@ -494,6 +497,8 @@ export class Session {
     const mine = loadGame();
     let st = clean(msg.state);
     if (mine && mine.state.gid === st.gid) st = mergeStates(st, clean(mine.state));
+    // Mon carnet de combats de cette partie, s'il est sur ce téléphone (même joueur).
+    if (mine && mine.state.gid === st.gid && mine.me === msg.you) this.journal = mine.journal || null;
     this.me = msg.you;
     this.state = st;
     const id = loadIdentity();
@@ -818,6 +823,7 @@ export class Session {
       p.colonies = colonies;
       this.addLog(`${p.name} perd sa colonie ${pl.name} (${why}).`);
       this.ontoast?.(`Colonie ${pl.name} perdue (${why}).`);
+      this.note(p, { at, kind: 'planet', tone: 'bad', text: `Colonie ${pl.name} perdue (${why}).` });
       return;
     }
     const next = this.livePlanets(p, at)
@@ -828,7 +834,8 @@ export class Session {
       p.out = at;
       p.deathPts = this.wave.pts;
       this.addLog(`${p.name} perd ${pl.name} (${why}) : plus aucune planète, ${p.name} est éliminé.`);
-      this.ontoast?.(`${pl.name} perdue (${why}) : tu es éliminé.`);
+      this.ontoast?.(`${pl.name} perdue (${why}) : tu es éliminé.`, 8000);
+      this.note(p, { at, kind: 'planet', tone: 'bad', text: `${pl.name} perdue (${why}) : tu es éliminé.` });
       return;
     }
     const colonies = { ...p.colonies };
@@ -840,6 +847,7 @@ export class Session {
     p.planet = next.planet;
     this.addLog(`${p.name} perd ${pl.name} (${why}) : ${next.name} devient sa planète mère.`);
     this.ontoast?.(`${pl.name} perdue (${why}) : ${next.name} devient ta planète mère.`);
+    this.note(p, { at, kind: 'planet', tone: 'bad', text: `${pl.name} perdue (${why}) : ${next.name} devient ta planète mère.` });
   }
 
   /** Le froid prend mes planètes qu'il a atteintes, la plus lointaine d'abord. */
@@ -1324,7 +1332,7 @@ export class Session {
   }
 
   /**
-   * Flottes armées adverses que je vois (D-110). Celles qui visent une de mes
+   * Flottes armées adverses que je vois (D-115). Celles qui visent une de mes
    * planètes (attaque, conquête, simple trajet vers sa case, ou déjà en
    * orbite) d'abord, la plus proche de l'impact en tête ; puis les autres,
    * de la plus proche à la plus lointaine de mes planètes.
@@ -1491,8 +1499,15 @@ export class Session {
     const ack = (p.engaged || []).filter((g) => g.got && theirs.includes(g.fleet) && mine.includes(g.by)).map((g) => g.got);
     const id = this.newId(8);
     p.engaged = [...(p.engaged || []), { fleet: target.id, by: f.id, at: now, id }].slice(-20);
-    p.effects = [...(p.effects || []), { id, to: enemy.id, fleet: target.id, by: f.id, sim: true, ack, at: now, ships: res.defLost, take }].slice(-MAX_EFFECTS);
+    // `lost` : mes pertes, pour son rapport de combat (il ne les connaît pas autrement).
+    p.effects = [...(p.effects || []), { id, to: enemy.id, fleet: target.id, by: f.id, sim: true, ack, at: now, ships: res.defLost, lost: res.attLost, take }].slice(-MAX_EFFECTS);
     const loot = lootText(take);
+    const wiped = !countShips(res.attLeft);
+    this.note(p, {
+      at: now, kind: 'combat', who: enemy.name, mine: countShips(res.attLost), theirs: countShips(res.defLost), loot,
+      tone: res.won ? 'good' : wiped ? 'bad' : 'even',
+      text: res.won ? `Ta flotte détruit une flotte ${de(enemy.name)}.` : wiped ? `Ta flotte est détruite par ${enemy.name}.` : `Combat de flottes indécis contre ${enemy.name}.`,
+    });
     this.addLog(
       res.won
         ? `${p.name} détruit une flotte ${de(enemy.name)}${loot ? ` et récupère ${loot}` : ''}.`
@@ -2025,7 +2040,7 @@ export class Session {
       const w = this.planets.find((x) => sameCell(x, pl.cell));
       const capture = order.kind === 'conquer' && res.won && !!w && this.frostOf(w) > f.arrive;
       // Un identifiant par combat : une même flotte peut attaquer plusieurs fois.
-      const effect = { id: this.newId(8), to: enemy.id, key: pl.key, at: f.arrive, ships: res.defLost, take };
+      const effect = { id: this.newId(8), to: enemy.id, key: pl.key, at: f.arrive, ships: res.defLost, lost: res.attLost, take };
       if (capture) Object.assign(effect, { capture: true, cell: { ...pl.cell } });
       p.effects = [...(p.effects || []), effect].slice(-MAX_EFFECTS);
       if (capture) return this.capture(p, f, w, pl, enemy, res, take, now);
@@ -2036,6 +2051,11 @@ export class Session {
           : `${p.name} perd le combat sur ${pl.name} (${enemy.name}).`,
       );
       this.ontoast?.(res.won ? `Victoire sur ${pl.name} !` : `Défaite sur ${pl.name}.`);
+      this.note(p, {
+        at: f.arrive, kind: 'combat', who: enemy.name, planet: pl.name, mine: countShips(res.attLost), theirs: countShips(res.defLost), loot,
+        tone: res.won ? 'good' : 'bad',
+        text: res.won ? `Victoire sur ${pl.name} (${enemy.name}).` : `Défaite sur ${pl.name} (${enemy.name}) : sa défense te repousse.`,
+      });
       // Les soutes perdues emportent leur cargaison, comme en combat entre flottes.
       if (!applyLosses(f, p.race, p.planet.tech, res.attLost, null, now)) return drop(), true;
       f.cargo =Object.fromEntries(SOIL.map((r) => [r, (f.cargo?.[r] || 0) + (take[r] || 0)]));
@@ -2065,6 +2085,10 @@ export class Session {
     p.fleets = p.fleets.filter((x) => x.id !== f.id);
     this.addLog(`${p.name} prend ${pl.name} à ${enemy.name} !`);
     this.ontoast?.(`${pl.name} est à toi !`);
+    this.note(p, {
+      at: f.arrive, kind: 'combat', who: enemy.name, planet: pl.name, capture: true, mine: countShips(res.attLost), theirs: countShips(res.defLost), loot: lootText(take),
+      tone: 'good', text: `Tu prends ${pl.name} à ${enemy.name}.`,
+    });
     return true;
   }
 
@@ -2117,6 +2141,10 @@ export class Session {
           : this.planetOf(p, e.fleet ? p.docked?.[e.fleet] : e.key); // flotte posée entre-temps : sa planète encaisse
         if (!pl) continue;
         if (e.capture) {
+          this.note(p, {
+            at: e.at, kind: 'combat', who: other.name, planet: pl.name, capture: true, mine: countShips(e.ships), theirs: e.lost ? countShips(e.lost) : null,
+            pillaged: lootText(e.take || {}), tone: 'bad', text: `${other.name} prend ${pl.name}.`,
+          });
           this.losePlanet(p, pl.key, e.at, `prise par ${other.name}`);
           continue;
         }
@@ -2129,6 +2157,11 @@ export class Session {
         const ships = lost ? `${lost} vaisseau${lost > 1 ? 'x' : ''} perdu${lost > 1 ? 's' : ''}` : 'aucun vaisseau perdu';
         this.addLog(`${pl.name} (${p.name}) est attaquée par ${other.name} : ${ships}${loot ? `, ${loot} pillés` : ''}.`);
         this.ontoast?.(`${other.name} attaque ${pl.name} !`);
+        const harm = lost > 0 || !!loot;
+        this.note(p, {
+          at: e.at, kind: 'combat', who: other.name, planet: pl.name, mine: lost, theirs: e.lost ? countShips(e.lost) : null, pillaged: loot,
+          tone: harm ? 'bad' : 'good', text: harm ? `${other.name} attaque ${pl.name}.` : `${pl.name} repousse ${other.name}.`,
+        });
       }
     }
     // Un rapport que son auteur a effacé ne reviendra pas (sa fiche ne fait
@@ -2163,15 +2196,47 @@ export class Session {
     p.engaged = [...(p.engaged || []), { fleet: e.by, by: f.id, at: e.at, got: e.id }].slice(-20);
     const ships = g ? {} : e.ships;
     const lost = countShips(ships);
+    // Le même combat que le mien : mon carnet l'a déjà, vu de mon côté.
+    const noteHit = (destroyed) =>
+      g || this.note(p, {
+        at: e.at, kind: 'combat', who: other.name, mine: lost, theirs: e.lost ? countShips(e.lost) : null, pillaged: lootText(e.take || {}),
+        tone: destroyed ? 'bad' : lost ? 'even' : 'good',
+        text: destroyed ? `Ta flotte est détruite par ${other.name}.` : `${other.name} attaque ta flotte.`,
+      });
     if (!applyLosses(f, p.race, p.planet.tech, ships, e.take, now)) {
       p.fleets = p.fleets.filter((x) => x.id !== f.id);
       this.addLog(`Une flotte ${de(p.name)} est détruite par ${other.name}.`);
       this.ontoast?.(`${other.name} a détruit une de tes flottes !`);
+      noteHit(true);
       return true;
     }
     this.addLog(`Une flotte ${de(p.name)} est attaquée par ${other.name} : ${lost ? `${shipsText(lost)} perdu${lost > 1 ? 's' : ''}` : 'aucun vaisseau perdu'}.`);
     this.ontoast?.(`${other.name} attaque une de tes flottes !`);
+    noteHit(false);
     return true;
+  }
+
+  /**
+   * Mon carnet : les combats et les planètes perdues qui me concernent, vus de
+   * mon côté (pertes des deux côtés, `loot` que j'ai pris, `pillaged` qu'on m'a pris). Gardé sur ce téléphone seulement,
+   * avec la sauvegarde ; il ne part pas sur le réseau. `n` numérote les
+   * entrées : celles au-delà de `read` sont neuves (résumé « pendant ton
+   * absence »). `at` : l'heure du combat, qui peut être dans le passé (D-109).
+   */
+  note(p, entry) {
+    if (p.id !== this.me) return;
+    const j = (this.journal ||= { n: 0, read: 0, list: [] });
+    j.n += 1;
+    j.list = [...j.list, { n: j.n, ...entry }].slice(-JOURNAL_MAX);
+    this.onnote?.(j.list.at(-1));
+  }
+
+  /** Tout mon carnet est lu (jusqu'à `n`, ou jusqu'au bout). */
+  markRead(n) {
+    const j = this.journal;
+    if (!j || j.read >= (n ?? j.n)) return;
+    j.read = Math.min(n ?? j.n, j.n);
+    this.save();
   }
 
   addLog(text) {
@@ -2210,7 +2275,7 @@ export class Session {
   }
 
   save() {
-    if (this.state && this.me && this.status === 'playing') saveGame(this.me, this.state);
+    if (this.state && this.me && this.status === 'playing') saveGame(this.me, this.state, this.journal);
   }
 
   /** Un autre joueur a une version plus récente de l'appli. */

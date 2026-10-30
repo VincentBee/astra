@@ -1,4 +1,4 @@
-// Alerte de flotte ennemie (D-110) : ce que Session.threats signale au
+// Alerte de flotte ennemie (D-115) : ce que Session.threats signale au
 // défenseur, et ce qu'elle tait (flottes sans armes, hors de vue, les miennes).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

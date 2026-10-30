@@ -5,11 +5,11 @@ import { scanQr } from './scanner.js';
 import {
   RACES, RACE_KEYS, RES_INFO, resIcon, raceIcon, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
   powerReadyAt, powerCost, liftGain, fmt, UNIVERSE, SOIL, sameCell, sunFor, climateName, kindLabel, usedPlaces, TEMPO, frostLine, planForecast, PLAN_MAX,
-  shipsAffordable,
+  shipsAffordable, planetAlerts,
 } from './game.js';
 import { drawSun } from './sky.js';
 import { ic, fillIcons } from './icons.js';
-import { startGalaxy } from './galaxy.js';
+import { startGalaxy, skyMode, setSkyMode } from './galaxy.js';
 import { TECHS, SHIPS, SHIP_KEYS, techCost, techMissing, researchDuration, shipUnlock, shipUnlocked, shipStats, shipDuration } from './tech.js';
 import { TRADE_RES, TRADE_NAMES } from './trade.js';
 import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fleetSpeed, slowestShip, fuelAt, moving, aggressive, armed } from './fleet.js';
@@ -57,13 +57,27 @@ function show(screen) {
   window.scrollTo(0, 0);
 }
 
-let toastTimer;
-function toast(text) {
+/**
+ * Messages en bas de l'écran, à la file : un à la fois, dans l'ordre, aucun
+ * n'en efface un autre (D-110). Des messages attendent : chacun reste moins
+ * longtemps. Appli cachée : rien n'est montré, le journal garde les combats.
+ */
+const toasts = [];
+let toastTimer = null;
+function toast(text, ms = 3200) {
+  if (document.visibilityState === 'hidden') return;
+  if (toasts.some((t) => t.text === text) || (toastTimer && $('toast').textContent === text)) return;
+  toasts.push({ text, ms });
+  if (toasts.length > 6) toasts.splice(Math.max(0, toasts.findIndex((t) => t.ms <= 3200)), 1); // les longs (élimination) restent
+  if (!toastTimer) nextToast();
+}
+function nextToast() {
   const t = $('toast');
-  t.textContent = text;
-  t.hidden = false;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (t.hidden = true), 3200);
+  const next = toasts.shift();
+  t.hidden = !next;
+  if (!next) return (toastTimer = null);
+  t.textContent = next.text;
+  toastTimer = setTimeout(nextToast, toasts.length ? Math.max(2000, next.ms / 2) : next.ms);
 }
 
 async function copy(text, okMessage) {
@@ -134,6 +148,16 @@ try {
   $('name').value = localStorage.getItem('astra.name') || '';
 } catch {}
 
+// Réglages de l'appareil : une fenêtre, ouverte par la roue crantée (accueil et jeu).
+for (const btn of document.querySelectorAll('[data-settings]')) {
+  btn.onclick = () => {
+    $('sky').value = skyMode();
+    $('sheet-settings').hidden = false;
+  };
+}
+$('btn-settings-close').onclick = () => ($('sheet-settings').hidden = true);
+$('sky').onchange = () => setSkyMode($('sky').value);
+
 for (const el of document.querySelectorAll('[data-go]')) {
   el.onclick = () => {
     session?.end?.();
@@ -188,6 +212,10 @@ $('games').addEventListener('click', (e) => {
   session.onchange = onSessionChange;
   startGame();
   toast('Partie reprise.');
+  // Les combats rattrapés à la reprise ont été notés avant que l'écran existe, ceux d'avant la
+  // fermeture (appli en arrière-plan) n'ont pas été lus : le résumé montre tout ce qui n'est pas lu.
+  awayFrom = saved.journal?.read || 0;
+  showAbsence(Date.now() - saved.savedAt);
 });
 
 window.addEventListener('pagehide', () => session?.save?.());
@@ -439,6 +467,7 @@ function startGame() {
   show('game');
   buildStatic();
   selected = null;
+  alertsSeen = new Map();
   showView('map');
   // Le rafraîchissement d'abord : un premier rendu qui échouerait ne doit pas figer l'écran.
   clearInterval(liveTimer);
@@ -805,8 +834,9 @@ function renderState() {
 }
 
 /**
- * Journal de la partie : il n'est pas affiché dans le jeu, on l'écrit dans
- * la console du navigateur (chaque entrée une seule fois, dans l'ordre).
+ * Journal partagé de la partie, copié aussi dans la console du navigateur
+ * (chaque entrée une seule fois, dans l'ordre) pour déboguer. Dans le jeu,
+ * c'est la fenêtre Journal qui le montre (D-110, plus haut).
  */
 const printed = new Set();
 function printLog(log) {
@@ -819,6 +849,86 @@ function printLog(log) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Journal en jeu (D-110) : mes combats vus de mon côté (carnet du téléphone),
+// puis les lignes du journal partagé qui me nomment.
+// ---------------------------------------------------------------------------
+
+/** Absence au-delà de laquelle le retour ouvre le résumé « pendant ton absence ». */
+const AWAY_MS = 2 * 60_000;
+let awayFrom = 0; // numéro de la dernière entrée du carnet quand je suis parti
+let hiddenAt = 0;
+
+function when(at) {
+  const d = new Date(at);
+  const hm = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  return d.toDateString() === new Date().toDateString() ? hm : `${d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} ${hm}`;
+}
+
+/** « Tes pertes : 3 · Ses pertes : 4 · Butin : 173 minéraux » (pertes adverses inconnues : ancien rapport). */
+function reportDetail(e) {
+  if (e.kind !== 'combat') return '';
+  const n = (v) => (v == null ? '?' : v);
+  const parts = [`Tes pertes : ${n(e.mine)}`, `Ses pertes : ${n(e.theirs)}`];
+  if (e.loot) parts.push(`Butin : ${e.loot}`);
+  if (e.pillaged) parts.push(`Pillé : ${e.pillaged}`);
+  return parts.join(' · ');
+}
+
+/** Ouvre le journal ; `away` : seulement ce qui est arrivé pendant mon absence. */
+function openJournal(away = null) {
+  const j = session.journal || { n: 0, read: 0, list: [] };
+  const read = j.read;
+  const me = session.state.players[session.me];
+  const fights = j.list.filter((e) => !away || e.n > away.n).sort((a, b) => b.at - a.at || b.n - a.n);
+  $('journal-title').textContent = away ? 'Pendant ton absence' : 'Journal';
+  $('journal-away').hidden = !away;
+  if (away) $('journal-away').textContent = `Absent ${away.text}.`;
+  $('journal-fights').innerHTML = fights.length
+    ? fights
+        .map((e) => {
+          const detail = reportDetail(e);
+          return `<li class="${esc(e.tone || '')}${e.n > read ? ' new' : ''}"><span class="j-time mono">${when(e.at)}</span><strong>${esc(e.text)}</strong>${detail ? `<div class="j-detail mono">${esc(detail)}</div>` : ''}</li>`;
+        })
+        .join('')
+    : '<li class="j-empty">Aucun combat pour l’instant.</li>';
+  const events = (session.state.log || [])
+    .filter((l) => me && l.text.includes(me.name) && (!away || l.at >= away.since))
+    .sort((a, b) => b.at - a.at)
+    .slice(0, 20);
+  $('journal-events').innerHTML = events.length
+    ? events.map((l) => `<li><span class="j-time mono">${when(l.at)}</span>${esc(l.text)}</li>`).join('')
+    : '<li class="j-empty">Rien de neuf.</li>';
+  $('btn-journal-all').hidden = !away;
+  $('sheet-journal').hidden = false;
+  session.markRead();
+}
+
+/** Au retour (reprise ou appli revenue au premier plan) : le résumé, s'il y a du neuf. */
+function showAbsence(gone) {
+  const j = session?.journal;
+  if (!session?.state || gone < AWAY_MS || !j || !j.list.some((e) => e.n > awayFrom)) return;
+  const min = Math.round(gone / 60_000);
+  const text = min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}`;
+  openJournal({ n: awayFrom, since: Date.now() - gone, text });
+}
+
+$('btn-journal').onclick = () => openJournal();
+$('btn-journal-all').onclick = () => openJournal();
+$('btn-journal-close').onclick = () => ($('sheet-journal').hidden = true);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    hiddenAt = Date.now();
+    awayFrom = session?.journal?.n || 0;
+    return;
+  }
+  if (!hiddenAt) return;
+  const gone = Date.now() - hiddenAt;
+  hiddenAt = 0;
+  // Le rattrapage tourne au passage suivant (toutes les 250 ms) : on lui laisse le temps.
+  setTimeout(() => showAbsence(gone), 1000);
+});
+
 function routeLabel(route) {
   return { host: 'réseau local', srflx: 'direct', prflx: 'direct', relay: 'relais' }[route] || '';
 }
@@ -830,7 +940,8 @@ function renderLive() {
   const me = st.players[session.me];
   const now = session.now();
   renderRace(now);
-  renderAlert(now);
+  renderThreat(now);
+  renderAlerts(me, now);
 
   {
     const online = session.peerCount;
@@ -842,6 +953,12 @@ function renderLive() {
       ? `${online + 1} joueurs en ligne${worst != null ? ` · ${worst} ms` : ''}`
       : 'Seul en ligne';
     $('net-detail').className = 'net' + (worst != null && worst > 250 ? ' slow' : '');
+  }
+  {
+    const j = session.journal;
+    const fresh = j ? j.n - j.read : 0;
+    $('journal-count').hidden = !fresh;
+    $('journal-count').textContent = fresh > 9 ? '9+' : fresh;
   }
 
   if (me?.planet) {
@@ -932,12 +1049,12 @@ function renderRace(now) {
 }
 
 /**
- * Bandeau rouge (D-110) : la flotte armée adverse la plus pressante, avec le
+ * Bandeau rouge (D-115) : la flotte armée adverse la plus pressante, avec le
  * compte à rebours si elle vise une de mes planètes ; il reste tant qu'elle
  * est en vue. Un toucher montre la carte.
  */
-function renderAlert(now) {
-  const el = $('alert');
+function renderThreat(now) {
+  const el = $('threat');
   const list = session.over ? [] : session.threats(now);
   el.hidden = !list.length;
   if (!list.length) return;
@@ -950,9 +1067,90 @@ function renderAlert(now) {
     : t.eta > 0 ? `${who} sur ${where} dans <span class="mono">${Math.ceil(t.eta / 1000)} s</span>`
     : `${who} en orbite ${esc(de(t.target.name))}`;
   const more = list.length > 1 ? ` <span class="hint">· +${list.length - 1} autre${list.length > 2 ? 's' : ''}</span>` : '';
-  setHtml($('alert-text'), `${ic('attack')} <strong>${what}</strong>${more}`);
+  setHtml($('threat-text'), `${ic('attack')} <strong>${what}</strong>${more}`);
 }
-$('alert').addEventListener('click', () => showView('map'));
+$('threat').addEventListener('click', () => showView('map'));
+// Diagnostic des planètes : famine, panne d'énergie, stock vital qui baisse (D-111).
+let alertsNow = new Map(); // case « x:y » → { key, name, cell, list } : mes planètes à problème
+let alertsSeen = new Map(); // problème déjà annoncé → dernière fois vu (évite de répéter le toast)
+const cellKey = (c) => `${Math.round(c.x)}:${Math.round(c.y)}`;
+const ALERT_NAMES = {
+  short: { food: 'Famine', energy: 'Panne d’énergie' },
+  deficit: { food: 'Nourriture en baisse', energy: 'Énergie en baisse' },
+};
+function alertText(a) {
+  if (a.kind === 'short') return `${ALERT_NAMES.short[a.res]} · besoins couverts à ${Math.floor(a.eff * 100)} %`;
+  const min = Math.ceil(a.left / 60_000);
+  return `${ALERT_NAMES.deficit[a.res]} · vide dans ${min > 1 ? `${min} min` : 'moins d’une minute'}`;
+}
+
+/** Pastille sur la carte, toast à l'apparition, ligne dans le bandeau, icône et sa liste. */
+function renderAlerts(me, now) {
+  const all = new Map();
+  if (me?.planet && !me.out) {
+    for (const pl of session.livePlanets(me, now)) {
+      const list = planetAlerts(me.race, stateAt(pl.planet, now));
+      if (list.length) all.set(cellKey(pl.cell), { ...pl, list });
+    }
+  }
+  alertsNow = all;
+
+  // Toast : seulement ce qui vient d'apparaître. Un problème parti depuis moins de 10 s ne se réannonce pas.
+  const fresh = [];
+  for (const a of all.values()) {
+    for (const x of a.list) {
+      const k = `${a.key}:${x.res}:${x.kind}`;
+      if (!alertsSeen.has(k)) fresh.push(`${ALERT_NAMES[x.kind][x.res]} sur ${a.name}`);
+      alertsSeen.set(k, now);
+    }
+  }
+  for (const [k, t] of alertsSeen) if (now - t > 10_000) alertsSeen.delete(k);
+  if (fresh.length) toast(fresh.join(' · '));
+
+  // Bandeau : une ligne pour les pénuries, sur tout l'empire, quelle que soit la vue.
+  const shorts = [...all.values()].flatMap((a) => a.list.filter((x) => x.kind === 'short').map((x) => `<strong>${ALERT_NAMES.short[x.res]}</strong> sur ${esc(a.name)}`));
+  $('alert-line').hidden = !shorts.length;
+  setHtml($('alert-text'), shorts.join(' · '));
+
+  // Icône : toutes mes planètes sur la carte, seulement celle ouverte sur sa vue.
+  const onPlanet = currentView === 'planet';
+  const scope = [...all.values()].filter((a) => !onPlanet || a.key === openKey);
+  const n = scope.reduce((t, a) => t + a.list.length, 0);
+  const bad = scope.some((a) => a.list.some((x) => x.kind === 'short'));
+  const btn = $('alerts-btn');
+  btn.hidden = !me?.planet;
+  btn.classList.toggle('bad', bad);
+  btn.classList.toggle('warn', !bad && n > 0);
+  $('alerts-count').textContent = n || '';
+  const label = `${onPlanet ? 'Diagnostic de cette planète' : 'Diagnostic de toutes mes planètes'} : ${n ? `${n} problème${n > 1 ? 's' : ''}` : 'tout va bien'}`;
+  if (btn.title !== label) {
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+  }
+  if ($('alerts-panel').hidden) return;
+  const rows = scope.flatMap((a) =>
+    a.list.map(
+      (x) =>
+        `<li class="${x.kind}">${onPlanet ? '' : `<button class="ghost small" data-alert-go="${esc(a.key)}">${esc(a.name)}</button>`}<span>${alertText(x)}</span></li>`,
+    ),
+  );
+  setHtml($('alerts-list'), rows.join('') || `<li class="ok"><span>Tout va bien : nourriture et énergie couvertes${onPlanet ? '' : ' sur toutes tes planètes'}.</span></li>`);
+}
+
+/** Petit rond sur une de mes planètes à problème : rouge si pénurie, orange si le stock baisse. */
+function drawAlertDot(ctx, w, cx, cy, cell, pulse) {
+  const a = alertsNow.get(cellKey(w));
+  if (!a) return;
+  const short = a.list[0].kind === 'short';
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = short ? '#ff6b7a' : '#ffb36b';
+  ctx.strokeStyle = '#05070f';
+  ctx.lineWidth = Math.max(1, cell * 0.04);
+  ctx.beginPath();
+  ctx.arc(cx + cell * 0.4, cy - cell * 0.32, cell * (short ? 0.2 + 0.04 * pulse : 0.17), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+}
 
 /** La planète ouverte (mère ou colonie) : ressources, population, chantiers, recherche, flottes. */
 function renderPlanet(me, now) {
@@ -1382,7 +1580,10 @@ function showView(view, key = openKey) {
   $('view-universe').hidden = view !== 'map';
   $('view-planet').hidden = view !== 'planet';
   // Pas de barre du haut : le compteur de joueurs se range à droite de la première ligne de l'écran.
-  (view === 'map' ? document.querySelector('.map-head .pi-head-right') : document.querySelector('.planet-head')).append($('net'));
+  // L'icône de diagnostic le suit, et sa liste se déplie sous cette même ligne.
+  const head = document.querySelector(view === 'map' ? '.map-head' : '.planet-head');
+  (view === 'map' ? head.querySelector('.pi-head-right') : head).append($('btn-journal'), $('alerts-btn'), $('btn-settings'), $('net'));
+  head.append($('alerts-panel'));
   window.scrollTo(0, 0);
   if (view === 'map') {
     if (!mapFrame) mapFrame = requestAnimationFrame(drawMap);
@@ -1433,6 +1634,20 @@ $('btn-map-help').onclick = (e) => {
 };
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.help-wrap')) $('btn-map-help').setAttribute('aria-expanded', 'false');
+});
+$('alerts-btn').onclick = () => {
+  const open = $('alerts-panel').hidden;
+  $('alerts-panel').hidden = !open;
+  $('alerts-btn').setAttribute('aria-expanded', String(open));
+  delete $('alerts-list').dataset.html; // réécrire la liste tout de suite
+  renderLive();
+};
+$('alerts-list').addEventListener('click', (e) => {
+  const go = e.target.closest('[data-alert-go]');
+  if (!go) return;
+  selected = null;
+  renderPick();
+  showView('planet', go.dataset.alertGo);
 });
 $('btn-open-planet').onclick = (e) => {
   selected = null; // sinon la fiche se rouvrirait au retour sur la carte
@@ -1611,6 +1826,7 @@ function drawMap() {
         ctx.arc(cx, cy, cell * 0.4, 0, Math.PI * 2);
         ctx.stroke();
       }
+      if (mine) drawAlertDot(ctx, w, cx, cy, cell, pulse);
       continue;
     }
     ctx.beginPath();
@@ -1640,6 +1856,7 @@ function drawMap() {
       const label = o.name.length > 8 ? o.name.slice(0, 7) + '…' : o.name;
       ctx.fillText(label, cx, Math.max(cell * 0.4, cy - cell * 0.5));
     }
+    if (mine) drawAlertDot(ctx, w, cx, cy, cell, pulse);
   }
   ctx.globalAlpha = 1;
 
@@ -1713,7 +1930,7 @@ function drawMap() {
     ctx.restore();
     ctx.globalAlpha = 1;
     if (p.id !== session.me) {
-      // Effectif des flottes adverses (D-110), en haut à droite du triangle.
+      // Effectif des flottes adverses (D-115), en haut à droite du triangle.
       ctx.font = `700 ${Math.max(9 * dpr, cell * 0.34)}px system-ui, sans-serif`;
       ctx.textAlign = 'left';
       ctx.lineWidth = Math.max(2, cell * 0.08);

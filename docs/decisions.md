@@ -148,7 +148,9 @@ Aucune conversation ne les prouve.
   - régénération des gisements baissée (minéraux 15–45/min, nourriture 8–25/min), nouvelles
     parties seulement ; anciennes planètes sans gisement : sans limite.
 - Qui : Claude (défaut). Source : `aeb160d5` 22:07:26, 22:11:44 ; `40cdb51`.
-- Statut : en vigueur, sauf la régénération, **modifiée par D-060** (gisements ×10).
+- Statut : en vigueur, sauf la régénération, **modifiée par D-060** (gisements ×10), et le journal
+  en console, **modifié par D-110** (journal visible dans le jeu ; la console n'en garde qu'une
+  copie pour déboguer).
 
 **D-019 — Tout ce qui est produit est pris à la planète**
 - 2026-10-25 22:10. Contexte : Claude avait laissé hors gisement le revenu de base, l'impôt
@@ -507,7 +509,8 @@ Aucune conversation ne les prouve.
 
 **D-068 — Accéléromètre sur iPhone**
 - 2026-10-28 22:17. Choix : autorisation « Mouvement » au premier tap ; position de repos qui
-  s'adapte ; mouvement lissé ; fond fixe si « réduire les animations ».
+  s'adapte ; mouvement lissé ; fond fixe si « réduire les animations » (modifiée par D-112 :
+  ce fond fixe est désormais une seule image, et chacun peut le choisir).
 - Qui : Claude (défaut). Testé avec des événements simulés seulement (**non confirmé** sur un vrai
   iPhone). Source : `f4afbcd0` 22:15:08, 22:17:00. Statut : en vigueur.
 
@@ -976,7 +979,106 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Qui : Vincent (corriger), Claude (méthode). Source : session `e67321a7`. Statut : en vigueur.
 - Tests : `tests/fleet.test.mjs`, section « Rencontres que personne n'a regardées ».
 
-**D-110 — Alerte quand une flotte ennemie arrive sur une de mes planètes**
+**D-110 — Rapport de combat et journal visibles dans le jeu ; messages à la file**
+- 2026-10-30 14:03. Contexte : tâche 1.4 collée par Vincent : pertes, butin et planètes perdues
+  n'étaient écrits que dans la console (D-018, décidé avant les combats) ; en jeu, un seul message
+  de 3,2 s, écrasé par le suivant (« tu es éliminé » aussi). Demandé : revoir D-018, un journal
+  dans le jeu filtré sur moi avec les combats en tête, un résumé « pendant ton absence », une file
+  de messages.
+- Choix :
+  - **Carnet de combats propre au téléphone** (`session.journal`, 100 entrées) : chaque combat vu
+    de mon côté (mes pertes, ses pertes, butin pris ou pillé, planète prise) et chaque planète
+    perdue, daté de l'heure du combat. Il est rangé avec la sauvegarde (`saveGame`), pas dans la
+    fiche : il ne part pas sur le réseau et le rejeu ne le touche pas. Écrit par la session
+    elle-même, donc aussi pendant le rattrapage à la reprise (avant que l'écran existe).
+  - **Les rapports `effects` portent `lost`** (pertes de l'attaquant) : le défenseur connaît ainsi
+    les pertes des deux côtés. Champ facultatif, sans changer `FORMAT` ; un rapport d'une ancienne
+    version donne « Ses pertes : ? ».
+  - **Fenêtre Journal** (bouton à côté du compteur de joueurs, pastille du nombre d'entrées non
+    lues) : « Combats et planètes » en tête, puis « Ce qui me concerne » = les lignes du journal
+    partagé qui me nomment (20 au plus).
+  - **Résumé « Pendant ton absence »** : la même fenêtre, limitée à ce qui est neuf, ouverte au
+    retour après 2 min ou plus d'absence (reprise d'une partie : tout le non-lu ; appli revenue au
+    premier plan : ce qui est arrivé depuis qu'elle a été cachée), seulement s'il y a un combat ou
+    une perte.
+  - **Messages à la file** : un à la fois, dans l'ordre, aucun n'en efface un autre ; 6 en attente
+    au plus ; doublons ignorés ; quand d'autres attendent, chacun reste au moins 2 s ; « tu es
+    éliminé » reste 8 s. Appli cachée : pas de message (le carnet garde l'essentiel).
+  - La console garde une copie du journal partagé, pour déboguer (D-018 modifiée).
+- Choix de Claude, par défaut : tout ce qui précède dans le détail (taille du carnet, 2 min, 6
+  messages, 8 s, filtre par le nom du joueur, une file plutôt qu'une pile de messages).
+- Alternatives écartées : afficher le journal partagé tel quel (40 lignes de tout le monde, texte
+  seul, coupé à 120 caractères, pas de pertes adverses) ; mettre le carnet dans la fiche (plus
+  lourde pour tous, inutile aux autres) ; plusieurs messages empilés à l'écran (cachent la carte).
+- Limites : le filtre « ce qui me concerne » cherche mon nom dans le texte (un autre nom qui
+  contient le mien passerait) ; l'ouverture au retour au premier plan n'a pas été testée dans le
+  navigateur (seulement la reprise d'une partie).
+- Qui : Vincent (demande), Claude (méthode). Source : session `caf0e31a`. Statut : en vigueur.
+- Tests : `tests/journal.test.mjs`.
+**D-111 — Alertes de famine et de panne d'énergie, et diagnostic des planètes**
+- 2026-10-30 14:11. Contexte : point 1.6 de la recette (`a-humain-01`, `a-alien-10`) : une
+  colonie qui meurt de faim ou manque d'énergie ne prévient pas, sauf si l'on est sur son écran.
+  Vincent ajoute une icône de diagnostic sur la carte (toutes les planètes, qui déroule les
+  problèmes au toucher) et la même sur la planète (cette planète seulement).
+- Choix : `planetAlerts(race, stateAt(...))` (`js/game.js`) donne, pour la nourriture et
+  l'énergie que la race utilise, une **pénurie** (`effF` ou `effE` < 1 : famine, panne) ou une
+  **baisse** (solde < −0,5 par heure de jeu, le seuil déjà utilisé par les tuiles, avec le temps
+  avant d'être vide). Sur mes planètes vivantes : pastille sur la carte, toast à l'apparition,
+  ligne dans un bandeau `#alert-line`, icône `#alerts-btn` qui suit le compteur de joueurs.
+- Choix de Claude, par défaut : pastille **rouge** pour une pénurie, **orange** pour une baisse
+  (un solde négatif avec un entrepôt plein est courant, ce serait du bruit en rouge) ; la ligne
+  du bandeau ne montre que les pénuries, de tout l'empire, dans les deux vues ; les minéraux ne
+  sont jamais vitaux ; le toast n'annonce que ce qui apparaît, un problème parti depuis moins de
+  10 s ne se réannonce pas ; à la reprise d'une partie, les problèmes déjà là sont annoncés une
+  fois (c'est la plainte d'origine) ; dans la liste de la carte, le nom de la planète ouvre sa vue.
+- Alternatives écartées : tout en rouge ; un toast à chaque passage (répète sans fin) ; une
+  ligne dans le bandeau du froid `#race` (caché dans les parties d'avant la course).
+- Qui : Vincent (demande, icône), Claude (seuils, couleurs, détails). Source : session
+  `b4653aec`. Statut : en vigueur.
+- Tests : `tests/alerts.test.mjs`.
+
+**D-112 — Réglage « Fond » : étoiles animées, fixes ou absentes**
+- 2026-10-30. Contexte : Vincent demande d'estimer ce que coûte la parallaxe et de pouvoir la
+  retirer. Mesure (Chrome, téléphone simulé 390 × 844, densité 3, processeur ralenti × 4) : en
+  animé, 3 calques de 2 × 2 écrans ≈ 142 Mo de surface de calque (estimation : la part
+  réellement gardée en mémoire graphique dépend du navigateur, **non mesurée**), 3 images de
+  12 Mo, 103 ms de dessin au lancement, et jusqu'à 180 écritures de style par seconde tant que
+  le téléphone bouge (le ciel est recomposé à chaque image). En fixe : 1 image, 12 Mo, 38 ms,
+  rien ensuite. Sans étoiles : rien.
+- Choix : un réglage « Fond » (accueil et fenêtre Joueurs ; rangé dans la fenêtre Réglages par
+  D-114), gardé dans `astra.sky` :
+  `anime` (par défaut, comme avant), `fixe` (les 3 couches dans une seule image immobile, sans
+  capteurs), `aucun` (dégradé CSS seul). Changement immédiat, sans recharger. « Réduire les
+  animations » donne aussi le rendu fixe (une image au lieu de 3 calques). En animé, la
+  position est arrondie au pixel de l'écran : un tremblement plus petit ne redessine plus rien
+  (environ 2 fois moins d'écritures avec un capteur bruité simulé).
+- Alternatives écartées : retirer la parallaxe pour tous ; fixe par défaut ; détecter
+  « téléphone faible » ou « batterie faible » (pas d'API fiable sur iPhone).
+- Qui : Claude (défaut : animé reste le défaut, 3 choix). Source : session `0a3a42f6`.
+- Statut : en vigueur, modifiée par D-114 (emplacement). Effet sur la batterie d'un vrai
+  téléphone : **non confirmé**.
+
+**D-113 — Cache `astra-p2p-v63`**
+- 2026-10-30. Choix de Claude : `index.html`, `style.css`, `js/app.js`, `js/galaxy.js` et
+  `js/icons.js` (D-114) changent ; nouvelle version de cache pour que les téléphones les récupèrent.
+- Statut : en vigueur.
+
+**D-114 — Une fenêtre « Réglages », ouverte par une roue crantée**
+- 2026-10-30 16:40. Demande de Vincent : « Les réglages utilisateurs doivent être bien rangés dans
+  l'application et ne pas prendre trop de place. Ils doivent être accessibles avec un icône de roue
+  crantée. »
+- Choix : une seule fenêtre `#sheet-settings` (comme les autres `.sheet`), avec le réglage « Fond »
+  (D-112) ; elle s'ouvre par une roue crantée (icône `gear`, sans texte) en haut à droite de
+  l'accueil et dans la rangée de boutons du jeu (entre le diagnostic et le compteur de joueurs).
+  Les deux listes « Fond » de l'accueil et de la fenêtre Joueurs sont retirées. Les futurs
+  réglages de l'appareil iront dans cette fenêtre.
+- Choix de Claude, par défaut : le dessin de la roue (8 dents, trou central) ; la place des
+  boutons ; la fenêtre en bas d'écran comme les autres.
+- Alternatives écartées : garder une liste sur chaque écran (prend de la place) ; mettre les
+  réglages dans la fenêtre Joueurs (mal rangé).
+- Qui : Vincent (demande), Claude (forme). Source : session `0a3a42f6`. Statut : en vigueur.
+
+**D-115 — Alerte quand une flotte ennemie arrive sur une de mes planètes**
 - 2026-10-30 14:10. Contexte : retour de 7 testeurs (point 1.3 de leur synthèse) : une conquête
   tombe sans préavis, le seul signal est un toast de 3,2 s à l'impact, et l'effectif des flottes
   ennemies ne se voit pas sur la carte. Demande : un bandeau rouge persistant avec compte à
@@ -985,11 +1087,11 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   ma zone de détection, la même règle que la carte). Deux niveaux : d'abord celles qui visent une
   de mes planètes (ordre attaque ou conquête sur moi, simple trajet vers la case de ma planète, ou
   déjà en orbite), la plus proche de l'impact en tête ; puis les autres, de la plus proche à la
-  plus lointaine de mes planètes. Bandeau `#alert` sous celui du froid, sur tous les onglets : la
+  plus lointaine de mes planètes. Bandeau `#threat` sous celui du froid, sur tous les onglets : la
   plus pressante (« 12 vaisseaux de Zorg sur Pollux dans 8 s », « … en orbite de Pollux »,
   « … en vue, à 3 cases de Pollux ») et « +N autres ». Un toucher montre la carte. Compte à
   rebours en secondes (les trajets durent 2 à 10 s). Sur la carte, le nombre de vaisseaux est
-  écrit à côté de chaque flotte adverse visible. Cache v61.
+  écrit à côté de chaque flotte adverse visible. Cache v64.
 - Choix de Claude, par défaut : la cible et l'ordre d'une flotte visible sont montrés (ils sont
   déjà dans la copie de la partie ; la carte, elle, ne montrait que la direction) ; une flotte
   arrivée dont le combat n'est pas encore réglé garde l'alerte à « en orbite » ; une flotte d'un
@@ -998,11 +1100,11 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   les flottes de la partie, même hors de vue (révèle ce que la carte cache) ; vibration ou son
   (non demandé).
 - Qui : Vincent (demande), Claude (détails). Source : session `0cb6f324`. Statut : en vigueur.
-- Tests : `tests/alert.test.mjs`.
+- Tests : `tests/threat.test.mjs`.
 
-**D-111 — Délai avant qu'une flotte en orbite frappe une case voisine**
+**D-116 — Délai avant qu'une flotte en orbite frappe une case voisine**
 - 2026-10-30 14:10. Contexte : même point 1.3 : depuis l'orbite, une conquête de la case voisine
   prend 2 à 3 s (plancher `MIN_TRIP` de 2 s). La synthèse le met « à discuter ».
-- Choix : **rien n'est changé pour l'instant**. Question posée à Vincent ; l'alerte de D-110
+- Choix : **rien n'est changé pour l'instant**. Question posée à Vincent ; l'alerte de D-115
   laisse déjà voir les flottes en orbite proches (« en vue, à 1 case »).
 - Qui : en attente de Vincent. Source : session `0cb6f324`. Statut : ouvert, non tranché.

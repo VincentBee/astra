@@ -65,11 +65,11 @@ Ordre conseillé pour arriver sur le projet : README racine → `reseau.md` §1-
 | `js/app.js` | Toute l'interface du jeu (≈ 1 970 lignes) | interface |
 | `js/replay-view.js` | Écran de `replay.html` | interface |
 | `js/sky.js` | Soleil central de la carte | interface (et regles pour la carte) |
-| `js/galaxy.js` | Fond de galaxie en parallaxe | interface |
-| `js/icons.js` | Icônes SVG (35 tracés) | interface |
-| `tests/` | 14 fichiers `*.test.mjs` (147 tests, dont `alert.test.mjs` : alerte de flotte ennemie, dont `plan.test.mjs` : fil de construction, dont `end.test.mjs` : fin de partie) + `harness.mjs` | regles (règles), reseau (`peer`, `hostile`, `harness`), [tests-decisions](architecture/tests-decisions.md) (`decisions-*.test.mjs`) |
+| `js/galaxy.js` | Fond de galaxie en parallaxe ; réglage « Fond » (animé, fixe, aucun) | interface |
+| `js/icons.js` | Icônes SVG (36 tracés) | interface |
+| `tests/` | 16 fichiers `*.test.mjs` (157 tests, dont `threat.test.mjs` : alerte de flotte ennemie, dont `alerts.test.mjs` : famine et panne d'énergie, dont `plan.test.mjs` : fil de construction, dont `end.test.mjs` : fin de partie, dont `journal.test.mjs` : carnet de combats) + `harness.mjs` | regles (règles), reseau (`peer`, `hostile`, `harness`), [tests-decisions](architecture/tests-decisions.md) (`decisions-*.test.mjs`) |
 
-Lancer les tests : `node --test tests/*.test.mjs` (147/147 réussis le 2026-10-30 avec le fil de construction, D-105, le chantier sur la carte, D-106, les rencontres hors ligne, D-109, et l'alerte de flotte ennemie, D-110). Quel test
+Lancer les tests : `node --test tests/*.test.mjs` (157/157 réussis le 2026-10-30 avec le fil de construction, D-105, le chantier sur la carte, D-106, les rencontres hors ligne, D-109, le carnet de combats, D-110, les alertes de famine, D-111, et le réglage « Fond », D-112, et l'alerte de flotte ennemie, D-115). Quel test
 protège quelle décision : [architecture/tests-decisions.md](architecture/tests-decisions.md). Attention :
 `node --test tests/` échoue (voir reseau.md §9).
 
