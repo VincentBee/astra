@@ -66,7 +66,7 @@ Ordre conseillé pour arriver sur le projet : README racine → `reseau.md` §1-
 | `js/replay-view.js` | Écran de `replay.html` | interface |
 | `js/sky.js` | Soleil central de la carte | interface (et regles pour la carte) |
 | `js/galaxy.js` | Fond de galaxie en parallaxe | interface |
-| `js/icons.js` | Icônes SVG (31 tracés) | interface |
+| `js/icons.js` | Icônes SVG (35 tracés) | interface |
 | `tests/` | 13 fichiers `*.test.mjs` (138 tests, dont `plan.test.mjs` : fil de construction, dont `end.test.mjs` : fin de partie) + `harness.mjs` | regles (règles), reseau (`peer`, `hostile`, `harness`), [tests-decisions](architecture/tests-decisions.md) (`decisions-*.test.mjs`) |
 
 Lancer les tests : `node --test tests/*.test.mjs` (138/138 réussis le 2026-10-30 avec le fil de construction, D-105, et le chantier sur la carte, D-106). Quel test

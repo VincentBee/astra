@@ -263,7 +263,7 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
 |---|---|---|---|---|---|
 | 10:24:11 | `defa0982` | « On ne peut pas faire de recherche sur les colonies » | Réponse : c'est la règle D-021 (planète mère seulement) ; deux options proposées | — | D-021 |
-| 10:29:38 | `defa0982` | « je veux changer la regle, ce doit etre possible de faire une recherche sur n'importe quel planet avec un labo, en accord avec le niveau du labo » | Recherche sur toute planète avec un labo (son niveau, son stock), une par planète, pas la même technologie en double, partage à tout l'empire ; onglet Recherche dans les colonies ; test D-098 ; cache v53 | (ce commit) | D-098 |
+| 10:29:38 | `defa0982` | « je veux changer la regle, ce doit etre possible de faire une recherche sur n'importe quel planet avec un labo, en accord avec le niveau du labo » | Recherche sur toute planète avec un labo (son niveau, son stock), une par planète, pas la même technologie en double, partage à tout l'empire ; onglet Recherche dans les colonies ; test D-098 ; cache v53 (v60 à la fusion de `main`) | `01a9557` | D-107 (D-098 avant la fusion) |
 | 10:52:06 | `defa0982` | [Bouton] « Créer la PR » | Commit et pull request | (cette PR) | D-098 |
 | 10:40 (non confirmé) | `359242b9` | « Notion de rapidite de flotte avec le vaiseau le plus lent » | La règle existait déjà (`fleetSpeed`) ; ajout de `slowestShip`, affichage de la vitesse et du vaisseau le plus lent au décollage et dans la fiche de flotte, test dédié, cache v54 | `aaabe49` | D-099, renumérotée D-101 |
 | 11:30:15 | `359242b9` | [Bouton] « Créer la PR » | Pull request vers `main` | (cette PR) | — |
@@ -290,6 +290,10 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 13:15 | `843c17b3` | « fait moi des screens » | Les 3 captures du test dans le navigateur envoyées dans la conversation (fiche Chantier, lot en cours, flotte en orbite) ; déjà jointes à la PR #9 | (cette PR) | D-106 |
 | 13:20 | `843c17b3` | [Auto-fix] conflit avec `main` | Fusion de `main` (PR #11 : D-102 à D-104, cache v57) : ma décision renumérotée D-105, cache v58 ; tests 131/131 | (cette PR) | D-106 |
 | 13:30 | `843c17b3` | « rebase et merge » | `main` avait pris D-105 (fil de construction) et le cache v58 : ma décision devient D-106, cache v59 ; branche refaite en un seul commit sur `main` ; tests verts ; PR #9 fusionnée | PR #9 | D-106 |
+| 10:40 | `1d5bf2da` | « Sur la map, avoir la list des flottes ppur leur donner des ordres rapidement » | Rangée `#map-fleets` sous la carte : un bouton par flotte (nom, statut, compte à rebours) ; toucher la sélectionne, retoucher la relâche ; testé dans le navigateur (3 flottes, envoi sur une case) ; cache v53 (v60 à la fusion de `main`) | `01a9557` | D-107 (D-098 avant la fusion) |
+| 11:20 | `1d5bf2da` | « il faudrait plutôt une grille. Avec un bref récapitulatif du contenu de la flotte avec des icônes et le nombre de vaisseaux correspondants. » | `#map-fleets` devient une grille (2 colonnes sur téléphone) ; chaque case montre une icône par type de vaisseau et son nombre ; 4 icônes de vaisseaux ajoutées ; testé dans le navigateur | `ac07bf5` | D-108 (D-099 avant la fusion) |
+| 13:36 | `1d5bf2da` | [Bouton] « Oui, ouvre la PR » | Branche poussée, pull request ouverte avec capture et résultats des tests | (cette PR) | — |
+| 13:45 | `1d5bf2da` | [Auto-fix] conflit avec `main` | Fusion de `main` : mes décisions D-098/D-099 renumérotées D-107/D-108 (`main` allait jusqu'à D-106) ; cache v60 (`main` en v59) ; sections du journal réunies | (cette PR) | D-107, D-108 |
 
 ### Travaux en cours au 2026-10-29
 

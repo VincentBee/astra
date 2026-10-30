@@ -881,6 +881,31 @@ Aucune conversation ne les prouve.
 - Pas de nouveau `FORMAT` ; cache `astra-p2p-v59` (D-101 à D-105 et les caches v55 à v58 pris par `main` pendant le travail : renumérotée D-106).
 - Qui : Vincent (demande), Claude (forme). Statut : en vigueur.
 
+**D-107 — Liste de mes flottes sous la carte, pour leur donner des ordres vite**
+- 2026-10-30 10:40. Demande : « Sur la map, avoir la list des flottes ppur leur donner des ordres
+  rapidement ».
+- Choix : une rangée de boutons (`#map-fleets`) juste sous la carte, au-dessus de la fiche de
+  flotte ; un bouton par flotte : nom, statut, compte à rebours ; bord rouge si attaque, conquête
+  ou poursuite ; grisé si à sec. Toucher = sélectionner (comme toucher le triangle) ; retoucher =
+  relâcher. La rangée défile sur le côté si elle déborde.
+- Alternatives : liste verticale (pousse la fiche de flotte loin sous la carte) ; fenêtre
+  `.sheet` (un toucher de plus) ; liste dans l'onglet Flottes de la planète (existe déjà, mais
+  oblige à quitter la carte).
+- Qui : Vincent (demande) ; forme choisie par Claude (défaut). Source : `1d5bf2da`. Statut :
+  **modifiée par D-108** (grille au lieu d'une rangée). Cache `astra-p2p-v60` (v53 à v59 pris sur `main`).
+
+**D-108 — La liste des flottes devient une grille, avec les vaisseaux en icônes**
+- 2026-10-30 11:20. Demande : « il faudrait plutôt une grille. Avec un bref récapitulatif du
+  contenu de la flotte avec des icônes et le nombre de vaisseaux correspondants ».
+- Choix : grille de cases (`auto-fill`, 150 px minimum : 2 colonnes sur un téléphone). Chaque
+  case : nom et compte à rebours, puis une icône par type de vaisseau avec son nombre (nom du
+  vaisseau en infobulle), puis le statut sur une ligne coupée par « … ». Quatre icônes ajoutées
+  à `js/icons.js` : `cargo` (caisse), `fighter` (chasseur), `heavy` (coque blindée), `colony`
+  (drapeau). La cargaison n'est pas montrée (la fiche de flotte la donne).
+- Alternatives : garder la rangée qui défile (on ne voyait qu'une flotte et demie) ; liste
+  verticale d'une colonne (prend plus de hauteur).
+- Qui : Vincent (grille, icônes, nombres) ; dessin des icônes et taille des cases par Claude
+  (défaut). Source : `1d5bf2da`. Statut : en vigueur.
 ---
 
 ## Annexe A — affirmations réfutées (retirées ou corrigées avant assemblage)
