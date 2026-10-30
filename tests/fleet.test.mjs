@@ -3,7 +3,7 @@
 // sa planète peut y faire le plein. Cas trouvés en faisant jouer des robots.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newGame } from './harness.mjs';
+import { newGame, fleet } from './harness.mjs';
 
 const P = (s) => s.state.players[s.me];
 
@@ -192,4 +192,95 @@ test('raids : pas d’attaque sans armes, et un seul pillage par planète toutes
   clock.t += 1000;
   A.tick();
   assert.ok(looted() > once, 'un nouveau pillage après 2 min');
+});
+
+// ----- Comportement en voyage : passif, agressif (D-098) ---------------------
+
+const fx = (s) => P(s).effects || [];
+
+/** Fait tourner `s` (et les autres) seconde par seconde, en se passant les fiches toutes les 5 s. */
+function run(players, clock, sync, seconds) {
+  for (let i = 0; i < seconds; i++) {
+    clock.t += 1000;
+    for (const s of players) s.tick();
+    if (i % 5 === 4) for (const a of players) for (const b of players) if (a !== b) sync(a, b);
+  }
+}
+
+test('flotte agressive : elle combat la flotte ennemie qu’elle croise, puis reprend sa route et son ordre', () => {
+  const { players: [A, B], clock, sync } = newGame(2, ['human', 'human']);
+  const bid = park(B, { cargo: 2 }, { minerals: 400 }, { x: 6, y: 5 }, 40);
+  const aid = park(A, { fighter: 5, cargo: 2 }, {}, { x: 3, y: 5 }, 300);
+  sync(A, B);
+  assert.ok(A.setFleetStance(aid, 'aggressive'));
+  assert.ok(A.moveFleet(aid, { x: 10, y: 5 }, null));
+  for (let i = 0; i < 30 && !fx(A).length; i++) run([A], clock, () => {}, 1);
+  assert.equal(fx(A).length, 1, 'un combat');
+  const f = A.myFleet(aid);
+  assert.equal(f.cargo.minerals, 400, 'butin récupéré');
+  assert.ok(fleet.moving(f, clock.t), 'la flotte continue');
+  assert.deepEqual(f.to, { x: 10, y: 5 }, 'vers sa destination');
+  run([A, B], clock, sync, 10);
+  assert.equal(B.myFleet(bid), null, 'la flotte de B est détruite chez B aussi');
+});
+
+test('flotte passive : elle croise une flotte ennemie sans combattre', () => {
+  const { players: [A, B], clock, sync } = newGame(2, ['human', 'human']);
+  park(B, { fighter: 3 }, {}, { x: 6, y: 5 }, 40);
+  const aid = park(A, { fighter: 5 }, {}, { x: 3, y: 5 }, 300);
+  sync(A, B);
+  sync(B, A);
+  assert.equal(A.myFleet(aid).stance, 'passive', 'passive au décollage');
+  A.moveFleet(aid, { x: 10, y: 5 }, null);
+  run([A, B], clock, sync, 30);
+  assert.equal(fx(A).length + fx(B).length, 0);
+  assert.deepEqual(A.myFleet(aid).ships, { fighter: 5 }, 'aucune perte');
+});
+
+test('flotte agressive à l’arrêt : elle garde la case et combat celle qui passe', () => {
+  const { players: [A, B], clock, sync } = newGame(2, ['human', 'human']);
+  const aid = park(A, { fighter: 5 }, {}, { x: 6, y: 5 }, 300);
+  const bid = park(B, { fighter: 1 }, {}, { x: 3, y: 5 }, 300);
+  A.setFleetStance(aid, 'aggressive');
+  sync(A, B);
+  sync(B, A);
+  B.moveFleet(bid, { x: 10, y: 5 }, null);
+  run([A, B], clock, sync, 40);
+  assert.equal(B.myFleet(bid), null, 'la flotte de passage est détruite');
+});
+
+test('deux flottes agressives qui se croisent : les pertes ne comptent qu’une fois', () => {
+  const { players: [A, B], clock, sync } = newGame(2, ['human', 'human']);
+  const fa = park(A, { fighter: 10 }, {}, { x: 3, y: 5 }, 300);
+  const fb = park(B, { fighter: 10 }, {}, { x: 9, y: 5 }, 300);
+  A.setFleetStance(fa, 'aggressive');
+  B.setFleetStance(fb, 'aggressive');
+  A.moveFleet(fa, { x: 9, y: 5 }, null);
+  B.moveFleet(fb, { x: 3, y: 5 }, null);
+  sync(A, B);
+  sync(B, A);
+  for (let i = 0; i < 60; i++) {
+    clock.t += 250;
+    A.tick();
+    B.tick();
+    if (i % 20 === 19) {
+      sync(A, B);
+      sync(B, A);
+    }
+  }
+  for (const s of [A, B]) assert.deepEqual(P(s).fleets.map((f) => f.ships), [{ fighter: 2 }], 'comme un seul combat 10 contre 10');
+});
+
+test('comportement : refusé sans armes, vu par les autres, gardé par la flotte qui en absorbe une autre', () => {
+  const { players: [A, B], sync } = newGame(2, ['human', 'human']);
+  const unarmed = park(A, { cargo: 2 }, {}, { x: 3, y: 5 }, 40);
+  assert.equal(A.setFleetStance(unarmed, 'aggressive'), false);
+  assert.equal(A.myFleet(unarmed).stance, 'passive');
+  const aid = park(A, { fighter: 2 }, {}, { x: 3, y: 5 }, 40);
+  assert.ok(A.setFleetStance(aid, 'aggressive'));
+  assert.equal(A.setFleetStance(aid, 'aggressive'), false, 'déjà agressive');
+  sync(B, A);
+  assert.equal(B.state.players[A.me].fleets.find((f) => f.id === aid).stance, 'aggressive');
+  assert.ok(A.mergeFleets(unarmed, aid));
+  assert.equal(A.myFleet(aid).stance, 'aggressive');
 });

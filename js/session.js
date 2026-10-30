@@ -21,8 +21,8 @@ import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity } from './save.js';
 import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, sunFor, fortOf } from './game.js';
-import { TECHS, SHIPS, shipStats, sightRange, TEMPO } from './tech.js';
-import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, salvage, applyLosses, parkedCell, fleetPos, fleetCargo, fleetTank, ORDERS, MAX_FLEETS } from './fleet.js';
+import { TECHS, SHIPS, sightRange, TEMPO } from './tech.js';
+import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, salvage, applyLosses, parkedCell, fleetPos, fleetCargo, fleetTank, ORDERS, MAX_FLEETS, STANCES, aggressive, armed } from './fleet.js';
 import { amounts, isEmpty, holdings, lacks, noRoom, take, put, outcome, OFFER_MS, MAX_OFFERS, GRACE_MS } from './trade.js';
 
 /** « de Beta », « d'Alpha ». */
@@ -1178,8 +1178,7 @@ export class Session {
       order = { kind, key: here.key };
     } else if (kind === 'attack' || kind === 'conquer') {
       if (!here || here.owner.id === this.me) return this.refuse('Aucune planète adverse ici.');
-      const armed = Object.entries(f.ships).some(([k, n]) => n && shipStats(p.race, k, p.planet.tech).attack > 0);
-      if (!armed) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas attaquer.');
+      if (!armed(p.race, f.ships, p.planet.tech)) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas attaquer.');
       order = { kind, pid: here.owner.id, key: here.key };
     } else if (kind === 'colonize') {
       if (!w || here) return this.refuse('Cette planète n’est pas libre.');
@@ -1205,6 +1204,24 @@ export class Session {
     const err = stopAt(f, p.race, p.planet.tech, this.now());
     if (err) return this.refuse(err);
     this.touch();
+    this.changed();
+    return true;
+  }
+
+  /** Comportement en voyage d'une de mes flottes : 'passive' ou 'aggressive' (STANCES). */
+  setFleetStance(id, stance) {
+    if (!this.canAct) return false;
+    const p = this.state.players[this.me];
+    const f = this.myFleet(id);
+    if (!f || !STANCES[stance]) return false;
+    if (stance === 'aggressive' && !armed(p.race, f.ships, p.planet.tech)) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas être agressive.');
+    if ((f.stance || 'passive') === stance) return false;
+    f.stance = stance;
+    this.tickLogs = []; // une flotte ennemie déjà au contact : le combat part avec ma fiche
+    this.engage(p, f, this.now());
+    const logs = this.tickLogs;
+    this.tickLogs = null;
+    this.touch(logs.length ? logs : null);
     this.changed();
     return true;
   }
@@ -1249,8 +1266,7 @@ export class Session {
     if (!f || !target) return this.refuse('Flotte introuvable.');
     if (this.locked(id)) return false;
     if (!this.sees(enemy, target, this.now())) return this.refuse('Cette flotte est hors de ta portée de détection.');
-    const armed = Object.entries(f.ships).some(([k, n]) => n && shipStats(p.race, k, p.planet.tech).attack > 0);
-    if (!armed) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas attaquer.');
+    if (!armed(p.race, f.ships, p.planet.tech)) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas attaquer.');
     // Ma copie de sa flotte ne change qu'une fois mon rapport lu par son téléphone : d'ici là, ce
     // que je vois est l'état d'avant le combat, et rejouer le combat compterait les pertes deux fois.
     const pendingHit = (p.effects || []).some((e) => e.to === pid && [target.id, ...(target.absorbed || [])].includes(e.fleet) && !enemy.applied?.includes(e.id));
@@ -1301,6 +1317,28 @@ export class Session {
     return true;
   }
 
+  /**
+   * Flotte agressive, à chaque passage : combat contre la flotte ennemie
+   * visible la plus proche à son contact (la même règle que la poursuite),
+   * puis la flotte reprend son trajet et son ordre. Renvoie true si ma fiche a changé.
+   */
+  engage(p, f, now) {
+    if (!aggressive(f) || f.order?.kind === 'chase' || !armed(p.race, f.ships, p.planet.tech)) return false;
+    const eyes = this.eyes(now);
+    const pos = fleetPos(f, now);
+    let best = null;
+    for (const enemy of Object.values(this.state.players)) {
+      if (enemy.id === this.me) continue;
+      for (const target of enemy.fleets || []) {
+        if (!inContact(f, target, now) || !this.sees(enemy, target, now, eyes) || this.pendingFight(p, f, enemy, target)) continue;
+        const t = fleetPos(target, now);
+        const d = Math.hypot(t.x - pos.x, t.y - pos.y);
+        if (!best || d < best.d) best = { enemy, target, d };
+      }
+    }
+    return best ? this.fight(p, f, best.enemy, best.target, now, true) : false;
+  }
+
   /** Un rapport de combat entre ma flotte `f` et sa flotte `target`, dans un sens ou dans l'autre, pas encore lu ? */
   pendingFight(p, f, enemy, target) {
     const ids = (x) => [x.id, ...(x.absorbed || [])];
@@ -1316,8 +1354,9 @@ export class Session {
    * Combat entre ma flotte et celle d'un autre joueur, au contact. Je
    * calcule avec ce que je sais de la sienne ; son téléphone appliquera ses
    * pertes en lisant mon rapport (un identifiant neuf par combat).
+   * `onward` : ma flotte (agressive) garde ensuite son trajet et son ordre.
    */
-  fight(p, f, enemy, target, now) {
+  fight(p, f, enemy, target, now, onward = false) {
     const res = battle({ race: p.race, ships: f.ships, tech: p.planet.tech }, { race: enemy.race, ships: target.ships, tech: enemy.planet?.tech || {} });
     const take = res.won ? salvage(p.race, res.attLeft, target.cargo, f.cargo) : {};
     // Lui aussi a pu livrer ce combat de son côté, sans avoir encore lu mon rapport (poursuite
@@ -1340,12 +1379,12 @@ export class Session {
           : `${p.name} perd une flotte contre ${enemy.name}.`,
     );
     this.ontoast?.(res.won ? 'Flotte ennemie détruite !' : countShips(res.attLeft) ? 'Combat indécis.' : 'Flotte perdue.');
-    f.order = null;
+    if (!onward) f.order = null;
     if (!applyLosses(f, p.race, p.planet.tech, res.attLost, null, now)) {
       p.fleets = p.fleets.filter((x) => x.id !== f.id);
       return true;
     }
-    if (moving(f, now)) stopAt(f, p.race, p.planet.tech, now);
+    if (!onward && moving(f, now)) stopAt(f, p.race, p.planet.tech, now);
     f.cargo = Object.fromEntries(SOIL.map((r) => [r, (f.cargo?.[r] || 0) + (take[r] || 0)]));
     return true;
   }
@@ -1745,7 +1784,11 @@ export class Session {
     for (const f of [...(p.fleets || [])]) {
       if (f.order?.kind === 'chase') {
         if (this.pursue(p, f, now)) changed = true;
-      } else if (f.order && !moving(f, now) && this.arrive(p, f)) changed = true;
+        continue;
+      }
+      if (this.engage(p, f, now)) changed = true;
+      if (!p.fleets.includes(f)) continue; // détruite dans ce combat
+      if (f.order && !moving(f, now) && this.arrive(p, f)) changed = true;
     }
     if (this.settleOffers(p, now)) changed = true;
     if (this.refuseExpired(p, now)) changed = true;
@@ -2084,7 +2127,7 @@ function seenNews(state, me) {
  * (`tick`) qui ont fait avancer quelque chose (voir touch). Le reste de la partie vient des fiches des
  * autres, qui ont chacune leur journal.
  */
-export const ORDER_KINDS = ['chooseRace', 'claimPlanet', 'build', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'splitFleet', 'returnFleet', 'power'];
+export const ORDER_KINDS = ['chooseRace', 'claimPlanet', 'build', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'setFleetStance', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'splitFleet', 'returnFleet', 'power'];
 for (const k of [...ORDER_KINDS, 'tick']) {
   const act = Session.prototype[k];
   Session.prototype[k] = function (...a) {

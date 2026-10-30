@@ -1,8 +1,8 @@
 # Tests et décisions
 
 Pour chaque décision de [decisions.md](../decisions.md), le test qui la protège, ou la raison
-pour laquelle il n'y en a pas (voir D-082). État au 2026-10-29 : `node --test tests/*.test.mjs` →
-119 tests, 119 réussis (après la fusion du rythme des parties, D-083 à D-097).
+pour laquelle il n'y en a pas (voir D-082). État au 2026-10-30 : `node --test tests/*.test.mjs` →
+124 tests, 124 réussis (avec le comportement en voyage, D-098).
 
 - **nouveau test** : ajouté le 2026-10-29 dans `tests/decisions-planete.test.mjs` (24),
   `tests/decisions-flotte.test.mjs` (30) ou `tests/decisions-reseau.test.mjs` (20). Le nom de
@@ -127,3 +127,4 @@ que fait le code.
 | D-095 | La défense compte contre le pillage et se répare | nouveau test | `end.test.mjs` trop peu de vaisseaux d'attaque : les tourelles tiennent, ni prise ni pillage |  |
 | D-096 | Déconstruire un bâtiment | nouveau test | `rules.test.mjs` déconstruire un niveau rend la moitié de son prix et libère sa place à la fin |  |
 | D-097 | `FORMAT` 8 et cache v52 | non testable |  | version de format et de cache |
+| D-098 | Comportement en voyage : passif ou agressif | nouveau test | `fleet.test.mjs` flotte agressive : elle combat la flotte ennemie qu’elle croise, puis reprend sa route et son ordre<br>`fleet.test.mjs` flotte passive : elle croise une flotte ennemie sans combattre<br>`fleet.test.mjs` flotte agressive à l’arrêt : elle garde la case et combat celle qui passe<br>`fleet.test.mjs` deux flottes agressives qui se croisent : les pertes ne comptent qu’une fois<br>`fleet.test.mjs` comportement : refusé sans armes, vu par les autres, gardé par la flotte qui en absorbe une autre<br>`replay.test.mjs` (les robots changent le comportement) | le bouton de l'interface n'est pas testé (navigateur) |

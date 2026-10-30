@@ -718,6 +718,26 @@ Aucune conversation ne les prouve.
   `demolish`) ; un téléphone resté sur l'ancienne version est invité à recharger.
 - Statut : en vigueur.
 
+**D-098 — Comportement en voyage : passif ou agressif**
+- 2026-10-30 10:59. Demande : « Avoir des comportement de voyage: passif, agressif ».
+- Choix (Claude, par défaut) : un champ `stance` par flotte, à part de l'ordre (une flotte qui
+  va se poser peut être agressive). **Passive** (au décollage, à la scission, et pour les
+  flottes d'avant) : ne combat que sur ordre, comme avant. **Agressive** : à chaque passage,
+  combat la flotte ennemie visible la plus proche **au contact** (`CONTACT` = 0,5 case, la règle
+  de la poursuite), en route comme à l'arrêt (une flotte arrêtée garde sa case), puis **reprend
+  son trajet et son ordre**. Refusé pour une flotte sans armes. Une fusion garde le
+  comportement de la flotte qui reçoit. Elle n'attaque ni planètes ni vaisseaux posés : ça reste
+  « Attaquer » / « Conquérir ».
+- Alternatives écartées : poursuivre toute flotte ennemie vue dans le rayon de détection (plus
+  proche de ce qu'on attend d'« agressif », mais elle quitterait sa route ; suite possible) ;
+  s'arrêter après le combat comme la poursuite ; un mode « fuite » pour la flotte passive.
+- Limite **non confirmée** : comme la poursuite, le contact n'est regardé qu'à l'heure du
+  passage ; un téléphone en arrière-plan (passages ralentis) peut laisser deux flottes se
+  croiser sans combat.
+- Pas de nouveau `FORMAT` : un téléphone d'avant ignore le champ (ses flottes restent
+  passives) ; cache `astra-p2p-v53`.
+- Qui : Vincent (demande), Claude (règle). Statut : en vigueur.
+
 ---
 
 ## Annexe A — affirmations réfutées (retirées ou corrigées avant assemblage)

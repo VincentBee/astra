@@ -263,3 +263,10 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
   (`9b37782` et suivants), pas encore fusionné dans `main`. La doc du code le décrit.
 - **Design épuré** (`f4afbcd0`) : session encore ouverte, mais son worktree n'a aucun changement
   non commité ; tout le travail est dans `1eeb2c1`.
+
+## 30 octobre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 10:55 | `e67321a7` | « Etudier le rayon d'action des flottes » | Étude sans code, mesurée sur 500 cartes : un plein mène à 40 cases (humains), 36 (machines ; 30 pour la sonde réplicatrice), 50 (aliens) ; aucune technologie ne change `tank` ni `burn`. Planète → planète : médiane 12 cases, au plus 34 ; l'aller-retour sur un plein couvre 84 % (machines) à 98 % (aliens) des paires. Le carburant ne limite presque jamais ; c'est le froid qui réduit la carte. Écart de commentaire déjà noté (regles §18, point 4), numéros de ligne mis à jour | — | — |
+| 10:59 | `ef4e56a1` | « Avoir des comportement de voyage: passif, agressif » | Champ `stance` par flotte ; bouton Passive / Agressive dans la fiche de la flotte ; une flotte agressive combat toute flotte ennemie visible qu'elle touche, en route ou à l'arrêt, puis reprend son trajet et son ordre ; ordre `setFleetStance` (journal, rejeu) ; 5 tests (124/124) ; doc regles §9.3 bis, interface, tests-decisions ; cache v53 | (ce commit) | D-098 |
