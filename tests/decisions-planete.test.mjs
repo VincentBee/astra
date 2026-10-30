@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { game, fleet, newGame, Session, clone } from './harness.mjs';
 
-const { TECHS, SHIPS } = await import('../js/tech.js');
+const { TECHS, SHIPS, techCost, researchDuration } = await import('../js/tech.js');
 
 const T0 = 10_000_000;
 const MIN = 60_000;
@@ -189,6 +189,57 @@ test('D-021 : une recherche à la fois, et elle vaut pour toutes les planètes',
   me.planet.tech = { forage: 2 };
   A.tick();
   assert.deepEqual(me.colonies.a0.tech, { forage: 2 });
+});
+
+test('D-098 : recherche sur toute planète qui a un labo, selon le niveau de ce labo', () => {
+  const { players: [A], clock } = newGame(1, ['human']);
+  const me = A.state.players[A.me];
+  const toasts = [];
+  A.ontoast = (m) => toasts.push(m);
+  const w = A.planets.find((x) => x.id === 'a0');
+  me.colonies = { a0: { ...game.newPlanet('human', clock.t, w), claimAt: clock.t } };
+  const col = me.colonies.a0;
+  // Sans labo dans la colonie : refusé.
+  A.research('forage', 'a0');
+  assert.ok(!col.research);
+  assert.match(toasts.at(-1), /labo/);
+  // Labo 1 dans la colonie : Blindage (labo 2) reste fermé, même si la planète mère a un labo 2.
+  col.levels.lab = 1;
+  col.stock.minerals = 5000;
+  me.planet.levels.lab = 2;
+  me.planet.tech = { propulsion: 1 };
+  A.research('blindage', 'a0');
+  assert.ok(!col.research);
+  assert.match(toasts.at(-1), /labo niv. 2/);
+  // Propulsion niv. 2 : lancée dans la colonie, payée par la colonie.
+  const before = col.stock.minerals;
+  A.research('propulsion', 'a0');
+  assert.equal(col.research?.key, 'propulsion');
+  assert.equal(col.research.level, 2, 'le niveau part des technologies de l’empire');
+  assert.ok(col.stock.minerals < before);
+  // La durée vient du labo de la colonie (niv. 1), pas de celui de la planète mère (niv. 2).
+  const cost = techCost('human', 'propulsion', 1);
+  assert.equal(col.research.end - col.research.start, researchDuration(cost, 1));
+  assert.notEqual(researchDuration(cost, 1), researchDuration(cost, 2));
+  // La même technologie ne peut pas être lancée ailleurs en même temps ; une autre, si.
+  me.planet.stock.minerals = 5000;
+  A.research('propulsion', 'home');
+  assert.ok(!me.planet.research);
+  assert.match(toasts.at(-1), /déjà en recherche/);
+  A.research('agro', 'home');
+  assert.equal(me.planet.research?.key, 'agro');
+  // À la fin, la technologie trouvée dans la colonie vaut pour toutes mes planètes.
+  clock.t = Math.max(col.research.end, me.planet.research.end) + 1000;
+  A.tick();
+  assert.equal(me.planet.tech.propulsion, 2);
+  assert.equal(col.tech.propulsion, 2);
+  assert.equal(col.tech.agro, 1);
+  // Plus rien à partager : un passage de plus ne change rien.
+  let changed = 0;
+  A.changed = () => changed++;
+  clock.t += 1000;
+  A.tick();
+  assert.equal(changed, 0);
 });
 
 test('D-038 : consommation des machines doublée (carburant par case)', () => {

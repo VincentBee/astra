@@ -257,6 +257,14 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 08:51:37 | `26f178b9` | « il faut pouvoir deconstruire un batiment, et rajoute aussi de la documentation sur tout ca, j'ai merge de la doc sur master » | Fusion de `main` (doc) dans la branche ; déconstruction ; doc de tout le rythme (regles §4.1, §5.5, §9.2, §19 ; interface §12 ; décisions D-083 à D-097) | (ce commit) | D-096 |
 | 09:03:50 | `26f178b9` | [Bouton] « Créer la PR » | Fusion de `main` (tests des décisions, D-082 déjà pris) : mes décisions renumérotées D-083 à D-097 ; tests D-002, D-016, D-019, D-028, D-053 comptés en heures de jeu, D-036 sans défense de bâtiments ; D-002 et D-036 marquées « modifiée » ; tableau `tests-decisions.md` complété (119/119) ; pull request | (cette PR) | D-083 à D-097 |
 
+## 30 octobre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 10:24:11 | `defa0982` | « On ne peut pas faire de recherche sur les colonies » | Réponse : c'est la règle D-021 (planète mère seulement) ; deux options proposées | — | D-021 |
+| 10:29:38 | `defa0982` | « je veux changer la regle, ce doit etre possible de faire une recherche sur n'importe quel planet avec un labo, en accord avec le niveau du labo » | Recherche sur toute planète avec un labo (son niveau, son stock), une par planète, pas la même technologie en double, partage à tout l'empire ; onglet Recherche dans les colonies ; test D-098 ; cache v53 | (ce commit) | D-098 |
+| 10:52:06 | `defa0982` | [Bouton] « Créer la PR » | Commit et pull request | (cette PR) | D-098 |
+
 ### Travaux en cours au 2026-10-29
 
 - **Rythme des parties** (`26f178b9`) : commité sur `claude/swarm-it-game-pacing-1d4502`

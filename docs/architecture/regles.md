@@ -339,15 +339,19 @@ détection.
 
 ### 7.2 Règles de recherche
 
-- **Sur la planète mère seulement** : `Session.research` utilise `p.planet`
-  (`js/session.js:917-925`). Il faut un labo (`js/game.js:659-660`), une seule recherche à la
-  fois, et les prérequis (`techMissing`, `js/tech.js:274-284`).
+- **Sur toute planète qui a un labo** (D-098) : `Session.research(key, where)`
+  (`js/session.js:1077`) lance la recherche sur la planète `where`, avec `startResearch`
+  (`js/game.js:730`). Le labo **de cette planète** donne les prérequis (`techMissing`) et la
+  durée ; son stock paie. Une recherche à la fois par planète, et pas la même technologie sur
+  deux planètes à la fois (refus « déjà en recherche sur … »).
 - Coût : `floor(base × 1,7^niveau)` (`techCost`, `js/tech.js:259-265`).
 - Durée : `max(8, round(total / (20 × (1 + 0,5 × (labo − 1)))))` secondes
   (`researchDuration`, `js/tech.js:268-271`).
-- Les technologies valent pour toutes mes planètes : chaque colonie en garde une copie,
-  remise à jour par `tick()` (`js/session.js:1552-1558`) et donnée à la fondation
-  (`js/session.js:1626`).
+- Les technologies valent pour toutes mes planètes : la planète mère tient la liste de
+  l'empire, chaque colonie en garde une copie, remise à jour par `tick()` (`shareTech`,
+  `js/session.js:1751`) et donnée à la fondation. Une recherche finie dans une colonie monte
+  d'abord dans la planète mère, puis un second passage la donne aux autres colonies
+  (`js/session.js:1766`).
 
 ### 7.3 Le graphe (`js/techtree.js`)
 
