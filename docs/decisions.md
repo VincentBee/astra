@@ -823,6 +823,41 @@ Aucune conversation ne les prouve.
 - Qui : Vincent (lien), Claude (place et comportement). Cache `astra-p2p-v57`. Source : session
   `a7cb8a19`. Statut : en vigueur.
 
+**D-105 — Fil de construction par planète**
+- 2026-10-30 12:24. Demande : « Je voudrais un système de fil de construction par planète.
+  Comme ça, dès que les ressources sont disponibles, cela lance la construction suivante. Avec
+  des estimations de quand elles le seront en fonction de la production. »
+- Choix (Claude, par défaut) :
+  - Un champ `plan` par planète : liste de noms de bâtiments, **8 au plus** (`PLAN_MAX`). Le
+    chantier reste unique (`queue`) ; le fil attend derrière.
+  - **Le lancement est calculé dans `stateAt`**, pas dans `tick()` : chantier libre, il reste une
+    place, et le stock couvre le prix du premier → il se lance à l'heure où le stock suffit (au
+    pas de calcul près, 1 s quand le jeu est ouvert, 48 s au plus après une longue absence). Le
+    fil avance donc **aussi téléphone fermé** : au retour, le rattrapage enchaîne tout. `tick()`
+    écrit (`settle`) dès qu'un lancement est dû, et le journal dit « … (fil) ».
+  - Un élément sans place reste en tête et bloque le fil (rien n'est jeté tout seul) ; le joueur
+    le retire avec ×.
+  - Deux nouveaux ordres, `planBuild` et `unplan` (journal, rejeu). **`build` ne change pas** :
+    un vieux journal contient des `build` refusés (chantier occupé), qui deviendraient des ajouts
+    au fil au rejeu. `planBuild` refuse si les places ne suffiront pas (bâties + chantier + fil).
+  - Interface : chantier occupé, fil non vide ou stock trop court, le bouton d'un bâtiment
+    devient « + niveau » et ajoute au fil ; sinon il construit tout de suite, comme avant.
+  - Estimations (`planForecast`, affichage seulement, rien dans la fiche) : le même `stateAt`,
+    projeté 10 min (à la seconde près) puis 6 h plus loin, avec la production d'aujourd'hui
+    (chantier, recherches et vaisseaux déjà lancés compris). Au-delà : « plus de 6 h », ou la
+    raison connue (« Plus de place », « Entrepôt trop petit »).
+- Alternatives écartées : lancer le suivant dans `tick()` seulement (plus simple, mais rien
+  n'avance téléphone fermé) ; faire de `build` un ajout au fil quand le chantier est occupé
+  (casse le rejeu des vieux journaux) ; jeter un élément bloqué ; un fil pour la recherche et le
+  chantier naval (pas demandé).
+- Limites **non confirmées** : l'estimation suppose que rien ne change (population qui grandit
+  ou meurt, ordres à venir, transe) ; un autre ordre qui dépense le stock (recherche, vaisseaux)
+  repousse le fil. Les autres joueurs voient le même calcul pour l'affichage, sans le vérifier.
+- Pas de nouveau `FORMAT` : un téléphone d'avant ignore `plan` (son fil ne se lance pas chez lui,
+  mais rien ne casse) ; cache `astra-p2p-v57` (v55 et v56 pris par D-101 et D-099 ; D-101 prise par la vitesse de flotte, d'où D-105).
+- Qui : Vincent (demande), Claude (règle). Statut : en vigueur.
+
+
 ---
 
 ## Annexe A — affirmations réfutées (retirées ou corrigées avant assemblage)

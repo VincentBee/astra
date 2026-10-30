@@ -687,3 +687,11 @@ button.net-btn.slow { color: var(--warn); }
 /* Aide de la carte à gauche, à côté des coordonnées : sa bulle s'ouvre vers la droite. */
 .map-head > span:first-child { display: flex; align-items: center; gap: 8px; }
 .map-head .help-wrap .tooltip { right: auto; left: 0; }
+
+/* Fil de construction (D-101) : ce qui attend le chantier, avec l'heure estimée. */
+.plan { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 4px; }
+.plan-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid rgba(122, 162, 255, 0.25); background: rgba(122, 162, 255, 0.05); font-size: 0.85rem; }
+.plan-item .plan-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-item .plan-when { font-size: 0.74rem; color: var(--muted); white-space: nowrap; }
+.plan-item.blocked .plan-when { color: var(--warn); }
+.plan-item button { min-height: 30px; padding: 0 8px; }

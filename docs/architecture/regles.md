@@ -95,6 +95,7 @@ Créée par `newPlanet(race, now, world)` (`js/game.js:404-420`) :
 | `at` | heure (ms) à laquelle `stock`, `pop`, `reserve` sont vrais |
 | `levels` | `{ bâtiment: niveau }`, départ : `buildings[k].start` |
 | `queue` | chantier en cours `{ key, level, start, end }` ou `null` (`js/game.js:645`) |
+| `plan` | fil de construction : noms de bâtiments qui attendent le chantier, 8 au plus (D-105) ; absent sur une planète d'avant |
 | `research` | recherche en cours `{ key, level, start, end }` (`js/game.js:669`) |
 | `yard` | lot de vaisseaux en cours `{ type, count, start, end }` (`js/game.js:688`) |
 | `tech` | `{ technologie: niveau }` |
@@ -176,6 +177,13 @@ l'intègre par pas (`js/game.js:13-15`).
   niveau, nouvelle techno, nouveaux vaisseaux), puis on continue (`js/game.js:566-579`). À
   égalité d'heure, l'ordre est celui du nom de la file (`js/game.js:569`). Le résultat contient
   aussi `prod`, le rythme actuel pour l'affichage (`js/game.js:582`).
+- **Fil de construction** (`plan`, D-105) : à chaque tour de cette boucle, si le chantier est
+  libre, qu'il reste une place et qu'un bâtiment attend en tête du fil, `stateAt` avance
+  l'économie pas à pas (fonction `until`, les pas de `steps`) jusqu'à ce que le stock couvre son
+  prix, au plus jusqu'au prochain événement. Trouvé : il paye, remplit `queue`, retire la tête
+  du fil, et note `{ kind: 'start', … }` dans `done`. Le fil avance donc aussi pendant une
+  absence. `planForecast(planet, now)` refait ce calcul 10 min puis 6 h plus loin pour estimer
+  le début et la fin de chaque élément (affichage seulement).
 - `settle(planet, now)` (`js/game.js:591-607`) écrit cet état dans la planète. Seul le
   propriétaire l'appelle. **Une heure qui recule est ignorée** : `now = max(now, planet.at)`,
   et une heure invalide (`NaN`) ne fait rien (`js/game.js:592-594`).
@@ -190,7 +198,7 @@ l'intègre par pas (`js/game.js:13-15`).
 1. `checkClaim()` : rendre une planète ou une colonie prise avant moi (section 12).
 2. Pour chaque planète (la mère d'abord) : recopier les technologies de la mère dans les
    colonies, à partir de la fin de la recherche (`js/session.js:1554-1558`) ; puis `settle` si
-   une file est terminée, et écrire au journal (`js/session.js:1559-1570`). **`tick()` ne fait
+   une file est terminée **ou si le fil de construction peut lancer le suivant** (D-105), et écrire au journal (`js/session.js:1559-1570`). **`tick()` ne fait
    donc pas avancer `planet.at` toutes les 250 ms** : la fiche garde son ancien `at` (et son
    ancien stock) jusqu'à la fin d'une file ou au prochain ordre ; l'affichage passe par
    `stateAt`.
@@ -254,6 +262,11 @@ gisement n'est pas vide ; ensuite pas plus que `réserve / h + regen`.
   construction de ce niveau ; rend **tout de suite la moitié** de son coût ; le niveau (et sa
   place) ne disparaît qu'à la fin du chantier. La file `queue` porte alors `demolish: true` ;
   `stateAt` applique `levels[key] = job.level` comme pour une construction (le niveau baisse).
+- **Fil de construction** (D-105) : ordre `Session.planBuild(key, where)` (ajoute en fin de fil,
+  8 au plus, refusé si les places bâties + le chantier + le fil atteignent `places`) et
+  `Session.unplan(key, index, where)` (retire un élément, seulement si c'est bien `key` à cette place : le fil a pu avancer entre l'affichage et le toucher). Les deux font d'abord `settle`, pour que le
+  fil parte de maintenant. Le lancement automatique est décrit en §4.3. Un élément sans place
+  bloque le fil jusqu'à ce que le joueur le retire ou déconstruise.
 - `covers` tolère 1e-9 d'écart d'arrondi (`js/game.js:624-626`).
 
 ### 5.6 Classement

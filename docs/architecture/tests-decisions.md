@@ -134,3 +134,4 @@ que fait le code.
 | D-102 | Points au présent ; mort simultanée départagée par les points d'avant la chute | nouveau test | `end.test.mjs` mort simultanée : le meilleur score d’avant la chute gagne, les points tombent à 0<br>`replay.test.mjs` courbe des points : elle retombe à 0… et le rejeu refait deathPts |  |
 | D-103 | Courbe des points dans le replay | nouveau test | `replay.test.mjs` courbe des points : elle suit le score de chaque joueur | le dessin est vérifié à l'œil dans le navigateur |
 | D-104 | Lien vers la courbe à la fin de la partie | non testable |  | interface : vérifié dans le navigateur (lien du bandeau, arrivée sur la courbe) |
+| D-105 | Fil de construction par planète | nouveau test | `plan.test.mjs` (7 tests : lancement à l'heure où le stock suffit, ordre gardé, `settle`, plus de place, estimation, ordres du joueur et rejeu fidèle, fil abîmé nettoyé) | la liste et le bouton × ne sont testés que dans le navigateur |

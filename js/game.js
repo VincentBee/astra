@@ -595,6 +595,30 @@ function simulate(race, s, from, to, trance = 0) {
   return steps(race, s, from, to, 1);
 }
 
+/** Taille maximale du fil de construction d'une planète. */
+export const PLAN_MAX = 8;
+
+/** Places libres pour ces niveaux (les planètes d'avant la place n'ont pas de limite). */
+const freePlaces = (places, levels) => (Number.isFinite(places) ? places - usedPlaces(levels) : Infinity);
+
+/**
+ * Fait avancer `s` de `from` vers `to` jusqu'à ce que le stock couvre `cost`
+ * (vérifié avant de partir, puis après chaque pas). Les pas sont ceux de
+ * `steps` (300 au plus, 2 h de jeu au plus). Renvoie { s, at, ok }.
+ */
+function until(race, s, from, to, cost, trance) {
+  if (covers(s.stock, cost)) return { s, at: from, ok: true };
+  const dt = Math.max(1000, Math.min(120_000 / TEMPO, (to - from) / 300));
+  let t = from;
+  while (t < to) {
+    const ms = Math.min(dt, to - t);
+    s = advance(race, s, ms, trance > t ? 2 : 1);
+    t += ms;
+    if (covers(s.stock, cost)) return { s, at: t, ok: true };
+  }
+  return { s, at: to, ok: false };
+}
+
 /**
  * État d'une planète à l'instant `now`, sans la modifier.
  * Trois files d'attente peuvent finir entre-temps, chacune à son heure : le
@@ -602,6 +626,11 @@ function simulate(race, s, from, to, trance = 0) {
  * de vaisseaux). On calcule l'économie jusqu'à chaque fin, on applique son
  * effet, puis on continue : un bâtiment ou une technologie terminés
  * changent la production à partir de cet instant-là.
+ *
+ * Fil de construction (`plan`, D-105) : chantier libre, le premier bâtiment
+ * du fil se lance tout seul dès que le stock couvre son prix (et qu'il reste
+ * une place). Même calcul pour tous : chez le propriétaire, au rattrapage
+ * après une absence, et pour les estimations (voir planForecast).
  */
 export function stateAt(planet, now) {
   const race = planet.race;
@@ -617,11 +646,31 @@ export function stateAt(planet, now) {
   };
   let at = planet.at;
   const q = { queue: planet.queue || null, research: planet.research || null, yard: planet.yard || null };
+  const plan = Array.isArray(planet.plan) ? [...planet.plan] : [];
   const done = [];
   for (;;) {
     const next = Object.entries(q)
       .filter(([, v]) => v && v.end <= now)
       .sort((x, y) => x[1].end - y[1].end || (x[0] < y[0] ? -1 : 1))[0];
+    // Chantier libre : le fil attend que le stock couvre le prix, au plus jusqu'au prochain événement.
+    const key = plan[0];
+    if (!q.queue && key && own(RACES[race].buildings, key) && freePlaces(planet.places, s.levels) > 0) {
+      const level = s.levels[key] || 0;
+      const cost = upgradeCost(race, key, level);
+      const limit = next ? Math.max(at, next[1].end) : now;
+      const r = until(race, s, at, limit, cost, planet.trance || 0);
+      s = r.s;
+      at = Math.max(at, r.at);
+      if (r.ok) {
+        const stock = { ...s.stock };
+        for (const [k, v] of Object.entries(cost)) stock[k] -= v;
+        s = { ...s, stock };
+        q.queue = { key, level: level + 1, start: at, end: at + buildDuration(race, s.levels, cost) };
+        plan.shift();
+        done.push({ kind: 'start', ...q.queue });
+        continue;
+      }
+    }
     if (!next) break;
     const [kind, job] = next;
     s = simulate(race, s, at, job.end, planet.trance);
@@ -635,13 +684,48 @@ export function stateAt(planet, now) {
   s = simulate(race, s, at, now, planet.trance);
   // Rythme actuel, pour l'affichage (sur une seconde de jeu).
   const prod = flows(race, s.levels, s.pop, s.stock, 1 / 3600, (planet.trance || 0) > now ? 2 : 1, s.nature, s.reserve, s.tech, s.climate);
-  return { stock: s.stock, pop: s.pop, levels: s.levels, reserve: s.reserve, tech: s.tech, ships: s.ships, ...q, done, prod };
+  return { stock: s.stock, pop: s.pop, levels: s.levels, reserve: s.reserve, tech: s.tech, ships: s.ships, ...q, plan, done, prod };
+}
+
+/**
+ * Estimation du fil de construction, pour l'affichage seulement : quand
+ * chaque bâtiment du fil devrait commencer et finir, si la production
+ * reste celle d'aujourd'hui (bâtiments, recherches et vaisseaux déjà lancés
+ * compris). Deux passes : 10 min à la seconde près, puis 6 h, plus grossière.
+ * Renvoie [{ key, level, cost, start, end }] dans l'ordre du fil ; `start`
+ * vaut null si rien n'arrive dans les 6 h, et `why` dit ce qui bloque quand
+ * on le sait (plus de place, entrepôt trop petit).
+ */
+export function planForecast(planet, now) {
+  const s = stateAt(planet, now);
+  if (!s.plan.length) return [];
+  // Ce qui s'est déjà lancé avant `now` (pas encore écrit dans la fiche) ne compte plus.
+  const gone = (planet.plan || []).length - s.plan.length;
+  const passes = [10 * 60_000, 6 * 3_600_000].map((h) => stateAt(planet, now + h).done.filter((d) => d.kind === 'start').slice(gone));
+  // Niveau, prix et places tels qu'au lancement de chaque élément, si tout passe dans l'ordre.
+  const levels = { ...s.levels };
+  if (s.queue) levels[s.queue.key] = s.queue.level;
+  const caps = s.prod.caps || {};
+  let free = freePlaces(planet.places, levels);
+  return s.plan.map((key, i) => {
+    const level = levels[key] || 0;
+    const cost = upgradeCost(planet.race, key, level);
+    levels[key] = level + 1;
+    const hit = passes.map((p) => p[i]).find((d) => d && d.key === key) || null;
+    let why = null;
+    if (!hit) {
+      if (free <= 0) why = 'Plus de place';
+      else if (Object.entries(cost).some(([r, v]) => v > (caps[r] ?? Infinity))) why = 'Entrepôt trop petit';
+    }
+    free -= 1;
+    return { key, level: level + 1, cost, start: hit?.start ?? null, end: hit?.end ?? null, why };
+  });
 }
 
 /**
  * Version « solde » : écrit l'état courant dans la planète (par son
- * propriétaire uniquement). Renvoie ce qui s'est terminé entre-temps :
- * [{ kind: 'queue' | 'research' | 'yard', ... }].
+ * propriétaire uniquement). Renvoie ce qui s'est terminé ou lancé (fil de
+ * construction) entre-temps : [{ kind: 'queue' | 'research' | 'yard' | 'start', ... }].
  */
 export function settle(planet, now) {
   // Une heure qui recule (ou invalide) ne doit pas faire recompter la production déjà comptée.
@@ -653,6 +737,7 @@ export function settle(planet, now) {
   planet.at = now;
   planet.levels = s.levels;
   planet.queue = s.queue;
+  if (planet.plan || s.plan.length) planet.plan = s.plan;
   planet.research = s.research;
   planet.yard = s.yard;
   planet.tech = s.tech;

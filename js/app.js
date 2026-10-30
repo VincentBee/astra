@@ -4,7 +4,7 @@ import { inviteLink, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
 import {
   RACES, RACE_KEYS, RES_INFO, resIcon, raceIcon, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
-  powerReadyAt, powerCost, liftGain, fmt, UNIVERSE, SOIL, sameCell, sunFor, climateName, kindLabel, usedPlaces, TEMPO, frostLine,
+  powerReadyAt, powerCost, liftGain, fmt, UNIVERSE, SOIL, sameCell, sunFor, climateName, kindLabel, usedPlaces, TEMPO, frostLine, planForecast, PLAN_MAX,
 } from './game.js';
 import { drawSun } from './sky.js';
 import { ic, fillIcons } from './icons.js';
@@ -746,7 +746,10 @@ function popText(race, pop) {
 
 $('buildings').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-build]');
-  if (btn && !btn.disabled) session.build(btn.dataset.build, openKey);
+  if (btn && !btn.disabled) {
+    if (btn.dataset.mode === 'now') session.build(btn.dataset.build, openKey);
+    else session.planBuild(btn.dataset.build, openKey);
+  }
   const down = e.target.closest('[data-demolish]');
   if (down && !down.disabled) {
     const name = RACES[session.myRace].buildings[down.dataset.demolish].name;
@@ -991,28 +994,43 @@ function renderPlanet(me, now) {
   const full = !!planet.places && used >= planet.places;
   $('places').textContent = planet.places ? `${used} / ${planet.places} places` : '';
   $('places').classList.toggle('full', full);
+  // Fil de construction (D-105) : chantier occupé ou stock trop court, le bouton ajoute au fil.
+  const plan = s.plan || [];
+  const busy = !!s.queue || plan.length > 0;
+  // Places une fois tout fini : chantier en cours et fil compris.
+  const taken = used + (s.queue ? (s.queue.demolish ? -1 : 1) : 0) + plan.length;
+  const noRoom = !!planet.places && taken >= planet.places;
   for (const k of Object.keys(R.buildings)) {
     const level = s.levels[k] || 0;
-    const cost = upgradeCost(me.race, k, level);
+    // Niveau du prochain ajout : celui en chantier et ceux qui attendent déjà dans le fil.
+    const next = level + (s.queue?.key === k ? (s.queue.demolish ? -1 : 1) : 0) + plan.filter((x) => x === k).length;
+    const cost = upgradeCost(me.race, k, next);
     const ok = covers(s.stock, cost) && !full;
-    q(`[data-level="${k}"]`).textContent = `niv ${level}`;
+    const direct = !busy && ok;
+    const job = s.queue?.key === k ? s.queue : null;
+    q(`[data-level="${k}"]`).textContent = job ? `niv ${level} → ${job.level} · ${clock(Math.max(0, job.end - now))}` : `niv ${level}`;
     setHtml(q(`[data-cost="${k}"]`), `${costText(cost)} · ${buildDuration(me.race, s.levels, cost) / 1000} s`);
     const card = q(`[data-card="${k}"]`);
-    card.classList.toggle('affordable', ok && !s.queue);
-    card.classList.toggle('building-now', s.queue?.key === k);
+    card.classList.toggle('affordable', direct);
+    card.classList.toggle('building-now', !!job);
     const btn = q(`[data-build="${k}"]`);
-    btn.disabled = !!s.queue || !ok || session.status !== 'playing';
-    const job = s.queue?.key === k ? s.queue : null;
+    btn.dataset.mode = direct ? 'now' : 'plan';
+    btn.disabled = noRoom || plan.length >= PLAN_MAX || session.status !== 'playing';
     cardProgress(card, job, now);
-    setHtml(btn, job ? `${ic('wait')}${clock(Math.max(0, job.end - now))}` : `${ic('up')}${level + 1}`);
-    btn.title =
-      s.queue?.key === k ? 'En chantier' : full ? 'Plus de place sur cette planète' : !covers(s.stock, cost) ? 'Ressources insuffisantes' : `Passer au niveau ${level + 1}`;
+    setHtml(btn, direct ? `${ic('up')}${next + 1}` : `${ic('plus')}${next + 1}`);
+    btn.title = noRoom
+      ? 'Plus de place sur cette planète'
+      : plan.length >= PLAN_MAX
+        ? `Fil plein (${PLAN_MAX} au plus)`
+        : direct
+          ? `Passer au niveau ${next + 1}`
+          : `Ajouter le niveau ${next + 1} au fil : il se lancera dès que possible`;
     btn.setAttribute('aria-label', `${R.buildings[k].name} : ${btn.title.toLowerCase()}`);
     const down = q(`[data-demolish="${k}"]`);
     down.disabled = !!s.queue || level < 1 || !session.canAct;
     down.hidden = level < 1;
-    if (job?.demolish) setHtml(btn, `${ic('wait')}−${clock(Math.max(0, job.end - now))}`);
   }
+  renderPlan(me, pl, planet, now);
 
   if (me.race === 'alien') {
     const trance = Math.max(0, (planet.trance || 0) - now);
@@ -1037,6 +1055,48 @@ function renderPlanet(me, now) {
   renderFleets(me, pl, s, now);
   renderPartners($('planet-partners'), { planet: pl.key });
 }
+
+/**
+ * Fil de construction de la planète ouverte, avec l'heure estimée de début
+ * et de fin de chaque bâtiment (planForecast, recalculée une fois par seconde).
+ */
+let planCache = { key: '', list: [] };
+function renderPlan(me, pl, planet, now) {
+  const el = $('plan');
+  const key = [pl.key, planet.at, JSON.stringify(planet.plan || []), planet.queue?.end, planet.research?.end, planet.yard?.end, Math.floor(now / 1000)].join('|');
+  if (planCache.key !== key) planCache = { key, list: planForecast(planet, now) };
+  const list = planCache.list;
+  el.hidden = !list.length;
+  const R = RACES[me.race];
+  const when = (f) => {
+    if (f.start == null) return f.why || 'plus de 6 h';
+    const start = f.start <= now ? 'maintenant' : `dans ${clock(f.start - now)}`;
+    return `${start} → fini dans ${clock(Math.max(0, f.end - now))}`;
+  };
+  // La structure ne change qu'avec le fil (les boutons restent sous le doigt) ; les heures, à chaque tic.
+  setHtml(
+    el,
+    list
+      .map(
+        (f, i) => `<li class="plan-item">
+      <span class="plan-name">${i + 1}. ${esc(R.buildings[f.key].short || R.buildings[f.key].name)} <span class="level mono">niv ${f.level}</span></span>
+      <span class="plan-when mono" title="Estimation, si la production reste la même"></span>
+      <button class="ghost small" data-unplan="${i}" data-key="${f.key}" title="Retirer du fil" aria-label="Retirer ${esc(R.buildings[f.key].name)} du fil"${session.canAct ? '' : ' disabled'}>${ic('close')}</button>
+    </li>`,
+      )
+      .join(''),
+  );
+  el.querySelectorAll('.plan-item').forEach((li, i) => {
+    const f = list[i];
+    li.classList.toggle('blocked', f.start == null);
+    li.querySelector('.plan-when').textContent = `${f.start == null ? '' : '≈ '}${when(f)}`;
+  });
+}
+
+$('plan').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-unplan]');
+  if (btn && !btn.disabled) session.unplan(btn.dataset.key, Number(btn.dataset.unplan), openKey);
+});
 
 /** Chantier, recherche ou vaisseaux en cours : la barre de progression s'affiche sur la carte concernée. */
 function cardProgress(card, job, now) {
