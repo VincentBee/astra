@@ -194,7 +194,7 @@ test('raids : pas d’attaque sans armes, et un seul pillage par planète toutes
   assert.ok(looted() > once, 'un nouveau pillage après 2 min');
 });
 
-// ----- Comportement en voyage : passif, agressif (D-098) ---------------------
+// ----- Comportement en voyage : passif, agressif (D-100) ---------------------
 
 const fx = (s) => P(s).effects || [];
 

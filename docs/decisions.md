@@ -173,7 +173,8 @@ Aucune conversation ne les prouve.
 - Source : `aeb160d5` 22:13:26, bilan 2026-10-26 00:45:04 ; `1f11f6f`.
 - Statut : en vigueur, **modifiée par D-031** : une 7ᵉ technologie par race (détection : Radar
   profond, Réseau de capteurs, Clairvoyance) ajoutée le 2026-10-27 à 23:49:51 (`796e0ad`, vérifié
-  avec `git show`).
+  avec `git show`). **Modifiée par D-098** (2026-10-30) : la recherche n'est plus réservée à la
+  planète mère.
 
 **D-022 — Combat sans arbitre : le téléphone de l'attaquant calcule**
 - 2026-10-26 00:45. Contexte : aucun serveur pour arbitrer.
@@ -718,7 +719,21 @@ Aucune conversation ne les prouve.
   `demolish`) ; un téléphone resté sur l'ancienne version est invité à recharger.
 - Statut : en vigueur.
 
-**D-098 — Comportement en voyage : passif ou agressif**
+**D-098 — Recherche sur toute planète qui a un labo**
+- 2026-10-30 10:29. Demande : « ce doit etre possible de faire une recherche sur n'importe quel
+  planet avec un labo, en accord avec le niveau du labo ». Modifie D-021 (planète mère seulement).
+- Choix : chaque planète avec un labo lance ses recherches ; les prérequis de labo et la durée
+  viennent du labo de cette planète, le prix est payé par son stock. Une recherche à la fois par
+  planète, et pas la même technologie sur deux planètes à la fois. Une technologie trouvée vaut
+  pour tout l'empire (la planète mère la reçoit, puis toutes les colonies).
+- Alternatives écartées : une seule recherche à la fois pour tout l'empire ; refuser la recherche
+  en colonie et seulement l'expliquer à l'écran.
+- Qui : Vincent (règle) ; Claude (une recherche par planète, même technologie interdite en
+  double). Pas de nouveau `FORMAT` (le champ `research` existait déjà sur chaque planète) ; cache
+  `astra-p2p-v53`.
+- Source : session `defa0982`. Statut : en vigueur.
+
+**D-100 — Comportement en voyage : passif ou agressif**
 - 2026-10-30 10:59. Demande : « Avoir des comportement de voyage: passif, agressif ».
 - Choix (Claude, par défaut) : un champ `stance` par flotte, à part de l'ordre (une flotte qui
   va se poser peut être agressive). **Passive** (au décollage, à la scission, et pour les
@@ -735,7 +750,7 @@ Aucune conversation ne les prouve.
   passage ; un téléphone en arrière-plan (passages ralentis) peut laisser deux flottes se
   croiser sans combat.
 - Pas de nouveau `FORMAT` : un téléphone d'avant ignore le champ (ses flottes restent
-  passives) ; cache `astra-p2p-v53`.
+  passives) ; cache `astra-p2p-v54` (D-098 avait pris v53 ; D-099 est pris par la recette, pas encore fusionnée).
 - Qui : Vincent (demande), Claude (règle). Statut : en vigueur.
 
 ---

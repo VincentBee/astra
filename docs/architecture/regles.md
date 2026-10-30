@@ -339,15 +339,19 @@ détection.
 
 ### 7.2 Règles de recherche
 
-- **Sur la planète mère seulement** : `Session.research` utilise `p.planet`
-  (`js/session.js:917-925`). Il faut un labo (`js/game.js:659-660`), une seule recherche à la
-  fois, et les prérequis (`techMissing`, `js/tech.js:274-284`).
+- **Sur toute planète qui a un labo** (D-098) : `Session.research(key, where)`
+  (`js/session.js:1077`) lance la recherche sur la planète `where`, avec `startResearch`
+  (`js/game.js:730`). Le labo **de cette planète** donne les prérequis (`techMissing`) et la
+  durée ; son stock paie. Une recherche à la fois par planète, et pas la même technologie sur
+  deux planètes à la fois (refus « déjà en recherche sur … »).
 - Coût : `floor(base × 1,7^niveau)` (`techCost`, `js/tech.js:259-265`).
 - Durée : `max(8, round(total / (20 × (1 + 0,5 × (labo − 1)))))` secondes
   (`researchDuration`, `js/tech.js:268-271`).
-- Les technologies valent pour toutes mes planètes : chaque colonie en garde une copie,
-  remise à jour par `tick()` (`js/session.js:1552-1558`) et donnée à la fondation
-  (`js/session.js:1626`).
+- Les technologies valent pour toutes mes planètes : la planète mère tient la liste de
+  l'empire, chaque colonie en garde une copie, remise à jour par `tick()` (`shareTech`,
+  `js/session.js:1751`) et donnée à la fondation. Une recherche finie dans une colonie monte
+  d'abord dans la planète mère, puis un second passage la donne aux autres colonies
+  (`js/session.js:1766`).
 
 ### 7.3 Le graphe (`js/techtree.js`)
 
@@ -509,7 +513,7 @@ Une flotte qui attend la réponse à un échange est **bloquée** (`locked`,
   (`js/session.js:1160-1170`, `fleetHit` `js/session.js:1746-1770`). À plus de 30 min d'écart,
   ce n'est jamais le même combat (revanche) (`js/session.js:1754-1755`).
 
-### 9.3 bis Comportement en voyage : passif ou agressif (D-098)
+### 9.3 bis Comportement en voyage : passif ou agressif (D-100)
 
 - Champ `stance` de la flotte : `'passive'` (défaut, `launch` et `split`) ou `'aggressive'`
   (`STANCES`, `aggressive`, `armed`, `js/fleet.js`). Sans champ : passive.
@@ -726,7 +730,7 @@ fiche de `b` (`tests/harness.mjs:20-35`).
 node --test tests/*.test.mjs
 ```
 
-Résultat le 2026-10-30 (Node v24.14.1), avec le comportement en voyage (D-098) : `tests 124, pass 124, fail 0` (12 fichiers, dont les `decisions-*.test.mjs` de D-082). Le harnais
+Résultat le 2026-10-30 (Node v24.14.1), avec la recherche en colonie (D-098) et le comportement en voyage (D-100) : `tests 125, pass 125, fail 0` (12 fichiers, dont les `decisions-*.test.mjs` de D-082). Le harnais
 coupe le froid (`FROST.delayMs = Infinity`) : les parties de test ne finissent pas d'elles-mêmes ;
 `tests/end.test.mjs` le rallume test par test.
 
@@ -748,7 +752,7 @@ Résultat : `tests 34, pass 34, fail 0`, environ 5,6 s (le rejeu d'une partie de
 | `tests/rules.test.mjs` | 11 | Déconstruire (moitié du prix rendue, place libérée à la fin) ; heure qui recule puis revient : pas de double production ; longue absence ≈ passages toutes les heures (population à moins de 2 %) ; arrachement refusé sans payer ; clés héritées (`constructor`, `__proto__`) refusées ; effectifs négatifs ou fractionnaires au combat ; soleil au centre et sans planète ; climat et production ; une place par niveau ; places lues sur la carte ; une colonie humaine sur le plus petit corps garde des places |
 | `tests/combat.test.mjs` | 4 | Attaques contre une planète : pas de butin créé avec un défenseur hors ligne ou plusieurs flottes arrivées ensemble ; 70 attaques avant le retour du défenseur ; les vaisseaux perdus emportent leur cargaison |
 | `tests/effects.test.mjs` | 1 | 5 joueurs, 4 attaquants × 70 combats : chaque perte subie une fois, puis rapports oubliés des deux côtés |
-| `tests/fleet.test.mjs` | 13 | Deux flottes sur la même cible ; poursuite mutuelle ; colonie qui encaisse les pertes ; premier arrivé à la colonisation ; plein en panne tout près ; plusieurs attaquants ne pillent pas plus que le stock ; revanche ; raids sans armes et un pillage par 2 min ; flotte agressive qui combat puis reprend sa route ; flotte passive qui croise sans combattre ; agressive à l'arrêt qui garde sa case ; deux agressives : pertes comptées une fois ; agressive refusée sans armes, vue par les autres, gardée à la fusion (D-098) |
+| `tests/fleet.test.mjs` | 13 | Deux flottes sur la même cible ; poursuite mutuelle ; colonie qui encaisse les pertes ; premier arrivé à la colonisation ; plein en panne tout près ; plusieurs attaquants ne pillent pas plus que le stock ; revanche ; raids sans armes et un pillage par 2 min ; flotte agressive qui combat puis reprend sa route ; flotte passive qui croise sans combattre ; agressive à l'arrêt qui garde sa case ; deux agressives : pertes comptées une fois ; agressive refusée sans armes, vue par les autres, gardée à la fusion (D-100) |
 | `tests/colony.test.mjs` | 1 | Colonie perdue au recollage : vaisseaux et cargaison restent en orbite |
 | `tests/hostile.test.mjs` | 6 | Pair malveillant ou fiche abîmée : personne ne réécrit ma fiche ni un secret, ni ne date sa fiche loin dans le futur ; fiche abîmée sans plantage ; race ou identifiant spécial ; installation antidatée ; heure qui recule ; téléphone en avance reste visible. Une partie de ces tests passe par l'acceptation des fiches (mécanisme décrit dans reseau.md) |
 | `tests/replay.test.mjs` | 4 | Une partie de robots (construire, chercher, armer, décoller, attaquer, échanger) rejouée retombe sur les mêmes fiches ; partie coupée en deux puis recollée ; journal tronqué signalé ; copie pas à jour signalée |

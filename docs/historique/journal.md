@@ -257,18 +257,22 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 08:51:37 | `26f178b9` | « il faut pouvoir deconstruire un batiment, et rajoute aussi de la documentation sur tout ca, j'ai merge de la doc sur master » | Fusion de `main` (doc) dans la branche ; déconstruction ; doc de tout le rythme (regles §4.1, §5.5, §9.2, §19 ; interface §12 ; décisions D-083 à D-097) | (ce commit) | D-096 |
 | 09:03:50 | `26f178b9` | [Bouton] « Créer la PR » | Fusion de `main` (tests des décisions, D-082 déjà pris) : mes décisions renumérotées D-083 à D-097 ; tests D-002, D-016, D-019, D-028, D-053 comptés en heures de jeu, D-036 sans défense de bâtiments ; D-002 et D-036 marquées « modifiée » ; tableau `tests-decisions.md` complété (119/119) ; pull request | (cette PR) | D-083 à D-097 |
 
+## 30 octobre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 10:24:11 | `defa0982` | « On ne peut pas faire de recherche sur les colonies » | Réponse : c'est la règle D-021 (planète mère seulement) ; deux options proposées | — | D-021 |
+| 10:29:38 | `defa0982` | « je veux changer la regle, ce doit etre possible de faire une recherche sur n'importe quel planet avec un labo, en accord avec le niveau du labo » | Recherche sur toute planète avec un labo (son niveau, son stock), une par planète, pas la même technologie en double, partage à tout l'empire ; onglet Recherche dans les colonies ; test D-098 ; cache v53 | (ce commit) | D-098 |
+| 10:52:06 | `defa0982` | [Bouton] « Créer la PR » | Commit et pull request | (cette PR) | D-098 |
+| 10:55 | `e67321a7` | « Etudier le rayon d'action des flottes » | Étude sans code, mesurée sur 500 cartes : un plein mène à 40 cases (humains), 36 (machines ; 30 pour la sonde réplicatrice), 50 (aliens) ; aucune technologie ne change `tank` ni `burn`. Planète → planète : médiane 12 cases, au plus 34 ; l'aller-retour sur un plein couvre 84 % (machines) à 98 % (aliens) des paires. Le carburant ne limite presque jamais ; c'est le froid qui réduit la carte. Écart de commentaire déjà noté (regles §18, point 4), numéros de ligne mis à jour | — | — |
+| 10:59 | `ef4e56a1` | « Avoir des comportement de voyage: passif, agressif » | Champ `stance` par flotte ; bouton Passive / Agressive dans la fiche de la flotte ; une flotte agressive combat toute flotte ennemie visible qu'elle touche, en route ou à l'arrêt, puis reprend son trajet et son ordre ; ordre `setFleetStance` (journal, rejeu) ; 5 tests (124/124) ; doc regles §9.3 bis, interface, tests-decisions ; cache v54 | (ce commit) | D-100 |
+| 11:05 | `e67321a7` | « Je veux plutôt parler de la distance à laquelle une flotte peut en attaquer une autre ou une planète ou échanger avec une autre flotte. » | Étude sans code : attaquer une flotte = la voir (2 à 3 cases + détection) puis la toucher (≤ 0,5 case, Manhattan) ; attaquer une planète = arriver sur sa case ; échanger = deux parties arrêtées sur la même case (arrondie) et visibles. Calcul : deux flottes rapides qui se croisent de face restent au contact 0,9 à 3 s ; le passage a lieu toutes les 0,25 s au premier plan, mais un téléphone en arrière-plan peut rater le croisement d'une flotte agressive (déjà noté « non confirmé », regles §9.3 bis) | — | — |
+| 11:25 | `ef4e56a1` | [Bouton] « Créer la PR » | Ligne du journal ajoutée ; push de `claude/swarm-it-game-recipe-1cf190` ; pull request vers `main` | (cette PR) | D-100 |
+| 11:40 | `ef4e56a1` | [Auto-fix] conflit avec `main` | Fusion de `main` (recherche en colonie) : ma décision renumérotée D-100 (D-098 pris par `main`, D-099 par la recette), cache v54, tests 125/125 | (cette PR) | D-100 |
+
 ### Travaux en cours au 2026-10-29
 
 - **Rythme des parties** (`26f178b9`) : commité sur `claude/swarm-it-game-pacing-1d4502`
   (`9b37782` et suivants), pas encore fusionné dans `main`. La doc du code le décrit.
 - **Design épuré** (`f4afbcd0`) : session encore ouverte, mais son worktree n'a aucun changement
   non commité ; tout le travail est dans `1eeb2c1`.
-
-## 30 octobre 2026
-
-| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
-|---|---|---|---|---|---|
-| 10:55 | `e67321a7` | « Etudier le rayon d'action des flottes » | Étude sans code, mesurée sur 500 cartes : un plein mène à 40 cases (humains), 36 (machines ; 30 pour la sonde réplicatrice), 50 (aliens) ; aucune technologie ne change `tank` ni `burn`. Planète → planète : médiane 12 cases, au plus 34 ; l'aller-retour sur un plein couvre 84 % (machines) à 98 % (aliens) des paires. Le carburant ne limite presque jamais ; c'est le froid qui réduit la carte. Écart de commentaire déjà noté (regles §18, point 4), numéros de ligne mis à jour | — | — |
-| 10:59 | `ef4e56a1` | « Avoir des comportement de voyage: passif, agressif » | Champ `stance` par flotte ; bouton Passive / Agressive dans la fiche de la flotte ; une flotte agressive combat toute flotte ennemie visible qu'elle touche, en route ou à l'arrêt, puis reprend son trajet et son ordre ; ordre `setFleetStance` (journal, rejeu) ; 5 tests (124/124) ; doc regles §9.3 bis, interface, tests-decisions ; cache v53 | (ce commit) | D-098 |
-| 11:05 | `e67321a7` | « Je veux plutôt parler de la distance à laquelle une flotte peut en attaquer une autre ou une planète ou échanger avec une autre flotte. » | Étude sans code : attaquer une flotte = la voir (2 à 3 cases + détection) puis la toucher (≤ 0,5 case, Manhattan) ; attaquer une planète = arriver sur sa case ; échanger = deux parties arrêtées sur la même case (arrondie) et visibles. Calcul : deux flottes rapides qui se croisent de face restent au contact 0,9 à 3 s ; le passage a lieu toutes les 0,25 s au premier plan, mais un téléphone en arrière-plan peut rater le croisement d'une flotte agressive (déjà noté « non confirmé », regles §9.3 bis) | — | — |
-| 11:25 | `ef4e56a1` | [Bouton] « Créer la PR » | Ligne du journal ajoutée ; push de `claude/swarm-it-game-recipe-1cf190` ; pull request vers `main` | (cette PR) | D-098 |
