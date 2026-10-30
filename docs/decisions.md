@@ -733,6 +733,18 @@ Aucune conversation ne les prouve.
   `astra-p2p-v53`.
 - Source : session `defa0982`. Statut : en vigueur.
 
+**D-099 — Des recherches humaines coûtent aussi de la nourriture**
+- 2026-10-30 10:53. Demande : « Certaines recherches devraient couter de la nouriture aussi ».
+  Session `074fcd56`.
+- Choix : chez les humains, **Agronomie** coûte 120 minéraux + 40 nourriture (au niveau 1) et
+  **Arches coloniales** 400 minéraux + 120 nourriture. Les deux touchent aux vivres et aux colons.
+  Les aliens payaient déjà leurs recherches en nourriture ; les machines n'en ont pas, rien ne
+  change pour elles. La nourriture compte dans la durée de recherche (un peu plus longue).
+  Cache `astra-p2p-v56` (v53 à v55 pris par D-098, D-100 et D-101).
+- Alternatives écartées : de la nourriture sur toutes les recherches humaines ; en ajouter aux
+  machines (elles n'en produisent pas).
+- Qui : Vincent (demande), Claude (lesquelles et combien). Statut : en vigueur.
+
 **D-100 — Comportement en voyage : passif ou agressif**
 - 2026-10-30 10:59. Demande : « Avoir des comportement de voyage: passif, agressif ».
 - Choix (Claude, par défaut) : un champ `stance` par flotte, à part de l'ordre (une flotte qui

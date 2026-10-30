@@ -2,7 +2,7 @@
 
 Pour chaque décision de [decisions.md](../decisions.md), le test qui la protège, ou la raison
 pour laquelle il n'y en a pas (voir D-082). État au 2026-10-30 : `node --test tests/*.test.mjs` →
-125 tests, 125 réussis (avec la recherche en colonie, D-098, et le comportement en voyage, D-100).
+127 tests, 127 réussis (avec la recherche en colonie, D-098, le coût en nourriture, D-099, le comportement en voyage, D-100, et la vitesse de flotte, D-101).
 
 - **nouveau test** : ajouté le 2026-10-29 dans `tests/decisions-planete.test.mjs` (24),
   `tests/decisions-flotte.test.mjs` (30) ou `tests/decisions-reseau.test.mjs` (20). Le nom de
@@ -128,5 +128,6 @@ que fait le code.
 | D-096 | Déconstruire un bâtiment | nouveau test | `rules.test.mjs` déconstruire un niveau rend la moitié de son prix et libère sa place à la fin |  |
 | D-097 | `FORMAT` 8 et cache v52 | non testable |  | version de format et de cache |
 | D-098 | Recherche sur toute planète qui a un labo | nouveau test | `decisions-planete.test.mjs` D-098 : recherche sur toute planète qui a un labo, selon le niveau de ce labo |  |
+| D-099 | Agronomie et Arches coloniales humaines coûtent de la nourriture | nouveau test | `decisions-planete.test.mjs` D-099 : chez les humains, l'Agronomie et les Arches coloniales coûtent aussi de la nourriture | refus sans nourriture |
 | D-100 | Comportement en voyage : passif ou agressif | nouveau test | `fleet.test.mjs` flotte agressive : elle combat la flotte ennemie qu’elle croise, puis reprend sa route et son ordre<br>`fleet.test.mjs` flotte passive : elle croise une flotte ennemie sans combattre<br>`fleet.test.mjs` flotte agressive à l’arrêt : elle garde la case et combat celle qui passe<br>`fleet.test.mjs` deux flottes agressives qui se croisent : les pertes ne comptent qu’une fois<br>`fleet.test.mjs` comportement : refusé sans armes, vu par les autres, gardé par la flotte qui en absorbe une autre<br>`replay.test.mjs` (les robots changent le comportement) | le bouton de l'interface n'est pas testé (navigateur) |
 | D-101 | Vitesse de flotte = vaisseau le plus lent | testé | `tests/fleet.test.mjs` « une flotte va à la vitesse de son vaisseau le plus lent » | l'affichage (`speedText`) n'est pas testé |
