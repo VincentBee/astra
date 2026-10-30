@@ -975,3 +975,34 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   cher après des heures) ; garder l'historique des segments de chaque flotte (fiches plus lourdes).
 - Qui : Vincent (corriger), Claude (méthode). Source : session `e67321a7`. Statut : en vigueur.
 - Tests : `tests/fleet.test.mjs`, section « Rencontres que personne n'a regardées ».
+
+**D-110 — Alerte quand une flotte ennemie arrive sur une de mes planètes**
+- 2026-10-30 14:10. Contexte : retour de 7 testeurs (point 1.3 de leur synthèse) : une conquête
+  tombe sans préavis, le seul signal est un toast de 3,2 s à l'impact, et l'effectif des flottes
+  ennemies ne se voit pas sur la carte. Demande : un bandeau rouge persistant avec compte à
+  rebours, et l'effectif des flottes ennemies sur la carte.
+- Choix : `Session.threats(now)` liste les flottes **armées**, **adverses**, **visibles** (dans
+  ma zone de détection, la même règle que la carte). Deux niveaux : d'abord celles qui visent une
+  de mes planètes (ordre attaque ou conquête sur moi, simple trajet vers la case de ma planète, ou
+  déjà en orbite), la plus proche de l'impact en tête ; puis les autres, de la plus proche à la
+  plus lointaine de mes planètes. Bandeau `#alert` sous celui du froid, sur tous les onglets : la
+  plus pressante (« 12 vaisseaux de Zorg sur Pollux dans 8 s », « … en orbite de Pollux »,
+  « … en vue, à 3 cases de Pollux ») et « +N autres ». Un toucher montre la carte. Compte à
+  rebours en secondes (les trajets durent 2 à 10 s). Sur la carte, le nombre de vaisseaux est
+  écrit à côté de chaque flotte adverse visible. Cache v61.
+- Choix de Claude, par défaut : la cible et l'ordre d'une flotte visible sont montrés (ils sont
+  déjà dans la copie de la partie ; la carte, elle, ne montrait que la direction) ; une flotte
+  arrivée dont le combat n'est pas encore réglé garde l'alerte à « en orbite » ; une flotte d'un
+  joueur éliminé ne compte pas ; pas d'alerte sans armes ; rien en partie finie.
+- Alternatives écartées : un toast de plus (disparaît, c'était le problème) ; alerter sur toutes
+  les flottes de la partie, même hors de vue (révèle ce que la carte cache) ; vibration ou son
+  (non demandé).
+- Qui : Vincent (demande), Claude (détails). Source : session `0cb6f324`. Statut : en vigueur.
+- Tests : `tests/alert.test.mjs`.
+
+**D-111 — Délai avant qu'une flotte en orbite frappe une case voisine**
+- 2026-10-30 14:10. Contexte : même point 1.3 : depuis l'orbite, une conquête de la case voisine
+  prend 2 à 3 s (plancher `MIN_TRIP` de 2 s). La synthèse le met « à discuter ».
+- Choix : **rien n'est changé pour l'instant**. Question posée à Vincent ; l'alerte de D-110
+  laisse déjà voir les flottes en orbite proches (« en vue, à 1 case »).
+- Qui : en attente de Vincent. Source : session `0cb6f324`. Statut : ouvert, non tranché.

@@ -299,6 +299,8 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 13:33 | `e67321a7` | [Bouton] « Oui, commite » | Commit de mes seuls fichiers (rencontres hors ligne, D-109) ; le travail de la session `787cfd98` (D-099, `TODO-RECETTE.md`) laissé hors du commit | `1e9f655` | D-109 |
 | 13:45 | `e67321a7` | [Bouton] « Créer la PR » | La branche d'origine était déjà fusionnée (PR #6) et `main` avait pris D-100 à D-106 : nouvelle branche `claude/fleet-offline-contact` depuis `main`, commit repris, décision renumérotée D-107, conflits de doc résolus ; pull request | (cette PR) | D-109 |
 | 13:55 | `e67321a7` | « rebase et merge » | `main` avait pris D-107 et D-108 (grille des flottes) : rebase, ma décision devient D-109 ; tests relancés ; pull request #13 fusionnée | (cette PR) | D-109 |
+| 14:10 | `0cb6f324` | Point 1.3 d'une synthèse de tests : « Ajouter une alerte quand une flotte ennemie vient vers une de mes planètes » (bandeau rouge avec compte à rebours, effectif des flottes ennemies sur la carte, délai depuis l'orbite à discuter) | `Session.threats` ; bandeau `#alert` (compte à rebours, « en orbite », « en vue », +N autres ; toucher → carte) ; nombre de vaisseaux à côté des flottes adverses ; 3 tests (147/147) ; vérifié dans le navigateur avec un faux joueur ajouté par la console ; cache v61. Délai depuis l'orbite : pas fait, question posée | (ce commit) | D-110, D-111 |
+| 14:20 | `0cb6f324` | [Bouton] « Oui, commite + PR » | Commit, push et pull request avec captures et résultats des tests | (cette PR) | D-110 |
 
 ### Travaux en cours au 2026-10-29
 

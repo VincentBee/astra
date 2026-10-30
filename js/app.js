@@ -830,6 +830,7 @@ function renderLive() {
   const me = st.players[session.me];
   const now = session.now();
   renderRace(now);
+  renderAlert(now);
 
   {
     const online = session.peerCount;
@@ -929,6 +930,29 @@ function renderRace(now) {
   el.classList.toggle('hot', hot);
   setHtml($('race-text'), html);
 }
+
+/**
+ * Bandeau rouge (D-110) : la flotte armée adverse la plus pressante, avec le
+ * compte à rebours si elle vise une de mes planètes ; il reste tant qu'elle
+ * est en vue. Un toucher montre la carte.
+ */
+function renderAlert(now) {
+  const el = $('alert');
+  const list = session.over ? [] : session.threats(now);
+  el.hidden = !list.length;
+  if (!list.length) return;
+  const [t] = list;
+  const who = `${t.n} vaisseau${t.n > 1 ? 'x' : ''} ${esc(de(t.p.name))}`;
+  const where = esc(t.target.name);
+  const cells = Math.max(1, Math.round(t.dist));
+  const what =
+    t.eta == null ? `${who} en vue, à ${cells} case${cells > 1 ? 's' : ''} ${esc(de(t.target.name))}`
+    : t.eta > 0 ? `${who} sur ${where} dans <span class="mono">${Math.ceil(t.eta / 1000)} s</span>`
+    : `${who} en orbite ${esc(de(t.target.name))}`;
+  const more = list.length > 1 ? ` <span class="hint">· +${list.length - 1} autre${list.length > 2 ? 's' : ''}</span>` : '';
+  setHtml($('alert-text'), `${ic('attack')} <strong>${what}</strong>${more}`);
+}
+$('alert').addEventListener('click', () => showView('map'));
 
 /** La planète ouverte (mère ou colonie) : ressources, population, chantiers, recherche, flottes. */
 function renderPlanet(me, now) {
@@ -1688,6 +1712,17 @@ function drawMap() {
     ctx.fill();
     ctx.restore();
     ctx.globalAlpha = 1;
+    if (p.id !== session.me) {
+      // Effectif des flottes adverses (D-110), en haut à droite du triangle.
+      ctx.font = `700 ${Math.max(9 * dpr, cell * 0.34)}px system-ui, sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.lineWidth = Math.max(2, cell * 0.08);
+      ctx.strokeStyle = 'rgba(5,8,18,0.9)';
+      ctx.fillStyle = '#ffffff';
+      const n = String(countShips(f.ships));
+      ctx.strokeText(n, cx + cell * 0.2, cy - cell * 0.14);
+      ctx.fillText(n, cx + cell * 0.2, cy - cell * 0.14);
+    }
   }
   // Case visée, en attente d'un choix (se poser, coloniser, attaquer…).
   if (pending) {
