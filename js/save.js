@@ -33,9 +33,10 @@ const valid = (s) => s && s.v === 1 && s.state?.players;
 /**
  * Range la partie en cours et la garde dans l'historique (les plus récentes seulement).
  * `journal` : mon carnet de combats (D-110), propre à ce téléphone.
+ * `intel` : ce que j'ai vu des planètes des autres (brouillard, D-124), propre à ce téléphone.
  */
-export function saveGame(me, state, journal) {
-  const save = { v: 1, me, savedAt: Date.now(), state, ...(journal ? { journal } : {}) };
+export function saveGame(me, state, journal, intel) {
+  const save = { v: 1, me, savedAt: Date.now(), state, ...(journal ? { journal } : {}), ...(intel ? { intel } : {}) };
   const all = archive(); // avant d'écraser la partie en cours, pour la garder
   all[state.gid] = save;
   write(SAVE_KEY, save);

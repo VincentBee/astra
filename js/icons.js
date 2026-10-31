@@ -24,6 +24,8 @@ const PATHS = {
   share: 'M12 15V3M7 8l5-5 5 5M5 13v8h14v-8',
   scan: 'M3 8V3h5M16 3h5v5M21 16v5h-5M8 21H3v-5M7 12h10',
   plus: 'M12 5v14M5 12h14',
+  minus: 'M5 12h14',
+  fit: 'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5',
   join: 'M14 3h6v18h-6M3 12h12M11 8l4 4-4 4',
   replay: 'M3 12a9 9 0 1 0 2.6-6.4M3 3v5h5',
   journal: 'M5 3h11l3 3v15H5zM8 9h8M8 13h8M8 17h5',

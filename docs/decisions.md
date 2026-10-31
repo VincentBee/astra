@@ -646,11 +646,13 @@ Aucune conversation ne les prouve.
 - Statut : **remplacée par D-088** à 07:01 (« le chrono est une mauvaise idée »). `GOAL` retiré
   du code avant le commit.
 
-**D-087 — Les parties d'avant la course n'ont ni fin ni froid**
+**D-087 — Les parties d'avant la course n'ont ni fin ni froid** — modifiée par D-120
 - 2026-10-29 06:59. Contexte : avec la fin à 40 min après la première installation, toutes les
   vieilles sauvegardes auraient fini dès leur ouverture.
 - Choix : champ `since` écrit à l'installation ; sans `since`, pas de course.
-- Qui : Claude (signalé par le conseiller). Statut : en vigueur.
+- Qui : Claude (signalé par le conseiller). Statut : modifiée par D-120 (2026-10-31) : la course
+  part au départ commun (`go`) ; `since` est écrit quand la flotte de départ apparaît. Une partie
+  sans `go` ni `since` n'a toujours ni fin ni froid.
 
 **D-088 — Le soleil s'éteint : le froid se resserre du bord vers le soleil**
 - 2026-10-29 07:01-07:05. Demande : « il faudrait un mechanisme qui force la fin, comme dans
@@ -662,7 +664,7 @@ Aucune conversation ne les prouve.
   galaxie qui s'épuise, merveille à construire.
 - Qui : Vincent (direction), Claude (règle). Statut : en vigueur (`9b37782`).
 
-**D-089 — Sans planète, éliminé ; le dernier en vie gagne ; une colonie remplace la planète mère**
+**D-089 — Sans planète, éliminé ; le dernier en vie gagne ; une colonie remplace la planète mère** — modifiée par D-120 (un joueur qui n'a pas encore fondé sa planète reste en vie tant qu'il a un colonisateur)
 - 2026-10-29 07:07. Question de Claude : peut-on prendre la planète mère ? Réponse de Vincent :
   « a » (oui, élimination possible).
 - Choix : la plus vieille colonie en vie devient planète mère ; sans colonie, `out` ; fin quand
@@ -1078,7 +1080,254 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   réglages dans la fenêtre Joueurs (mal rangé).
 - Qui : Vincent (demande), Claude (forme). Source : session `0a3a42f6`. Statut : en vigueur.
 
-**D-115 — Alerte quand une flotte ennemie arrive sur une de mes planètes**
+**D-115 — Mes planètes dans la grille sous la carte, avec Construire et Décoller**
+- 2026-10-31 11:00. Demande de Vincent : « Je voudrais que sur la vue map, il y ait avec les
+  flottes la liste des planètes dans la grille et qu'on puisse, depuis cet endroit, créer de
+  nouveaux vaisseaux ou faire décoller des vaisseaux déjà créés. »
+- Choix : la grille `#map-fleets` (D-107, D-108) commence par une case par planète à moi (mère
+  puis colonies), suivie des flottes. La case montre le nom, les vaisseaux à quai (une icône par
+  type et son nombre, comme les flottes), le lot en chantier et son compte à rebours. Deux
+  boutons-icônes : **+** ouvre la fiche de la planète sur son chantier (×1, ×5, ×N de D-106) ;
+  **Décoller** ouvre directement le formulaire de décollage de cette planète. Toucher ailleurs sur
+  la case ouvre la fiche, comme toucher la planète sur la carte. La grille s'affiche dès qu'on a
+  une planète, même sans flotte.
+- Choix de Claude, par défaut : les planètes avant les flottes (elles ne bougent pas, les flottes
+  vont et viennent en fin de liste) ; bord vert pour les distinguer des flottes (bord bleu ou
+  rouge) ; icône « + » plutôt que la maison, déjà prise par « Bâtiments » ; **+** caché sans
+  chantier naval (la case dit « 🔒 » et le nom du bâtiment) et **Décoller** caché sans vaisseau à
+  quai ; la construction reste dans la fiche de la planète (D-106) au lieu de boutons ×1/×5 dans
+  la case, trop petite sur un téléphone (2 colonnes).
+- Alternatives écartées : une liste séparée des planètes sous la grille des flottes ; des boutons
+  de construction dans chaque case ; une case qui sélectionne la planète sans rien ouvrir.
+- Qui : Vincent (la demande), Claude (la forme). Source : session `012yisg4`.
+- Statut : en vigueur. Vérifié dans Chromium (390 × 844) : construire depuis la case, compte à
+  rebours, décollage, flotte en orbite. Sur un vrai téléphone : **non confirmé**.
+
+**D-116 — Cache `astra-p2p-v64`**
+- 2026-10-31. Choix de Claude : `index.html`, `style.css`, `js/app.js` (D-115, D-117) et
+  `js/icons.js` (D-117) changent ; nouvelle version de cache pour que les téléphones les
+  récupèrent. Une seule version pour les deux demandes, faites sur la même branche.
+- Statut : en vigueur.
+
+**D-117 — Carte zoomable**
+- 2026-10-31 11:15. Demande de Vincent : « Je veux aussi que la carte soit zoomable. »
+- Choix : zoom de 1 (toute la carte, 20 cases) à 4 (5 cases de large). Pincer à deux doigts ou
+  molette pour zoomer (autour des doigts ou du curseur) ; glisser à un doigt ou à la souris pour
+  se déplacer ; boutons +, − et « vue entière » en haut à droite de la carte. Un geste qui a
+  bougé de plus de 8 px n'est pas un toucher (pas d'ordre envoyé par erreur en se déplaçant).
+  Les cases, les traits et les noms grossissent avec le zoom. Choisir une flotte dans la grille
+  sous la carte recentre la vue sur elle si elle est hors champ.
+- Choix de Claude, par défaut : zoom maximal 4 ; facteur 1,6 par bouton ; le zoom n'est pas
+  gardé d'une ouverture à l'autre ; la molette zoome toujours (sans touche Ctrl), comme sur une
+  carte en ligne ; pas de double toucher pour zoomer (il retarderait chaque toucher simple).
+- Alternatives écartées : zoom du navigateur (agrandit toute la page, pas la carte) ; agrandir
+  le canvas dans un cadre qui défile (le défilement se bat avec les touchers) ; un curseur de
+  zoom (prend de la place).
+- Qui : Vincent (la demande), Claude (la forme). Source : session `012yisg4`.
+- Statut : en vigueur. Vérifié dans Chromium (390 × 844) : boutons, molette autour du curseur,
+  glisser à la souris sans ouvrir de fiche, pincement simulé jusqu'au zoom 4, toucher d'une
+  planète juste une fois zoomé. Pincement sur un vrai téléphone : **non confirmé**.
+
+**D-118 — Curseur du temps dans le replay, à la minute près, sans arrêter la lecture**
+- 2026-10-31 11:40. Demande de Vincent : « Je voudrais que les replay ai un slider pour aller a
+  n'importe quel moment d'une partie en cours de visionnage ».
+- Constat : `replay.html` avait déjà un curseur (`#rp-time`, D-047), mais sur 1 000 crans (une
+  partie de 3 jours : un cran ≈ 4 min 20), rendu comme un champ de saisie (bordure et marges du
+  style des `input`), et le toucher arrêtait la lecture pour de bon.
+- Choix : le curseur compte en minutes de partie (`max` = durée en minutes) : n'importe quelle
+  minute est atteignable, au doigt ou aux flèches du clavier (une minute par appui). Glisser
+  pendant la lecture la met en pause le temps du geste, puis elle reprend du nouveau moment
+  quand on lâche ; à l'arrêt, le curseur déplace seulement. Même chose pour la courbe des
+  points (D-103). Précédent / Suivant ne coupent plus la lecture. Sous le curseur : « Début » et
+  la durée totale ; la piste est colorée jusqu'à l'instant affiché ; gros pouce carré (22 px)
+  pour le doigt.
+- Choix de Claude, par défaut : reprendre la lecture en lâchant (plutôt que rester en pause) ;
+  cran d'une minute (plus fin ne sert à rien : les ordres sont espacés de minutes et le pouce
+  ne vise pas mieux qu'un pixel, soit ≈ 3 min pour 20 h de partie) ; pas de marques
+  d'événements sur la piste (la courbe des points montre déjà où ça bouge).
+- Alternatives écartées : garder 1 000 crans ; un curseur en heures ; des marques de combats
+  sur la piste ; un champ pour taper une heure.
+- Qui : Vincent (la demande), Claude (la forme). Source : session `012yisfz`.
+- Statut : en vigueur. Vérifié dans Chromium (390 × 844, partie de robots de 20 h) : glissé
+  pendant la lecture (pause puis reprise à +12 h), flèche du clavier (+1 min). Sur un vrai
+  téléphone : **non confirmé**.
+
+**D-119 — Cache `astra-p2p-v65`**
+- 2026-10-31. Choix de Claude : `replay.html`, `js/replay-view.js` et `style.css` changent
+  (D-118) ; nouvelle version de cache pour que les téléphones les récupèrent.
+- Statut : en vigueur.
+
+**D-120 — La partie part quand tous les joueurs présents sont prêts ; chacun commence avec une seule flotte, un colonisateur, pour fonder sa planète mère**
+- 2026-10-31 12:40. Demande de Vincent : « Il faudrait que la partie commence quand tous les
+  joueurs presents soient pret, il faut aussi que les joueurs aient uniquenent une flotte avec un
+  colonisateur pour prendre leur premiere planete ».
+- Contexte : jusqu'ici, la course (et le froid, D-087) partait à la première installation d'un
+  joueur (`since`), et chaque joueur s'installait d'un toucher (`claimPlanet`, « S'installer »)
+  sur la planète de son choix, à l'instant.
+- Choix :
+  - **Prêt** : après sa race, chaque joueur se dit prêt (ordre `ready`, champ `ready` de sa
+    fiche) ; il peut revenir sur « plus prêt » tant que la partie n'est pas partie. Quand un
+    téléphone voit prêts tous les joueurs **présents** (lui, et ceux en ligne avec lui), il donne
+    le départ (ordre `begin`, champ `go`). Le départ est le plus petit `go` vu, partout le même ;
+    le froid compte depuis lui. Sans arbitre, comme la fin de partie (`over`).
+  - **Absent** : un joueur hors ligne ne bloque pas le départ ; à son retour, il se dit prêt et
+    entre tout de suite, avec sa flotte à cette heure-là (le froid, lui, a déjà avancé).
+  - **Flotte de départ** : un seul colonisateur de sa race, le plein fait, sans cargaison, sur un
+    cercle de 7 cases autour du soleil ; les joueurs prêts au départ y sont à égale distance les
+    uns des autres, jamais sur une planète. Aucune planète, aucun autre vaisseau.
+  - **Planète mère** : le colonisateur, envoyé sur une planète libre (pas un petit corps), la
+    fonde à son arrivée, avec les bâtiments et le stock de départ de sa race (comme
+    l'installation d'avant) ; le carburant restant est perdu, pour un départ égal. Le premier
+    arrivé l'emporte ; le perdant garde son colonisateur en orbite. Plus de colonisateur avant
+    d'avoir fondé sa planète : éliminé.
+  - `FORMAT` 9 : un téléphone d'avant compterait le départ autrement, il est prié de recharger.
+- Choix de Claude, par défaut : « présent » = en ligne avec mon téléphone ; rayon de 7 cases
+  (assez loin du soleil pour que le froid laisse ≈ 17 min de marge au départ, assez près pour
+  atteindre toute planète avec un plein) ; carburant restant perdu à la fondation ; un joueur
+  arrivé après le départ entre seul, sans attendre ; « S'installer » remplacé dans la fiche de
+  la planète par « Y envoyer mon colonisateur » ; `claimPlanet` gardé pour les parties d'avant
+  et les tests, mais refusé à un joueur qui a `ready`.
+- Alternatives écartées : un hôte qui lance la partie (il n'y a plus de maître du jeu, D-010) ;
+  attendre tous les joueurs de la partie, même hors ligne (un absent bloquerait tout le monde) ;
+  un compte à rebours après le dernier prêt ; cases de départ tirées au hasard (inégales) ;
+  ajouter le carburant restant au stock (avantage aux départs proches d'une planète) ; donner
+  aussi des cargos ou des chasseurs au départ (la demande dit « uniquement »).
+- Qui : Vincent (la demande), Claude (la forme). Source : session `012yisg3`.
+- Statut : en vigueur. 11 tests (`tests/start.test.mjs`), contrôlés par mutation. Vérifié dans
+  Chromium (390 × 844), seul et à deux avec une vraie invitation WebRTC. Équilibre des cases de
+  départ (une planète peut être plus proche de l'un que de l'autre) : **non confirmé**.
+
+**D-121 — Cache `astra-p2p-v66`**
+- 2026-10-31. Choix de Claude : `index.html`, `js/app.js`, `js/session.js` et `style.css`
+  changent (D-120) ; nouvelle version de cache pour que les téléphones les récupèrent.
+- Statut : en vigueur.
+
+**D-122 — Rapport de combat détaillé : le déroulé et le « pourquoi »**
+- 2026-10-31. Contexte : Vincent : « Il faut que les rapports de combat soient plus détaillés
+  et que l'on puisse comprendre pourquoi on a perdu ou gagné. » Le carnet (D-110) ne disait que
+  le résultat, les pertes de chaque camp et le butin.
+- Choix :
+  - `battle` (`js/fleet.js`) renvoie aussi `report` : pour chaque camp, les vaisseaux au départ,
+    les multiplicateurs de technologie (attaque, coque), le feu et la coque totaux, la défense de
+    la planète, la coque restante ; puis chaque passe (feu de chaque camp, pertes par type,
+    défense comprise). Le calcul du combat ne change pas.
+  - Le déroulé voyage dans le rapport que l'attaquant écrit pour le défenseur (`effects[].rep`) :
+    les deux carnets ont **le même** déroulé, chacun le lit de son côté (`side` : `'a'` ou
+    `'d'`). Nettoyé à la réception (`cleanReport`) comme toute donnée d'un autre téléphone ;
+    il ne sert qu'à l'affichage.
+  - Nouveau module pur `js/report.js` : `explainBattle(rep, side)` donne l'issue, une phrase
+    « pourquoi » (feu par passe contre coque, nombre de passes, part de la coque adverse
+    détruite), puis ce qui a pesé : rapport de forces feu × coque (et, en cas de défaite, à peu
+    près combien de vaisseaux armés il aurait fallu : racine du rapport, modèle de Lanchester,
+    **approché**), défense de la planète (part de la coque, tombée ou intacte), technologies,
+    vaisseaux sans armes qui prennent leur part des coups, absence de butin (pillage trop
+    récent, soutes pleines, rien à prendre) ; et une phrase par passe.
+  - Fenêtre Journal : sous chaque combat, la phrase « pourquoi » visible tout de suite ;
+    « Détail du combat » à déplier : ce qui a pesé, un tableau des forces de chaque camp
+    (vaisseau, nombre, ⚔, ◇, pertes ; défense « tient » ou « abattue »), les passes.
+- Choix de Claude, par défaut : le déroulé est stocké brut et expliqué à l'affichage (le texte
+  peut s'améliorer sans toucher aux sauvegardes) ; l'adversaire est nommé « l'adversaire »
+  dans les phrases ; les anciens combats du carnet, sans déroulé, restent affichés comme avant.
+- Alternatives écartées : que le défenseur recalcule le combat (il ne connaît pas la flotte
+  adverse ni ses technologies à l'heure du combat) ; envoyer le texte tout fait (plus lourd,
+  figé, et un pair pourrait y écrire n'importe quoi) ; une fenêtre à part pour chaque combat
+  (le carnet existe déjà) ; montrer les dégâts vaisseau par vaisseau (trop long sur téléphone).
+- Qui : Vincent (la demande), Claude (la forme). Source : session `012yisg3`.
+- Statut : en vigueur. 7 tests (`tests/report.test.mjs`), dont un contrôlé par mutation (rapport
+  envoyé sans déroulé). Vérifié dans Chromium (390 × 844) avec des combats injectés dans le
+  carnet. Justesse du conseil « il t'aurait fallu environ N fois plus » : **non confirmé**
+  (estimation, la défense d'une planète ne grandit pas avec la flotte).
+
+**D-123 — Cache `astra-p2p-v67`**
+- 2026-10-31. Choix de Claude : nouveau fichier `js/report.js` (ajouté à la liste du service
+  worker) et `js/app.js`, `js/fleet.js`, `js/session.js`, `style.css` changent (D-122).
+- Statut : en vigueur.
+
+**D-124 — Brouillard sur les planètes des autres, et souvenir de leur propriétaire**
+- 2026-10-31. Contexte : la détection (§8.6 des règles) ne cachait que les flottes ;
+  toutes les planètes des autres restaient visibles, avec leur propriétaire et leurs vaisseaux
+  à quai. Demande de Vincent : « on ne doit pas pouvoir voir la planète ennemie. Si on découvre
+  une planète ennemie dans notre champ de vision, on se rappelle à quel joueur elle appartient ».
+- Choix : hors de ma portée de détection, une planète des autres paraît libre (le corps céleste
+  reste dessiné : l'univers est le même pour tous) ; une planète mère hors de l'univers n'est pas
+  dessinée. Dans ma portée, je vois son vrai propriétaire et je le retiens (`intel`, propre au
+  téléphone, sauvegardé). Hors de portée ensuite : son propriétaire d'alors, en pâle, avec
+  « vue il y a … » ; pas son état (vaisseaux à quai, gisements actuels). Le souvenir ne change
+  qu'en la revoyant (prise entre-temps : on l'ignore). Mes planètes : toujours vues. Partie
+  finie : tout est révélé.
+- Choix de Claude, par défaut : souvenir local (comme le carnet de combats, D-110) plutôt que
+  dans ma fiche partagée ; découverte à chaque passage (`tick`) même carte fermée ; « Y envoyer
+  mon colonisateur » reste possible vers une planète qui paraît libre (c'est le jeu du
+  brouillard). Toujours un filtre d'affichage, pas un secret (la copie contient tout).
+- Alternatives écartées : cacher aussi le corps céleste (l'univers est déterministe, le cacher
+  n'apprendrait rien) ; un souvenir qui suit le propriétaire en direct (ce serait voir sans
+  voir) ; partager les découvertes entre joueurs (pas d'alliances).
+- Non traité : la fenêtre Joueurs montre toujours le nombre de planètes et de vaisseaux à quai
+  de chacun.
+- Qui : Vincent (la règle), Claude (la forme). Source : cette session.
+- Statut : en vigueur. 3 tests (`tests/fog.test.mjs`). Rendu dans le navigateur : non confirmé.
+
+**D-125 — Cache `astra-p2p-v68`**
+- 2026-10-31. Choix de Claude : `js/app.js`, `js/session.js`, `js/save.js` changent (D-124).
+- Statut : en vigueur.
+
+**D-126 — Viser sur la carte : aimant du doigt, menu au doigt, glisser une flotte vers sa cible**
+- 2026-10-31 15:15 (non confirmé). Demande de Vincent : « Améliore la sélection et l'utilisation des planètes
+  et des flottes dans la map. J'ai du mal des fois à déplacer les flottes vers l'endroit que je
+  veux et il faut souvent que je fasse plusieurs clics. Trouve un système plus naturel et plus
+  efficace. »
+- Constat (lecture du code) : à zoom 1, une case fait ~17 px ; la case visée était la case
+  arrondie sous le doigt (un toucher à côté d'une planète envoyait la flotte dans le vide) ;
+  flottes empilées : chaque toucher passait à la suivante, sans dire laquelle ; flotte
+  sélectionnée, toucher sa planète d'orbite pouvait reprendre une autre flotte au lieu de viser
+  la planète ; plusieurs ordres possibles : les boutons s'affichaient dans la fiche de la
+  flotte, **sous la grille des planètes et des flottes**, souvent hors de l'écran.
+- Choix :
+  1. **Aimant** (`js/aim.js`) : le doigt a une portée fixe à l'écran (18 px, au moins 0,6 case
+     zoomé) ; l'objet le plus proche (planète, une de mes flottes, flotte adverse vue) est visé,
+     plus la case arrondie.
+  2. **Pas de devinette** : si d'autres objets sont presque aussi près (moins de 12 px d'écart),
+     un **menu au doigt** s'ouvre sur la carte (« Lequel ? », « Que viser ? ») au lieu de
+     choisir au hasard ou de faire tourner les flottes une à une.
+  3. **Ordres au doigt** : plusieurs ordres possibles (se poser / orbite, attaquer / conquérir,
+     coloniser / orbite, ou panne en route) → le même menu, posé à côté du doigt, l'ordre
+     principal en premier et en couleur, plus « Fiche de … » pour voir la planète sans relâcher
+     la flotte. Un seul ordre sans risque (case vide, planète libre sans colonisateur) part
+     tout de suite, comme avant.
+  4. **Glisser pour envoyer** : appuyer sur une de mes flottes et glisser trace un trait
+     jusqu'à la cible (aimantée), l'ordre est écrit au-dessus du doigt ; lâcher envoie (ou
+     ouvre le menu s'il y a un choix). Lâcher sur la flotte elle-même : rien. Un glissé qui
+     commence ailleurs déplace la vue, comme avant (D-117).
+  5. Flotte sélectionnée : la retoucher la relâche ; toucher une autre de mes flottes la
+     choisit ; une flotte adverse → menu « Attaquer la flotte de … ».
+  6. **Autonomie dessinée** : losange jaune pointillé autour de la flotte sélectionnée, les
+     cases que son carburant atteint (distance |dx| + |dy|, comme les règles).
+  7. La fiche de la flotte sélectionnée remonte **juste sous la carte** (avant la grille).
+- Choix de Claude, par défaut : les seuils (18 px, 0,6 case, 12 px, 8 px pour un glissé) ;
+  toucher la carte pendant que le menu est ouvert le ferme sans rien envoyer (taper à côté pour
+  annuler ne doit pas envoyer la flotte) ; le menu se ferme quand la vue bouge (pas de menu
+  qui flotte loin de sa cible) ; lâcher une flotte traînée ne choisit jamais une autre de mes
+  flottes (on vise un endroit) ; sans flotte sélectionnée, les flottes adverses ne sont pas
+  des cibles.
+- Alternatives écartées : agrandir les objets (la carte est pleine à zoom 1) ; loupe sous le
+  doigt (cache ce qu'on vise, demande un appui long) ; envoyer d'office l'ordre principal en
+  lâchant (attaquer et conquérir ne se confondent pas, on demande) ; appui long pour la fiche
+  (lent, et peu découvrable sur un téléphone).
+- Qui : Vincent (la demande), Claude (le système). Source : session `012yisfzoyH`.
+- Statut : en vigueur. 8 tests (`tests/aim.test.mjs`). Vérifié dans Chromium (390 × 844,
+  toucher simulé) : toucher une planète libre avec le colonisateur → menu « Fonder / orbite /
+  fiche » ; toucher à côté → menu fermé, rien d'envoyé ; glisser le colonisateur jusqu'à la
+  planète → trait, libellé, menu, colonisation ; planète mère avec 3 flottes en orbite →
+  « Lequel ? » ; flotte choisie + case vide → départ direct ; flotte choisie + planète mère →
+  « Se poser / orbite / Choisir Flotte 2 / 3 » ; glisser depuis le vide zoomé → la vue bouge,
+  aucun ordre. Sur un vrai téléphone : **non confirmé**.
+
+**D-127 — Cache `astra-p2p-v69`**
+- 2026-10-31. Choix de Claude : `index.html`, `style.css`, `js/app.js` changent et
+  `js/aim.js` apparaît (ajouté à la liste du cache) (D-126).
+- Statut : en vigueur.
+
+**D-128 — Alerte quand une flotte ennemie arrive sur une de mes planètes**
 - 2026-10-30 14:10. Contexte : retour de 7 testeurs (point 1.3 de leur synthèse) : une conquête
   tombe sans préavis, le seul signal est un toast de 3,2 s à l'impact, et l'effectif des flottes
   ennemies ne se voit pas sur la carte. Demande : un bandeau rouge persistant avec compte à
@@ -1091,7 +1340,7 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   plus pressante (« 12 vaisseaux de Zorg sur Pollux dans 8 s », « … en orbite de Pollux »,
   « … en vue, à 3 cases de Pollux ») et « +N autres ». Un toucher montre la carte. Compte à
   rebours en secondes (les trajets durent 2 à 10 s). Sur la carte, le nombre de vaisseaux est
-  écrit à côté de chaque flotte adverse visible. Cache v64.
+  écrit à côté de chaque flotte adverse visible. Cache v70.
 - Choix de Claude, par défaut : la cible et l'ordre d'une flotte visible sont montrés (ils sont
   déjà dans la copie de la partie ; la carte, elle, ne montrait que la direction) ; une flotte
   arrivée dont le combat n'est pas encore réglé garde l'alerte à « en orbite » ; une flotte d'un
@@ -1102,9 +1351,9 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Qui : Vincent (demande), Claude (détails). Source : session `0cb6f324`. Statut : en vigueur.
 - Tests : `tests/threat.test.mjs`.
 
-**D-116 — Délai avant qu'une flotte en orbite frappe une case voisine**
+**D-129 — Délai avant qu'une flotte en orbite frappe une case voisine**
 - 2026-10-30 14:10. Contexte : même point 1.3 : depuis l'orbite, une conquête de la case voisine
   prend 2 à 3 s (plancher `MIN_TRIP` de 2 s). La synthèse le met « à discuter ».
-- Choix : **rien n'est changé pour l'instant**. Question posée à Vincent ; l'alerte de D-115
+- Choix : **rien n'est changé pour l'instant**. Question posée à Vincent ; l'alerte de D-128
   laisse déjà voir les flottes en orbite proches (« en vue, à 1 case »).
 - Qui : en attente de Vincent. Source : session `0cb6f324`. Statut : ouvert, non tranché.

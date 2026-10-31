@@ -38,5 +38,32 @@ export function newGame(n = 2, races = []) {
   return { players, clock, sync };
 }
 
+/**
+ * Partie d'aujourd'hui (D-120) : `n` joueurs qui ont choisi leur race, tous en ligne les uns avec
+ * les autres, mais ni prêts ni installés. Même retour que newGame ; `online` (Set des pid en
+ * ligne, tous au départ) se modifie pour simuler un joueur absent.
+ */
+export function newLobby(n = 2, races = []) {
+  const clock = { t: 10_000_000 };
+  const online = new Set(Array.from({ length: n }, (_, i) => `p${i}`));
+  const players = [];
+  for (let i = 0; i < n; i++) {
+    const s = new Session(`J${i}`);
+    Object.assign(s, { now: () => clock.t, start() {}, meet() {}, me: `p${i}`, status: 'playing' });
+    s.online = (pid) => pid === s.me || online.has(pid);
+    s.state = { gid: 'gtest', key: 'k', players: {}, log: [] };
+    s.addPlayer(s.me, s.name, 'x'.repeat(64));
+    s.chooseRace(races[i] || RACES[i % 3]);
+    players.push(s);
+    clock.t += 1;
+  }
+  const sync = (a, b) => {
+    a.mergeIn(b.snapshot(), { pid: b.me });
+    a.refreshOnline();
+  };
+  for (const a of players) for (const b of players) if (a !== b) sync(a, b);
+  return { players, clock, sync, online };
+}
+
 /** Copie profonde (une planète « avant » à comparer avec « après »). */
 export const clone = (x) => JSON.parse(JSON.stringify(x));

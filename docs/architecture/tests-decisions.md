@@ -1,7 +1,8 @@
 # Tests et décisions
 
 Pour chaque décision de [decisions.md](../decisions.md), le test qui la protège, ou la raison
-pour laquelle il n'y en a pas (voir D-082). État au 2026-10-30 : `node --test tests/*.test.mjs` →
+pour laquelle il n'y en a pas (voir D-082). État au 2026-10-31 : `node --test tests/*.test.mjs` →
+165 tests, 165 réussis (avec le départ commun et le colonisateur, D-120, dans `tests/start.test.mjs`). Au 2026-10-30 :
 154 tests, 153 réussis (avec la recherche en colonie, D-098, le coût en nourriture, D-099, le comportement en voyage, D-100, la vitesse de flotte, D-101, les points d'avant la chute, D-102 à D-104, le fil de construction, D-105, le chantier sur la carte, D-106, les rencontres hors ligne, D-109, le carnet de combats, D-110, les alertes de famine, D-111, et le réglage « Fond », D-112).
 
 - **nouveau test** : ajouté le 2026-10-29 dans `tests/decisions-planete.test.mjs` (24),
@@ -142,5 +143,16 @@ que fait le code.
 | D-112 | Réglage « Fond » : animé, fixe ou aucun | nouveau test | `decisions-reseau.test.mjs` D-112 : réglage « Fond » — fixe = une image sans capteurs, aucun = pas d’étoiles | les listes de l'interface (DOM) et le coût réel : non testés |
 | D-113 | Cache v63 | non testable |  | version de cache |
 | D-114 | Une fenêtre « Réglages », ouverte par une roue crantée | test existant | `decisions-reseau.test.mjs` D-064 : chaque icône de la page existe, et un bouton sans texte porte un nom | la fenêtre et son ouverture (DOM) : vérifiées dans le navigateur seulement |
-| D-115 | Alerte de flotte ennemie (bandeau et effectif sur la carte) | nouveau test | `threat.test.mjs` une flotte armée qui vise ma planète : alerte avec compte à rebours<br>`threat.test.mjs` une flotte armée visible qui ne vise rien : signalée, sans compte à rebours, après les menaces directes<br>`threat.test.mjs` pas d’alerte pour une flotte sans armes, hors de vue, ou à moi | le bandeau et les chiffres sur la carte sont vérifiés dans le navigateur |
-| D-116 | Délai avant une frappe depuis l'orbite | non testable |  | ouvert, rien n'est codé |
+| D-115 | Mes planètes dans la grille sous la carte, avec Construire et Décoller | test existant | `rules.test.mjs` D-106 : le plus grand lot de vaisseaux suit le stock, et le chantier l’accepte (le lot que propose la fiche) | les cases et leurs boutons (construits par `app.js`, DOM) : vérifiés dans le navigateur seulement |
+| D-116 | Cache v64 | non testable |  | version de cache |
+| D-117 | Carte zoomable | test existant | `decisions-reseau.test.mjs` D-064 : chaque icône de la page existe, et un bouton sans texte porte un nom (boutons +, −, vue entière) | les gestes et la conversion du toucher (DOM, canvas) : vérifiés dans le navigateur seulement |
+| D-118 | Curseur du temps dans le replay | non testable |  | `replay-view.js` dépend du DOM : glissé, reprise de la lecture et flèches vérifiés dans le navigateur seulement |
+| D-119 | Cache v65 | non testable |  | version de cache |
+| D-122 | Rapport de combat détaillé | nouveau test | `report.test.mjs` (7 tests : déroulé cohérent avec les pertes, explication des deux côtés, défense / technologies / cargos / indécis, sans armes et sans butin, déroulé trafiqué, même déroulé dans les deux carnets, seconde attaque trop tôt) | contrôle par mutation : rapport envoyé sans déroulé → 1 test échoue ; la fenêtre Journal (DOM) : vérifiée dans le navigateur seulement |
+| D-123 | Cache v67 | non testable |  | version de cache |
+| D-120 | Départ quand tous les joueurs présents sont prêts ; une seule flotte avec un colonisateur pour fonder la planète mère | nouveau test | `start.test.mjs` (11 tests, tous préfixés D-120) | Bandeau et boutons (`#pick`, `#btn-ready`, `#btn-claim`) : navigateur seulement, vérifiés dans Chromium |
+| D-121 | Cache `astra-p2p-v66` | non testable |  | version du service worker |
+| D-126 | Viser sur la carte : aimant du doigt, menu au doigt, glisser une flotte vers sa cible | nouveau test | `aim.test.mjs` (8 tests, tous préfixés D-126 : taille du doigt, flotte en orbite et planète à égalité puis départagées au zoom, flottes adverses, flotte sélectionnée, flotte lâchée, flottes empilées, place du menu) | le geste de glisser, le dessin de la visée et le menu (DOM, canvas) : vérifiés dans Chromium seulement |
+| D-127 | Cache `astra-p2p-v69` | non testable |  | version du service worker |
+| D-128 | Alerte de flotte ennemie (bandeau et effectif sur la carte) | nouveau test | `threat.test.mjs` une flotte armée qui vise ma planète : alerte avec compte à rebours<br>`threat.test.mjs` une flotte armée visible qui ne vise rien : signalée, sans compte à rebours, après les menaces directes<br>`threat.test.mjs` pas d’alerte pour une flotte sans armes, hors de vue, ou à moi | le bandeau et les chiffres sur la carte sont vérifiés dans le navigateur |
+| D-129 | Délai avant une frappe depuis l'orbite | non testable |  | ouvert, rien n'est codé |
