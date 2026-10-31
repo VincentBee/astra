@@ -508,7 +508,11 @@ Une flotte qui attend la réponse à un échange est **bloquée** (`locked`,
 
 - Il faut une flotte armée. Deux ordres : `attack` (piller) et `conquer` (prendre la planète,
   D-092) ; `ordersAt` propose les deux sur une planète adverse, avec la défense affichée
-  (« Conquérir Hadar · défense ⚔ 8 ◇ 80 »).
+  (« Conquérir Hadar · défense ⚔ 8 ◇ 80 + 3 vaisseaux posés · victoire probable »). Les vaisseaux
+  posés ne sont comptés que dans ma détection (`seesCell`), sinon « ? ». L'estimation
+  (`assaultView`, D-128) joue `battle` à l'heure présente avec ce que je vois : « bataille
+  perdue » si perdu, « victoire incertaine » si gagné sans voir les vaisseaux ou en perdant plus de
+  la moitié de la flotte, sinon « victoire probable ».
 - À l'arrivée (`arrive`), le défenseur = **les vaisseaux posés sur la planète** à l'heure
   d'arrivée (`def.ships`) **et la défense de la planète** (`fortOf`, D-093, D-095), qui se bat
   comme un seul gros vaisseau (champ `fort` de `battle`, qui l'ajoute aux vaisseaux du camp et
@@ -860,7 +864,7 @@ Résultat : `tests 34, pass 34, fail 0`, environ 5,6 s (le rejeu d'une partie de
 
 | Fichier | Tests | Ce qui est vérifié |
 |---|---|---|
-| `tests/end.test.mjs` | 10 | Score de tout l'empire ; le froid prend d'abord le bord ; planète mère gelée remplacée par la colonie la plus vieille, puis élimination ; à deux, le dernier en vie gagne même si l'autre est hors ligne, la fin se propage et bloque les ordres ; défense par race (`fortOf`) ; conquête qui élimine ; tourelles qui repoussent 3 frégates sans pillage ; colonisateur seul ou ordre « attaquer » ne prennent rien ; partie d'avant la course sans froid |
+| `tests/end.test.mjs` | 13 | Score de tout l'empire ; le froid prend d'abord le bord ; planète mère gelée remplacée par la colonie la plus vieille, puis élimination ; à deux, le dernier en vie gagne même si l'autre est hors ligne, la fin se propage et bloque les ordres ; défense par race (`fortOf`) ; conquête qui élimine ; tourelles qui repoussent 3 frégates sans pillage ; colonisateur seul ou ordre « attaquer » ne prennent rien ; partie d'avant la course sans froid ; « Attaquer » et « Conquérir » : vaisseaux posés, « ? » hors détection, estimation du combat |
 | `tests/rules.test.mjs` | 11 | Déconstruire (moitié du prix rendue, place libérée à la fin) ; heure qui recule puis revient : pas de double production ; longue absence ≈ passages toutes les heures (population à moins de 2 %) ; arrachement refusé sans payer ; clés héritées (`constructor`, `__proto__`) refusées ; effectifs négatifs ou fractionnaires au combat ; soleil au centre et sans planète ; climat et production ; une place par niveau ; places lues sur la carte ; une colonie humaine sur le plus petit corps garde des places |
 | `tests/combat.test.mjs` | 4 | Attaques contre une planète : pas de butin créé avec un défenseur hors ligne ou plusieurs flottes arrivées ensemble ; 70 attaques avant le retour du défenseur ; les vaisseaux perdus emportent leur cargaison |
 | `tests/effects.test.mjs` | 1 | 5 joueurs, 4 attaquants × 70 combats : chaque perte subie une fois, puis rapports oubliés des deux côtés |

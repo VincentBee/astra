@@ -126,6 +126,51 @@ test('un colonisateur ne prend pas une planète habitée, une attaque pille sans
   assert.equal(raid.A.ownerAt(raid.cell)?.id, raid.B.me, 'l’ordre « attaquer » ne prend pas la planète');
 });
 
+/** A a une flotte en orbite sur la planète mère de B, qui a `docked` posés et `defense` en bâtiments. */
+function facing(ships, docked = {}, defense = {}) {
+  const g = newGame(2, ['human', 'machine']);
+  const { players: [A, B], sync } = g;
+  const cell = { ...me(B).home };
+  Object.assign(me(B).planet.levels, defense);
+  me(B).planet.ships = { ...docked };
+  B.touch();
+  sync(A, B);
+  me(A).planet.ships = { ...ships };
+  const id = A.takeOff('home', { ...ships }, {}, 0);
+  Object.assign(A.myFleet(id), { from: { ...cell }, to: { ...cell }, fuel: 1000 });
+  return { A, B, cell, id };
+}
+
+test('« Attaquer » et « Conquérir » comptent les vaisseaux posés et estiment le combat', () => {
+  const { A, cell, id } = facing({ fighter: 3 }, { fighter: 7, heavy: 9 });
+  const orders = A.ordersAt(id, cell);
+  for (const kind of ['attack', 'conquer']) {
+    const o = orders.find((x) => x.kind === kind);
+    assert.match(o.label, /défense ⚔ \d+ ◇ \d+ \+ 16 vaisseaux posés/, kind);
+    assert.equal(o.odds, 'lose', `${kind} : 3 vaisseaux contre 16, perdu d’avance`);
+    assert.match(o.label, /bataille perdue/);
+  }
+});
+
+test('la même planète sans vaisseaux posés : victoire probable', () => {
+  const { A, cell, id } = facing({ fighter: 30 });
+  const o = A.ordersAt(id, cell).find((x) => x.kind === 'conquer');
+  assert.equal(o.odds, 'win');
+  assert.match(o.label, /\+ 0 vaisseau posé · victoire probable/);
+});
+
+test('hors de ma détection : vaisseaux posés inconnus, victoire au mieux incertaine', () => {
+  const { A, cell, id } = facing({ fighter: 30 }, { fighter: 7 });
+  A.eyes = () => [];
+  const o = A.ordersAt(id, cell).find((x) => x.kind === 'conquer');
+  assert.match(o.label, /\+ \? vaisseaux · victoire incertaine/);
+  assert.equal(o.odds, 'unsure');
+  // Même sans voir les vaisseaux, la défense seule suffit à dire « perdu ».
+  const weak = facing({ fighter: 1 }, {}, { turret: 3 });
+  weak.A.eyes = () => [];
+  assert.equal(weak.A.ordersAt(weak.id, weak.cell).find((x) => x.kind === 'attack').odds, 'lose');
+});
+
 test('une partie d’avant la course n’a ni froid ni fin', () => {
   frost();
   const { players: [A], clock } = newGame(1, ['human']);
