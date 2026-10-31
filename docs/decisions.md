@@ -1242,3 +1242,31 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - 2026-10-31. Choix de Claude : nouveau fichier `js/report.js` (ajouté à la liste du service
   worker) et `js/app.js`, `js/fleet.js`, `js/session.js`, `style.css` changent (D-122).
 - Statut : en vigueur.
+
+**D-124 — Brouillard sur les planètes des autres, et souvenir de leur propriétaire**
+- 2026-10-31. Contexte : la détection (§8.6 des règles) ne cachait que les flottes ;
+  toutes les planètes des autres restaient visibles, avec leur propriétaire et leurs vaisseaux
+  à quai. Demande de Vincent : « on ne doit pas pouvoir voir la planète ennemie. Si on découvre
+  une planète ennemie dans notre champ de vision, on se rappelle à quel joueur elle appartient ».
+- Choix : hors de ma portée de détection, une planète des autres paraît libre (le corps céleste
+  reste dessiné : l'univers est le même pour tous) ; une planète mère hors de l'univers n'est pas
+  dessinée. Dans ma portée, je vois son vrai propriétaire et je le retiens (`intel`, propre au
+  téléphone, sauvegardé). Hors de portée ensuite : son propriétaire d'alors, en pâle, avec
+  « vue il y a … » ; pas son état (vaisseaux à quai, gisements actuels). Le souvenir ne change
+  qu'en la revoyant (prise entre-temps : on l'ignore). Mes planètes : toujours vues. Partie
+  finie : tout est révélé.
+- Choix de Claude, par défaut : souvenir local (comme le carnet de combats, D-110) plutôt que
+  dans ma fiche partagée ; découverte à chaque passage (`tick`) même carte fermée ; « Y envoyer
+  mon colonisateur » reste possible vers une planète qui paraît libre (c'est le jeu du
+  brouillard). Toujours un filtre d'affichage, pas un secret (la copie contient tout).
+- Alternatives écartées : cacher aussi le corps céleste (l'univers est déterministe, le cacher
+  n'apprendrait rien) ; un souvenir qui suit le propriétaire en direct (ce serait voir sans
+  voir) ; partager les découvertes entre joueurs (pas d'alliances).
+- Non traité : la fenêtre Joueurs montre toujours le nombre de planètes et de vaisseaux à quai
+  de chacun.
+- Qui : Vincent (la règle), Claude (la forme). Source : cette session.
+- Statut : en vigueur. 3 tests (`tests/fog.test.mjs`). Rendu dans le navigateur : non confirmé.
+
+**D-125 — Cache `astra-p2p-v68`**
+- 2026-10-31. Choix de Claude : `js/app.js`, `js/session.js`, `js/save.js` changent (D-124).
+- Statut : en vigueur.

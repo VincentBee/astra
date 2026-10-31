@@ -213,6 +213,11 @@ Retour de la session vers l'interface : seulement deux rappels, `session.onchang
   5. flottes (`fleetSpots`, 1546-1566) : triangle orienté ; en route, pointillés jusqu'à la destination ; à l'arrêt, posées en couronne autour du centre de la case ; rouge `#ff7a93` si attaque ou poursuite ; cercle blanc = ma flotte sélectionnée, cercle rouge = proie visée ; croix rouge au point de panne ; jauge de carburant sous mes flottes ; flotte à sec grisée ;
   6. case visée en attente d'un choix : carré blanc qui pulse (1528-1535).
 - Seules les flottes que je vois (`session.sees`, portée de détection) sont dessinées (1552).
+- Planètes des autres (D-124) : `mapPlanets` passe par `session.knownOwner`. Jamais vue = dessinée
+  libre ; planète mère hors de l'univers jamais vue = pas dessinée du tout ; vue autrefois =
+  souvenir : couleur et nom de son propriétaire d'alors, pâles, anneau en pointillés, sans son
+  état (`pl` nul). La fiche dit « vue il y a … , hors de portée » (`seenAgo`) et ne montre que ce
+  que tout le monde sait de l'univers (gisements de départ, climat, places).
 - Coordonnées de ma planète mère dans `#my-coords`, ou « à choisir » (1537).
 
 ### 6.2 Toucher (`js/app.js:1573-1640`)
