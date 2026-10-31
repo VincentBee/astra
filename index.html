@@ -122,7 +122,7 @@
       </div>
       <div id="trades" class="trades" hidden></div>
       <div class="map-head">
-        <span><i data-ic="planet"></i> <strong id="my-coords" class="mono"></strong> <span class="help-wrap"><button id="btn-map-help" class="ghost help-btn" aria-expanded="false" aria-describedby="map-help" aria-label="Aide de la carte">?</button><span id="map-help" role="tooltip" class="tooltip">Touche une planète pour voir ses gisements, la tienne pour ouvrir ses bâtiments, une de tes flottes (triangle, ou sa case sous la carte) pour la piloter. Sous la carte, chaque planète a aussi sa case : construire des vaisseaux, faire décoller ceux à quai. Zoom : pince la carte (ou molette, ou boutons + et −), glisse pour te déplacer. Planètes en pointillés : libres. Halo : ta portée de détection ; les flottes adverses n’apparaissent que dedans.</span></span></span>
+        <span><i data-ic="planet"></i> <strong id="my-coords" class="mono"></strong> <span class="help-wrap"><button id="btn-map-help" class="ghost help-btn" aria-expanded="false" aria-describedby="map-help" aria-label="Aide de la carte">?</button><span id="map-help" role="tooltip" class="tooltip">Touche une planète pour voir ses gisements, la tienne pour ouvrir ses bâtiments, une de tes flottes (triangle, ou sa case sous la carte) pour la piloter : touche ensuite sa cible, ou traîne directement la flotte jusqu’à elle et lâche. Plusieurs ordres possibles, ou plusieurs objets sous le doigt : un petit menu s’ouvre au doigt. Retoucher la flotte la relâche. Losange jaune : ce que son carburant lui permet d’atteindre. Sous la carte, chaque planète a aussi sa case : construire des vaisseaux, faire décoller ceux à quai. Zoom : pince la carte (ou molette, ou boutons + et −), glisse pour te déplacer. Planètes en pointillés : libres. Halo : ta portée de détection ; les flottes adverses n’apparaissent que dedans.</span></span></span>
         <span class="pi-head-right"></span>
       </div>
       <div class="map-wrap"><canvas id="map" aria-label="Carte de l'univers : touche une planète"></canvas>
@@ -131,7 +131,27 @@
           <button id="btn-zoom-out" class="secondary small icon-only" title="Dézoomer" aria-label="Dézoomer"><i data-ic="minus"></i></button>
           <button id="btn-zoom-fit" class="secondary small icon-only" title="Voir toute la carte" aria-label="Voir toute la carte" hidden><i data-ic="fit"></i></button>
         </div>
+        <!-- Menu au doigt (D-126) : choisir l'ordre, ou l'objet visé quand plusieurs sont sous le doigt -->
+        <div id="map-menu" class="map-menu" role="menu" aria-label="Que faire ici ?" hidden></div>
       </div>
+      <!-- Fiche de la flotte sélectionnée : juste sous la carte, pour la voir en la pilotant -->
+      <article id="fleet-info" class="card planet-info" hidden>
+        <div class="b-head"><h4 id="fi-name">Flotte</h4><span id="fi-where" class="level mono"></span></div>
+        <p id="fi-ships" class="b-desc"></p>
+        <p id="fi-status" class="hint mono"></p>
+        <div class="fi-fuel"><span id="fi-fuel" class="hint mono"></span><div class="bar"><div id="fi-fuel-bar" class="bar-fill"></div></div></div>
+        <div id="fi-beside" class="fi-beside" hidden></div>
+        <div id="fi-partners" class="fi-beside" hidden></div>
+        <div class="fi-actions">
+          <button id="btn-fi-stop" class="secondary small icon-only" title="Arrêter la flotte" aria-label="Arrêter la flotte"><i data-ic="stop"></i></button>
+          <button id="btn-fi-return" class="secondary small icon-only" title="Rentrer à la planète mère" aria-label="Rentrer à la planète mère"><i data-ic="home"></i></button>
+          <button id="btn-fi-dock" class="secondary small icon-only" title="Se poser sur la planète" aria-label="Se poser sur la planète"><i data-ic="dock"></i></button>
+          <button id="btn-fi-refuel" class="secondary small icon-only" title="Faire le plein de carburant" aria-label="Faire le plein de carburant"><i data-ic="fuel"></i></button>
+          <button id="btn-fi-stance" class="secondary small icon-only" title="Passive : ne combat que sur ordre. Toucher pour la rendre agressive" aria-label="Comportement en voyage" aria-pressed="false"><i data-ic="attack"></i></button>
+          <button id="btn-fi-split" class="secondary small icon-only" title="Scinder la flotte" aria-label="Scinder la flotte"><i data-ic="split"></i></button>
+          <button id="btn-fi-close" class="ghost small icon-only" title="Fermer" aria-label="Fermer"><i data-ic="close"></i></button>
+        </div>
+      </article>
       <!-- Mes planètes (construire, décoller) puis mes flottes (un toucher la sélectionne pour lui donner un ordre) -->
       <div id="map-fleets" class="map-fleets" role="group" aria-label="Mes planètes et mes flottes" hidden></div>
 
@@ -157,24 +177,6 @@
         </article>
       </div>
 
-      <article id="fleet-info" class="card planet-info" hidden>
-        <div class="b-head"><h4 id="fi-name">Flotte</h4><span id="fi-where" class="level mono"></span></div>
-        <p id="fi-ships" class="b-desc"></p>
-        <p id="fi-status" class="hint mono"></p>
-        <div class="fi-fuel"><span id="fi-fuel" class="hint mono"></span><div class="bar"><div id="fi-fuel-bar" class="bar-fill"></div></div></div>
-        <div id="fi-choice" class="fi-actions" hidden></div>
-        <div id="fi-beside" class="fi-beside" hidden></div>
-        <div id="fi-partners" class="fi-beside" hidden></div>
-        <div class="fi-actions">
-          <button id="btn-fi-stop" class="secondary small icon-only" title="Arrêter la flotte" aria-label="Arrêter la flotte"><i data-ic="stop"></i></button>
-          <button id="btn-fi-return" class="secondary small icon-only" title="Rentrer à la planète mère" aria-label="Rentrer à la planète mère"><i data-ic="home"></i></button>
-          <button id="btn-fi-dock" class="secondary small icon-only" title="Se poser sur la planète" aria-label="Se poser sur la planète"><i data-ic="dock"></i></button>
-          <button id="btn-fi-refuel" class="secondary small icon-only" title="Faire le plein de carburant" aria-label="Faire le plein de carburant"><i data-ic="fuel"></i></button>
-          <button id="btn-fi-stance" class="secondary small icon-only" title="Passive : ne combat que sur ordre. Toucher pour la rendre agressive" aria-label="Comportement en voyage" aria-pressed="false"><i data-ic="attack"></i></button>
-          <button id="btn-fi-split" class="secondary small icon-only" title="Scinder la flotte" aria-label="Scinder la flotte"><i data-ic="split"></i></button>
-          <button id="btn-fi-close" class="ghost small icon-only" title="Fermer" aria-label="Fermer"><i data-ic="close"></i></button>
-        </div>
-              </article>
 
 
     </section>

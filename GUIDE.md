@@ -284,7 +284,7 @@ Avec les deux pouvoirs à chaque recharge.
 
 ## Flottes et voyage
 
-Une flotte se pilote comme une unité : on la fait décoller, on touche une case pour l’y envoyer, on peut l’arrêter, la faire rentrer, la poser. Elle brûle son carburant (de l’énergie) à chaque case.
+Une flotte se pilote comme une unité : on la fait décoller, on touche une case pour l’y envoyer (ou on traîne la flotte jusqu’à sa cible ; s’il y a un choix, un petit menu s’ouvre au doigt), on peut l’arrêter, la faire rentrer, la poser. Elle brûle son carburant (de l’énergie) à chaque case.
 
 ### Par race
 

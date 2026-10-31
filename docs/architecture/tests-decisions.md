@@ -152,3 +152,5 @@ que fait le code.
 | D-123 | Cache v67 | non testable |  | version de cache |
 | D-120 | Départ quand tous les joueurs présents sont prêts ; une seule flotte avec un colonisateur pour fonder la planète mère | nouveau test | `start.test.mjs` (11 tests, tous préfixés D-120) | Bandeau et boutons (`#pick`, `#btn-ready`, `#btn-claim`) : navigateur seulement, vérifiés dans Chromium |
 | D-121 | Cache `astra-p2p-v66` | non testable |  | version du service worker |
+| D-126 | Viser sur la carte : aimant du doigt, menu au doigt, glisser une flotte vers sa cible | nouveau test | `aim.test.mjs` (8 tests, tous préfixés D-126 : taille du doigt, flotte en orbite et planète à égalité puis départagées au zoom, flottes adverses, flotte sélectionnée, flotte lâchée, flottes empilées, place du menu) | le geste de glisser, le dessin de la visée et le menu (DOM, canvas) : vérifiés dans Chromium seulement |
+| D-127 | Cache `astra-p2p-v69` | non testable |  | version du service worker |

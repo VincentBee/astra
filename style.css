@@ -406,6 +406,15 @@ button.close-btn svg { width: 18px; height: 18px; }
 .map-zoom button { width: 36px; min-height: 36px; padding: 0; background: rgba(10, 14, 28, 0.82); }
 .map-zoom button:disabled { opacity: 0.35; }
 .map-zoom .ic { width: 16px; height: 16px; }
+/* Menu au doigt (D-126) : posé à côté du point touché, par-dessus la carte. */
+.map-menu {
+  position: absolute; z-index: 5; display: grid; gap: 6px; width: max-content; max-width: min(280px, calc(100% - 16px));
+  padding: 8px; background: rgba(10, 14, 28, 0.96); border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.map-menu[hidden] { display: none; }
+.mm-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font: 0.75rem var(--mono); color: var(--muted); }
+.mm-head button { min-height: 28px; width: 28px; padding: 0; }
+.map-menu [data-mm] { justify-content: flex-start; text-align: left; min-height: 40px; }
 
 
 /* ----- Feuille d'invitation ----- */
