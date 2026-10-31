@@ -1675,18 +1675,32 @@ $('btn-open-planet').onclick = (e) => {
  * planète (placées hors de la liste).
  */
 function mapPlanets() {
+  // Brouillard (D-124) : hors de ma portée, une planète des autres paraît libre, ou porte le nom
+  // de celui qui la tenait la dernière fois que je l'ai vue (`seen` : pas de nouvelles fraîches).
+  const now = session.now();
+  const eyes = session.eyes(now);
   const out = session.planets.map((w) => {
-    const owner = session.ownerAt(w);
-    // `pl` : la planète du propriétaire à cet endroit (mère ou colonie), avec sa clé.
-    const pl = owner && session.planetsOf(owner).find((x) => sameCell(x.cell, w));
-    return { ...w, owner: pl ? owner : null, pl: pl || null };
+    const k = session.knownOwner(w, now, eyes);
+    const owner = k.owner;
+    // `pl` : la planète du propriétaire à cet endroit (mère ou colonie), avec sa clé ; vue seulement en direct.
+    const pl = owner && k.live ? session.planetsOf(owner).find((x) => sameCell(x.cell, w)) : null;
+    return { ...w, owner: owner && (pl || !k.live) ? owner : null, pl: pl || null, live: k.live, seen: k.at };
   });
   for (const p of Object.values(session.state.players)) {
     if (p.home && p.planet && !out.some((w) => sameCell(w, p.home))) {
-      out.push({ id: `home-${p.id}`, name: `Planète ${de(p.name)}`, x: p.home.x, y: p.home.y, owner: p, nature: null, pl: session.planetOf(p, 'home') });
+      const k = session.knownOwner(p.home, now, eyes);
+      if (k.owner?.id !== p.id) continue; // jamais vue : on ne sait même pas qu'elle existe
+      out.push({ id: `home-${p.id}`, name: `Planète ${de(p.name)}`, x: p.home.x, y: p.home.y, owner: p, nature: null, pl: k.live ? session.planetOf(p, 'home') : null, live: k.live, seen: k.at });
     }
   }
   return out;
+}
+
+/** « vue il y a 12 min » : depuis quand je n'ai plus de nouvelles d'une planète (D-124). */
+function seenAgo(ms) {
+  const min = Math.max(0, Math.round(ms / 60000));
+  if (min < 1) return 'vue à l’instant';
+  return `vue il y a ${min < 60 ? `${min} min` : `${Math.floor(min / 60)} h${min % 60 ? ` ${String(min % 60).padStart(2, '0')}` : ''}`}`;
 }
 
 /** « de Beta », « d'Alpha ». */
@@ -1831,7 +1845,8 @@ function drawMap() {
     const o = w.owner;
     const mine = o?.id === session.me;
     // Planète libre : grise, plus lumineuse quand on cherche où s'installer. Gelée : presque effacée.
-    ctx.globalAlpha = session.frostOf(w) <= session.now() ? 0.15 : o ? (o.online ? 1 : 0.45) : picking && w.kind === 'planet' ? 0.55 + 0.35 * pulse : 0.6;
+    const memo = o && !w.live; // souvenir (D-124) : propriétaire vu la dernière fois, plus en vue
+    ctx.globalAlpha = session.frostOf(w) <= session.now() ? 0.15 : memo ? 0.4 : o ? (o.online ? 1 : 0.45) : picking && w.kind === 'planet' ? 0.55 + 0.35 * pulse : 0.6;
     const color = o ? o.color : '#8d95b3';
     ctx.fillStyle = color;
     if (w.kind === 'asteroid' || w.kind === 'comet') {
@@ -1852,7 +1867,7 @@ function drawMap() {
     ctx.fill();
     ctx.strokeStyle = color;
     ctx.lineWidth = Math.max(1, cell * 0.06);
-    if (!o) ctx.setLineDash([cell * 0.12, cell * 0.1]);
+    if (!o || memo) ctx.setLineDash([cell * 0.12, cell * 0.1]);
     ctx.beginPath();
     ctx.ellipse(cx, cy, cell * 0.42, cell * 0.14, -0.35, 0, Math.PI * 2);
     ctx.stroke();
@@ -1867,7 +1882,7 @@ function drawMap() {
     }
     // Nom du propriétaire au-dessus
     if (o) {
-      ctx.globalAlpha = o.online ? 1 : 0.6;
+      ctx.globalAlpha = memo ? 0.5 : o.online ? 1 : 0.6;
       ctx.font = `600 ${Math.max(9 * dpr, cell * 0.36)}px system-ui, sans-serif`;
       ctx.textAlign = 'center';
       ctx.fillStyle = mine ? '#ffffff' : 'rgba(232,235,247,0.8)';
@@ -2614,13 +2629,17 @@ function renderPick(me = session?.state?.players[session.me], now = session?.now
   $('pi-where').textContent = `[${w.x}:${w.y}]`;
   $('pi-owner').textContent = o
     ? `${o.id === session.me ? `${w.kind === 'asteroid' ? 'Ton' : 'Ta'} ${kindLabel(w.kind).toLowerCase()}` : `${kindLabel(w.kind)} ${de(o.name)}`}${o.race ? ` · ${RACES[o.race].name}` : ''}`
-    : `${kindLabel(w.kind)} libre. Ses gisements se vident quand on les exploite, et se reconstituent d’eux-mêmes jusqu’à leur maximum.`;
+    : w.live || session.over
+      ? `${kindLabel(w.kind)} libre. Ses gisements se vident quand on les exploite, et se reconstituent d’eux-mêmes jusqu’à leur maximum.`
+      : `${kindLabel(w.kind)} hors de ta portée de détection : libre la dernière fois qu’on l’a vue, ou jamais vue.`;
+  if (o && !w.live) $('pi-owner').textContent += ` · ${seenAgo(now - w.seen)}, hors de portée`;
   // Gisements : pleins pour une planète libre, calculés chez son propriétaire sinon.
   const planet = w.pl?.planet;
   const s = planet ? stateAt(planet, now) : null;
-  const nature = o ? planet?.nature : w.nature;
-  showClimate($('pi-climate'), o ? planet?.climate : w.climate);
-  const places = o ? planet?.places : w.places;
+  // Hors de portée (D-124) : seulement ce que tout le monde sait de l'univers, pas son état chez son propriétaire.
+  const nature = planet ? planet.nature : w.nature;
+  showClimate($('pi-climate'), planet ? planet.climate : w.climate);
+  const places = planet ? planet.places : w.places;
   $('pi-size').hidden = !places;
   $('pi-size').textContent = places
     ? `${kindLabel(w.kind)} · ${planet ? `${usedPlaces(stateAt(planet, now).levels)} / ${places}` : places} places${!o && w.kind !== 'planet' ? ' · à coloniser' : ''}`

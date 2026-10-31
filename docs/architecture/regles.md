@@ -471,6 +471,13 @@ Une flotte qui attend la réponse à un échange est **bloquée** (`locked`,
   visible (`js/session.js:1088`), on perd la poursuite si la cible sort de vue
   (`js/session.js:1114-1119`), et on ne peut échanger qu'avec une flotte visible
   (`js/session.js:1228`).
+- **Brouillard sur les planètes** (D-124) : `knownOwner(cell)` dit ce que je sais d'une case.
+  Mes planètes : toujours vues. Une case dans ma portée (`seesCell`) : son vrai propriétaire,
+  retenu dans `intel` ({ "x,y": { pid, at } }), propre à ce téléphone, sauvegardé avec la
+  partie (`saveGame(…, intel)`), jamais envoyé aux autres. Hors de portée : le propriétaire vu
+  la dernière fois (même s'il l'a perdue depuis), ou rien (elle paraît libre). Vue libre :
+  le souvenir s'efface. `scout` passe toutes les planètes des autres à chaque `tick`, carte
+  fermée comprise. Partie finie (`over`) : tout est visible.
 
 ## 9. Combat
 
