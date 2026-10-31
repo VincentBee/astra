@@ -392,6 +392,12 @@ button.close-btn svg { width: 18px; height: 18px; }
   padding: 6px;
 }
 .map-wrap canvas { display: block; width: 100%; height: auto; aspect-ratio: 1; border-radius: 0; touch-action: none; }
+/* Zoom de la carte (D-117) : boutons en colonne, en haut à droite, par-dessus le canvas. */
+.map-wrap { position: relative; }
+.map-zoom { position: absolute; top: 12px; right: 12px; display: grid; gap: 4px; }
+.map-zoom button { width: 36px; min-height: 36px; padding: 0; background: rgba(10, 14, 28, 0.82); }
+.map-zoom button:disabled { opacity: 0.35; }
+.map-zoom .ic { width: 16px; height: 16px; }
 
 
 /* ----- Feuille d'invitation ----- */

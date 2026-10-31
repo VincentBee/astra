@@ -316,7 +316,8 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 
 | Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
 |---|---|---|---|---|---|
-| 11:00 | `012yisg4` | « Je voudrais que sur la vue map, il y ait avec les flottes la liste des planètes dans la grille et qu'on puisse, depuis cet endroit, créer de nouveaux vaisseaux ou faire décoller des vaisseaux déjà créés. » | Une case par planète en tête de `#map-fleets` : vaisseaux à quai en icônes, lot en chantier et compte à rebours ; bouton **+** (fiche de la planète, partie Chantier) et **Décoller** (formulaire de décollage de cette planète) ; aide de la carte complétée ; vérifié dans Chromium (390 × 844 : construire, décoller, flotte en orbite) ; tests 154/154 ; cache v64 | (ce commit) | D-115, D-116 |
+| 11:00 | `012yisg4` | « Je voudrais que sur la vue map, il y ait avec les flottes la liste des planètes dans la grille et qu'on puisse, depuis cet endroit, créer de nouveaux vaisseaux ou faire décoller des vaisseaux déjà créés. » | Une case par planète en tête de `#map-fleets` : vaisseaux à quai en icônes, lot en chantier et compte à rebours ; bouton **+** (fiche de la planète, partie Chantier) et **Décoller** (formulaire de décollage de cette planète) ; aide de la carte complétée ; vérifié dans Chromium (390 × 844 : construire, décoller, flotte en orbite) ; tests 154/154 ; cache v64 | `a7e9f5a` | D-115, D-116 |
+| 11:15 | `012yisg4` | « Je veux aussi que la carte soit zoomable. » (envoyé pendant le travail précédent) | Zoom de 1 à 4 : pincer, molette, glisser pour se déplacer, boutons + / − / vue entière ; toucher converti selon le zoom, un glissé n'est pas un toucher ; flotte choisie dans la grille ramenée dans la vue ; icônes `minus` et `fit` ; vérifié dans Chromium (390 × 844) ; tests 154/154 ; cache v64 (même version) | (ce commit) | D-116, D-117 |
 
 ### Travaux en cours au 2026-10-29
 

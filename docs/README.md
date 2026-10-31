@@ -66,7 +66,7 @@ Ordre conseillé pour arriver sur le projet : README racine → `reseau.md` §1-
 | `js/replay-view.js` | Écran de `replay.html` | interface |
 | `js/sky.js` | Soleil central de la carte | interface (et regles pour la carte) |
 | `js/galaxy.js` | Fond de galaxie en parallaxe ; réglage « Fond » (animé, fixe, aucun) | interface |
-| `js/icons.js` | Icônes SVG (36 tracés) | interface |
+| `js/icons.js` | Icônes SVG (40 tracés) | interface |
 | `tests/` | 15 fichiers `*.test.mjs` (154 tests, dont `alerts.test.mjs` : famine et panne d'énergie, dont `plan.test.mjs` : fil de construction, dont `end.test.mjs` : fin de partie, dont `journal.test.mjs` : carnet de combats) + `harness.mjs` | regles (règles), reseau (`peer`, `hostile`, `harness`), [tests-decisions](architecture/tests-decisions.md) (`decisions-*.test.mjs`) |
 
 Lancer les tests : `node --test tests/*.test.mjs` (154/154 réussis le 2026-10-30 avec le fil de construction, D-105, le chantier sur la carte, D-106, les rencontres hors ligne, D-109, le carnet de combats, D-110, les alertes de famine, D-111, et le réglage « Fond », D-112). Quel test
