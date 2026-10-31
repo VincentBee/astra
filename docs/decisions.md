@@ -1201,3 +1201,44 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - 2026-10-31. Choix de Claude : `index.html`, `js/app.js`, `js/session.js` et `style.css`
   changent (D-120) ; nouvelle version de cache pour que les téléphones les récupèrent.
 - Statut : en vigueur.
+
+**D-122 — Rapport de combat détaillé : le déroulé et le « pourquoi »**
+- 2026-10-31. Contexte : Vincent : « Il faut que les rapports de combat soient plus détaillés
+  et que l'on puisse comprendre pourquoi on a perdu ou gagné. » Le carnet (D-110) ne disait que
+  le résultat, les pertes de chaque camp et le butin.
+- Choix :
+  - `battle` (`js/fleet.js`) renvoie aussi `report` : pour chaque camp, les vaisseaux au départ,
+    les multiplicateurs de technologie (attaque, coque), le feu et la coque totaux, la défense de
+    la planète, la coque restante ; puis chaque passe (feu de chaque camp, pertes par type,
+    défense comprise). Le calcul du combat ne change pas.
+  - Le déroulé voyage dans le rapport que l'attaquant écrit pour le défenseur (`effects[].rep`) :
+    les deux carnets ont **le même** déroulé, chacun le lit de son côté (`side` : `'a'` ou
+    `'d'`). Nettoyé à la réception (`cleanReport`) comme toute donnée d'un autre téléphone ;
+    il ne sert qu'à l'affichage.
+  - Nouveau module pur `js/report.js` : `explainBattle(rep, side)` donne l'issue, une phrase
+    « pourquoi » (feu par passe contre coque, nombre de passes, part de la coque adverse
+    détruite), puis ce qui a pesé : rapport de forces feu × coque (et, en cas de défaite, à peu
+    près combien de vaisseaux armés il aurait fallu : racine du rapport, modèle de Lanchester,
+    **approché**), défense de la planète (part de la coque, tombée ou intacte), technologies,
+    vaisseaux sans armes qui prennent leur part des coups, absence de butin (pillage trop
+    récent, soutes pleines, rien à prendre) ; et une phrase par passe.
+  - Fenêtre Journal : sous chaque combat, la phrase « pourquoi » visible tout de suite ;
+    « Détail du combat » à déplier : ce qui a pesé, un tableau des forces de chaque camp
+    (vaisseau, nombre, ⚔, ◇, pertes ; défense « tient » ou « abattue »), les passes.
+- Choix de Claude, par défaut : le déroulé est stocké brut et expliqué à l'affichage (le texte
+  peut s'améliorer sans toucher aux sauvegardes) ; l'adversaire est nommé « l'adversaire »
+  dans les phrases ; les anciens combats du carnet, sans déroulé, restent affichés comme avant.
+- Alternatives écartées : que le défenseur recalcule le combat (il ne connaît pas la flotte
+  adverse ni ses technologies à l'heure du combat) ; envoyer le texte tout fait (plus lourd,
+  figé, et un pair pourrait y écrire n'importe quoi) ; une fenêtre à part pour chaque combat
+  (le carnet existe déjà) ; montrer les dégâts vaisseau par vaisseau (trop long sur téléphone).
+- Qui : Vincent (la demande), Claude (la forme). Source : session `012yisg3`.
+- Statut : en vigueur. 7 tests (`tests/report.test.mjs`), dont un contrôlé par mutation (rapport
+  envoyé sans déroulé). Vérifié dans Chromium (390 × 844) avec des combats injectés dans le
+  carnet. Justesse du conseil « il t'aurait fallu environ N fois plus » : **non confirmé**
+  (estimation, la défense d'une planète ne grandit pas avec la flotte).
+
+**D-123 — Cache `astra-p2p-v67`**
+- 2026-10-31. Choix de Claude : nouveau fichier `js/report.js` (ajouté à la liste du service
+  worker) et `js/app.js`, `js/fleet.js`, `js/session.js`, `style.css` changent (D-122).
+- Statut : en vigueur.
