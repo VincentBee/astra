@@ -371,6 +371,14 @@ button.close-btn svg { width: 18px; height: 18px; }
 .mf.hot { border-left-color: #ff7a93; }
 .mf.dry { opacity: 0.55; }
 .mf[aria-pressed='true'] { border-color: var(--text); background: var(--panel-2); }
+/* Case d'une de mes planètes (D-115) : bord vert, boutons Construire et Décoller en bas. */
+.mf.mp { border-left-color: var(--ok); }
+.mf-top strong { display: inline-flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mf-top .ic { width: 14px; height: 14px; color: var(--accent); }
+.mp-actions { display: flex; justify-content: flex-end; gap: 4px; }
+.mp-actions:empty { display: none; }
+.mp-actions button { min-height: 32px; padding: 0 10px; }
+.mp-actions .ic { width: 16px; height: 16px; }
 
 /* ----- Univers ----- */
 

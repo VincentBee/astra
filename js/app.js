@@ -2071,31 +2071,69 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
   }
 }
 
-/** Mes flottes sous la carte, en grille : une case par flotte, pour la sélectionner sans la chercher. */
+/**
+ * Mes planètes puis mes flottes sous la carte, en grille. Une case par planète (vaisseaux à
+ * quai, chantier en cours, boutons Construire et Décoller) et une par flotte, pour la
+ * sélectionner sans la chercher.
+ */
 function renderMapFleets(me = session?.state?.players[session.me], now = session?.now()) {
   const box = $('map-fleets');
   const fleets = me?.fleets || [];
-  box.hidden = !fleets.length;
+  const planets = me ? session.planetsOf(me) : [];
+  box.hidden = !fleets.length && !planets.length;
+  const shipIcons = (ships) =>
+    SHIP_KEYS.filter((k) => ships[k])
+      .map((k) => `<span title="${esc(SHIPS[me.race][k].name)}">${ic(k)}${ships[k]}</span>`)
+      .join('');
   // Le statut change rarement, le compte à rebours chaque seconde : on ne réécrit le HTML que
   // pour le premier (redessiner sous le doigt ferait rater le toucher), le reste en place.
-  const html = fleets
+  const planetHtml = planets
+    .map((pl) => {
+      const s = stateAt(pl.planet, now);
+      const yard = s.levels.yard || 0;
+      const docked = countShips(s.ships);
+      const status = s.yard
+        ? `Chantier : +${s.yard.count} ${SHIPS[me.race][s.yard.type].name}`
+        : !yard
+          ? `🔒 ${RACES[me.race].buildings.yard.name}`
+          : docked
+            ? `${docked} à quai`
+            : 'Aucun vaisseau à quai';
+      const build = yard
+        ? `<button class="secondary small icon-only" data-mp-build="${esc(pl.key)}" title="Construire des vaisseaux ${esc(de(pl.name))}" aria-label="Construire des vaisseaux ${esc(de(pl.name))}">${ic('plus')}</button>`
+        : '';
+      const go = docked
+        ? `<button class="secondary small icon-only" data-mp-go="${esc(pl.key)}" title="Faire décoller des vaisseaux ${esc(de(pl.name))}" aria-label="Faire décoller des vaisseaux ${esc(de(pl.name))}">${ic('fleet')}</button>`
+        : '';
+      return `<div class="mf mp" role="group" aria-label="${esc(pl.name)}" data-planet="${esc(pl.key)}">
+        <span class="mf-top"><strong>${ic('planet')}${esc(pl.name)}</strong><span class="mf-clock"></span></span>
+        <span class="mf-ships">${shipIcons(s.ships)}</span>
+        <span class="mf-status">${esc(status)}</span>
+        <span class="mp-actions">${build}${go}</span></div>`;
+    })
+    .join('');
+  const fleetHtml = fleets
     .map((f) => {
       const hot = ['attack', 'conquer', 'chase'].includes(f.order?.kind);
       const dry = fuelAt(f, me.race, now) < DRY;
-      const ships = SHIP_KEYS.filter((k) => f.ships[k])
-        .map((k) => `<span title="${esc(SHIPS[me.race][k].name)}">${ic(k)}${f.ships[k]}</span>`)
-        .join('');
       return `<button class="mf${hot ? ' hot' : ''}${dry ? ' dry' : ''}" data-fleet="${esc(f.id)}">
         <span class="mf-top"><strong>${esc(fleetName(f))}</strong><span class="mf-clock"></span></span>
-        <span class="mf-ships">${ships}</span>
+        <span class="mf-ships">${shipIcons(f.ships)}</span>
         <span class="mf-status">${esc(fleetStatus(me.race, f, now))}</span></button>`;
     })
     .join('');
+  const html = planetHtml + fleetHtml;
   if (box.dataset.html !== html) {
     box.innerHTML = html;
     box.dataset.html = html;
   }
   for (const b of box.children) {
+    if (b.dataset.planet) {
+      const pl = planets.find((x) => x.key === b.dataset.planet);
+      const job = pl && stateAt(pl.planet, now).yard;
+      b.querySelector('.mf-clock').textContent = job ? clock(Math.max(0, job.end - now)) : '';
+      continue;
+    }
     const f = fleets.find((x) => x.id === b.dataset.fleet);
     b.setAttribute('aria-pressed', String(b.dataset.fleet === selFleet));
     b.querySelector('.mf-clock').textContent = f && moving(f, now) ? clock(f.arrive - now) : '';
@@ -2103,6 +2141,33 @@ function renderMapFleets(me = session?.state?.players[session.me], now = session
 }
 
 $('map-fleets').addEventListener('click', (e) => {
+  if (!session?.state) return;
+  const me = session.state.players[session.me];
+  // Construire : la fiche de la planète s'ouvre sur son chantier (×1, ×5, ×N, D-106).
+  const build = e.target.closest('[data-mp-build]')?.dataset.mpBuild;
+  if (build) {
+    const pl = session.planetOf(me, build);
+    if (!pl) return;
+    selected = { x: pl.cell.x, y: pl.cell.y };
+    renderPick();
+    $('pi-yard').scrollIntoView({ block: 'nearest' });
+    return;
+  }
+  // Décoller : le formulaire de décollage de cette planète, directement.
+  const go = e.target.closest('[data-mp-go]')?.dataset.mpGo;
+  if (go) {
+    selected = null;
+    renderPick();
+    openFleetSheet(go);
+    return;
+  }
+  // Ailleurs sur la case d'une planète : sa fiche, comme en la touchant sur la carte.
+  const tile = e.target.closest('[data-planet]')?.dataset.planet;
+  const pl = tile && session.planetOf(me, tile);
+  if (pl) {
+    selected = { x: pl.cell.x, y: pl.cell.y };
+    return renderPick();
+  }
   const id = e.target.closest('[data-fleet]')?.dataset.fleet;
   if (!id) return;
   selFleet = selFleet === id ? null : id; // retoucher la flotte choisie la relâche
