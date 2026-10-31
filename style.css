@@ -492,7 +492,46 @@ button.close-btn svg { width: 18px; height: 18px; }
 .rp-when { flex: 1; min-width: 0; display: grid; }
 .rp-when .mono:first-child { font-weight: 600; }
 .rp-controls select { width: auto; flex: none; }
-.rp-controls input[type=range] { width: 100%; accent-color: var(--accent); }
+/* Curseur du temps : piste fine, gros pouce à attraper du doigt (D-118). */
+.rp-timeline { display: grid; gap: 2px; }
+.rp-controls input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  touch-action: none;
+  cursor: pointer;
+  --pct: 0%;
+}
+/* La partie déjà vue en couleur, le reste en gris. */
+.rp-controls input[type=range]::-webkit-slider-runnable-track {
+  height: 4px;
+  background: linear-gradient(to right, var(--accent) var(--pct), var(--line) var(--pct));
+}
+.rp-controls input[type=range]::-moz-range-track { height: 4px; background: var(--line); }
+.rp-controls input[type=range]::-moz-range-progress { height: 4px; background: var(--accent); }
+.rp-controls input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: -9px;
+  background: var(--accent);
+  border: 3px solid var(--accent-ink);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.rp-controls input[type=range]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 0;
+  background: var(--accent);
+  border: 3px solid var(--accent-ink);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.rp-bounds { display: flex; justify-content: space-between; font-size: 0.75rem; }
 .rp-steps > button { flex: 1; min-height: 40px; font-size: 0.9rem; }
 .rp-h { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
 .rp-score { padding: 10px; display: grid; gap: 8px; }
