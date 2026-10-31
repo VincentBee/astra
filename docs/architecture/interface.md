@@ -46,11 +46,19 @@ Puis ouvrir `http://localhost:8080`. Le service worker ne s'enregistre qu'en `ht
 - soit deux origines : un onglet sur `http://localhost:8080`, l'autre sur `http://127.0.0.1:8080` (vérifié le 2026-10-29, voir §9).
 
 Parcours qui marche avec l'interface actuelle (vérifié) :
-1. Onglet A : un nom → **Créer** → choisir la race → **Commencer la partie** → toucher une planète → **S'installer**.
+1. Onglet A : un nom → **Créer** → choisir la race → **Choisir cette race** → bandeau du départ (D-120) : **Inviter**.
 2. Onglet A : bouton du compteur de joueurs (icône « users » + nombre) → **Inviter un joueur** → bouton **copier** (icône) sous le QR. Le lien a la forme `http://…/#o2.…`.
 3. Onglet B : ouvrir ce lien. L'accueil dit « Invitation reçue… ». Un nom → **Rejoindre**. L'écran « Montre ta réponse » apparaît → bouton **copier** (code `a2.…`).
 4. Onglet A : dans la fenêtre d'invitation, « Coller une réponse » → coller → **Valider**. Toast « Joueur connecté. ».
-5. Onglet B passe à l'écran de race (bouton « Rejoindre la partie », la race de A affichée dessous).
+5. Onglet B passe à l'écran de race (bouton « Choisir cette race », la race de A affichée dessous).
+6. Chacun touche **Je suis prêt** dans le bandeau : la partie part quand tous les joueurs en
+   ligne le sont. Chacun a alors une flotte d'un seul colonisateur : toucher une planète libre →
+   **Y envoyer mon colonisateur** ; à l'arrivée, elle devient la planète mère.
+
+Vérifié le 2026-10-31 dans Chromium (390 × 844) : seul (prêt → départ → colonisateur envoyé →
+planète mère fondée) et à deux avec deux contextes de navigateur et une vraie invitation
+WebRTC (Alice prête attend Bob, qui choisit sa race puis se dit prêt ; même départ sur les deux
+téléphones ; flottes de départ en [6:15] et [13:4]).
 
 > Le pas à pas de `README.md:16-20` ne correspond plus aux libellés : « Créer une partie » est devenu « Créer », « Copier le lien » / « Copier la réponse » sont des boutons-icônes, « Il est à distance ? Colle la réponse reçue » est devenu « Coller une réponse », et l'invitation passe par le compteur de joueurs, pas par une icône « en haut à droite ».
 
@@ -68,7 +76,7 @@ Quatre **écrans** (`<section class="screen">`), un seul visible à la fois via 
 |---|---|---|
 | `#screen-home` (19-38) | Titre, historique des parties (`#saved`/`#games`), champ Nom, **Créer**, **Rejoindre**, note `#home-note`, roue crantée des réglages (`.settings-btn`, D-114). | `showSaved` 153-172 (liste), clic sur la liste 174-190 (Reprendre → `Session.resume` ; Revoir → `replay.html` ; Oublier → `forgetGame`), `btn-create` 194-201, `btn-join` 203-206, `playerName` 89-100, `boot` 1935-1957. |
 | `#screen-join` (41-67) | Étape 1 : scanner ou coller l'invitation. Étape 2 : QR de la réponse, copier/partager, statut. `#join-error`. | `startJoin` 212-219, `useOffer` 236-258, `onSessionChange` 263-283, scanner 226-232. |
-| `#screen-race` (70-80) | 3 boutons de race (radiogroup), fiche de la race choisie, bouton Commencer/Rejoindre, ce qu'ont choisi les autres. | `showRace` 385-395, `updateRacePick` 398-410, `renderRaceOthers` 413-419, `btn-race` 428-432. |
+| `#screen-race` (70-80) | 3 boutons de race (radiogroup), fiche de la race choisie, bouton **Choisir cette race** (mène à la carte et au bandeau du départ, D-120), ce qu'ont choisi les autres. | `showRace` 385-395, `updateRacePick` 398-410, `renderRaceOthers` 413-419, `btn-race` 428-432. |
 | `#screen-game` (83-200) | La partie. Deux **vues** : la carte (`#view-universe`) ou une planète (`#view-planet`). | `startGame` 436-447, `stopGame` 449-455, `showView` 1217-1229. |
 
 Détail de `#screen-game` :
@@ -78,8 +86,8 @@ Détail de `#screen-game` :
 | `.topbar` (84-95) | Ancienne barre du haut (nom, race). **Masquée** par `style.css:671` (`display: none`) ; ses champs sont encore remplis par `renderState` 753-762. | — |
 | `#net` (91-93) | Compteur de joueurs en ligne (vert, orange si un lien > 250 ms). `showView` le **déplace** dans la première ligne de la vue affichée (`js/app.js:1223`). Ouvre `#sheet-players`. | `renderLive` 811-821, clic 319-322. |
 | `#lost` (97-100) | Bandeau « Seul en ligne » + **Rejoindre** (rejoindre les autres par une nouvelle invitation). | `renderState` 762 (`session.alone`), `btn-rejoin` 286-289. |
-| `#view-universe` (102-148) | Vue carte : `#pick` (bandeau « Choisis ta planète »), `#trades` (offres d'échange), `.map-head` (coordonnées, aide `?`), `canvas#map`. | `drawMap` 1349-1538, `renderPick` 1876-1913, `renderTrades` 1777-1800. |
-| `#sheet-planet` | Fiche de la planète touchée : nom, coordonnées, propriétaire, places, climat, gisements, **S'installer** ou **Bâtiments**. Sur une de mes planètes, partie **Chantier** (`#pi-yard`, D-106) : vaisseaux recherchés, prix, « jusqu'à N », boutons ×1 / ×5 / ×N, et **Décoller**. | `renderPick`, `renderPickYard`, écouteur de `#pi-ships`, `btn-pi-takeoff`, `btn-claim`, `btn-open-planet`, `closePlanetSheet`. |
+| `#view-universe` (102-148) | Vue carte : `#pick` (bandeau du départ, D-120 : « Prépare-toi » / « Prêt · on attend … » avec les joueurs, prêts en vert, absents grisés, et les boutons **Je suis prêt** / **Plus prêt** / **Inviter** ; après le départ « Envoie ton colonisateur » et **Ma flotte** ; caché dès la planète mère fondée), `#trades` (offres d'échange), `.map-head` (coordonnées, aide `?`), `canvas#map`. | `drawMap` 1349-1538, `renderPick` 1876-1913, `renderTrades` 1777-1800. |
+| `#sheet-planet` | Fiche de la planète touchée : nom, coordonnées, propriétaire, places, climat, gisements, **Y envoyer mon colonisateur** (`#btn-claim` : planète libre, pas un petit corps, tant que je n'ai pas de planète mère, D-120) ou **Bâtiments**. Sur une de mes planètes, partie **Chantier** (`#pi-yard`, D-106) : vaisseaux recherchés, prix, « jusqu'à N », boutons ×1 / ×5 / ×N, et **Décoller**. | `renderPick`, `renderPickYard`, écouteur de `#pi-ships`, `btn-pi-takeoff`, `btn-claim`, `btn-open-planet`, `closePlanetSheet`. |
 | `#map-fleets` (sous `canvas#map`) | Mes planètes puis mes flottes en grille (2 colonnes sur téléphone). **Une case par planète** (D-115, bord vert) : nom, compte à rebours du chantier, une icône par type de vaisseau à quai avec son nombre, statut (« Chantier : +5 Frégate », « 7 à quai », « Aucun vaisseau à quai » ou « 🔒 » sans chantier naval) et deux boutons-icônes : **+** (Construire, si la planète a un chantier naval) ouvre `#sheet-planet` sur sa partie Chantier ; **Décoller** (icône `fleet`, s'il y a des vaisseaux à quai) ouvre directement le formulaire de décollage de cette planète. Toucher ailleurs sur la case ouvre la fiche de la planète. Une case par flotte : nom, compte à rebours, une icône par type de vaisseau avec son nombre, statut ; bord rouge si attaque/conquête/poursuite, grisée si à sec. Toucher = sélectionner la flotte (ouvre `#fleet-info`), retoucher = la relâcher (D-107, D-108). | `renderMapFleets`, appelé par `renderLive` ; le HTML n'est réécrit que si le contenu ou le statut change, les comptes à rebours (flotte, chantier) et `aria-pressed` sont mis à jour en place. Un seul écouteur de clic : `[data-mp-build]`, `[data-mp-go]`, `[data-planet]`, puis `[data-fleet]`. |
 | `#fleet-info` (129-145) | Fiche de la flotte sélectionnée : vaisseaux, statut (avec la vitesse et, si la flotte mêle plusieurs types, le nom du plus lent : `speedText`), carburant, choix d'ordres (`#fi-choice`), mes flottes à côté (`#fi-beside`), joueurs à côté (`#fi-partners`), boutons Arrêter / Rentrer / Se poser / Plein / Passive-Agressive (`#btn-fi-stance`, icône d'attaque, pleine quand la flotte est agressive, cachée pour une flotte sans armes ; D-100) / Scinder / Fermer. Le statut finit par « · agressive » (`fleetStatus`). | `renderFleetInfo` 1643-1687, handlers 1689-1714. |
 | `#view-planet` (150-199) | Vue planète : en-tête (retour, nom, climat), gisements `#soil-zone`, stocks `#resources`, onglets, puis les panneaux `data-pane`. | `renderPlanet` 869-988. |
@@ -175,7 +183,8 @@ Table des appels de l'interface vers la session :
 | Créer / reprendre / rejoindre | 197, 185, 244-250 | `Session.create`, `Session.resume`, `new Session` + `answer` |
 | Inviter / accepter / annuler | 304, 346, 329 | `openInvite`, `acceptAnswer`, `cancelInvite` |
 | Choisir sa race | 430 | `chooseRace` |
-| S'installer sur une planète | 1924 | `claimPlanet` |
+| Se dire prêt / plus prêt (D-120) | `btn-ready` | `ready(true / false)` puis `checkStart` |
+| Envoyer le colonisateur de départ (D-120) | `btn-claim` (fiche de la planète), ou carte une fois la flotte choisie (`btn-pick-fleet`) | `moveFleet(id, case, 'colonize')` |
 | Bâtiment / recherche / vaisseaux / pouvoir | 749, 610, 614, 606 | `build` (ou `planBuild`, voir §13), `research`, `buildShips`, `power` |
 | Retirer un élément du fil de construction | `#plan` (× d'un élément) | `unplan` |
 | Vaisseaux depuis la carte (D-106, D-115) | écouteur de `#pi-ships` (fiche ouverte en touchant la planète, ou par le bouton **+** de sa case sous la carte) | `buildShips(type, n, clé de la planète touchée)` ; ×N = `shipsAffordable` |
@@ -400,3 +409,19 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   vue planète avec la seule liste de la planète ; ferme remise → bandeau caché, icône orange
   « Énergie en baisse · vide dans 2 min ». **Pas vérifié** : aliens et machines dans le
   navigateur (couverts par les tests), plusieurs colonies à la fois.
+
+## 15. Départ commun et colonisateur (2026-10-31, D-120)
+
+- `renderLobby(me)` (appelé par `renderPick`) remplit `#pick` : avant le départ, « Prépare-toi »
+  ou « Prêt · on attend Bob », la liste des joueurs (`.pick-who`, race, nom, « prêt » / « pas
+  prêt » / « choisit sa race » / « absent ») et les boutons ; après le départ, « Envoie ton
+  colonisateur » et **Ma flotte** (sélectionne la flotte et la ramène dans la vue) ; partie
+  partie sans m'être dit prêt : « La partie a commencé » et **Je suis prêt**.
+- `myColonizer(me)` : ma flotte avec un colonisateur tant que je n'ai pas de planète mère. Les
+  planètes libres clignotent sur la carte seulement dans ce cas.
+- Dans la fenêtre Joueurs, un joueur sans planète est « pas encore prêt », « prêt », « en route
+  vers sa planète… » ou « éliminé » ; l'en-tête de la carte dit « avant le départ » puis
+  « à fonder » à la place des coordonnées.
+- Le bouton de l'écran de race dit **Choisir cette race** (avant : « Commencer la partie » ou
+  « Rejoindre la partie »).
+

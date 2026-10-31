@@ -71,7 +71,10 @@ Créée par `addPlayer` (`js/session.js:696-713`), complétée par `normalize`
 | `actAt` | heure de la dernière modification (la plus récente gagne) | `js/session.js:712`, `touch` `js/session.js:586` |
 | `v` | version du format (`FORMAT = 7`) | `js/session.js:41`, `js/session.js:587` |
 | `race` | `human`, `machine` ou `alien`, choisie une seule fois | `chooseRace` `js/session.js:722-736` |
-| `home`, `claimAt` | case de la planète mère, heure d'installation | `claimPlanet` `js/session.js:827-828` |
+| `ready` | heure à laquelle le joueur s'est dit prêt (D-120) ; absent tant qu'il ne l'est pas | `Session.ready` |
+| `go` | heure du départ, si c'est ce joueur qui l'a donné (tous les présents prêts, D-120) | `Session.begin` |
+| `since` | entrée dans la course : apparition de la flotte de départ (D-120), ou installation dans une partie d'avant | `enterRace`, `claimPlanet` |
+| `home`, `claimAt` | case de la planète mère, heure de fondation (arrivée du colonisateur) | `Session.found` (ou `claimPlanet` dans une partie d'avant) |
 | `planet` | planète mère (3.3) | `js/session.js:829` |
 | `colonies` | `{ idPlanèteUnivers: planète }` | `js/session.js:1631` |
 | `fleets` | flottes sur la carte (3.4), 16 au plus | `MAX_FLEETS` `js/fleet.js:25` |
@@ -660,8 +663,37 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
 ## 12. Installation et colonies
 
 - **Race** : choisie une fois, définitive (`chooseRace`, `js/session.js:722-736`).
-- **Planète mère** : `claimPlanet` (`js/session.js:808-833`), seulement sur une planète libre
-  de type `planet` (pas un petit corps).
+- **Départ commun (D-120)** : après sa race, chaque joueur se dit prêt (ordre `ready`, champ
+  `ready` = heure ; `ready(false)` le retire tant que la partie n'est pas partie). Un joueur qui
+  n'a pas encore choisi sa race n'est pas prêt. `checkStart` (hors ordre, appelé par le minuteur
+  de 250 ms et par le bouton) regarde les **joueurs présents** (`notReady` : moi, et ceux en
+  ligne avec mon téléphone) ; s'ils sont tous prêts, il appelle l'ordre `begin`, qui écrit
+  `go = maintenant` dans ma fiche. Le départ (`startedAt`) est le plus petit `go` vu : deux
+  téléphones qui le donnent en même temps tombent d'accord sur le plus ancien. Un joueur hors
+  ligne ne bloque pas le départ.
+- **Flotte de départ (D-120)** : au premier passage (`tick` → `enterRace`) après le départ, un
+  joueur prêt reçoit **une seule flotte** : un colonisateur de sa race, le plein fait, sans
+  cargaison, à l'arrêt depuis l'heure du départ (ou depuis l'heure où il s'est dit prêt, s'il
+  arrive après le départ). `since` prend cette heure. Pas de planète, pas d'autre vaisseau.
+- **Case de départ** (`startCell`) : les joueurs prêts au départ sont répartis à égale distance
+  sur un cercle de `START_RING = 7` cases autour du centre du soleil, dans l'ordre d'arrivée,
+  tourné d'un angle tiré de `gid` ; un retardataire tombe sur ce cercle à un angle tiré de son
+  identifiant. Si la case est une planète, on glisse le long du cercle jusqu'à une case vide.
+  Chaque téléphone ne calcule que la sienne (deux copies pas à jour peuvent, au pire, donner la
+  même case à deux joueurs). Les réservoirs suffisent pour atteindre toute planète de la carte.
+- **Planète mère** : l'ordre « Fonder ta planète mère » (`moveFleet(…, 'colonize')` sans
+  planète mère), seulement vers une planète libre de type `planet` (pas un petit corps). À
+  l'arrivée, `Session.found` crée la planète comme l'ancienne installation (`newPlanet` :
+  bâtiments et stock de départ de la race), consomme le colonisateur, pose les autres vaisseaux
+  et ajoute la cargaison au stock ; **le carburant restant est perdu** (même départ pour tous).
+  `claimAt` = heure d'arrivée. Planète prise, gelée ou trop petite : la flotte reste en orbite.
+  `claimPlanet` (`js/session.js:808-833`) reste pour les parties d'avant (et les tests) ; il est
+  refusé à un joueur qui a un champ `ready`.
+- **Sans colonisateur** (`noColonizer`) : un joueur dans la course, sans planète et sans plus
+  aucun colonisateur (détruit, donné), est éliminé (`out`).
+- **Dans la course** (`inRace`) : `since` écrit, ou prêt dans une partie partie (sa fiche n'a
+  peut-être pas encore sa flotte). `ranking` et `checkOver` comptent ces joueurs même sans
+  planète : tant que l'un vole vers sa planète, la partie ne se finit pas sans lui.
 - **Propriétaire d'une case** : le premier installé, d'après `claimAt` (ou `rank`), départagé
   par identifiant à égalité (`ownerAt`, `js/session.js:775-788`). Même résultat sur tous les
   téléphones.
@@ -675,8 +707,12 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
   à l'heure d'arrivée `f.arrive` (`takenBefore`, `js/session.js:794-799`).
 - **Perdant** (choix simultanés, partie coupée en deux) : `checkClaim` rend la planète.
   Pour une colonie, `evacuate` remet vaisseaux (colonisateur compris), cargaison et carburant
-  en orbite (`js/session.js:840-889`). Pour une planète mère, le joueur doit en choisir une
-  autre (`js/session.js:853-862`).
+  en orbite (`js/session.js:840-889`). Pour une planète mère fondée par le colonisateur de
+  départ (D-120), `evacuate` le remet de même en orbite : le joueur l'envoie sur une autre.
+  Dans une partie d'avant, le joueur doit en choisir une autre (`js/session.js:853-862`).
+- **Fiche antidatée** (`backdated`) : une planète mère datée d'avant la fiche qui ne l'avait pas
+  est refusée, sauf si cette fiche montrait déjà le colonisateur en route vers cette case avec
+  cette heure d'arrivée (téléphone passé après l'arrivée).
 
 ## 13. Journal d'ordres et rejeu
 
@@ -806,6 +842,7 @@ Résultat : `tests 34, pass 34, fail 0`, environ 5,6 s (le rejeu d'une partie de
 | `tests/effects.test.mjs` | 1 | 5 joueurs, 4 attaquants × 70 combats : chaque perte subie une fois, puis rapports oubliés des deux côtés |
 | `tests/fleet.test.mjs` | 20 | Deux flottes sur la même cible ; poursuite mutuelle ; colonie qui encaisse les pertes ; premier arrivé à la colonisation ; plein en panne tout près ; plusieurs attaquants ne pillent pas plus que le stock ; revanche ; raids sans armes et un pillage par 2 min ; flotte agressive qui combat puis reprend sa route ; flotte passive qui croise sans combattre ; agressive à l'arrêt qui garde sa case ; deux agressives : pertes comptées une fois ; agressive refusée sans armes, vue par les autres, gardée à la fusion (D-100) ; vitesse du vaisseau le plus lent ; rencontres que personne n'a regardées : `firstContact`, agressive et poursuite hors ligne, pas de combat rejoué, pertes comptées une fois (D-109) |
 | `tests/colony.test.mjs` | 1 | Colonie perdue au recollage : vaisseaux et cargaison restent en orbite |
+| `tests/start.test.mjs` | 11 | Départ commun et colonisateur (D-120) : pas de départ tant qu'un présent n'est pas prêt ; tous prêts → même départ partout, une seule flotte d'un colonisateur chacun, plein fait, cases distinctes hors planètes ; planète mère fondée à l'arrivée (bâtiments et stock de départ), installation directe et astéroïde refusés ; absent qui ne bloque pas puis entre en retard ; « plus prêt » ; deux colonisateurs sur la même planète ; colonisateur perdu → éliminé ; pas de fin tant qu'un joueur vole ; fondation hors ligne acceptée ; rejeu fidèle ; toute planète atteignable. Harnais `newLobby` (`tests/harness.mjs`) |
 | `tests/hostile.test.mjs` | 6 | Pair malveillant ou fiche abîmée : personne ne réécrit ma fiche ni un secret, ni ne date sa fiche loin dans le futur ; fiche abîmée sans plantage ; race ou identifiant spécial ; installation antidatée ; heure qui recule ; téléphone en avance reste visible. Une partie de ces tests passe par l'acceptation des fiches (mécanisme décrit dans reseau.md) |
 | `tests/replay.test.mjs` | 4 | Une partie de robots (construire, chercher, armer, décoller, attaquer, échanger) rejouée retombe sur les mêmes fiches ; partie coupée en deux puis recollée ; journal tronqué signalé ; copie pas à jour signalée |
 
@@ -853,8 +890,11 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
 
 ### 19.1 Début de la course
 
-- `claimPlanet` écrit `p.since` (une seule fois) ; `Session.startedAt` = le plus petit `since`
-  des joueurs. Une partie d'avant la course n'a aucun `since` : ni froid, ni fin (D-087).
+- Depuis D-120 : `Session.startedAt` = le plus petit `go` (départ donné quand tous les joueurs
+  présents sont prêts, §12) ; le froid compte depuis cette heure. `enterRace` écrit `p.since`.
+- Partie d'avant D-120 (aucun `go`) : `claimPlanet` écrivait `p.since` (une seule fois) et
+  `startedAt` = le plus petit `since`. Une partie d'avant la course n'a aucun `since` : ni
+  froid, ni fin (D-087).
 
 ### 19.2 Le froid (`FROST`, `frostAt`, `frostLine`, `sunDistance`, `js/game.js`)
 

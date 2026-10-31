@@ -646,11 +646,13 @@ Aucune conversation ne les prouve.
 - Statut : **remplacée par D-088** à 07:01 (« le chrono est une mauvaise idée »). `GOAL` retiré
   du code avant le commit.
 
-**D-087 — Les parties d'avant la course n'ont ni fin ni froid**
+**D-087 — Les parties d'avant la course n'ont ni fin ni froid** — modifiée par D-120
 - 2026-10-29 06:59. Contexte : avec la fin à 40 min après la première installation, toutes les
   vieilles sauvegardes auraient fini dès leur ouverture.
 - Choix : champ `since` écrit à l'installation ; sans `since`, pas de course.
-- Qui : Claude (signalé par le conseiller). Statut : en vigueur.
+- Qui : Claude (signalé par le conseiller). Statut : modifiée par D-120 (2026-10-31) : la course
+  part au départ commun (`go`) ; `since` est écrit quand la flotte de départ apparaît. Une partie
+  sans `go` ni `since` n'a toujours ni fin ni froid.
 
 **D-088 — Le soleil s'éteint : le froid se resserre du bord vers le soleil**
 - 2026-10-29 07:01-07:05. Demande : « il faudrait un mechanisme qui force la fin, comme dans
@@ -662,7 +664,7 @@ Aucune conversation ne les prouve.
   galaxie qui s'épuise, merveille à construire.
 - Qui : Vincent (direction), Claude (règle). Statut : en vigueur (`9b37782`).
 
-**D-089 — Sans planète, éliminé ; le dernier en vie gagne ; une colonie remplace la planète mère**
+**D-089 — Sans planète, éliminé ; le dernier en vie gagne ; une colonie remplace la planète mère** — modifiée par D-120 (un joueur qui n'a pas encore fondé sa planète reste en vie tant qu'il a un colonisateur)
 - 2026-10-29 07:07. Question de Claude : peut-on prendre la planète mère ? Réponse de Vincent :
   « a » (oui, élimination possible).
 - Choix : la plus vieille colonie en vie devient planète mère ; sans colonie, `out` ; fin quand
@@ -1153,4 +1155,49 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 **D-119 — Cache `astra-p2p-v65`**
 - 2026-10-31. Choix de Claude : `replay.html`, `js/replay-view.js` et `style.css` changent
   (D-118) ; nouvelle version de cache pour que les téléphones les récupèrent.
+- Statut : en vigueur.
+
+**D-120 — La partie part quand tous les joueurs présents sont prêts ; chacun commence avec une seule flotte, un colonisateur, pour fonder sa planète mère**
+- 2026-10-31 12:40. Demande de Vincent : « Il faudrait que la partie commence quand tous les
+  joueurs presents soient pret, il faut aussi que les joueurs aient uniquenent une flotte avec un
+  colonisateur pour prendre leur premiere planete ».
+- Contexte : jusqu'ici, la course (et le froid, D-087) partait à la première installation d'un
+  joueur (`since`), et chaque joueur s'installait d'un toucher (`claimPlanet`, « S'installer »)
+  sur la planète de son choix, à l'instant.
+- Choix :
+  - **Prêt** : après sa race, chaque joueur se dit prêt (ordre `ready`, champ `ready` de sa
+    fiche) ; il peut revenir sur « plus prêt » tant que la partie n'est pas partie. Quand un
+    téléphone voit prêts tous les joueurs **présents** (lui, et ceux en ligne avec lui), il donne
+    le départ (ordre `begin`, champ `go`). Le départ est le plus petit `go` vu, partout le même ;
+    le froid compte depuis lui. Sans arbitre, comme la fin de partie (`over`).
+  - **Absent** : un joueur hors ligne ne bloque pas le départ ; à son retour, il se dit prêt et
+    entre tout de suite, avec sa flotte à cette heure-là (le froid, lui, a déjà avancé).
+  - **Flotte de départ** : un seul colonisateur de sa race, le plein fait, sans cargaison, sur un
+    cercle de 7 cases autour du soleil ; les joueurs prêts au départ y sont à égale distance les
+    uns des autres, jamais sur une planète. Aucune planète, aucun autre vaisseau.
+  - **Planète mère** : le colonisateur, envoyé sur une planète libre (pas un petit corps), la
+    fonde à son arrivée, avec les bâtiments et le stock de départ de sa race (comme
+    l'installation d'avant) ; le carburant restant est perdu, pour un départ égal. Le premier
+    arrivé l'emporte ; le perdant garde son colonisateur en orbite. Plus de colonisateur avant
+    d'avoir fondé sa planète : éliminé.
+  - `FORMAT` 9 : un téléphone d'avant compterait le départ autrement, il est prié de recharger.
+- Choix de Claude, par défaut : « présent » = en ligne avec mon téléphone ; rayon de 7 cases
+  (assez loin du soleil pour que le froid laisse ≈ 17 min de marge au départ, assez près pour
+  atteindre toute planète avec un plein) ; carburant restant perdu à la fondation ; un joueur
+  arrivé après le départ entre seul, sans attendre ; « S'installer » remplacé dans la fiche de
+  la planète par « Y envoyer mon colonisateur » ; `claimPlanet` gardé pour les parties d'avant
+  et les tests, mais refusé à un joueur qui a `ready`.
+- Alternatives écartées : un hôte qui lance la partie (il n'y a plus de maître du jeu, D-010) ;
+  attendre tous les joueurs de la partie, même hors ligne (un absent bloquerait tout le monde) ;
+  un compte à rebours après le dernier prêt ; cases de départ tirées au hasard (inégales) ;
+  ajouter le carburant restant au stock (avantage aux départs proches d'une planète) ; donner
+  aussi des cargos ou des chasseurs au départ (la demande dit « uniquement »).
+- Qui : Vincent (la demande), Claude (la forme). Source : session `012yisg3`.
+- Statut : en vigueur. 11 tests (`tests/start.test.mjs`), contrôlés par mutation. Vérifié dans
+  Chromium (390 × 844), seul et à deux avec une vraie invitation WebRTC. Équilibre des cases de
+  départ (une planète peut être plus proche de l'un que de l'autre) : **non confirmé**.
+
+**D-121 — Cache `astra-p2p-v66`**
+- 2026-10-31. Choix de Claude : `index.html`, `js/app.js`, `js/session.js` et `style.css`
+  changent (D-120) ; nouvelle version de cache pour que les téléphones les récupèrent.
 - Statut : en vigueur.
