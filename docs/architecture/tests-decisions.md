@@ -148,5 +148,7 @@ que fait le code.
 | D-117 | Carte zoomable | test existant | `decisions-reseau.test.mjs` D-064 : chaque icône de la page existe, et un bouton sans texte porte un nom (boutons +, −, vue entière) | les gestes et la conversion du toucher (DOM, canvas) : vérifiés dans le navigateur seulement |
 | D-118 | Curseur du temps dans le replay | non testable |  | `replay-view.js` dépend du DOM : glissé, reprise de la lecture et flèches vérifiés dans le navigateur seulement |
 | D-119 | Cache v65 | non testable |  | version de cache |
+| D-122 | Rapport de combat détaillé | nouveau test | `report.test.mjs` (7 tests : déroulé cohérent avec les pertes, explication des deux côtés, défense / technologies / cargos / indécis, sans armes et sans butin, déroulé trafiqué, même déroulé dans les deux carnets, seconde attaque trop tôt) | contrôle par mutation : rapport envoyé sans déroulé → 1 test échoue ; la fenêtre Journal (DOM) : vérifiée dans le navigateur seulement |
+| D-123 | Cache v67 | non testable |  | version de cache |
 | D-120 | Départ quand tous les joueurs présents sont prêts ; une seule flotte avec un colonisateur pour fonder la planète mère | nouveau test | `start.test.mjs` (11 tests, tous préfixés D-120) | Bandeau et boutons (`#pick`, `#btn-ready`, `#btn-claim`) : navigateur seulement, vérifiés dans Chromium |
 | D-121 | Cache `astra-p2p-v66` | non testable |  | version du service worker |

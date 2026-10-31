@@ -60,6 +60,7 @@ Ordre conseillé pour arriver sur le projet : README racine → `reseau.md` §1-
 | `js/tech.js` | Technologies, vaisseaux, coûts et durées | regles |
 | `js/fleet.js` | Flottes, trajets, carburant, combat | regles |
 | `js/trade.js` | Échanges entre joueurs | regles |
+| `js/report.js` | Rapport de combat détaillé : explique le déroulé de `battle` (pourquoi on gagne ou perd, passe par passe), D-122 | regles (et interface pour l'affichage) |
 | `js/replay.js` | Moteur de rejeu depuis le journal des ordres | regles |
 | `js/techtree.js` | Construit le graphe des technologies (données : regles ; dessin : interface) | regles + interface |
 | `js/app.js` | Toute l'interface du jeu (≈ 1 970 lignes) | interface |
@@ -67,9 +68,9 @@ Ordre conseillé pour arriver sur le projet : README racine → `reseau.md` §1-
 | `js/sky.js` | Soleil central de la carte | interface (et regles pour la carte) |
 | `js/galaxy.js` | Fond de galaxie en parallaxe ; réglage « Fond » (animé, fixe, aucun) | interface |
 | `js/icons.js` | Icônes SVG (40 tracés) | interface |
-| `tests/` | 16 fichiers `*.test.mjs` (165 tests, dont `start.test.mjs` : départ commun et colonisateur, dont `alerts.test.mjs` : famine et panne d'énergie, dont `plan.test.mjs` : fil de construction, dont `end.test.mjs` : fin de partie, dont `journal.test.mjs` : carnet de combats) + `harness.mjs` | regles (règles), reseau (`peer`, `hostile`, `harness`), [tests-decisions](architecture/tests-decisions.md) (`decisions-*.test.mjs`) |
+| `tests/` | 17 fichiers `*.test.mjs` (172 tests, dont `report.test.mjs` : rapport de combat détaillé, dont `start.test.mjs` : départ commun et colonisateur, dont `alerts.test.mjs` : famine et panne d'énergie, dont `plan.test.mjs` : fil de construction, dont `end.test.mjs` : fin de partie, dont `journal.test.mjs` : carnet de combats) + `harness.mjs` | regles (règles), reseau (`peer`, `hostile`, `harness`), [tests-decisions](architecture/tests-decisions.md) (`decisions-*.test.mjs`) |
 
-Lancer les tests : `node --test tests/*.test.mjs` (165/165 réussis le 2026-10-31 avec le départ commun, D-120 ; 154/154 le 2026-10-30 avec le fil de construction, D-105, le chantier sur la carte, D-106, les rencontres hors ligne, D-109, le carnet de combats, D-110, les alertes de famine, D-111, et le réglage « Fond », D-112). Quel test
+Lancer les tests : `node --test tests/*.test.mjs` (172/172 réussis le 2026-10-31 avec le rapport de combat détaillé, D-122 ; 165/165 avec le départ commun, D-120 ; 154/154 le 2026-10-30 avec le fil de construction, D-105, le chantier sur la carte, D-106, les rencontres hors ligne, D-109, le carnet de combats, D-110, les alertes de famine, D-111, et le réglage « Fond », D-112). Quel test
 protège quelle décision : [architecture/tests-decisions.md](architecture/tests-decisions.md). Attention :
 `node --test tests/` échoue (voir reseau.md §9).
 
