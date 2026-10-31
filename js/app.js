@@ -8,6 +8,7 @@ import {
   shipsAffordable, planetAlerts,
 } from './game.js';
 import { drawSun } from './sky.js';
+import { readTap, underFinger, contenders, menuPlace } from './aim.js';
 import { ic, fillIcons } from './icons.js';
 import { startGalaxy, skyMode, setSkyMode } from './galaxy.js';
 import { TECHS, SHIPS, SHIP_KEYS, techCost, techMissing, researchDuration, shipUnlock, shipUnlocked, shipStats, shipDuration } from './tech.js';
@@ -1584,8 +1585,9 @@ let openKey = 'home'; // planète ouverte : « home » ou l'identifiant d'une co
 let mapFrame = null;
 let selected = null; // planète touchée sur la carte : { x, y }
 let selFleet = null; // id d'une de mes flottes, sélectionnée pour la piloter
-let pending = null; // case visée par la flotte sélectionnée, en attente d'un choix : { x, y }
-let prey = null; // flotte ennemie visée par la flotte sélectionnée, en attente d'un choix : { pid, id }
+// Menu posé sur la carte, au doigt (D-126) : le choix d'un ordre, ou de l'objet visé quand
+// plusieurs sont sous le doigt. { at: { x, y } en cases, cell, foe, title, items: [{ label, primary, run }] }
+let menu = null;
 
 /** Carte (vue principale) ou bâtiments d'une de mes planètes. */
 function showView(view, key = openKey) {
@@ -1895,6 +1897,9 @@ function drawMap() {
 
   // Flottes : un petit triangle qui glisse le long de son trajet, ou qui attend en orbite.
   const now = session.now();
+  drawRange(ctx, cell, now);
+  const aim = aimRead(now); // flotte traînée vers sa cible (D-126)
+  const foe = menu?.foe || aim?.foe; // flotte ennemie visée : cercle rouge
   for (const spot of fleetSpots(now)) {
     const { p, f, x, y } = spot;
     const cx = (x + 0.5) * cell;
@@ -1911,7 +1916,7 @@ function drawMap() {
       ctx.setLineDash([]);
     }
     ctx.globalAlpha = 1;
-    if (prey && p.id === prey.pid && f.id === prey.id) {
+    if (foe && p.id === foe.pid && f.id === foe.id) {
       ctx.strokeStyle = '#ff7a93';
       ctx.lineWidth = Math.max(1.5, cell * 0.06);
       ctx.beginPath();
@@ -1964,13 +1969,14 @@ function drawMap() {
     ctx.globalAlpha = 1;
   }
   // Case visée, en attente d'un choix (se poser, coloniser, attaquer…).
-  if (pending) {
+  if (menu?.cell) {
     ctx.strokeStyle = '#ffffff';
     ctx.globalAlpha = 0.6 + 0.4 * pulse;
     ctx.lineWidth = Math.max(1, cell * 0.05);
-    ctx.strokeRect(pending.x * cell + 1, pending.y * cell + 1, cell - 2, cell - 2);
+    ctx.strokeRect(menu.cell.x * cell + 1, menu.cell.y * cell + 1, cell - 2, cell - 2);
     ctx.globalAlpha = 1;
   }
+  drawAim(ctx, cell, dpr, aim);
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   $('my-coords').textContent = me?.home ? `[${me.home.x}:${me.home.y}]` : me?.out ? 'éliminé' : session.startedAt == null ? 'avant le départ' : 'à fonder';
@@ -1983,7 +1989,7 @@ function drawMap() {
 
 const ZOOM_MAX = 4; // 5 cases sur 20 de large, au plus près
 const zoom = { z: 1, x: 0, y: 0 };
-const gesture = { pts: new Map(), moved: false, start: null };
+const gesture = { pts: new Map(), moved: false, start: null, aim: null }; // aim : ma flotte traînée vers sa cible (D-126)
 
 /** Taille d'une case à l'écran, en pixels CSS, zoom compris. */
 const cellCss = () => ($('map').getBoundingClientRect().width * zoom.z) / UNIVERSE.w;
@@ -2027,19 +2033,39 @@ function reveal(x, y) {
   clampZoom();
 }
 
-$('btn-zoom-in').onclick = () => zoomCenter(1.6);
-$('btn-zoom-out').onclick = () => zoomCenter(1 / 1.6);
+$('btn-zoom-in').onclick = () => (closeMenu(), zoomCenter(1.6));
+$('btn-zoom-out').onclick = () => (closeMenu(), zoomCenter(1 / 1.6));
 $('btn-zoom-fit').onclick = () => {
+  closeMenu();
   zoom.z = 1;
   clampZoom();
 };
 
 // Doigts et souris : un doigt glisse la vue (si elle est zoomée), deux doigts pincent.
 // Un geste qui a bougé n'est pas un toucher : le clic qui suit est ignoré.
+// Appuyer sur une de mes flottes puis glisser la traîne vers sa cible (D-126) : on lâche, elle part.
+/** Point (clientX, clientY) en cases : le centre d'une case tombe sur ses coordonnées entières. */
+function toCells(clientX, clientY) {
+  const r = $('map').getBoundingClientRect();
+  const size = cellCss();
+  return { x: zoom.x + (clientX - r.left) / size - 0.5, y: zoom.y + (clientY - r.top) / size - 0.5 };
+}
+
+/** Ma flotte sous le doigt au moment d'appuyer (celle qu'on va traîner), ou null. */
+function grabFleet(at) {
+  if (!session?.state || session.status !== 'playing') return null;
+  const top = contenders(underFinger(mapItems(), at, cellCss()), cellCss()).map((h) => h.it);
+  const mine = top.filter((it) => it.type === 'mine');
+  return (mine.find((it) => it.id === selFleet) || mine[0])?.id || null;
+}
+
 $('map').addEventListener('pointerdown', (e) => {
   if (!gesture.pts.size) gesture.moved = false;
   gesture.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
   gesture.start = null;
+  // Un deuxième doigt : c'est un pincement, plus une visée.
+  const id = gesture.pts.size === 1 && (e.pointerType !== 'mouse' || e.button === 0) ? grabFleet(toCells(e.clientX, e.clientY)) : null;
+  gesture.aim = id ? { id, at: null, started: false } : null;
   try {
     e.currentTarget.setPointerCapture(e.pointerId);
   } catch {}
@@ -2054,12 +2080,26 @@ $('map').addEventListener('pointermove', (e) => {
     const dy = e.clientY - p.y;
     if (!gesture.moved && Math.hypot(dx, dy) < 8) return; // petit tremblement : c'est encore un toucher
     gesture.moved = true;
+    if (gesture.aim) {
+      // Visée : la vue ne bouge pas, un trait suit le doigt jusqu'à la cible.
+      if (!gesture.aim.started) {
+        gesture.aim.started = true;
+        if (selFleet !== gesture.aim.id) selectFleet(gesture.aim.id);
+        else closeMenu();
+      }
+      gesture.aim.at = toCells(e.clientX, e.clientY);
+      gesture.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      return;
+    }
+    closeMenu(); // le menu est posé sur un point de la carte : il ne suit pas la vue
     const c = cellCss();
     zoom.x -= dx / c;
     zoom.y -= dy / c;
     clampZoom();
   } else if (pts.length === 2) {
     gesture.moved = true;
+    gesture.aim = null;
+    closeMenu();
     const other = pts.find((q) => q !== p);
     const before = Math.hypot(p.x - other.x, p.y - other.y);
     const after = Math.hypot(e.clientX - other.x, e.clientY - other.y);
@@ -2076,11 +2116,22 @@ $('map').addEventListener('pointermove', (e) => {
   }
   gesture.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
 });
-for (const type of ['pointerup', 'pointercancel']) $('map').addEventListener(type, (e) => gesture.pts.delete(e.pointerId));
+$('map').addEventListener('pointerup', (e) => {
+  gesture.pts.delete(e.pointerId);
+  const aim = gesture.aim;
+  if (gesture.pts.size) return;
+  gesture.aim = null;
+  if (aim?.started) dropFleet(aim.id, toCells(e.clientX, e.clientY));
+});
+$('map').addEventListener('pointercancel', (e) => {
+  gesture.pts.delete(e.pointerId);
+  if (!gesture.pts.size) gesture.aim = null;
+});
 $('map').addEventListener(
   'wheel',
   (e) => {
     e.preventDefault();
+    closeMenu();
     const r = e.currentTarget.getBoundingClientRect();
     zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
   },
@@ -2116,85 +2167,252 @@ function fleetSpots(now) {
   return out;
 }
 
+/** Tout ce qu'on peut toucher sur la carte, en cases : planètes, mes flottes, flottes adverses vues. */
+function mapItems(now = session.now()) {
+  const out = mapPlanets().map((w) => ({ type: 'planet', w, x: w.x, y: w.y }));
+  for (const spot of fleetSpots(now)) {
+    out.push({ type: spot.p.id === session.me ? 'mine' : 'foe', id: spot.f.id, spot, x: spot.x, y: spot.y });
+  }
+  return out;
+}
+
+const cellOf = (it, at) => (it?.type === 'planet' ? { x: it.w.x, y: it.w.y } : { x: Math.round(it ? it.x : at.x), y: Math.round(it ? it.y : at.y) });
+const inUniverse = (c) => c.x >= 0 && c.y >= 0 && c.x < UNIVERSE.w && c.y < UNIVERSE.h;
+
+/** Sélectionne une de mes flottes pour la piloter (ou la relâche, `id` nul). */
+function selectFleet(id) {
+  selFleet = id;
+  closeMenu();
+  if (id) selected = null;
+  renderPick();
+  renderFleetInfo();
+  renderMapFleets();
+}
+
+/** La fiche d'une planète de la carte. */
+function showPlanet(w) {
+  closeMenu();
+  selected = { x: w.x, y: w.y };
+  renderPick();
+}
+
 /**
- * Toucher la carte : une de mes flottes la sélectionne ; flotte
- * sélectionnée, une case l'y envoie ; sinon ma planète ouvre ses bâtiments,
- * une autre montre ses gisements.
+ * Ce qu'on peut faire de l'objet `it` (ou de la case vide sous `at`) : la liste d'un menu.
+ * `fid` : ma flotte qui recevra l'ordre ; sans elle, choisir l'objet (flotte ou fiche).
+ */
+function actionsFor(fid, it, at) {
+  if (it?.type === 'mine' && it.id !== fid) {
+    const f = it.spot.f;
+    return [{ icon: 'fleet', label: `${fid ? 'Choisir · ' : ''}${fleetName(f)} · ${countShips(f.ships)} vaisseau${countShips(f.ships) > 1 ? 'x' : ''}`, run: () => selectFleet(it.id) }];
+  }
+  if (!fid) return it?.type === 'planet' ? [{ icon: 'planet', label: `${it.w.name} · fiche`, run: () => showPlanet(it.w) }] : [];
+  if (it?.type === 'mine') return [];
+  if (it?.type === 'foe') {
+    const { p, f } = it.spot;
+    return [{ icon: 'attack', primary: true, label: `Attaquer la flotte ${de(p.name)} · ${countShips(f.ships)} vaisseau${countShips(f.ships) > 1 ? 'x' : ''}`, run: () => session.chaseFleet(fid, p.id, f.id) && renderFleetInfo() }];
+  }
+  const cell = cellOf(it, at);
+  if (!inUniverse(cell)) return [];
+  const opts = session.ordersAt(fid, cell);
+  const warn = opts[0]?.short ? ' · panne en route' : '';
+  const out = opts.map((o) => ({
+    icon: { dock: 'dock', attack: 'attack', conquer: 'attack', colonize: 'planet' }[o.kind] || 'fleet',
+    primary: o.kind !== 'move',
+    kind: o.kind,
+    short: o.short,
+    label: o.label + warn,
+    run: () => session.moveFleet(fid, cell, o.kind) && renderFleetInfo(),
+  }));
+  if (out.length && !out.some((o) => o.primary)) out[0].primary = true;
+  return out;
+}
+
+/**
+ * Donne un ordre à ma flotte `fid` vers ce qui est sous le doigt (lecture `t` de readTap) :
+ * un seul ordre sans risque part tout de suite ; sinon un menu s'ouvre au doigt.
+ */
+function orderAt(fid, t, at) {
+  const list = t.kind === 'many' ? t.list : [t.kind === 'one' ? t.it : null];
+  const items = list.flatMap((it) => actionsFor(fid, it, at));
+  const target = t.kind === 'one' ? t.it : null;
+  const cell = target?.type === 'foe' ? null : cellOf(target, at);
+  // Un seul ordre, sans panne en route, vers une planète ou une case vide : pas de question.
+  if (t.kind !== 'many' && target?.type !== 'foe' && items.length === 1 && !items[0].short) {
+    items[0].run();
+    return;
+  }
+  const planet = list.find((it) => it?.type === 'planet');
+  if (planet && t.kind === 'one') items.push({ icon: 'planet', ghost: true, label: `Fiche de ${planet.w.name}`, run: () => showPlanet(planet.w) });
+  const title = t.kind === 'many' ? 'Que viser ?' : planet ? `${planet.w.name} [${planet.w.x}:${planet.w.y}]` : target?.type === 'foe' ? 'Flotte ennemie' : `Case [${cell.x}:${cell.y}]`;
+  openMenu(at, items, { title, cell: t.kind === 'many' ? null : cell, fleet: fid, foe: target?.type === 'foe' ? { pid: target.spot.p.id, id: target.id } : null });
+}
+
+/** On lâche la flotte traînée : même règle qu'un toucher, sans choisir une autre de mes flottes. */
+function dropFleet(fid, at) {
+  if (!session?.state || !session.myFleet(fid)) return;
+  const px = cellCss();
+  const items = mapItems();
+  const t = readTap(items, at, px, fid, true);
+  // Lâchée sur elle-même (plus près d'elle que de toute cible) : rien, elle reste sélectionnée.
+  const self = items.find((it) => it.type === 'mine' && it.id === fid);
+  const dSelf = self ? Math.hypot(self.x - at.x, self.y - at.y) : Infinity;
+  const dTarget = t.kind === 'one' ? Math.hypot(t.it.x - at.x, t.it.y - at.y) : t.kind === 'many' ? Math.hypot(t.list[0].x - at.x, t.list[0].y - at.y) : Infinity;
+  if (underFinger(self ? [self] : [], at, px).length && dSelf <= dTarget) return;
+  orderAt(fid, t, at);
+}
+
+/**
+ * Toucher la carte (D-126). Ce qui est sous le doigt est cherché avec un aimant (`js/aim.js`) ;
+ * plusieurs objets presque aussi près : un menu au doigt pour choisir, au lieu de deviner.
+ * Sans flotte sélectionnée : une de mes flottes la sélectionne, une planète ouvre sa fiche.
+ * Flotte sélectionnée : la retoucher la relâche, une autre de mes flottes la remplace, ailleurs
+ * c'est sa cible (un seul ordre possible : il part ; plusieurs : menu au doigt).
  */
 $('map').addEventListener('click', (e) => {
   if (!session?.state) return;
-  if (gesture.moved) return; // fin d'un glissé ou d'un pincement, pas un toucher
-  const rect = e.currentTarget.getBoundingClientRect();
-  const size = cellCss(); // en pixels CSS, zoom compris (le canvas, lui, est à l'échelle de l'écran)
-  const fx = zoom.x + (e.clientX - rect.left) / size - 0.5;
-  const fy = zoom.y + (e.clientY - rect.top) / size - 0.5;
-
-  // Planète et flotte les plus proches du doigt : la plus proche gagne (une
-  // flotte en orbite est à côté du centre de sa planète, pas dessus).
-  let best = null;
-  for (const w of mapPlanets()) {
-    const d = Math.hypot(w.x - fx, w.y - fy);
-    if (d < 1.2 && (!best || d < best.d)) best = { w, d };
+  if (gesture.moved) return; // fin d'un glissé, d'un pincement ou d'une visée, pas un toucher
+  if (menu) return closeMenu(); // toucher à côté du menu le ferme, sans rien faire d'autre
+  const at = toCells(e.clientX, e.clientY);
+  const fid = selFleet && session.myFleet(selFleet) ? selFleet : null;
+  const t = readTap(mapItems(), at, cellCss(), fid);
+  if (t.kind === 'many') {
+    if (!fid) return openMenu(at, t.list.flatMap((it) => actionsFor(null, it, at)), { title: 'Lequel ?' });
+    return orderAt(fid, t, at);
   }
-  const now = session.now();
-  const dist = (s) => Math.hypot(s.x - fx, s.y - fy);
-  // Toucher large : une case fait ~16 px sur un téléphone. Plusieurs flottes sous le doigt : chaque toucher passe à la suivante.
-  // Une flotte déjà choisie : toucher une case voisine l'y envoie, au lieu de choisir une flotte en orbite à côté.
-  const tap = { x: Math.round(fx), y: Math.round(fy) };
-  const hits = fleetSpots(now)
-    .filter((s) => s.p.id === session.me && dist(s) < 0.7 && (!selFleet || sameCell({ x: Math.round(s.x), y: Math.round(s.y) }, tap)))
-    .sort((a, b) => dist(a) - dist(b));
-  if (hits.length && (!best || dist(hits[0]) < best.d)) {
-    const i = hits.findIndex((s) => s.f.id === selFleet);
-    selFleet = hits[(i + 1) % hits.length].f.id;
-    pending = null;
-    prey = null;
-    selected = null;
-    renderPick();
-    renderFleetInfo();
-    return;
-  }
-  if (selFleet && session.myFleet(selFleet)) {
-    // Une flotte ennemie sous le doigt (plus près qu'une planète) : proposer la poursuite.
-    const foe = fleetSpots(now)
-      .filter((s) => s.p.id !== session.me && dist(s) < 0.7)
-      .sort((a, b) => dist(a) - dist(b))[0];
-    if (foe && (!best || dist(foe) < best.d)) {
-      prey = { pid: foe.p.id, id: foe.f.id };
-      pending = null;
-      renderFleetInfo();
-      return;
-    }
-    prey = null;
-    const cell = { x: Math.round(fx), y: Math.round(fy) };
-    if (cell.x < 0 || cell.y < 0 || cell.x >= UNIVERSE.w || cell.y >= UNIVERSE.h) return;
-    const opts = session.ordersAt(selFleet, cell);
-    if (opts.length === 1 && !opts[0].short) {
-      pending = null;
-      session.moveFleet(selFleet, cell, opts[0].kind);
-    } else pending = cell;
-    renderFleetInfo();
-    return;
-  }
-
-  if (!best) {
-    selected = null;
-    return renderPick();
-  }
-  // Une de mes planètes aussi : sa fiche s'ouvre sur la carte (chantier, décollage), « Bâtiments » mène à l'écran planète.
-  const { w } = best;
-  selected = { x: w.x, y: w.y };
+  const it = t.kind === 'one' ? t.it : null;
+  if (it?.type === 'mine') return selectFleet(it.id === fid ? null : it.id);
+  if (fid) return orderAt(fid, t, at);
+  if (it?.type === 'planet') return showPlanet(it.w);
+  selected = null;
   renderPick();
 });
 
-/** Fiche de la flotte sélectionnée : son état, ses ordres, et le choix en attente sur une planète. */
+/** Ouvre le menu au doigt, sur la carte, à côté du point `at` (en cases). */
+function openMenu(at, items, { title = '', cell = null, fleet = null, foe = null } = {}) {
+  if (!items.length) return closeMenu();
+  menu = { at, items, title, cell, fleet, foe };
+  const box = $('map-menu');
+  box.innerHTML =
+    `<div class="mm-head"><span>${esc(title)}</span><button class="ghost small icon-only" data-mm-close title="Fermer" aria-label="Fermer">${ic('close')}</button></div>` +
+    items.map((o, i) => `<button class="${o.ghost ? 'ghost' : o.primary ? 'primary' : 'secondary'} small" role="menuitem" data-mm="${i}">${ic(o.icon || 'fleet')}${esc(o.label)}</button>`).join('');
+  box.hidden = false;
+  const canvas = $('map');
+  const wrap = box.parentElement;
+  const size = cellCss();
+  const sx = canvas.offsetLeft + (at.x + 0.5 - zoom.x) * size;
+  const sy = canvas.offsetTop + (at.y + 0.5 - zoom.y) * size;
+  const pos = menuPlace(sx, sy, box.offsetWidth, box.offsetHeight, wrap.clientWidth, wrap.clientHeight);
+  box.style.left = `${pos.x}px`;
+  box.style.top = `${pos.y}px`;
+  box.querySelector('[data-mm]')?.focus({ preventScroll: true });
+}
+
+function closeMenu() {
+  if (!menu) return;
+  menu = null;
+  $('map-menu').hidden = true;
+}
+
+$('map-menu').addEventListener('click', (e) => {
+  if (e.target.closest('[data-mm-close]')) return closeMenu();
+  const o = menu?.items[Number(e.target.closest('[data-mm]')?.dataset.mm)];
+  if (!o) return;
+  closeMenu();
+  o.run();
+});
+// Échap ou un toucher hors de la carte ferment le menu.
+document.addEventListener('keydown', (e) => e.key === 'Escape' && closeMenu());
+document.addEventListener('click', (e) => {
+  if (menu && !e.target.closest('#map-menu, #map')) closeMenu();
+});
+
+/** La cible visée par la flotte qu'on traîne : { fid, from, t, at, cell, label, short } ou null. */
+function aimRead(now) {
+  const a = gesture.aim;
+  if (!a?.started || !a.at || !session.myFleet(a.id)) return null;
+  const from = fleetSpots(now).find((s) => s.p.id === session.me && s.f.id === a.id);
+  if (!from) return null;
+  const t = readTap(mapItems(now), a.at, cellCss(), a.id, true);
+  const it = t.kind === 'one' ? t.it : null;
+  const items = t.kind === 'many' ? [] : actionsFor(a.id, it, a.at);
+  const back = Math.hypot(from.x - a.at.x, from.y - a.at.y) < 0.5 && !it;
+  const label = back ? 'Lâche ailleurs pour l’envoyer' : t.kind === 'many' ? 'Lâche pour choisir' : items.length > 1 && it?.type !== 'foe' ? `${it?.type === 'planet' ? it.w.name : `[${Math.round(a.at.x)}:${Math.round(a.at.y)}]`} · lâche pour choisir l’ordre` : items[0]?.label || 'Hors de la carte';
+  return { fid: a.id, from, t, it, at: a.at, cell: it?.type === 'foe' ? null : cellOf(it, a.at), label, short: !!items[0]?.short, foe: it?.type === 'foe' ? { pid: it.spot.p.id, id: it.id } : null };
+}
+
+/** Pendant qu'on traîne une flotte : un trait jusqu'à la cible, la cible entourée, l'ordre écrit au-dessus du doigt. */
+function drawAim(ctx, cell, dpr, aim) {
+  if (!aim) return;
+  const { from, it, at } = aim;
+  const tx = ((it ? it.x : aim.cell ? aim.cell.x : at.x) + 0.5) * cell;
+  const ty = ((it ? it.y : aim.cell ? aim.cell.y : at.y) + 0.5) * cell;
+  const color = aim.short || aim.foe ? '#ff7a93' : '#ffffff';
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = 0.9;
+  ctx.lineWidth = Math.max(1.5, cell * 0.05);
+  ctx.beginPath();
+  ctx.moveTo((from.x + 0.5) * cell, (from.y + 0.5) * cell);
+  ctx.lineTo(tx, ty);
+  ctx.stroke();
+  if (it) {
+    ctx.beginPath();
+    ctx.arc(tx, ty, cell * (it.type === 'planet' ? 0.55 : 0.32), 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (aim.cell && aim.t.kind === 'empty') ctx.strokeRect(aim.cell.x * cell + 1, aim.cell.y * cell + 1, cell - 2, cell - 2);
+  // L'ordre, au-dessus du doigt (sinon il le cache), gardé dans la partie vue.
+  const fs = 13 * dpr;
+  ctx.font = `600 ${fs}px system-ui, sans-serif`;
+  const tw = ctx.measureText(aim.label).width + 12 * dpr;
+  const left = zoom.x * cell;
+  const top = zoom.y * cell;
+  const W0 = ctx.canvas.width;
+  const lx = Math.min(left + W0 - tw / 2 - 4 * dpr, Math.max(left + tw / 2 + 4 * dpr, (at.x + 0.5) * cell));
+  const ly = Math.max(top + fs + 6 * dpr, (at.y + 0.5) * cell - 48 * dpr);
+  ctx.globalAlpha = 0.92;
+  ctx.fillStyle = '#0a0e1c';
+  ctx.fillRect(lx - tw / 2, ly - fs - 2 * dpr, tw, fs + 10 * dpr);
+  ctx.strokeRect(lx - tw / 2, ly - fs - 2 * dpr, tw, fs + 10 * dpr);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.fillText(aim.label, lx, ly + 2 * dpr);
+  ctx.restore();
+}
+
+/** Autonomie de ma flotte sélectionnée : le losange des cases qu'elle atteint avec son carburant (distance en |dx| + |dy|). */
+function drawRange(ctx, cell, now) {
+  const id = gesture.aim?.started ? gesture.aim.id : selFleet;
+  const p = session.state.players[session.me];
+  const f = id && session.myFleet(id);
+  if (!f) return;
+  const r = fuelAt(f, p.race, now) / Math.max(1e-9, fleetBurn(p.race, f.ships));
+  if (!(r > 0.3) || r > UNIVERSE.w * 2) return;
+  const pos = fleetPos(f, now);
+  const cx = (pos.x + 0.5) * cell;
+  const cy = (pos.y + 0.5) * cell;
+  ctx.save();
+  ctx.strokeStyle = '#f5c96a';
+  ctx.globalAlpha = 0.35;
+  ctx.lineWidth = Math.max(1, cell * 0.04);
+  ctx.setLineDash([cell * 0.2, cell * 0.15]);
+  ctx.beginPath();
+  ctx.moveTo(cx + r * cell, cy);
+  ctx.lineTo(cx, cy + r * cell);
+  ctx.lineTo(cx - r * cell, cy);
+  ctx.lineTo(cx, cy - r * cell);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** Fiche de la flotte sélectionnée : son état et ses ordres (les ordres vers une cible : menu au doigt, D-126). */
 function renderFleetInfo(me = session?.state?.players[session.me], now = session?.now()) {
   if (!session?.state) return;
   const f = selFleet && session.myFleet(selFleet);
   if (!f) {
     selFleet = null;
-    pending = null;
-    prey = null;
+    if (menu?.fleet) closeMenu();
   }
   $('fleet-info').hidden = !f;
   if (!f) return;
@@ -2226,19 +2444,6 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
   stance.title = hawk ? 'Agressive : combat toute flotte ennemie qu’elle croise. Toucher pour la rendre passive' : 'Passive : ne combat que sur ordre. Toucher pour la rendre agressive';
   renderBeside(me, f, now);
   renderPartners($('fi-partners'), go ? null : { fleet: f.id });
-  const choice = pending ? session.ordersAt(selFleet, pending) : [];
-  const warn = choice[0]?.short ? ' · panne en route' : '';
-  const foe = prey && session.state.players[prey.pid];
-  const html = foe
-    ? `<button class="primary small" data-fchase>${ic('attack')}Attaquer · ${esc(foe.name)}</button>`
-    : choice
-        .map((o) => `<button class="${o.kind === 'move' ? 'secondary' : 'primary'} small" data-forder="${o.kind}">${esc(o.label + warn)}</button>`)
-        .join('');
-  $('fi-choice').hidden = !html;
-  if ($('fi-choice').dataset.html !== html) {
-    $('fi-choice').innerHTML = html;
-    $('fi-choice').dataset.html = html;
-  }
 }
 
 /**
@@ -2341,26 +2546,13 @@ $('map-fleets').addEventListener('click', (e) => {
   const id = e.target.closest('[data-fleet]')?.dataset.fleet;
   if (!id) return;
   selFleet = selFleet === id ? null : id; // retoucher la flotte choisie la relâche
-  pending = null;
-  prey = null;
+  closeMenu();
   const spot = selFleet && fleetSpots(session.now()).find((x) => x.p.id === session.me && x.f.id === selFleet);
   if (spot) reveal(spot.x, spot.y); // carte zoomée : la flotte choisie revient dans la vue
   renderFleetInfo();
   renderMapFleets();
 });
 
-$('fi-choice').addEventListener('click', (e) => {
-  if (e.target.closest('[data-fchase]') && prey) {
-    session.chaseFleet(selFleet, prey.pid, prey.id);
-    prey = null;
-    return renderFleetInfo();
-  }
-  const kind = e.target.closest('[data-forder]')?.dataset.forder;
-  if (!kind || !pending) return;
-  session.moveFleet(selFleet, pending, kind);
-  pending = null;
-  renderFleetInfo();
-});
 $('btn-fi-stop').onclick = () => session.stopFleet(selFleet) && renderFleetInfo();
 $('btn-fi-stance').onclick = () => {
   const f = session.myFleet(selFleet);
@@ -2376,12 +2568,7 @@ $('btn-fi-dock').onclick = () => {
   if (f) session.moveFleet(selFleet, f.to, 'dock');
   renderFleetInfo();
 };
-$('btn-fi-close').onclick = () => {
-  selFleet = null;
-  pending = null;
-  prey = null;
-  renderFleetInfo();
-};
+$('btn-fi-close').onclick = () => selectFleet(null);
 
 // ---------------------------------------------------------------------------
 // Échanges entre joueurs

@@ -1270,3 +1270,59 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 **D-125 — Cache `astra-p2p-v68`**
 - 2026-10-31. Choix de Claude : `js/app.js`, `js/session.js`, `js/save.js` changent (D-124).
 - Statut : en vigueur.
+
+**D-126 — Viser sur la carte : aimant du doigt, menu au doigt, glisser une flotte vers sa cible**
+- 2026-10-31 15:15 (non confirmé). Demande de Vincent : « Améliore la sélection et l'utilisation des planètes
+  et des flottes dans la map. J'ai du mal des fois à déplacer les flottes vers l'endroit que je
+  veux et il faut souvent que je fasse plusieurs clics. Trouve un système plus naturel et plus
+  efficace. »
+- Constat (lecture du code) : à zoom 1, une case fait ~17 px ; la case visée était la case
+  arrondie sous le doigt (un toucher à côté d'une planète envoyait la flotte dans le vide) ;
+  flottes empilées : chaque toucher passait à la suivante, sans dire laquelle ; flotte
+  sélectionnée, toucher sa planète d'orbite pouvait reprendre une autre flotte au lieu de viser
+  la planète ; plusieurs ordres possibles : les boutons s'affichaient dans la fiche de la
+  flotte, **sous la grille des planètes et des flottes**, souvent hors de l'écran.
+- Choix :
+  1. **Aimant** (`js/aim.js`) : le doigt a une portée fixe à l'écran (18 px, au moins 0,6 case
+     zoomé) ; l'objet le plus proche (planète, une de mes flottes, flotte adverse vue) est visé,
+     plus la case arrondie.
+  2. **Pas de devinette** : si d'autres objets sont presque aussi près (moins de 12 px d'écart),
+     un **menu au doigt** s'ouvre sur la carte (« Lequel ? », « Que viser ? ») au lieu de
+     choisir au hasard ou de faire tourner les flottes une à une.
+  3. **Ordres au doigt** : plusieurs ordres possibles (se poser / orbite, attaquer / conquérir,
+     coloniser / orbite, ou panne en route) → le même menu, posé à côté du doigt, l'ordre
+     principal en premier et en couleur, plus « Fiche de … » pour voir la planète sans relâcher
+     la flotte. Un seul ordre sans risque (case vide, planète libre sans colonisateur) part
+     tout de suite, comme avant.
+  4. **Glisser pour envoyer** : appuyer sur une de mes flottes et glisser trace un trait
+     jusqu'à la cible (aimantée), l'ordre est écrit au-dessus du doigt ; lâcher envoie (ou
+     ouvre le menu s'il y a un choix). Lâcher sur la flotte elle-même : rien. Un glissé qui
+     commence ailleurs déplace la vue, comme avant (D-117).
+  5. Flotte sélectionnée : la retoucher la relâche ; toucher une autre de mes flottes la
+     choisit ; une flotte adverse → menu « Attaquer la flotte de … ».
+  6. **Autonomie dessinée** : losange jaune pointillé autour de la flotte sélectionnée, les
+     cases que son carburant atteint (distance |dx| + |dy|, comme les règles).
+  7. La fiche de la flotte sélectionnée remonte **juste sous la carte** (avant la grille).
+- Choix de Claude, par défaut : les seuils (18 px, 0,6 case, 12 px, 8 px pour un glissé) ;
+  toucher la carte pendant que le menu est ouvert le ferme sans rien envoyer (taper à côté pour
+  annuler ne doit pas envoyer la flotte) ; le menu se ferme quand la vue bouge (pas de menu
+  qui flotte loin de sa cible) ; lâcher une flotte traînée ne choisit jamais une autre de mes
+  flottes (on vise un endroit) ; sans flotte sélectionnée, les flottes adverses ne sont pas
+  des cibles.
+- Alternatives écartées : agrandir les objets (la carte est pleine à zoom 1) ; loupe sous le
+  doigt (cache ce qu'on vise, demande un appui long) ; envoyer d'office l'ordre principal en
+  lâchant (attaquer et conquérir ne se confondent pas, on demande) ; appui long pour la fiche
+  (lent, et peu découvrable sur un téléphone).
+- Qui : Vincent (la demande), Claude (le système). Source : session `012yisfzoyH`.
+- Statut : en vigueur. 8 tests (`tests/aim.test.mjs`). Vérifié dans Chromium (390 × 844,
+  toucher simulé) : toucher une planète libre avec le colonisateur → menu « Fonder / orbite /
+  fiche » ; toucher à côté → menu fermé, rien d'envoyé ; glisser le colonisateur jusqu'à la
+  planète → trait, libellé, menu, colonisation ; planète mère avec 3 flottes en orbite →
+  « Lequel ? » ; flotte choisie + case vide → départ direct ; flotte choisie + planète mère →
+  « Se poser / orbite / Choisir Flotte 2 / 3 » ; glisser depuis le vide zoomé → la vue bouge,
+  aucun ordre. Sur un vrai téléphone : **non confirmé**.
+
+**D-127 — Cache `astra-p2p-v69`**
+- 2026-10-31. Choix de Claude : `index.html`, `style.css`, `js/app.js` changent et
+  `js/aim.js` apparaît (ajouté à la liste du cache) (D-126).
+- Statut : en vigueur.
