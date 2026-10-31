@@ -432,10 +432,8 @@ function updateRacePick() {
   $('race-detail').innerHTML = `<p class="race-pitch">${esc(R.pitch)}</p>
     <ul class="race-traits">${R.traits.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
     <span class="chips">${res}${R.pop ? `<span class="chip pop">${resIcon('pop', R.pop.label)}${R.pop.label}</span>` : '<span class="chip none">Sans population</span>'}</span>`;
-  // Le premier arrivé ouvre la partie ; les suivants la rejoignent.
-  const players = Object.values(session?.state?.players || {});
-  const first = !players.some((p) => p.id !== session.me && p.rank < session.state.players[session.me]?.rank);
-  $('btn-race').innerHTML = first ? `${ic('play')}Commencer la partie` : `${ic('join')}Rejoindre la partie`;
+  // La partie part ensuite, quand tous les joueurs présents sont prêts (D-120).
+  $('btn-race').innerHTML = `${ic('check')}Choisir cette race`;
 }
 
 /** Ce qu'ont choisi les autres, pour se décider. */
@@ -980,7 +978,13 @@ function renderLive() {
     const net = p.id === session.me ? '' : !info ? 'déconnecté' : info.rtt != null ? `${info.rtt} ms${info.route ? ' ' + routeLabel(info.route) : ''}` : '';
     const scoreEl = document.querySelector(`[data-pscore="${p.id}"]`);
     if (!p.race || !p.planet) {
-      sub.textContent = `${p.race ? 'choisit sa planète…' : 'choisit sa race…'}${net ? ' · ' + net : ''}`;
+      const started = session.startedAt != null;
+      const what = !p.race ? 'choisit sa race…'
+        : p.out ? 'éliminé'
+        : session.inRace(p) ? 'en route vers sa planète…'
+        : Number.isFinite(p.ready) ? 'prêt'
+        : started ? 'pas encore entré' : 'pas encore prêt';
+      sub.textContent = `${what}${net ? ' · ' + net : ''}`;
       scoreEl.textContent = '—';
       continue;
     }
@@ -1503,7 +1507,7 @@ function openFleetSheet(key = openKey) {
 function updateFleetSheet() {
   const me = session.state.players[session.me];
   const { ships } = fleetChoice();
-  const speed = speedText(me.race, ships, me.planet.tech);
+  const speed = speedText(me.race, ships, me.planet?.tech);
   $('fleet-room').textContent = `Soutes : ${fmt(fleetCargo(me.race, ships))}${speed ? ` · ${speed[0].toUpperCase()}${speed.slice(1)}` : ''}`;
   const tank = fleetTank(me.race, ships);
   const burn = fleetBurn(me.race, ships);
@@ -1772,7 +1776,7 @@ function drawMap() {
   drawFrost(ctx, sun, cell, W);
 
   const me = session.state.players[session.me];
-  const picking = !me?.home && !me?.out;
+  const picking = !!myColonizer(me); // colonisateur de départ en jeu : les planètes libres clignotent
   const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 300);
 
   // Portée de détection : ce que je vois, en léger halo (hors du halo, les flottes adverses sont cachées).
@@ -1921,7 +1925,7 @@ function drawMap() {
   }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  $('my-coords').textContent = me?.home ? `[${me.home.x}:${me.home.y}]` : me?.out ? 'éliminé' : 'à choisir';
+  $('my-coords').textContent = me?.home ? `[${me.home.x}:${me.home.y}]` : me?.out ? 'éliminé' : session.startedAt == null ? 'avant le départ' : 'à fonder';
 }
 
 // ---------------------------------------------------------------------------
@@ -2151,7 +2155,7 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
   $('fi-where').textContent = `[${Math.round(pos.x)}:${Math.round(pos.y)}]`;
   setHtml($('fi-ships'), shipsLine(me.race, f));
   $('fi-name').textContent = fleetName(f);
-  const speed = speedText(me.race, f.ships, me.planet.tech);
+  const speed = speedText(me.race, f.ships, me.planet?.tech);
   $('fi-status').textContent = `${fleetStatus(me.race, f, now)}${go ? ` · ${clock(f.arrive - now)}` : ''}${speed ? ` · ${speed}` : ''}`;
   const here = !go && session.planetsAt(f.to)[0];
   const fuel = fuelAt(f, me.race, now);
@@ -2490,11 +2494,85 @@ $('btn-move-go').onclick = () => {
   renderFleetInfo();
 };
 
-/** Bandeau de choix de la planète de départ et fiche de la planète touchée. */
+/** Mon colonisateur de départ, tant que je n'ai pas de planète (D-120), ou null. */
+function myColonizer(me) {
+  if (!me?.race || me.home || me.out) return null;
+  return (me.fleets || []).find((f) => f.ships?.colony > 0) || null;
+}
+
+/**
+ * Bandeau du départ (D-120) : se dire prêt, voir qui l'est parmi les joueurs présents, puis,
+ * la partie partie, envoyer son colonisateur fonder sa planète mère.
+ */
+function renderLobby(me) {
+  const show = !!me?.race && !me.home && !me.out;
+  $('pick').hidden = !show;
+  if (!show) return;
+  const start = session.startedAt;
+  const ready = Number.isFinite(me.ready);
+  const colonizer = myColonizer(me);
+  let text;
+  let btn = null; // 'ready' | 'unready'
+  let who = '';
+  if (colonizer) {
+    text = `${ic('fleet')} <strong>Envoie ton colonisateur</strong> <span class="hint">· touche une planète libre (pas un petit corps) : il y fondera ta planète mère. Le premier arrivé l’emporte.</span>`;
+  } else if (start != null && Number.isFinite(me.since)) {
+    text = `${ic('planet')} <strong>Ton colonisateur arrive…</strong>`;
+  } else if (start != null) {
+    text = `${ic('play')} <strong>La partie a commencé</strong> <span class="hint">· dis-toi prêt : tu entres tout de suite, avec un seul colonisateur</span>`;
+    btn = 'ready';
+  } else {
+    const waiting = session.notReady.filter((p) => p.id !== session.me);
+    text = ready
+      ? `${ic('check')} <strong>Prêt</strong> <span class="hint">· ${waiting.length ? `on attend ${waiting.map((p) => esc(p.name)).join(', ')}` : 'départ…'}</span>`
+      : `${ic('play')} <strong>Prépare-toi</strong> <span class="hint">· la partie part quand tous les joueurs présents sont prêts ; chacun commence avec un seul colonisateur</span>`;
+    btn = ready ? 'unready' : 'ready';
+    who = Object.values(session.state.players)
+      .sort((a, b) => a.rank - b.rank)
+      .map((p) => {
+        const here = p.id === session.me || p.online;
+        const state = !here ? 'absent' : Number.isFinite(p.ready) ? 'prêt' : !p.race ? 'choisit sa race' : 'pas prêt';
+        return `<span class="pw${!here ? ' off' : Number.isFinite(p.ready) ? ' ok' : ''}">${p.race ? raceIcon(p.race) : ''}${esc(p.name)} <span class="hint">${state}</span></span>`;
+      })
+      .join('');
+  }
+  setHtml($('pick-text'), text);
+  $('pick-who').hidden = !who;
+  setHtml($('pick-who'), who);
+  const b = $('btn-ready');
+  b.hidden = !btn;
+  b.dataset.on = btn === 'ready' ? '1' : '';
+  b.className = btn === 'unready' ? 'secondary small' : 'primary small';
+  setHtml(b, btn === 'unready' ? `${ic('stop')}Plus prêt` : `${ic('check')}Je suis prêt`);
+  $('btn-pick-fleet').hidden = !colonizer;
+  $('btn-pick-fleet').dataset.fleet = colonizer?.id || '';
+  $('btn-pick-invite').hidden = start != null;
+}
+$('btn-ready').onclick = (e) => {
+  if (!session?.state) return;
+  session.ready(e.currentTarget.dataset.on === '1');
+  session.checkStart(); // seul présent : le départ part tout de suite
+  renderPick();
+};
+$('btn-pick-fleet').onclick = (e) => {
+  const id = e.currentTarget.dataset.fleet;
+  if (!id) return;
+  selFleet = id;
+  selected = null;
+  showView('map');
+  const spot = fleetSpots(session.now()).find((x) => x.p.id === session.me && x.f.id === id);
+  if (spot) reveal(spot.x, spot.y);
+  renderPick();
+  renderFleetInfo();
+  renderMapFleets();
+};
+$('btn-pick-invite').onclick = () => openInviteSheet();
+
+/** Bandeau du départ et fiche de la planète touchée. */
 function renderPick(me = session?.state?.players[session.me], now = session?.now()) {
   if (!session?.state) return;
-  const picking = !me?.home && !me?.out;
-  $('pick').hidden = !picking;
+  renderLobby(me);
+  const colonizer = myColonizer(me);
   const w = selected && mapPlanets().find((x) => sameCell(x, selected));
   $('sheet-planet').hidden = !w;
   if (!w) return;
@@ -2524,8 +2602,9 @@ function renderPick(me = session?.state?.players[session.me], now = session?.now
     if (!box.firstChild) box.innerHTML = soilTiles('pi');
     fillSoil('pi', nature, s ? s.reserve : w.reserve, s ? s.prod.soil : null);
   }
-  $('btn-claim').hidden = !picking || !!o || (w.kind && w.kind !== 'planet');
-  $('btn-claim').innerHTML = `${ic('dock')}S'installer · ${esc(w.name)}`;
+  // Départ (D-120) : la planète mère se fonde avec le colonisateur, envoyé d'ici.
+  $('btn-claim').hidden = !colonizer || !!o || (w.kind && w.kind !== 'planet') || session.locked(colonizer.id) || session.frostOf(w) <= now;
+  setHtml($('btn-claim'), `${ic('fleet')}Y envoyer mon colonisateur · ${esc(w.name)}`);
   $('btn-open-planet').hidden = o?.id !== session.me || !w.pl;
   $('btn-open-planet').dataset.key = w.pl?.key || 'home';
   renderPickYard(me, o?.id === session.me && w.pl ? w.pl : null, s, now);
@@ -2592,11 +2671,13 @@ $('btn-planet-close').onclick = closePlanetSheet;
 
 $('btn-claim').onclick = () => {
   const w = selected && session.planets.find((x) => sameCell(x, selected));
-  if (!w || !session.claimPlanet(w.id)) return;
+  const f = myColonizer(session.state.players[session.me]);
+  if (!w || !f || !session.moveFleet(f.id, { x: w.x, y: w.y }, 'colonize')) return;
   selected = null;
-  buildStatic();
+  selFleet = f.id; // la flotte reste choisie : on la voit partir
   renderPick();
-  showView('planet');
+  renderFleetInfo();
+  renderMapFleets();
 };
 
 // ---------------------------------------------------------------------------

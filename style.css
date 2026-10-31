@@ -313,6 +313,14 @@ button.close-btn svg { width: 18px; height: 18px; }
 .banner.warn { border-color: rgba(255, 179, 107, 0.5); margin-bottom: 10px; }
 .banner.race { margin-bottom: 10px; padding: 8px 14px; }
 .race-link { color: var(--accent); font-weight: 600; }
+/* Bandeau du départ (D-120) : joueurs présents, prêts ou non */
+.pick-who { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.pick-who .pw { display: inline-flex; align-items: center; gap: 4px; }
+.pick-who .pw.ok { color: var(--ok, #7cf0b4); }
+.pick-who .pw.off { opacity: 0.5; }
+.pick-who .pw .hint { color: var(--muted); }
+.pick-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.pick-actions:not(:has(button:not([hidden]))) { display: none; }
 .banner.race.hot { border-color: rgba(255, 179, 107, 0.8); }
 
 /* ----- Planète du joueur ----- */

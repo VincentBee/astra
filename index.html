@@ -110,8 +110,15 @@
     <div id="alerts-panel" class="alerts-panel" hidden><ul id="alerts-list" class="alerts-list"></ul></div>
 
     <section id="view-universe" class="universe" aria-label="Carte de l'univers">
+      <!-- Départ (D-120) : prêt, attente des joueurs présents, puis le colonisateur à envoyer -->
       <div id="pick" class="banner" hidden>
-        <p><i data-ic="planet"></i> <strong>Choisis ta planète</strong> <span class="hint">· définitif</span></p>
+        <p id="pick-text"></p>
+        <p id="pick-who" class="pick-who" hidden></p>
+        <div class="pick-actions">
+          <button id="btn-ready" class="primary small" hidden></button>
+          <button id="btn-pick-fleet" class="primary small" hidden><i data-ic="fleet"></i>Ma flotte</button>
+          <button id="btn-pick-invite" class="secondary small" hidden><i data-ic="invite"></i>Inviter</button>
+        </div>
       </div>
       <div id="trades" class="trades" hidden></div>
       <div class="map-head">
@@ -145,7 +152,7 @@
             <div id="pi-ships" class="pi-ships"></div>
             <button id="btn-pi-takeoff" class="secondary" hidden><i data-ic="fleet"></i>Décoller</button>
           </section>
-          <button id="btn-claim" class="primary" hidden><i data-ic="dock"></i>S'installer</button>
+          <button id="btn-claim" class="primary" hidden><i data-ic="fleet"></i>Y envoyer mon colonisateur</button>
           <button id="btn-open-planet" class="secondary" hidden><i data-ic="build"></i>Bâtiments</button>
         </article>
       </div>
