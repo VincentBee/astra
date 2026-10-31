@@ -145,3 +145,5 @@ que fait le code.
 | D-115 | Mes planètes dans la grille sous la carte, avec Construire et Décoller | test existant | `rules.test.mjs` D-106 : le plus grand lot de vaisseaux suit le stock, et le chantier l’accepte (le lot que propose la fiche) | les cases et leurs boutons (construits par `app.js`, DOM) : vérifiés dans le navigateur seulement |
 | D-116 | Cache v64 | non testable |  | version de cache |
 | D-117 | Carte zoomable | test existant | `decisions-reseau.test.mjs` D-064 : chaque icône de la page existe, et un bouton sans texte porte un nom (boutons +, −, vue entière) | les gestes et la conversion du toucher (DOM, canvas) : vérifiés dans le navigateur seulement |
+| D-118 | Curseur du temps dans le replay | non testable |  | `replay-view.js` dépend du DOM : glissé, reprise de la lecture et flèches vérifiés dans le navigateur seulement |
+| D-119 | Cache v65 | non testable |  | version de cache |

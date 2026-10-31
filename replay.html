@@ -38,7 +38,10 @@
             <option value="3600">1 h / s</option>
           </select>
         </div>
-        <input id="rp-time" type="range" min="0" max="1000" value="0" step="1" aria-label="Moment de la partie">
+        <div class="rp-timeline">
+          <input id="rp-time" type="range" min="0" max="0" value="0" step="1" aria-label="Moment de la partie">
+          <div class="rp-bounds hint mono"><span>Début</span><span id="rp-length"></span></div>
+        </div>
         <div class="rp-row rp-steps">
           <button id="rp-prev" class="secondary" aria-label="Événement précédent">⏮ Précédent</button>
           <button id="rp-next" class="secondary" aria-label="Événement suivant">Suivant ⏭</button>

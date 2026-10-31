@@ -1125,3 +1125,32 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Statut : en vigueur. Vérifié dans Chromium (390 × 844) : boutons, molette autour du curseur,
   glisser à la souris sans ouvrir de fiche, pincement simulé jusqu'au zoom 4, toucher d'une
   planète juste une fois zoomé. Pincement sur un vrai téléphone : **non confirmé**.
+
+**D-118 — Curseur du temps dans le replay, à la minute près, sans arrêter la lecture**
+- 2026-10-31 11:40. Demande de Vincent : « Je voudrais que les replay ai un slider pour aller a
+  n'importe quel moment d'une partie en cours de visionnage ».
+- Constat : `replay.html` avait déjà un curseur (`#rp-time`, D-047), mais sur 1 000 crans (une
+  partie de 3 jours : un cran ≈ 4 min 20), rendu comme un champ de saisie (bordure et marges du
+  style des `input`), et le toucher arrêtait la lecture pour de bon.
+- Choix : le curseur compte en minutes de partie (`max` = durée en minutes) : n'importe quelle
+  minute est atteignable, au doigt ou aux flèches du clavier (une minute par appui). Glisser
+  pendant la lecture la met en pause le temps du geste, puis elle reprend du nouveau moment
+  quand on lâche ; à l'arrêt, le curseur déplace seulement. Même chose pour la courbe des
+  points (D-103). Précédent / Suivant ne coupent plus la lecture. Sous le curseur : « Début » et
+  la durée totale ; la piste est colorée jusqu'à l'instant affiché ; gros pouce carré (22 px)
+  pour le doigt.
+- Choix de Claude, par défaut : reprendre la lecture en lâchant (plutôt que rester en pause) ;
+  cran d'une minute (plus fin ne sert à rien : les ordres sont espacés de minutes et le pouce
+  ne vise pas mieux qu'un pixel, soit ≈ 3 min pour 20 h de partie) ; pas de marques
+  d'événements sur la piste (la courbe des points montre déjà où ça bouge).
+- Alternatives écartées : garder 1 000 crans ; un curseur en heures ; des marques de combats
+  sur la piste ; un champ pour taper une heure.
+- Qui : Vincent (la demande), Claude (la forme). Source : session `012yisfz`.
+- Statut : en vigueur. Vérifié dans Chromium (390 × 844, partie de robots de 20 h) : glissé
+  pendant la lecture (pause puis reprise à +12 h), flèche du clavier (+1 min). Sur un vrai
+  téléphone : **non confirmé**.
+
+**D-119 — Cache `astra-p2p-v65`**
+- 2026-10-31. Choix de Claude : `replay.html`, `js/replay-view.js` et `style.css` changent
+  (D-118) ; nouvelle version de cache pour que les téléphones les récupèrent.
+- Statut : en vigueur.
