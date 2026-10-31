@@ -1202,7 +1202,132 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   changent (D-120) ; nouvelle version de cache pour que les téléphones les récupèrent.
 - Statut : en vigueur.
 
-**D-122 — Les ordres d'assaut montrent les vaisseaux posés et une estimation du combat**
+**D-122 — Rapport de combat détaillé : le déroulé et le « pourquoi »**
+- 2026-10-31. Contexte : Vincent : « Il faut que les rapports de combat soient plus détaillés
+  et que l'on puisse comprendre pourquoi on a perdu ou gagné. » Le carnet (D-110) ne disait que
+  le résultat, les pertes de chaque camp et le butin.
+- Choix :
+  - `battle` (`js/fleet.js`) renvoie aussi `report` : pour chaque camp, les vaisseaux au départ,
+    les multiplicateurs de technologie (attaque, coque), le feu et la coque totaux, la défense de
+    la planète, la coque restante ; puis chaque passe (feu de chaque camp, pertes par type,
+    défense comprise). Le calcul du combat ne change pas.
+  - Le déroulé voyage dans le rapport que l'attaquant écrit pour le défenseur (`effects[].rep`) :
+    les deux carnets ont **le même** déroulé, chacun le lit de son côté (`side` : `'a'` ou
+    `'d'`). Nettoyé à la réception (`cleanReport`) comme toute donnée d'un autre téléphone ;
+    il ne sert qu'à l'affichage.
+  - Nouveau module pur `js/report.js` : `explainBattle(rep, side)` donne l'issue, une phrase
+    « pourquoi » (feu par passe contre coque, nombre de passes, part de la coque adverse
+    détruite), puis ce qui a pesé : rapport de forces feu × coque (et, en cas de défaite, à peu
+    près combien de vaisseaux armés il aurait fallu : racine du rapport, modèle de Lanchester,
+    **approché**), défense de la planète (part de la coque, tombée ou intacte), technologies,
+    vaisseaux sans armes qui prennent leur part des coups, absence de butin (pillage trop
+    récent, soutes pleines, rien à prendre) ; et une phrase par passe.
+  - Fenêtre Journal : sous chaque combat, la phrase « pourquoi » visible tout de suite ;
+    « Détail du combat » à déplier : ce qui a pesé, un tableau des forces de chaque camp
+    (vaisseau, nombre, ⚔, ◇, pertes ; défense « tient » ou « abattue »), les passes.
+- Choix de Claude, par défaut : le déroulé est stocké brut et expliqué à l'affichage (le texte
+  peut s'améliorer sans toucher aux sauvegardes) ; l'adversaire est nommé « l'adversaire »
+  dans les phrases ; les anciens combats du carnet, sans déroulé, restent affichés comme avant.
+- Alternatives écartées : que le défenseur recalcule le combat (il ne connaît pas la flotte
+  adverse ni ses technologies à l'heure du combat) ; envoyer le texte tout fait (plus lourd,
+  figé, et un pair pourrait y écrire n'importe quoi) ; une fenêtre à part pour chaque combat
+  (le carnet existe déjà) ; montrer les dégâts vaisseau par vaisseau (trop long sur téléphone).
+- Qui : Vincent (la demande), Claude (la forme). Source : session `012yisg3`.
+- Statut : en vigueur. 7 tests (`tests/report.test.mjs`), dont un contrôlé par mutation (rapport
+  envoyé sans déroulé). Vérifié dans Chromium (390 × 844) avec des combats injectés dans le
+  carnet. Justesse du conseil « il t'aurait fallu environ N fois plus » : **non confirmé**
+  (estimation, la défense d'une planète ne grandit pas avec la flotte).
+
+**D-123 — Cache `astra-p2p-v67`**
+- 2026-10-31. Choix de Claude : nouveau fichier `js/report.js` (ajouté à la liste du service
+  worker) et `js/app.js`, `js/fleet.js`, `js/session.js`, `style.css` changent (D-122).
+- Statut : en vigueur.
+
+**D-124 — Brouillard sur les planètes des autres, et souvenir de leur propriétaire**
+- 2026-10-31. Contexte : la détection (§8.6 des règles) ne cachait que les flottes ;
+  toutes les planètes des autres restaient visibles, avec leur propriétaire et leurs vaisseaux
+  à quai. Demande de Vincent : « on ne doit pas pouvoir voir la planète ennemie. Si on découvre
+  une planète ennemie dans notre champ de vision, on se rappelle à quel joueur elle appartient ».
+- Choix : hors de ma portée de détection, une planète des autres paraît libre (le corps céleste
+  reste dessiné : l'univers est le même pour tous) ; une planète mère hors de l'univers n'est pas
+  dessinée. Dans ma portée, je vois son vrai propriétaire et je le retiens (`intel`, propre au
+  téléphone, sauvegardé). Hors de portée ensuite : son propriétaire d'alors, en pâle, avec
+  « vue il y a … » ; pas son état (vaisseaux à quai, gisements actuels). Le souvenir ne change
+  qu'en la revoyant (prise entre-temps : on l'ignore). Mes planètes : toujours vues. Partie
+  finie : tout est révélé.
+- Choix de Claude, par défaut : souvenir local (comme le carnet de combats, D-110) plutôt que
+  dans ma fiche partagée ; découverte à chaque passage (`tick`) même carte fermée ; « Y envoyer
+  mon colonisateur » reste possible vers une planète qui paraît libre (c'est le jeu du
+  brouillard). Toujours un filtre d'affichage, pas un secret (la copie contient tout).
+- Alternatives écartées : cacher aussi le corps céleste (l'univers est déterministe, le cacher
+  n'apprendrait rien) ; un souvenir qui suit le propriétaire en direct (ce serait voir sans
+  voir) ; partager les découvertes entre joueurs (pas d'alliances).
+- Non traité : la fenêtre Joueurs montre toujours le nombre de planètes et de vaisseaux à quai
+  de chacun.
+- Qui : Vincent (la règle), Claude (la forme). Source : cette session.
+- Statut : en vigueur. 3 tests (`tests/fog.test.mjs`). Rendu dans le navigateur : non confirmé.
+
+**D-125 — Cache `astra-p2p-v68`**
+- 2026-10-31. Choix de Claude : `js/app.js`, `js/session.js`, `js/save.js` changent (D-124).
+- Statut : en vigueur.
+
+**D-126 — Viser sur la carte : aimant du doigt, menu au doigt, glisser une flotte vers sa cible**
+- 2026-10-31 15:15 (non confirmé). Demande de Vincent : « Améliore la sélection et l'utilisation des planètes
+  et des flottes dans la map. J'ai du mal des fois à déplacer les flottes vers l'endroit que je
+  veux et il faut souvent que je fasse plusieurs clics. Trouve un système plus naturel et plus
+  efficace. »
+- Constat (lecture du code) : à zoom 1, une case fait ~17 px ; la case visée était la case
+  arrondie sous le doigt (un toucher à côté d'une planète envoyait la flotte dans le vide) ;
+  flottes empilées : chaque toucher passait à la suivante, sans dire laquelle ; flotte
+  sélectionnée, toucher sa planète d'orbite pouvait reprendre une autre flotte au lieu de viser
+  la planète ; plusieurs ordres possibles : les boutons s'affichaient dans la fiche de la
+  flotte, **sous la grille des planètes et des flottes**, souvent hors de l'écran.
+- Choix :
+  1. **Aimant** (`js/aim.js`) : le doigt a une portée fixe à l'écran (18 px, au moins 0,6 case
+     zoomé) ; l'objet le plus proche (planète, une de mes flottes, flotte adverse vue) est visé,
+     plus la case arrondie.
+  2. **Pas de devinette** : si d'autres objets sont presque aussi près (moins de 12 px d'écart),
+     un **menu au doigt** s'ouvre sur la carte (« Lequel ? », « Que viser ? ») au lieu de
+     choisir au hasard ou de faire tourner les flottes une à une.
+  3. **Ordres au doigt** : plusieurs ordres possibles (se poser / orbite, attaquer / conquérir,
+     coloniser / orbite, ou panne en route) → le même menu, posé à côté du doigt, l'ordre
+     principal en premier et en couleur, plus « Fiche de … » pour voir la planète sans relâcher
+     la flotte. Un seul ordre sans risque (case vide, planète libre sans colonisateur) part
+     tout de suite, comme avant.
+  4. **Glisser pour envoyer** : appuyer sur une de mes flottes et glisser trace un trait
+     jusqu'à la cible (aimantée), l'ordre est écrit au-dessus du doigt ; lâcher envoie (ou
+     ouvre le menu s'il y a un choix). Lâcher sur la flotte elle-même : rien. Un glissé qui
+     commence ailleurs déplace la vue, comme avant (D-117).
+  5. Flotte sélectionnée : la retoucher la relâche ; toucher une autre de mes flottes la
+     choisit ; une flotte adverse → menu « Attaquer la flotte de … ».
+  6. **Autonomie dessinée** : losange jaune pointillé autour de la flotte sélectionnée, les
+     cases que son carburant atteint (distance |dx| + |dy|, comme les règles).
+  7. La fiche de la flotte sélectionnée remonte **juste sous la carte** (avant la grille).
+- Choix de Claude, par défaut : les seuils (18 px, 0,6 case, 12 px, 8 px pour un glissé) ;
+  toucher la carte pendant que le menu est ouvert le ferme sans rien envoyer (taper à côté pour
+  annuler ne doit pas envoyer la flotte) ; le menu se ferme quand la vue bouge (pas de menu
+  qui flotte loin de sa cible) ; lâcher une flotte traînée ne choisit jamais une autre de mes
+  flottes (on vise un endroit) ; sans flotte sélectionnée, les flottes adverses ne sont pas
+  des cibles.
+- Alternatives écartées : agrandir les objets (la carte est pleine à zoom 1) ; loupe sous le
+  doigt (cache ce qu'on vise, demande un appui long) ; envoyer d'office l'ordre principal en
+  lâchant (attaquer et conquérir ne se confondent pas, on demande) ; appui long pour la fiche
+  (lent, et peu découvrable sur un téléphone).
+- Qui : Vincent (la demande), Claude (le système). Source : session `012yisfzoyH`.
+- Statut : en vigueur. 8 tests (`tests/aim.test.mjs`). Vérifié dans Chromium (390 × 844,
+  toucher simulé) : toucher une planète libre avec le colonisateur → menu « Fonder / orbite /
+  fiche » ; toucher à côté → menu fermé, rien d'envoyé ; glisser le colonisateur jusqu'à la
+  planète → trait, libellé, menu, colonisation ; planète mère avec 3 flottes en orbite →
+  « Lequel ? » ; flotte choisie + case vide → départ direct ; flotte choisie + planète mère →
+  « Se poser / orbite / Choisir Flotte 2 / 3 » ; glisser depuis le vide zoomé → la vue bouge,
+  aucun ordre. Sur un vrai téléphone : **non confirmé**.
+
+**D-127 — Cache `astra-p2p-v69`**
+- 2026-10-31. Choix de Claude : `index.html`, `style.css`, `js/app.js` changent et
+  `js/aim.js` apparaît (ajouté à la liste du cache) (D-126).
+- Statut : en vigueur.
+
+**D-128 — Les ordres d'assaut montrent les vaisseaux posés et une estimation du combat**
 - 2026-10-30 14:05. Contexte : recette (point 1.2) : « Conquérir X · défense ⚔ ◇ » ne comptait que
   les bâtiments (`fortOf`) ; un joueur a vu « ⚔54 ◇1380 » sur une planète qui avait 7 + 9
   vaisseaux posés, et a perdu des assauts d'avance.
@@ -1218,7 +1343,7 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Qui : Vincent (demande), Claude (forme et seuils). Source : session `fb0c1844`. Statut : en vigueur.
 - Tests : `tests/end.test.mjs`, trois tests « Attaquer » et « Conquérir »… / sans vaisseaux posés / hors de ma détection.
 
-**D-123 — Cache `astra-p2p-v67`**
-- 2026-10-31. Contexte : fusion de `main` (cache v66) dans la PR des ordres d'assaut (D-122).
-- Choix : `VERSION` passe à `astra-p2p-v67` pour que les téléphones prennent le nouveau `session.js`.
+**D-129 — Cache `astra-p2p-v70`**
+- 2026-10-31. Contexte : fusion de `main` (cache v69) dans la PR des ordres d'assaut (D-128).
+- Choix : `VERSION` passe à `astra-p2p-v70` pour que les téléphones prennent le nouveau `session.js`.
 - Qui : Claude, par défaut. Source : session `fb0c1844`. Statut : en vigueur.

@@ -471,6 +471,13 @@ Une flotte qui attend la réponse à un échange est **bloquée** (`locked`,
   visible (`js/session.js:1088`), on perd la poursuite si la cible sort de vue
   (`js/session.js:1114-1119`), et on ne peut échanger qu'avec une flotte visible
   (`js/session.js:1228`).
+- **Brouillard sur les planètes** (D-124) : `knownOwner(cell)` dit ce que je sais d'une case.
+  Mes planètes : toujours vues. Une case dans ma portée (`seesCell`) : son vrai propriétaire,
+  retenu dans `intel` ({ "x,y": { pid, at } }), propre à ce téléphone, sauvegardé avec la
+  partie (`saveGame(…, intel)`), jamais envoyé aux autres. Hors de portée : le propriétaire vu
+  la dernière fois (même s'il l'a perdue depuis), ou rien (elle paraît libre). Vue libre :
+  le souvenir s'efface. `scout` passe toutes les planètes des autres à chaque `tick`, carte
+  fermée comprise. Partie finie (`over`) : tout est visible.
 
 ## 9. Combat
 
@@ -488,6 +495,11 @@ Une flotte qui attend la réponse à un échange est **bloquée** (`locked`,
 - Après 4 passes avec des survivants des deux côtés, chaque camp garde ses survivants. Le
   journal dit « Combat indécis » pour un combat de flottes (`js/session.js:1175-1176`), et
   « perd le combat » pour une attaque de planète non gagnée (`js/session.js:1662`).
+- **Déroulé** (D-122) : `battle` renvoie aussi `report = { a, d, rounds }`. Chaque camp :
+  `{ race, ships (au départ), bonus: { attack, hull } (technologies), fire, hull (totaux au
+  départ, défense comprise), fort?: { attack, hull }, hullLeft }` ; chaque passe : `{ a, d (feu
+  de chaque camp), aLost, dLost (pertes par type, clé `fort` = défense abattue) }`. Il ne change
+  pas le calcul ; il sert au carnet (§9.5).
 - Le calcul est fait par le téléphone de l'attaquant, sur sa copie de la fiche du défenseur ;
   le défenseur ne décide rien. Pour un combat de flottes, la technologie du défenseur est celle
   de sa planète mère (`enemy.planet?.tech`, `js/session.js:1158`).
@@ -498,7 +510,7 @@ Une flotte qui attend la réponse à un échange est **bloquée** (`locked`,
   D-092) ; `ordersAt` propose les deux sur une planète adverse, avec la défense affichée
   (« Conquérir Hadar · défense ⚔ 8 ◇ 80 + 3 vaisseaux posés · victoire probable »). Les vaisseaux
   posés ne sont comptés que dans ma détection (`seesCell`), sinon « ? ». L'estimation
-  (`assaultView`, D-122) joue `battle` à l'heure présente avec ce que je vois : « bataille
+  (`assaultView`, D-128) joue `battle` à l'heure présente avec ce que je vois : « bataille
   perdue » si perdu, « victoire incertaine » si gagné sans voir les vaisseaux ou en perdant plus de
   la moitié de la flotte, sinon « victoire probable ».
 - À l'arrivée (`arrive`), le défenseur = **les vaisseaux posés sur la planète** à l'heure
@@ -516,7 +528,8 @@ Une flotte qui attend la réponse à un échange est **bloquée** (`locked`,
   l'attaquant, avec la clé `pid:planète`. Sans ça, des attaques en chaîne depuis l'orbite
   vidaient tout. Le combat a lieu quand même ; seul le butin est refusé.
 - J'écris un rapport `{ id, to, key, at, ships: pertes, lost: mes pertes, take: butin }` dans mes
-  `effects` (`lost` depuis D-110, pour le carnet du défenseur ; absent des anciens rapports).
+  `effects` (`lost` depuis D-110, pour le carnet du défenseur ; absent des anciens rapports ;
+  `rep` depuis D-122 : le déroulé du combat, nettoyé à la réception par `cleanReport`).
 - **Conquête** (`conquer` gagné, sur une case que le froid n'a pas prise) : le rapport porte en
   plus `capture: true` et `cell`. `Session.capture` crée tout de suite une colonie neuve de ma
   race sur la case (`newPlanet`, les bâtiments adverses sont perdus), avec les survivants, la
@@ -596,6 +609,17 @@ Une flotte qui attend la réponse à un échange est **bloquée** (`locked`,
   planet, capture, mine, theirs, loot, pillaged }` ; `mine`/`theirs` = vaisseaux perdus de chaque
   côté (`theirs` = `null` si le rapport n'a pas `lost`) ; `loot` = ce que j'ai pris, `pillaged` =
   ce qu'on m'a pris ; `at` = l'heure du combat (passée si calculée au retour, D-109).
+- **Rapport détaillé** (D-122) : l'entrée porte aussi `rep` (le déroulé de `battle`, le même
+  dans les deux carnets : l'attaquant l'envoie dans son rapport) et `side` (`'a'` attaquant,
+  `'d'` défenseur) ; pour une victoire de l'attaquant sans butin, `noLoot` (`'cooldown'`,
+  `'full'`, `'empty'`) et `cooldown` (ms). `js/report.js` l'explique, sans état :
+  `explainBattle(rep, side, { noLoot, cooldown })` → `{ outcome: 'win' | 'loss' | 'both' |
+  'draw', reasons, rounds }` (la première raison dit pourquoi : feu par passe contre coque,
+  nombre de passes, part de la coque adverse détruite ; puis rapport de forces feu × coque et,
+  en cas d'échec, combien de vaisseaux armés en plus il aurait fallu, à peu près — racine du
+  rapport ; défense de la planète ; technologies ; vaisseaux sans armes ; butin absent) ;
+  `sideTable(rep, side)` → lignes du tableau des forces. Les anciennes entrées, sans `rep`,
+  n'ont pas de détail.
 - Gardé dans la sauvegarde du téléphone (`saveGame(me, state, journal)`), repris par
   `Session.resume` **avant** le rattrapage, et par `onWelcome` si c'est la même partie et le même
   joueur. Jamais dans la fiche ni le journal d'ordres : rien à rejouer, rien à fusionner.
@@ -845,6 +869,7 @@ Résultat : `tests 34, pass 34, fail 0`, environ 5,6 s (le rejeu d'une partie de
 | `tests/combat.test.mjs` | 4 | Attaques contre une planète : pas de butin créé avec un défenseur hors ligne ou plusieurs flottes arrivées ensemble ; 70 attaques avant le retour du défenseur ; les vaisseaux perdus emportent leur cargaison |
 | `tests/effects.test.mjs` | 1 | 5 joueurs, 4 attaquants × 70 combats : chaque perte subie une fois, puis rapports oubliés des deux côtés |
 | `tests/fleet.test.mjs` | 20 | Deux flottes sur la même cible ; poursuite mutuelle ; colonie qui encaisse les pertes ; premier arrivé à la colonisation ; plein en panne tout près ; plusieurs attaquants ne pillent pas plus que le stock ; revanche ; raids sans armes et un pillage par 2 min ; flotte agressive qui combat puis reprend sa route ; flotte passive qui croise sans combattre ; agressive à l'arrêt qui garde sa case ; deux agressives : pertes comptées une fois ; agressive refusée sans armes, vue par les autres, gardée à la fusion (D-100) ; vitesse du vaisseau le plus lent ; rencontres que personne n'a regardées : `firstContact`, agressive et poursuite hors ligne, pas de combat rejoué, pertes comptées une fois (D-109) |
+| `tests/report.test.mjs` | 7 | Rapport de combat détaillé (D-122) : déroulé cohérent avec les pertes (défense comprise) ; explication du vainqueur et du vaincu avec les chiffres ; défense, technologies, cargos sans armes, combat indécis ; vaisseaux sans armes et victoire sans butin ; déroulé trafiqué borné ; même déroulé dans les deux carnets ; seconde attaque trop tôt expliquée |
 | `tests/colony.test.mjs` | 1 | Colonie perdue au recollage : vaisseaux et cargaison restent en orbite |
 | `tests/start.test.mjs` | 11 | Départ commun et colonisateur (D-120) : pas de départ tant qu'un présent n'est pas prêt ; tous prêts → même départ partout, une seule flotte d'un colonisateur chacun, plein fait, cases distinctes hors planètes ; planète mère fondée à l'arrivée (bâtiments et stock de départ), installation directe et astéroïde refusés ; absent qui ne bloque pas puis entre en retard ; « plus prêt » ; deux colonisateurs sur la même planète ; colonisateur perdu → éliminé ; pas de fin tant qu'un joueur vole ; fondation hors ligne acceptée ; rejeu fidèle ; toute planète atteignable. Harnais `newLobby` (`tests/harness.mjs`) |
 | `tests/hostile.test.mjs` | 6 | Pair malveillant ou fiche abîmée : personne ne réécrit ma fiche ni un secret, ni ne date sa fiche loin dans le futur ; fiche abîmée sans plantage ; race ou identifiant spécial ; installation antidatée ; heure qui recule ; téléphone en avance reste visible. Une partie de ces tests passe par l'acceptation des fiches (mécanisme décrit dans reseau.md) |

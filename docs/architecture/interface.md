@@ -117,7 +117,7 @@ Toutes se ferment par leur croix (`.close-btn`), un toucher sur le fond sombre o
 
 - `#scanner` (318-323) : caméra plein écran, `scan()` (`js/app.js:116-126`) appelle `scanQr` de `js/scanner.js` (voir `reseau.md`), **Annuler** abandonne via `AbortController`.
 - `#toast` : messages **à la file** (D-110), `toast(text, ms = 3200)` puis `nextToast()` : un à la fois, dans l'ordre ; 6 en attente au plus (les longs restent) ; un doublon de ce qui est affiché ou attend est ignoré ; d'autres attendent → au moins 2 s chacun. Appli cachée : ignoré. La session y écrit aussi via `session.ontoast` (« tu es éliminé » : 8 s).
-- `#btn-journal` (à gauche de `#net`, déplacé avec lui par `showView`) et `#sheet-journal` (D-110) : `openJournal(away)` montre « Combats et planètes » (le carnet `session.journal`, du plus récent au plus ancien ; bord vert gagné, rouge perdu ; ligne « Tes pertes · Ses pertes · Butin / Pillé » ; fond plus clair = pas encore lu), puis « Ce qui me concerne » (lignes du journal partagé qui contiennent mon nom, 20 au plus). Ouvrir marque tout lu (`session.markRead`). Pastille `#journal-count` = entrées non lues (mise à jour par `renderLive`).
+- `#btn-journal` (à gauche de `#net`, déplacé avec lui par `showView`) et `#sheet-journal` (D-110) : `openJournal(away)` montre « Combats et planètes » (le carnet `session.journal`, du plus récent au plus ancien ; bord vert gagné, rouge perdu ; ligne « Tes pertes · Ses pertes · Butin / Pillé » ; fond plus clair = pas encore lu ; depuis D-122, `reportHtml(e)` ajoute la phrase « pourquoi » (`.j-why`) et un `<details class="j-report">` « Détail du combat » : ce qui a pesé (`.j-reasons`), deux tableaux des forces `.j-forces` — « Tes forces » et « Forces de … », avec feu et coque au départ ; colonnes Vaisseau, Nb, ⚔, ◇, Perdus ; défense « tient » ou « abattue » — et les passes (`.j-rounds`), textes de `js/report.js`), puis « Ce qui me concerne » (lignes du journal partagé qui contiennent mon nom, 20 au plus). Ouvrir marque tout lu (`session.markRead`). Pastille `#journal-count` = entrées non lues (mise à jour par `renderLive`).
 - Résumé « Pendant ton absence » : `showAbsence(gone)` ouvre la même fenêtre limitée au neuf si l'absence dépasse `AWAY_MS` (2 min) et qu'il y a du neuf. Appelé à la reprise d'une partie (absence = depuis `savedAt`, neuf = non lu) et 1 s après le retour au premier plan (`visibilitychange` ; neuf = noté depuis qu'elle a été cachée). Bouton « Tout le journal ».
 - Fond de galaxie : un `div.galaxy` inséré en tête de `<body>` par `startGalaxy()` (§7.4).
 
@@ -189,8 +189,8 @@ Table des appels de l'interface vers la session :
 | Retirer un élément du fil de construction | `#plan` (× d'un élément) | `unplan` |
 | Vaisseaux depuis la carte (D-106, D-115) | écouteur de `#pi-ships` (fiche ouverte en touchant la planète, ou par le bouton **+** de sa case sous la carte) | `buildShips(type, n, clé de la planète touchée)` ; ×N = `shipsAffordable` |
 | Décoller (onglet Flottes, fiche de la carte, ou case de la planète sous la carte, D-115) | `openFleetSheet(clé)`, `btn-fleet-go` | `takeOff(fleetKey, …)` (renvoie l'id de la flotte, sélectionnée ensuite) |
-| Envoyer une flotte sur une case | 1619-1623, 1697 | `ordersAt` (ordres possibles) puis `moveFleet` |
-| Poursuivre une flotte ennemie | 1691 | `chaseFleet` |
+| Envoyer une flotte sur une case (toucher ou glisser, D-126) | `orderAt`, `actionsFor`, menu `#map-menu` | `ordersAt` (ordres possibles) puis `moveFleet` |
+| Poursuivre une flotte ennemie | menu au doigt « Attaquer la flotte de … » (`actionsFor`) | `chaseFleet` |
 | Arrêter / plein / rentrer / se poser | 1701-1708 | `stopFleet`, `refuelFleet`, `returnFleet`, `moveFleet(…, 'dock')` |
 | Donner / fusionner / scinder | 1869, 1832 | `transferFleet`, `mergeFleets`, `splitFleet` |
 | Proposer / accepter / refuser un échange | 1770, 1806 | `proposeTrade`, `answerTrade` |
@@ -211,23 +211,74 @@ Retour de la session vers l'interface : seulement deux rappels, `session.onchang
   3. halo de détection de ma couleur, en un seul tracé pour que les zones superposées ne foncent pas (1394-1405) ;
   4. planètes (`mapPlanets()`, 1286-1299) : disque + anneau incliné ; libre = gris `#8d95b3` et anneau en pointillés, et pulsation pendant le choix de planète ; à moi ou touchée = cercle blanc ; nom du propriétaire au-dessus (tronqué à 8 caractères) ; joueur hors ligne = transparence. Astéroïdes (polygone irrégulier) et comètes (tête + queue opposée au soleil) : `drawSmallBody` (1314-1347) ;
   5. flottes (`fleetSpots`, 1546-1566) : triangle orienté ; en route, pointillés jusqu'à la destination ; à l'arrêt, posées en couronne autour du centre de la case ; rouge `#ff7a93` si attaque ou poursuite ; cercle blanc = ma flotte sélectionnée, cercle rouge = proie visée ; croix rouge au point de panne ; jauge de carburant sous mes flottes ; flotte à sec grisée ;
-  6. case visée en attente d'un choix : carré blanc qui pulse (1528-1535).
+  6. case visée en attente d'un choix (menu au doigt ouvert) : carré blanc qui pulse ;
+     losange d'autonomie de la flotte sélectionnée (`drawRange`) et visée d'une flotte traînée
+     (`drawAim`) : voir §6.2 (D-126).
 - Seules les flottes que je vois (`session.sees`, portée de détection) sont dessinées (1552).
+- Planètes des autres (D-124) : `mapPlanets` passe par `session.knownOwner`. Jamais vue = dessinée
+  libre ; planète mère hors de l'univers jamais vue = pas dessinée du tout ; vue autrefois =
+  souvenir : couleur et nom de son propriétaire d'alors, pâles, anneau en pointillés, sans son
+  état (`pl` nul). La fiche dit « vue il y a … , hors de portée » (`seenAgo`) et ne montre que ce
+  que tout le monde sait de l'univers (gisements de départ, climat, places).
 - Coordonnées de ma planète mère dans `#my-coords`, ou « à choisir » (1537).
 
-### 6.2 Toucher (`js/app.js:1573-1640`)
+### 6.2 Toucher et viser (D-126)
 
-Le point touché est converti en cases : `zoom.x + pixels CSS / cellCss()` (taille d'une case à l'écran, zoom compris). Un clic qui termine un glissé ou un pincement (`gesture.moved`) est ignoré. Puis, dans l'ordre :
-1. **Une de mes flottes sous le doigt** (< 0,7 case, plus proche qu'une planète) → la sélectionner ; plusieurs flottes empilées : chaque toucher passe à la suivante (1592-1604). Si une flotte est déjà sélectionnée, seules celles de la case touchée comptent.
-   Autre façon de sélectionner : toucher la flotte dans la grille `#map-fleets` sous la carte (D-107, D-108).
-   La même grille commence par une case par planète à moi (D-115) : construire et faire décoller sans chercher la planète sur la carte.
-   Carte zoomée : choisir une flotte dans la grille recentre la vue sur elle si elle est hors champ (`reveal`, D-117).
-2. **Une flotte sélectionnée** :
-   - une flotte ennemie sous le doigt → `prey`, la fiche propose « Attaquer » (1607-1615) ;
-   - sinon la case touchée : `session.ordersAt` ; un seul ordre possible sans panne → `moveFleet` direct ; sinon `pending` = la case, et la fiche affiche un bouton par ordre (1617-1625, rendu 1674-1681).
-3. **Sinon** : une planète, à moi ou non → sa fiche (`selected`) ; pour la mienne, la fiche porte le chantier, « Décoller » et « Bâtiments » (D-106 ; avant, toucher ma planète ouvrait directement la vue planète) ; le vide → ferme la fiche.
+Le point touché est converti en cases par `toCells` : `zoom.x + pixels CSS / cellCss() − 0,5`
+(le centre d'une case tombe sur ses coordonnées entières, comme les planètes et `fleetSpots`).
+Un clic qui termine un glissé, un pincement ou une visée (`gesture.moved`) est ignoré.
 
-État de la carte, variables de module (1208-1214) : `currentView`, `openKey` (« home » ou id d'une colonie), `mapFrame`, `selected`, `selFleet`, `pending`, `prey`.
+**Aimant (`js/aim.js`, sans DOM, testé par `tests/aim.test.mjs`).** `mapItems()` liste tout ce
+qu'on peut toucher : planètes (`type: 'planet'`), mes flottes (`'mine'`), flottes adverses vues
+(`'foe'`). `underFinger` garde ceux à portée du doigt (`FINGER` = 18 px CSS, au moins
+`MIN_REACH` = 0,6 case zoomé), du plus proche au plus loin ; `contenders` garde le premier et
+ceux à moins de `GAP` = 12 px de lui. `readTap(items, at, px, sel, drag)` renvoie `empty`, `one`
+(un objet) ou `many` (plusieurs à égalité). Sans flotte sélectionnée, les flottes adverses ne
+comptent pas ; la flotte sélectionnée ne compte que seule sous le doigt ; une flotte lâchée
+(`drag`) ne vise jamais une de mes flottes.
+
+**Toucher (écouteur `click` de `#map`).** Menu ouvert → le toucher le ferme, rien d'autre. Puis :
+1. `many` sans flotte sélectionnée → menu « Lequel ? » (une ligne par objet : « Flotte 2 ·
+   3 vaisseaux », « Lyra · fiche ») ;
+2. une de mes flottes → la sélectionner (`selectFleet`) ; la flotte déjà sélectionnée → la
+   relâcher ;
+3. flotte sélectionnée → `orderAt` : les actions de chaque objet visé (`actionsFor` :
+   `session.ordersAt` sur la planète ou la case vide, « Attaquer la flotte de … » sur une
+   flotte adverse, « Choisir · Flotte N » sur une autre de mes flottes). Un seul ordre sans
+   panne vers une planète ou une case → `moveFleet` tout de suite ; sinon menu au doigt
+   (ordre principal en premier, en couleur, puis « Fiche de … ») ;
+4. sinon une planète → sa fiche (`selected`, `#sheet-planet`) ; le vide → ferme la fiche.
+
+Autre façon de sélectionner : toucher la flotte dans la grille `#map-fleets` sous la carte
+(D-107, D-108) ; la même grille commence par une case par planète à moi (D-115). Carte zoomée :
+choisir une flotte dans la grille recentre la vue sur elle si elle est hors champ (`reveal`).
+
+**Menu au doigt (`#map-menu`, dans `.map-wrap`).** `openMenu(at, items, …)` écrit les boutons
+puis le place avec `menuPlace` (à droite du doigt s'il y a la place, sinon à gauche, jamais hors
+de la carte). Il se ferme par sa croix, Échap, un toucher sur la carte ou hors d'elle, un
+glissé, un pincement, la molette ou les boutons de zoom (il est posé sur un point de la carte
+et ne suit pas la vue). La case visée pulse en blanc (`menu.cell`), la flotte adverse visée a
+un cercle rouge (`menu.foe`).
+
+**Glisser une flotte (`gesture.aim`).** `pointerdown` sur une de mes flottes (parmi les objets
+à égalité sous le doigt ; la sélectionnée d'abord) arme la visée. Au-delà de 8 px, la vue ne
+bouge pas : la flotte est sélectionnée, `drawAim` trace un trait jusqu'à la cible aimantée
+(`aimRead`), l'entoure, et écrit l'ordre au-dessus du doigt (rouge si attaque ou panne en
+route). `pointerup` → `dropFleet` : même règle que le toucher (`orderAt`), sauf lâchée sur
+elle-même (rien). Un deuxième doigt annule la visée (pincement). Un glissé qui commence hors
+de mes flottes déplace la vue (§6.4).
+
+**Autonomie.** `drawRange` dessine, autour de la flotte sélectionnée (ou traînée), le losange
+pointillé jaune des cases que son carburant atteint (`fuelAt / fleetBurn`, distance
+|dx| + |dy|).
+
+La fiche de la flotte (`#fleet-info`) est juste sous la carte, avant la grille `#map-fleets`
+(avant D-126 elle était après, et ses boutons d'ordre `#fi-choice`, retirés, tombaient souvent
+hors de l'écran).
+
+État de la carte, variables de module : `currentView`, `openKey` (« home » ou id d'une
+colonie), `mapFrame`, `selected` (planète dont la fiche est ouverte), `selFleet`, `menu`
+(`{ at, items, title, cell, fleet, foe }`), et `gesture` (`pts`, `moved`, `aim`).
 
 ### 6.4 Zoom (D-117)
 
@@ -353,7 +404,7 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   affichés sont `session.scoreOf(p)` (tout l'empire).
 - **Flottes** : sur une planète adverse, deux boutons « Attaquer X (joueur) » et « Conquérir X »,
   suivis tous deux de « · défense ⚔ a ◇ c + N vaisseaux posés · victoire probable » (`ordersAt`,
-  `assaultView`, D-122) : « + ? vaisseaux » hors de ma détection ; issue « victoire probable »,
+  `assaultView`, D-128) : « + ? vaisseaux » hors de ma détection ; issue « victoire probable »,
   « victoire incertaine » ou « bataille perdue ». Une flotte en conquête est dessinée en rouge comme une attaque.
 - **Bâtiments** : les bâtiments de défense de la race apparaissent dans la liste comme les autres.
   Carte dépliée (toucher le nom) : bouton « Déconstruire un niveau » (`data-demolish`), caché au

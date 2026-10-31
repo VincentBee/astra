@@ -406,6 +406,15 @@ button.close-btn svg { width: 18px; height: 18px; }
 .map-zoom button { width: 36px; min-height: 36px; padding: 0; background: rgba(10, 14, 28, 0.82); }
 .map-zoom button:disabled { opacity: 0.35; }
 .map-zoom .ic { width: 16px; height: 16px; }
+/* Menu au doigt (D-126) : posé à côté du point touché, par-dessus la carte. */
+.map-menu {
+  position: absolute; z-index: 5; display: grid; gap: 6px; width: max-content; max-width: min(280px, calc(100% - 16px));
+  padding: 8px; background: rgba(10, 14, 28, 0.96); border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.map-menu[hidden] { display: none; }
+.mm-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font: 0.75rem var(--mono); color: var(--muted); }
+.mm-head button { min-height: 28px; width: 28px; padding: 0; }
+.map-menu [data-mm] { justify-content: flex-start; text-align: left; min-height: 40px; }
 
 
 /* ----- Feuille d'invitation ----- */
@@ -749,6 +758,17 @@ button#btn-journal { color: var(--text); }
 .journal .j-time { color: var(--muted); font-size: 0.75rem; margin-right: 6px; }
 .journal .j-detail { color: var(--muted); font-size: 0.8rem; margin-top: 2px; }
 .journal .j-empty { border: 0; padding: 0; color: var(--muted); }
+.journal .j-why { margin: 4px 0 0; font-size: 0.85rem; }
+.journal .j-report { margin-top: 2px; gap: 6px; }
+.journal .j-report[open] > *:not(summary) { margin-top: 4px; }
+.journal .j-report summary { padding: 2px 0; font-size: 0.82rem; }
+.journal .j-reasons, .journal .j-rounds { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 0.82rem; }
+.journal .j-reasons li, .journal .j-rounds li { border: 0; padding: 0; }
+.journal .j-forces { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+.journal .j-forces caption { text-align: left; color: var(--muted); padding-bottom: 2px; }
+.journal .j-forces th, .journal .j-forces td { padding: 2px 4px; border-bottom: 1px solid var(--line); text-align: right; }
+.journal .j-forces th:first-child, .journal .j-forces td:first-child { text-align: left; }
+.journal .j-forces th { color: var(--muted); font-weight: normal; }
 #sheet-journal section { margin-top: 12px; }
 #sheet-journal .sheet-panel { max-height: 85vh; overflow-y: auto; }
 #sheet-players .sheet-panel { gap: 14px; }

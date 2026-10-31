@@ -22,6 +22,7 @@ import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity } from './save.js';
 import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, PLAN_MAX, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, sunFor, fortOf, seeded } from './game.js';
 import { TECHS, SHIPS, sightRange, TEMPO } from './tech.js';
+import { cleanReport } from './report.js';
 import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, firstContact, salvage, applyLosses, parkedCell, fleetPos, fleetCargo, fleetTank, ORDERS, MAX_FLEETS, STANCES, aggressive, armed } from './fleet.js';
 import { amounts, isEmpty, holdings, lacks, noRoom, take, put, outcome, OFFER_MS, MAX_OFFERS, GRACE_MS } from './trade.js';
 
@@ -177,7 +178,7 @@ function cleanAmounts(o) {
       .map(([k, v]) => [k, Math.min(v, MAX_AMOUNT)]),
   );
 }
-const cleanEffect = (e) => ({ ...e, ships: cleanAmounts(e.ships), take: cleanAmounts(e.take), ack: Array.isArray(e.ack) ? e.ack.filter((x) => typeof x === 'string').slice(0, 20) : [] });
+const cleanEffect = (e) => ({ ...e, ships: cleanAmounts(e.ships), take: cleanAmounts(e.take), ack: Array.isArray(e.ack) ? e.ack.filter((x) => typeof x === 'string').slice(0, 20) : [], rep: cleanReport(e.rep) });
 
 /** Identifiant de joueur acceptable (pas de clé spéciale comme __proto__). */
 export const pidOk = (pid) => typeof pid === 'string' && /^[A-Za-z0-9-]{1,24}$/.test(pid);
@@ -250,6 +251,7 @@ export class Session {
     s.me = saved.me;
     s.state = clean(saved.state);
     s.status = 'playing';
+    s.intel = saved.intel || {}; // brouillard (D-124) : ce que j'ai vu des planètes des autres
     s.journal = saved.journal || null; // avant le rattrapage : les combats de l'absence s'y inscrivent
     s.refreshOnline();
     s.start();
@@ -509,7 +511,10 @@ export class Session {
     let st = clean(msg.state);
     if (mine && mine.state.gid === st.gid) st = mergeStates(st, clean(mine.state));
     // Mon carnet de combats de cette partie, s'il est sur ce téléphone (même joueur).
-    if (mine && mine.state.gid === st.gid && mine.me === msg.you) this.journal = mine.journal || null;
+    if (mine && mine.state.gid === st.gid && mine.me === msg.you) {
+      this.journal = mine.journal || null;
+      this.intel = mine.intel || {};
+    }
     this.me = msg.you;
     this.state = st;
     const id = loadIdentity();
@@ -1498,6 +1503,51 @@ export class Session {
     return eyes.some((e) => Math.hypot(pos.x - e.x, pos.y - e.y) <= e.r + 1e-9);
   }
 
+  /** Une case est-elle dans ma portée de détection ? */
+  seesCell(cell, now, eyes = this.eyes(now)) {
+    return eyes.some((e) => Math.hypot(cell.x - e.x, cell.y - e.y) <= e.r + 1e-9);
+  }
+
+  /**
+   * Brouillard sur les planètes (D-124) : ce que je sais de la case `cell`.
+   * Dans ma portée (ou la partie finie) : son vrai propriétaire, retenu dans
+   * mes renseignements (`intel`, propre à ce téléphone, gardé avec la
+   * sauvegarde). Hors de portée : le propriétaire vu la dernière fois, même
+   * s'il l'a perdue depuis ; jamais vue : rien, elle paraît libre.
+   * { owner, live, at } — `live` : vu maintenant ; `at` : quand il a été vu.
+   */
+  knownOwner(cell, now = this.now(), eyes = this.eyes(now)) {
+    const real = this.ownerAt(cell);
+    if (real?.id === this.me || this.over) return { owner: real, live: true, at: now };
+    const k = `${cell.x},${cell.y}`;
+    const intel = (this.intel ||= {});
+    if (this.seesCell(cell, now, eyes)) {
+      if (real ? intel[k]?.pid !== real.id : intel[k]) {
+        if (real) intel[k] = { pid: real.id, at: now };
+        else delete intel[k];
+        this.scheduleSave();
+      } else if (real) intel[k].at = now;
+      return { owner: real, live: true, at: now };
+    }
+    const memo = intel[k];
+    const owner = memo && this.state.players[memo.pid];
+    return owner ? { owner, live: false, at: memo.at } : { owner: null, live: false, at: null };
+  }
+
+  /** Passe en revue les planètes des autres : celles que je vois rejoignent mes renseignements. */
+  scout(now = this.now()) {
+    const eyes = this.eyes(now);
+    if (!eyes.length) return;
+    for (const p of Object.values(this.state.players)) {
+      if (p.id === this.me) continue;
+      for (const pl of this.planetsOf(p)) this.knownOwner(pl.cell, now, eyes);
+    }
+    for (const k of Object.keys(this.intel || {})) {
+      const [x, y] = k.split(',').map(Number);
+      this.knownOwner({ x, y }, now, eyes); // perdue ou abandonnée sous mes yeux : oubliée
+    }
+  }
+
   /** La flotte `id` d'un joueur, ou celle qui l'a absorbée en fusionnant. */
   fleetOf(p, id) {
     const all = p?.fleets || [];
@@ -1634,11 +1684,12 @@ export class Session {
     const id = this.newId(8);
     p.engaged = [...(p.engaged || []), { fleet: target.id, by: f.id, at: now, id }].slice(-20);
     // `lost` : mes pertes, pour son rapport de combat (il ne les connaît pas autrement).
-    p.effects = [...(p.effects || []), { id, to: enemy.id, fleet: target.id, by: f.id, sim: true, ack, at: now, ships: res.defLost, lost: res.attLost, take }].slice(-MAX_EFFECTS);
+    p.effects = [...(p.effects || []), { id, to: enemy.id, fleet: target.id, by: f.id, sim: true, ack, at: now, ships: res.defLost, lost: res.attLost, take, rep: res.report }].slice(-MAX_EFFECTS);
     const loot = lootText(take);
     const wiped = !countShips(res.attLeft);
     this.note(p, {
       at: now, kind: 'combat', who: enemy.name, mine: countShips(res.attLost), theirs: countShips(res.defLost), loot,
+      rep: res.report, side: 'a', noLoot: res.won && !loot ? (fleetCargo(p.race, res.attLeft) > SOIL.reduce((t, r) => t + (f.cargo?.[r] || 0), 0) ? 'empty' : 'full') : undefined,
       tone: res.won ? 'good' : wiped ? 'bad' : 'even',
       text: res.won ? `Ta flotte détruit une flotte ${de(enemy.name)}.` : wiped ? `Ta flotte est détruite par ${enemy.name}.` : `Combat de flottes indécis contre ${enemy.name}.`,
     });
@@ -2023,6 +2074,7 @@ export class Session {
     const p = this.state.players[this.me];
     if (!p?.race) return;
     const now = this.now();
+    this.scout(now); // brouillard (D-124) : ce que mes planètes et mes flottes voient en ce moment
     const entered = this.enterRace(p, now); // départ donné : ma flotte de départ apparaît
     const racing = Number.isFinite(p.ready) && Number.isFinite(p.since) && !p.out; // dans la course, peut-être sans planète
     if (!p.planet && !p.fleets?.length && !racing) return;
@@ -2180,7 +2232,7 @@ export class Session {
       const w = this.planets.find((x) => sameCell(x, pl.cell));
       const capture = order.kind === 'conquer' && res.won && !!w && this.frostOf(w) > f.arrive;
       // Un identifiant par combat : une même flotte peut attaquer plusieurs fois.
-      const effect = { id: this.newId(8), to: enemy.id, key: pl.key, at: f.arrive, ships: res.defLost, lost: res.attLost, take };
+      const effect = { id: this.newId(8), to: enemy.id, key: pl.key, at: f.arrive, ships: res.defLost, lost: res.attLost, take, rep: res.report };
       if (capture) Object.assign(effect, { capture: true, cell: { ...pl.cell } });
       p.effects = [...(p.effects || []), effect].slice(-MAX_EFFECTS);
       if (capture) return this.capture(p, f, w, pl, enemy, res, take, now);
@@ -2193,6 +2245,8 @@ export class Session {
       this.ontoast?.(res.won ? `Victoire sur ${pl.name} !` : `Défaite sur ${pl.name}.`);
       this.note(p, {
         at: f.arrive, kind: 'combat', who: enemy.name, planet: pl.name, mine: countShips(res.attLost), theirs: countShips(res.defLost), loot,
+        rep: res.report, side: 'a', noLoot: res.won && !loot ? (recent ? 'cooldown' : fleetCargo(p.race, res.attLeft) > SOIL.reduce((t, r) => t + (f.cargo?.[r] || 0), 0) ? 'empty' : 'full') : undefined,
+        cooldown: res.won && recent ? RAID_COOLDOWN_MS : undefined,
         tone: res.won ? 'good' : 'bad',
         text: res.won ? `Victoire sur ${pl.name} (${enemy.name}).` : `Défaite sur ${pl.name} (${enemy.name}) : sa défense te repousse.`,
       });
@@ -2266,7 +2320,7 @@ export class Session {
     this.ontoast?.(`${pl.name} est à toi !`);
     this.note(p, {
       at: f.arrive, kind: 'combat', who: enemy.name, planet: pl.name, capture: true, mine: countShips(res.attLost), theirs: countShips(res.defLost), loot: lootText(take),
-      tone: 'good', text: `Tu prends ${pl.name} à ${enemy.name}.`,
+      rep: res.report, side: 'a', tone: 'good', text: `Tu prends ${pl.name} à ${enemy.name}.`,
     });
     return true;
   }
@@ -2322,7 +2376,7 @@ export class Session {
         if (e.capture) {
           this.note(p, {
             at: e.at, kind: 'combat', who: other.name, planet: pl.name, capture: true, mine: countShips(e.ships), theirs: e.lost ? countShips(e.lost) : null,
-            pillaged: lootText(e.take || {}), tone: 'bad', text: `${other.name} prend ${pl.name}.`,
+            pillaged: lootText(e.take || {}), rep: e.rep, side: 'd', tone: 'bad', text: `${other.name} prend ${pl.name}.`,
           });
           this.losePlanet(p, pl.key, e.at, `prise par ${other.name}`);
           continue;
@@ -2339,7 +2393,7 @@ export class Session {
         const harm = lost > 0 || !!loot;
         this.note(p, {
           at: e.at, kind: 'combat', who: other.name, planet: pl.name, mine: lost, theirs: e.lost ? countShips(e.lost) : null, pillaged: loot,
-          tone: harm ? 'bad' : 'good', text: harm ? `${other.name} attaque ${pl.name}.` : `${pl.name} repousse ${other.name}.`,
+          rep: e.rep, side: 'd', tone: harm ? 'bad' : 'good', text: harm ? `${other.name} attaque ${pl.name}.` : `${pl.name} repousse ${other.name}.`,
         });
       }
     }
@@ -2379,7 +2433,7 @@ export class Session {
     const noteHit = (destroyed) =>
       g || this.note(p, {
         at: e.at, kind: 'combat', who: other.name, mine: lost, theirs: e.lost ? countShips(e.lost) : null, pillaged: lootText(e.take || {}),
-        tone: destroyed ? 'bad' : lost ? 'even' : 'good',
+        rep: e.rep, side: 'd', tone: destroyed ? 'bad' : lost ? 'even' : 'good',
         text: destroyed ? `Ta flotte est détruite par ${other.name}.` : `${other.name} attaque ta flotte.`,
       });
     if (!applyLosses(f, p.race, techOf(p), ships, e.take, now)) {
@@ -2454,7 +2508,7 @@ export class Session {
   }
 
   save() {
-    if (this.state && this.me && this.status === 'playing') saveGame(this.me, this.state, this.journal);
+    if (this.state && this.me && this.status === 'playing') saveGame(this.me, this.state, this.journal, this.intel);
   }
 
   /** Un autre joueur a une version plus récente de l'appli. */
