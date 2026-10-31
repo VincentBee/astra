@@ -46,11 +46,19 @@ Puis ouvrir `http://localhost:8080`. Le service worker ne s'enregistre qu'en `ht
 - soit deux origines : un onglet sur `http://localhost:8080`, l'autre sur `http://127.0.0.1:8080` (vérifié le 2026-10-29, voir §9).
 
 Parcours qui marche avec l'interface actuelle (vérifié) :
-1. Onglet A : un nom → **Créer** → choisir la race → **Commencer la partie** → toucher une planète → **S'installer**.
+1. Onglet A : un nom → **Créer** → choisir la race → **Choisir cette race** → bandeau du départ (D-120) : **Inviter**.
 2. Onglet A : bouton du compteur de joueurs (icône « users » + nombre) → **Inviter un joueur** → bouton **copier** (icône) sous le QR. Le lien a la forme `http://…/#o2.…`.
 3. Onglet B : ouvrir ce lien. L'accueil dit « Invitation reçue… ». Un nom → **Rejoindre**. L'écran « Montre ta réponse » apparaît → bouton **copier** (code `a2.…`).
 4. Onglet A : dans la fenêtre d'invitation, « Coller une réponse » → coller → **Valider**. Toast « Joueur connecté. ».
-5. Onglet B passe à l'écran de race (bouton « Rejoindre la partie », la race de A affichée dessous).
+5. Onglet B passe à l'écran de race (bouton « Choisir cette race », la race de A affichée dessous).
+6. Chacun touche **Je suis prêt** dans le bandeau : la partie part quand tous les joueurs en
+   ligne le sont. Chacun a alors une flotte d'un seul colonisateur : toucher une planète libre →
+   **Y envoyer mon colonisateur** ; à l'arrivée, elle devient la planète mère.
+
+Vérifié le 2026-10-31 dans Chromium (390 × 844) : seul (prêt → départ → colonisateur envoyé →
+planète mère fondée) et à deux avec deux contextes de navigateur et une vraie invitation
+WebRTC (Alice prête attend Bob, qui choisit sa race puis se dit prêt ; même départ sur les deux
+téléphones ; flottes de départ en [6:15] et [13:4]).
 
 > Le pas à pas de `README.md:16-20` ne correspond plus aux libellés : « Créer une partie » est devenu « Créer », « Copier le lien » / « Copier la réponse » sont des boutons-icônes, « Il est à distance ? Colle la réponse reçue » est devenu « Coller une réponse », et l'invitation passe par le compteur de joueurs, pas par une icône « en haut à droite ».
 
@@ -68,7 +76,7 @@ Quatre **écrans** (`<section class="screen">`), un seul visible à la fois via 
 |---|---|---|
 | `#screen-home` (19-38) | Titre, historique des parties (`#saved`/`#games`), champ Nom, **Créer**, **Rejoindre**, note `#home-note`, roue crantée des réglages (`.settings-btn`, D-114). | `showSaved` 153-172 (liste), clic sur la liste 174-190 (Reprendre → `Session.resume` ; Revoir → `replay.html` ; Oublier → `forgetGame`), `btn-create` 194-201, `btn-join` 203-206, `playerName` 89-100, `boot` 1935-1957. |
 | `#screen-join` (41-67) | Étape 1 : scanner ou coller l'invitation. Étape 2 : QR de la réponse, copier/partager, statut. `#join-error`. | `startJoin` 212-219, `useOffer` 236-258, `onSessionChange` 263-283, scanner 226-232. |
-| `#screen-race` (70-80) | 3 boutons de race (radiogroup), fiche de la race choisie, bouton Commencer/Rejoindre, ce qu'ont choisi les autres. | `showRace` 385-395, `updateRacePick` 398-410, `renderRaceOthers` 413-419, `btn-race` 428-432. |
+| `#screen-race` (70-80) | 3 boutons de race (radiogroup), fiche de la race choisie, bouton **Choisir cette race** (mène à la carte et au bandeau du départ, D-120), ce qu'ont choisi les autres. | `showRace` 385-395, `updateRacePick` 398-410, `renderRaceOthers` 413-419, `btn-race` 428-432. |
 | `#screen-game` (83-200) | La partie. Deux **vues** : la carte (`#view-universe`) ou une planète (`#view-planet`). | `startGame` 436-447, `stopGame` 449-455, `showView` 1217-1229. |
 
 Détail de `#screen-game` :
@@ -78,9 +86,9 @@ Détail de `#screen-game` :
 | `.topbar` (84-95) | Ancienne barre du haut (nom, race). **Masquée** par `style.css:671` (`display: none`) ; ses champs sont encore remplis par `renderState` 753-762. | — |
 | `#net` (91-93) | Compteur de joueurs en ligne (vert, orange si un lien > 250 ms). `showView` le **déplace** dans la première ligne de la vue affichée (`js/app.js:1223`). Ouvre `#sheet-players`. | `renderLive` 811-821, clic 319-322. |
 | `#lost` (97-100) | Bandeau « Seul en ligne » + **Rejoindre** (rejoindre les autres par une nouvelle invitation). | `renderState` 762 (`session.alone`), `btn-rejoin` 286-289. |
-| `#view-universe` (102-148) | Vue carte : `#pick` (bandeau « Choisis ta planète »), `#trades` (offres d'échange), `.map-head` (coordonnées, aide `?`), `canvas#map`. | `drawMap` 1349-1538, `renderPick` 1876-1913, `renderTrades` 1777-1800. |
-| `#sheet-planet` | Fiche de la planète touchée : nom, coordonnées, propriétaire, places, climat, gisements, **S'installer** ou **Bâtiments**. Sur une de mes planètes, partie **Chantier** (`#pi-yard`, D-106) : vaisseaux recherchés, prix, « jusqu'à N », boutons ×1 / ×5 / ×N, et **Décoller**. | `renderPick`, `renderPickYard`, écouteur de `#pi-ships`, `btn-pi-takeoff`, `btn-claim`, `btn-open-planet`, `closePlanetSheet`. |
-| `#map-fleets` (sous `canvas#map`) | Mes flottes en grille (2 colonnes sur téléphone). Une case par flotte : nom, compte à rebours, une icône par type de vaisseau avec son nombre, statut ; bord rouge si attaque/conquête/poursuite, grisée si à sec. Toucher = sélectionner la flotte (ouvre `#fleet-info`), retoucher = la relâcher (D-107, D-108). | `renderMapFleets`, appelé par `renderLive` ; le HTML n'est réécrit que si le contenu ou le statut change, le compte à rebours et `aria-pressed` sont mis à jour en place. |
+| `#view-universe` (102-148) | Vue carte : `#pick` (bandeau du départ, D-120 : « Prépare-toi » / « Prêt · on attend … » avec les joueurs, prêts en vert, absents grisés, et les boutons **Je suis prêt** / **Plus prêt** / **Inviter** ; après le départ « Envoie ton colonisateur » et **Ma flotte** ; caché dès la planète mère fondée), `#trades` (offres d'échange), `.map-head` (coordonnées, aide `?`), `canvas#map`. | `drawMap` 1349-1538, `renderPick` 1876-1913, `renderTrades` 1777-1800. |
+| `#sheet-planet` | Fiche de la planète touchée : nom, coordonnées, propriétaire, places, climat, gisements, **Y envoyer mon colonisateur** (`#btn-claim` : planète libre, pas un petit corps, tant que je n'ai pas de planète mère, D-120) ou **Bâtiments**. Sur une de mes planètes, partie **Chantier** (`#pi-yard`, D-106) : vaisseaux recherchés, prix, « jusqu'à N », boutons ×1 / ×5 / ×N, et **Décoller**. | `renderPick`, `renderPickYard`, écouteur de `#pi-ships`, `btn-pi-takeoff`, `btn-claim`, `btn-open-planet`, `closePlanetSheet`. |
+| `#map-fleets` (sous `canvas#map`) | Mes planètes puis mes flottes en grille (2 colonnes sur téléphone). **Une case par planète** (D-115, bord vert) : nom, compte à rebours du chantier, une icône par type de vaisseau à quai avec son nombre, statut (« Chantier : +5 Frégate », « 7 à quai », « Aucun vaisseau à quai » ou « 🔒 » sans chantier naval) et deux boutons-icônes : **+** (Construire, si la planète a un chantier naval) ouvre `#sheet-planet` sur sa partie Chantier ; **Décoller** (icône `fleet`, s'il y a des vaisseaux à quai) ouvre directement le formulaire de décollage de cette planète. Toucher ailleurs sur la case ouvre la fiche de la planète. Une case par flotte : nom, compte à rebours, une icône par type de vaisseau avec son nombre, statut ; bord rouge si attaque/conquête/poursuite, grisée si à sec. Toucher = sélectionner la flotte (ouvre `#fleet-info`), retoucher = la relâcher (D-107, D-108). | `renderMapFleets`, appelé par `renderLive` ; le HTML n'est réécrit que si le contenu ou le statut change, les comptes à rebours (flotte, chantier) et `aria-pressed` sont mis à jour en place. Un seul écouteur de clic : `[data-mp-build]`, `[data-mp-go]`, `[data-planet]`, puis `[data-fleet]`. |
 | `#fleet-info` (129-145) | Fiche de la flotte sélectionnée : vaisseaux, statut (avec la vitesse et, si la flotte mêle plusieurs types, le nom du plus lent : `speedText`), carburant, choix d'ordres (`#fi-choice`), mes flottes à côté (`#fi-beside`), joueurs à côté (`#fi-partners`), boutons Arrêter / Rentrer / Se poser / Plein / Passive-Agressive (`#btn-fi-stance`, icône d'attaque, pleine quand la flotte est agressive, cachée pour une flotte sans armes ; D-100) / Scinder / Fermer. Le statut finit par « · agressive » (`fleetStatus`). | `renderFleetInfo` 1643-1687, handlers 1689-1714. |
 | `#view-planet` (150-199) | Vue planète : en-tête (retour, nom, climat), gisements `#soil-zone`, stocks `#resources`, onglets, puis les panneaux `data-pane`. | `renderPlanet` 869-988. |
 | `.tabs` (163-168) | Onglets Bâtiments / Pouvoirs (aliens seulement) / Recherche (toute planète ; « 🔒 Il faut un labo » sans labo, technologie grisée si elle est en recherche sur une autre planète) / Flottes. | `showTab` 1241-1252, flèches clavier 1255-1262. |
@@ -175,11 +183,12 @@ Table des appels de l'interface vers la session :
 | Créer / reprendre / rejoindre | 197, 185, 244-250 | `Session.create`, `Session.resume`, `new Session` + `answer` |
 | Inviter / accepter / annuler | 304, 346, 329 | `openInvite`, `acceptAnswer`, `cancelInvite` |
 | Choisir sa race | 430 | `chooseRace` |
-| S'installer sur une planète | 1924 | `claimPlanet` |
+| Se dire prêt / plus prêt (D-120) | `btn-ready` | `ready(true / false)` puis `checkStart` |
+| Envoyer le colonisateur de départ (D-120) | `btn-claim` (fiche de la planète), ou carte une fois la flotte choisie (`btn-pick-fleet`) | `moveFleet(id, case, 'colonize')` |
 | Bâtiment / recherche / vaisseaux / pouvoir | 749, 610, 614, 606 | `build` (ou `planBuild`, voir §13), `research`, `buildShips`, `power` |
 | Retirer un élément du fil de construction | `#plan` (× d'un élément) | `unplan` |
-| Vaisseaux depuis la carte (D-106) | écouteur de `#pi-ships` | `buildShips(type, n, clé de la planète touchée)` ; ×N = `shipsAffordable` |
-| Décoller (onglet Flottes ou fiche de la carte) | `openFleetSheet(clé)`, `btn-fleet-go` | `takeOff(fleetKey, …)` (renvoie l'id de la flotte, sélectionnée ensuite) |
+| Vaisseaux depuis la carte (D-106, D-115) | écouteur de `#pi-ships` (fiche ouverte en touchant la planète, ou par le bouton **+** de sa case sous la carte) | `buildShips(type, n, clé de la planète touchée)` ; ×N = `shipsAffordable` |
+| Décoller (onglet Flottes, fiche de la carte, ou case de la planète sous la carte, D-115) | `openFleetSheet(clé)`, `btn-fleet-go` | `takeOff(fleetKey, …)` (renvoie l'id de la flotte, sélectionnée ensuite) |
 | Envoyer une flotte sur une case | 1619-1623, 1697 | `ordersAt` (ordres possibles) puis `moveFleet` |
 | Poursuivre une flotte ennemie | 1691 | `chaseFleet` |
 | Arrêter / plein / rentrer / se poser | 1701-1708 | `stopFleet`, `refuelFleet`, `returnFleet`, `moveFleet(…, 'dock')` |
@@ -194,7 +203,7 @@ Retour de la session vers l'interface : seulement deux rappels, `session.onchang
 
 ### 6.1 Dessin (`drawMap`, `js/app.js:1349-1538`)
 
-- Canvas carré (`aspect-ratio: 1`, `style.css:356`), redimensionné à `largeur CSS × devicePixelRatio` (max 3). Une case = `largeur / UNIVERSE.w` pixels.
+- Canvas carré (`aspect-ratio: 1`, `style.css:356`), redimensionné à `largeur CSS × devicePixelRatio` (max 3). Une case = `largeur × zoom.z / UNIVERSE.w` pixels ; tout est dessiné sous `ctx.setTransform(1, 0, 0, 1, -zoom.x × case, -zoom.y × case)` (zoom, D-117, §6.4).
 - L'image suivante est demandée **avant** de dessiner : une erreur ne fige pas la carte (1352-1353).
 - Ordre des couches :
   1. fond `#05070f`, étoiles fixes tirées de `noise(x, y)` (bruit déterministe : mêmes étoiles partout, 1305-1308) et quadrillage très pâle (1365-1387) ;
@@ -208,15 +217,23 @@ Retour de la session vers l'interface : seulement deux rappels, `session.onchang
 
 ### 6.2 Toucher (`js/app.js:1573-1640`)
 
-Le point touché est converti en cases (pixels CSS / taille d'une case). Puis, dans l'ordre :
+Le point touché est converti en cases : `zoom.x + pixels CSS / cellCss()` (taille d'une case à l'écran, zoom compris). Un clic qui termine un glissé ou un pincement (`gesture.moved`) est ignoré. Puis, dans l'ordre :
 1. **Une de mes flottes sous le doigt** (< 0,7 case, plus proche qu'une planète) → la sélectionner ; plusieurs flottes empilées : chaque toucher passe à la suivante (1592-1604). Si une flotte est déjà sélectionnée, seules celles de la case touchée comptent.
    Autre façon de sélectionner : toucher la flotte dans la grille `#map-fleets` sous la carte (D-107, D-108).
+   La même grille commence par une case par planète à moi (D-115) : construire et faire décoller sans chercher la planète sur la carte.
+   Carte zoomée : choisir une flotte dans la grille recentre la vue sur elle si elle est hors champ (`reveal`, D-117).
 2. **Une flotte sélectionnée** :
    - une flotte ennemie sous le doigt → `prey`, la fiche propose « Attaquer » (1607-1615) ;
    - sinon la case touchée : `session.ordersAt` ; un seul ordre possible sans panne → `moveFleet` direct ; sinon `pending` = la case, et la fiche affiche un bouton par ordre (1617-1625, rendu 1674-1681).
 3. **Sinon** : une planète, à moi ou non → sa fiche (`selected`) ; pour la mienne, la fiche porte le chantier, « Décoller » et « Bâtiments » (D-106 ; avant, toucher ma planète ouvrait directement la vue planète) ; le vide → ferme la fiche.
 
 État de la carte, variables de module (1208-1214) : `currentView`, `openKey` (« home » ou id d'une colonie), `mapFrame`, `selected`, `selFleet`, `pending`, `prey`.
+
+### 6.4 Zoom (D-117)
+
+- État : `zoom = { z, x, y }` (`z` de 1 à `ZOOM_MAX` = 4, soit 20 à 5 cases de large ; `x`, `y` = coin haut-gauche de la partie vue, en cases). `clampZoom` garde la vue dans l'univers et met à jour les boutons. Le zoom n'est pas sauvegardé : chaque ouverture de l'appli repart de la carte entière.
+- Gestes sur `canvas#map` (événements `pointer*`, `touch-action: none` déjà posé) : un doigt ou la souris **glisse** la vue (au-delà de 8 px, sinon c'est un toucher) ; deux doigts **pincent** (l'écart donne le zoom, le milieu suit les doigts) ; la **molette** zoome autour du curseur (`zoomAt` garde fixe le point visé).
+- Boutons `.map-zoom` en haut à droite du canvas : `#btn-zoom-in` (+), `#btn-zoom-out` (−), `#btn-zoom-fit` (vue entière, caché à zoom 1) ; facteur 1,6 autour du centre de la vue.
 
 ### 6.3 Carte du replay
 
@@ -262,7 +279,7 @@ Le fichier est **en couches** : les sections de la fin redéfinissent celles du 
 
 ### 7.4 Icônes et fond
 
-- **`js/icons.js`** : 36 tracés (dont les 4 vaisseaux `cargo`, `fighter`, `heavy`, `colony`, D-108, et la roue crantée `gear`, D-114) 24 × 24 (`PATHS`). `ic(nom)` renvoie un `<svg class="ic" aria-hidden="true">` pour le HTML généré ; `fillIcons()` remplace chaque `<i data-ic="nom"></i>` du HTML statique (appelé au tout début de `app.js`). Style `.ic` : trait 1,6, `stroke-linecap: square`, couleur du texte (`style.css:559`). Ajouter une icône = ajouter un tracé dans `PATHS`.
+- **`js/icons.js`** : 40 tracés (dont les 4 vaisseaux `cargo`, `fighter`, `heavy`, `colony`, D-108, la roue crantée `gear`, D-114, et `minus` et `fit` du zoom de la carte, D-117) 24 × 24 (`PATHS`). `ic(nom)` renvoie un `<svg class="ic" aria-hidden="true">` pour le HTML généré ; `fillIcons()` remplace chaque `<i data-ic="nom"></i>` du HTML statique (appelé au tout début de `app.js`). Style `.ic` : trait 1,6, `stroke-linecap: square`, couleur du texte (`style.css:559`). Ajouter une icône = ajouter un tracé dans `PATHS`.
 - **Ressources et races** (`js/game.js:31-52`) : `resIcon(r, nom)` (cristal, feuille, éclair, buste ; classe `.ri ri-<r>` colorée par la variable de la ressource) et `raceIcon(r)` (casque, robot, alien ; classe `.rci`). Contrairement à `ic`, elles sont nommées (`role="img"`, `<title>`) pour les lecteurs d'écran.
 - **`js/sky.js`** : `drawSun(ctx, sun, cell)` ; disque en dégradé blanc → jaune → orange qui remplit son carré de `sun.size` cases, halo qui déborde (1,7 × le rayon). Position donnée par `sunFor(gid)` de `game.js` (voir `regles.md` pour l'effet du soleil sur le climat).
 - **`js/galaxy.js`** : `startGalaxy()` crée `div.galaxy` (fixe, `z-index: -1`) avec 3 couches d'étoiles (260/90/28 étoiles pour 400 × 800 px, densité constante), dessinées une fois en canvas puis posées en image de fond répétée (tuile = taille de l'écran). Graine fixe (`rng`) : le même ciel à chaque ouverture. 45 % des étoiles suivent une bande diagonale (« Voie lactée »). Parallaxe : défilement, souris, et inclinaison du téléphone (`devicemotion`, position de repos qui s'adapte ; permission demandée au premier toucher sur iPhone). Redessiné 150 ms après un redimensionnement. Sous les couches, la nébuleuse est un dégradé CSS du `body` (`style.css:589-596`). Chargé seulement par `index.html`.
@@ -284,11 +301,12 @@ Rendu (`js/techtree.js`, la construction du graphe est décrite dans `regles.md`
 
 Écran « film » de la partie sauvegardée ; le moteur de rejeu (`js/replay.js`) est décrit dans `regles.md`. Rien n'est écrit : ni sauvegarde ni partie en cours ne changent (`js/replay-view.js:3`).
 
-- `load` (28-67) : `loadGame()` (la partie sélectionnée dans l'historique), titre = noms des joueurs, `replayable(st)` ; messages si la copie n'est pas à jour ou si le début du journal manque ; calcul `replay(st)` lancé après 30 ms pour laisser s'afficher « Calcul du replay… » ; signale un « replay approché » si la fin ne retombe pas sur la vraie partie.
-- Index `film.at` : pour chaque image, où trouver la dernière fiche de chaque joueur (53-59). `frameAt` : recherche dichotomique (69-79).
-- Contrôles : lecture/pause (353-360), vitesse 1 min/s, 10 min/s (défaut), 1 h/s (`replay.html:35-39`), curseur sur 0-1000 (362-365), événement précédent/suivant (367-377). Pendant la lecture, si rien ne bouge et que le prochain événement est loin, on y saute (`QUIET_S`, 333-351).
-- Section « Points » (`replay.html`, `#rp-score`, D-103) : `drawScores` (219-287) dessine sur un canvas la courbe en escalier de chaque joueur (`film.scores` = `scoreSeries(frames, gid)`, `js/replay.js`), à sa couleur, graduée 0 / moitié / haut, avec un trait à l'instant affiché ; `#rp-score-legend` donne nom et points à cet instant, dans l'ordre d'arrivée. Toucher ou glisser sur la courbe déplace le replay (380-386). Adresse `replay.html#points` (lien du bandeau de fin) : `load` se place à la fin de la partie et fait défiler jusqu'à la courbe.
-- `renderPlayers` (289-314) : planètes, vaisseaux, minéraux, points de l'empire à l'instant affiché (`ptsAt`, les mêmes que la courbe). `renderLog` (316-330) : les 40 dernières entrées jusqu'à cet instant, la plus récente en haut.
+- `load` (31-76) : `loadGame()` (la partie sélectionnée dans l'historique), titre = noms des joueurs, `replayable(st)` ; messages si la copie n'est pas à jour ou si le début du journal manque ; calcul `replay(st)` lancé après 30 ms pour laisser s'afficher « Calcul du replay… » ; signale un « replay approché » si la fin ne retombe pas sur la vraie partie.
+- Index `film.at` : pour chaque image, où trouver la dernière fiche de chaque joueur (56-62). `frameAt` : recherche dichotomique (80-90).
+- Contrôles : lecture/pause (`play`, `pause` 362-376, bouton 395-400), vitesse 1 min/s, 10 min/s (défaut), 1 h/s (`replay.html:35-39`), événement précédent/suivant (409-418 : on saute à l'événement, la lecture continue si elle tournait). Pendant la lecture, si rien ne bouge et que le prochain événement est loin, on y saute (`QUIET_S`, 346-360).
+- Curseur du temps `#rp-time` (D-118) : un cran par minute de partie (`max` = durée en minutes, fixé par `load`), donc n'importe quelle minute, au doigt ou aux flèches du clavier ; « Début » et la durée totale (`#rp-length`) sous ses bouts ; la partie déjà vue en couleur (`--pct`, mis par `render`). Glisser pendant la lecture la met en pause (`scrub`, 378-385) ; lâcher la relance d'ici (`release`, 388-393, sur `change`, `pointerup`, `pointercancel`), sauf au bout de la partie. Style : `.rp-timeline`, piste de 4 px, pouce carré de 22 px (`style.css`, section Replay).
+- Section « Points » (`replay.html`, `#rp-score`, D-103) : `drawScores` (232-300) dessine sur un canvas la courbe en escalier de chaque joueur (`film.scores` = `scoreSeries(frames, gid)`, `js/replay.js`), à sa couleur, graduée 0 / moitié / haut, avec un trait à l'instant affiché ; `#rp-score-legend` donne nom et points à cet instant, dans l'ordre d'arrivée. Toucher ou glisser sur la courbe déplace le replay, comme le curseur : pause pendant le glissé, reprise en lâchant (420-428). Adresse `replay.html#points` (lien du bandeau de fin) : `load` se place à la fin de la partie et fait défiler jusqu'à la courbe.
+- `renderPlayers` (302-327) : planètes, vaisseaux, minéraux, points de l'empire à l'instant affiché (`ptsAt`, les mêmes que la courbe). `renderLog` (329-343) : les 40 dernières entrées jusqu'à cet instant, la plus récente en haut.
 
 ## 9. Vérification dans le navigateur (2026-10-29)
 
@@ -335,7 +353,7 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   affichés sont `session.scoreOf(p)` (tout l'empire).
 - **Flottes** : sur une planète adverse, deux boutons « Attaquer X (joueur) » et « Conquérir X »,
   suivis tous deux de « · défense ⚔ a ◇ c + N vaisseaux posés · victoire probable » (`ordersAt`,
-  `assaultView`, D-115) : « + ? vaisseaux » hors de ma détection ; issue « victoire probable »,
+  `assaultView`, D-122) : « + ? vaisseaux » hors de ma détection ; issue « victoire probable »,
   « victoire incertaine » ou « bataille perdue ». Une flotte en conquête est dessinée en rouge comme une attaque.
 - **Bâtiments** : les bâtiments de défense de la race apparaissent dans la liste comme les autres.
   Carte dépliée (toucher le nom) : bouton « Déconstruire un niveau » (`data-demolish`), caché au
@@ -393,3 +411,19 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   vue planète avec la seule liste de la planète ; ferme remise → bandeau caché, icône orange
   « Énergie en baisse · vide dans 2 min ». **Pas vérifié** : aliens et machines dans le
   navigateur (couverts par les tests), plusieurs colonies à la fois.
+
+## 15. Départ commun et colonisateur (2026-10-31, D-120)
+
+- `renderLobby(me)` (appelé par `renderPick`) remplit `#pick` : avant le départ, « Prépare-toi »
+  ou « Prêt · on attend Bob », la liste des joueurs (`.pick-who`, race, nom, « prêt » / « pas
+  prêt » / « choisit sa race » / « absent ») et les boutons ; après le départ, « Envoie ton
+  colonisateur » et **Ma flotte** (sélectionne la flotte et la ramène dans la vue) ; partie
+  partie sans m'être dit prêt : « La partie a commencé » et **Je suis prêt**.
+- `myColonizer(me)` : ma flotte avec un colonisateur tant que je n'ai pas de planète mère. Les
+  planètes libres clignotent sur la carte seulement dans ce cas.
+- Dans la fenêtre Joueurs, un joueur sans planète est « pas encore prêt », « prêt », « en route
+  vers sa planète… » ou « éliminé » ; l'en-tête de la carte dit « avant le départ » puis
+  « à fonder » à la place des coordonnées.
+- Le bouton de l'écran de race dit **Choisir cette race** (avant : « Commencer la partie » ou
+  « Rejoindre la partie »).
+

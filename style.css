@@ -313,6 +313,14 @@ button.close-btn svg { width: 18px; height: 18px; }
 .banner.warn { border-color: rgba(255, 179, 107, 0.5); margin-bottom: 10px; }
 .banner.race { margin-bottom: 10px; padding: 8px 14px; }
 .race-link { color: var(--accent); font-weight: 600; }
+/* Bandeau du départ (D-120) : joueurs présents, prêts ou non */
+.pick-who { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.pick-who .pw { display: inline-flex; align-items: center; gap: 4px; }
+.pick-who .pw.ok { color: var(--ok, #7cf0b4); }
+.pick-who .pw.off { opacity: 0.5; }
+.pick-who .pw .hint { color: var(--muted); }
+.pick-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.pick-actions:not(:has(button:not([hidden]))) { display: none; }
 .banner.race.hot { border-color: rgba(255, 179, 107, 0.8); }
 
 /* ----- Planète du joueur ----- */
@@ -371,6 +379,14 @@ button.close-btn svg { width: 18px; height: 18px; }
 .mf.hot { border-left-color: #ff7a93; }
 .mf.dry { opacity: 0.55; }
 .mf[aria-pressed='true'] { border-color: var(--text); background: var(--panel-2); }
+/* Case d'une de mes planètes (D-115) : bord vert, boutons Construire et Décoller en bas. */
+.mf.mp { border-left-color: var(--ok); }
+.mf-top strong { display: inline-flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mf-top .ic { width: 14px; height: 14px; color: var(--accent); }
+.mp-actions { display: flex; justify-content: flex-end; gap: 4px; }
+.mp-actions:empty { display: none; }
+.mp-actions button { min-height: 32px; padding: 0 10px; }
+.mp-actions .ic { width: 16px; height: 16px; }
 
 /* ----- Univers ----- */
 
@@ -384,6 +400,12 @@ button.close-btn svg { width: 18px; height: 18px; }
   padding: 6px;
 }
 .map-wrap canvas { display: block; width: 100%; height: auto; aspect-ratio: 1; border-radius: 0; touch-action: none; }
+/* Zoom de la carte (D-117) : boutons en colonne, en haut à droite, par-dessus le canvas. */
+.map-wrap { position: relative; }
+.map-zoom { position: absolute; top: 12px; right: 12px; display: grid; gap: 4px; }
+.map-zoom button { width: 36px; min-height: 36px; padding: 0; background: rgba(10, 14, 28, 0.82); }
+.map-zoom button:disabled { opacity: 0.35; }
+.map-zoom .ic { width: 16px; height: 16px; }
 
 
 /* ----- Feuille d'invitation ----- */
@@ -478,7 +500,46 @@ button.close-btn svg { width: 18px; height: 18px; }
 .rp-when { flex: 1; min-width: 0; display: grid; }
 .rp-when .mono:first-child { font-weight: 600; }
 .rp-controls select { width: auto; flex: none; }
-.rp-controls input[type=range] { width: 100%; accent-color: var(--accent); }
+/* Curseur du temps : piste fine, gros pouce à attraper du doigt (D-118). */
+.rp-timeline { display: grid; gap: 2px; }
+.rp-controls input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  touch-action: none;
+  cursor: pointer;
+  --pct: 0%;
+}
+/* La partie déjà vue en couleur, le reste en gris. */
+.rp-controls input[type=range]::-webkit-slider-runnable-track {
+  height: 4px;
+  background: linear-gradient(to right, var(--accent) var(--pct), var(--line) var(--pct));
+}
+.rp-controls input[type=range]::-moz-range-track { height: 4px; background: var(--line); }
+.rp-controls input[type=range]::-moz-range-progress { height: 4px; background: var(--accent); }
+.rp-controls input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: -9px;
+  background: var(--accent);
+  border: 3px solid var(--accent-ink);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.rp-controls input[type=range]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 0;
+  background: var(--accent);
+  border: 3px solid var(--accent-ink);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.rp-bounds { display: flex; justify-content: space-between; font-size: 0.75rem; }
 .rp-steps > button { flex: 1; min-height: 40px; font-size: 0.9rem; }
 .rp-h { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
 .rp-score { padding: 10px; display: grid; gap: 8px; }

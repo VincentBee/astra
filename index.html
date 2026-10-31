@@ -110,17 +110,30 @@
     <div id="alerts-panel" class="alerts-panel" hidden><ul id="alerts-list" class="alerts-list"></ul></div>
 
     <section id="view-universe" class="universe" aria-label="Carte de l'univers">
+      <!-- Départ (D-120) : prêt, attente des joueurs présents, puis le colonisateur à envoyer -->
       <div id="pick" class="banner" hidden>
-        <p><i data-ic="planet"></i> <strong>Choisis ta planète</strong> <span class="hint">· définitif</span></p>
+        <p id="pick-text"></p>
+        <p id="pick-who" class="pick-who" hidden></p>
+        <div class="pick-actions">
+          <button id="btn-ready" class="primary small" hidden></button>
+          <button id="btn-pick-fleet" class="primary small" hidden><i data-ic="fleet"></i>Ma flotte</button>
+          <button id="btn-pick-invite" class="secondary small" hidden><i data-ic="invite"></i>Inviter</button>
+        </div>
       </div>
       <div id="trades" class="trades" hidden></div>
       <div class="map-head">
-        <span><i data-ic="planet"></i> <strong id="my-coords" class="mono"></strong> <span class="help-wrap"><button id="btn-map-help" class="ghost help-btn" aria-expanded="false" aria-describedby="map-help" aria-label="Aide de la carte">?</button><span id="map-help" role="tooltip" class="tooltip">Touche une planète pour voir ses gisements, la tienne pour ouvrir ses bâtiments, une de tes flottes (triangle, ou sa case sous la carte) pour la piloter. Planètes en pointillés : libres. Halo : ta portée de détection ; les flottes adverses n’apparaissent que dedans.</span></span></span>
+        <span><i data-ic="planet"></i> <strong id="my-coords" class="mono"></strong> <span class="help-wrap"><button id="btn-map-help" class="ghost help-btn" aria-expanded="false" aria-describedby="map-help" aria-label="Aide de la carte">?</button><span id="map-help" role="tooltip" class="tooltip">Touche une planète pour voir ses gisements, la tienne pour ouvrir ses bâtiments, une de tes flottes (triangle, ou sa case sous la carte) pour la piloter. Sous la carte, chaque planète a aussi sa case : construire des vaisseaux, faire décoller ceux à quai. Zoom : pince la carte (ou molette, ou boutons + et −), glisse pour te déplacer. Planètes en pointillés : libres. Halo : ta portée de détection ; les flottes adverses n’apparaissent que dedans.</span></span></span>
         <span class="pi-head-right"></span>
       </div>
-      <div class="map-wrap"><canvas id="map" aria-label="Carte de l'univers : touche une planète"></canvas></div>
-      <!-- Mes flottes : un toucher la sélectionne pour lui donner un ordre -->
-      <div id="map-fleets" class="map-fleets" role="group" aria-label="Mes flottes" hidden></div>
+      <div class="map-wrap"><canvas id="map" aria-label="Carte de l'univers : touche une planète"></canvas>
+        <div class="map-zoom" role="group" aria-label="Zoom de la carte">
+          <button id="btn-zoom-in" class="secondary small icon-only" title="Zoomer" aria-label="Zoomer"><i data-ic="plus"></i></button>
+          <button id="btn-zoom-out" class="secondary small icon-only" title="Dézoomer" aria-label="Dézoomer"><i data-ic="minus"></i></button>
+          <button id="btn-zoom-fit" class="secondary small icon-only" title="Voir toute la carte" aria-label="Voir toute la carte" hidden><i data-ic="fit"></i></button>
+        </div>
+      </div>
+      <!-- Mes planètes (construire, décoller) puis mes flottes (un toucher la sélectionne pour lui donner un ordre) -->
+      <div id="map-fleets" class="map-fleets" role="group" aria-label="Mes planètes et mes flottes" hidden></div>
 
       <!-- Fiche de la planète touchée : devant la carte -->
       <div id="sheet-planet" class="sheet" hidden>
@@ -139,7 +152,7 @@
             <div id="pi-ships" class="pi-ships"></div>
             <button id="btn-pi-takeoff" class="secondary" hidden><i data-ic="fleet"></i>Décoller</button>
           </section>
-          <button id="btn-claim" class="primary" hidden><i data-ic="dock"></i>S'installer</button>
+          <button id="btn-claim" class="primary" hidden><i data-ic="fleet"></i>Y envoyer mon colonisateur</button>
           <button id="btn-open-planet" class="secondary" hidden><i data-ic="build"></i>Bâtiments</button>
         </article>
       </div>

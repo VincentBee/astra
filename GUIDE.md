@@ -5,7 +5,8 @@ Principes, ordres de construction et pièges pour chaque race, puis les flottes 
 ## Comment se joue une partie (depuis le 29 octobre 2026)
 
 - **Une partie dure environ 30 à 35 minutes.** Le jeu va 2,5 fois plus vite qu’avant : les heures de jeu des ordres ci-dessous passent 2,5 fois plus vite. Ces ordres datent d’avant ce changement (**à refaire**).
-- **Le soleil s’éteint.** 12 minutes après la première installation, le froid part du bord de la carte et se resserre vers le soleil, lentement puis de plus en plus vite. Une planète qu’il atteint est perdue. La carte montre le cercle de froid, et le bandeau du haut le temps avant que ta planète gèle.
+- **Le départ.** Choisis ta race, puis touche « Je suis prêt » : la partie part quand tous les joueurs présents sont prêts. Tu commences avec un seul vaisseau, ton colonisateur : envoie-le sur une planète libre, il y fonde ta planète mère. Une planète proche fait gagner du temps ; le premier arrivé l’emporte.
+- **Le soleil s’éteint.** 12 minutes après le départ, le froid part du bord de la carte et se resserre vers le soleil, lentement puis de plus en plus vite. Une planète qu’il atteint est perdue. La carte montre le cercle de froid, et le bandeau du haut le temps avant que ta planète gèle.
 - **Fuis vers le soleil.** Colonise des planètes plus proches du soleil (labo 2 suffit). Si ta planète mère gèle, ta plus vieille colonie encore en vie la remplace.
 - **Sans planète, tu es éliminé. Le dernier en vie gagne.**
 - **Conquérir** : sur une planète adverse, l’ordre « Conquérir » prend la planète si ta flotte abat ses vaisseaux posés **et** sa défense en un seul combat. « Attaquer » pille seulement. La défense vient des bâtiments : un peu pour chaque niveau, beaucoup avec les canons et boucliers de ta race (humains : canons et bouclier ; machines : tourelles et blindage, bon marché ; aliens : épines, plus fortes avec plus de psioniques, et dôme).

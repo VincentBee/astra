@@ -1,7 +1,8 @@
 # Tests et décisions
 
 Pour chaque décision de [decisions.md](../decisions.md), le test qui la protège, ou la raison
-pour laquelle il n'y en a pas (voir D-082). État au 2026-10-30 : `node --test tests/*.test.mjs` →
+pour laquelle il n'y en a pas (voir D-082). État au 2026-10-31 : `node --test tests/*.test.mjs` →
+165 tests, 165 réussis (avec le départ commun et le colonisateur, D-120, dans `tests/start.test.mjs`). Au 2026-10-30 :
 154 tests, 153 réussis (avec la recherche en colonie, D-098, le coût en nourriture, D-099, le comportement en voyage, D-100, la vitesse de flotte, D-101, les points d'avant la chute, D-102 à D-104, le fil de construction, D-105, le chantier sur la carte, D-106, les rencontres hors ligne, D-109, le carnet de combats, D-110, les alertes de famine, D-111, et le réglage « Fond », D-112).
 
 - **nouveau test** : ajouté le 2026-10-29 dans `tests/decisions-planete.test.mjs` (24),
@@ -142,4 +143,12 @@ que fait le code.
 | D-112 | Réglage « Fond » : animé, fixe ou aucun | nouveau test | `decisions-reseau.test.mjs` D-112 : réglage « Fond » — fixe = une image sans capteurs, aucun = pas d’étoiles | les listes de l'interface (DOM) et le coût réel : non testés |
 | D-113 | Cache v63 | non testable |  | version de cache |
 | D-114 | Une fenêtre « Réglages », ouverte par une roue crantée | test existant | `decisions-reseau.test.mjs` D-064 : chaque icône de la page existe, et un bouton sans texte porte un nom | la fenêtre et son ouverture (DOM) : vérifiées dans le navigateur seulement |
-| D-115 | Vaisseaux posés et estimation sur « Attaquer » / « Conquérir » | nouveau test | `end.test.mjs` « Attaquer » et « Conquérir » comptent les vaisseaux posés et estiment le combat<br>`end.test.mjs` la même planète sans vaisseaux posés : victoire probable<br>`end.test.mjs` hors de ma détection : vaisseaux posés inconnus, victoire au mieux incertaine | le cas « gagné avec de lourdes pertes » n'est pas testé ; boutons vérifiés dans le navigateur (cas visible), le cas « ? » seulement par test |
+| D-115 | Mes planètes dans la grille sous la carte, avec Construire et Décoller | test existant | `rules.test.mjs` D-106 : le plus grand lot de vaisseaux suit le stock, et le chantier l’accepte (le lot que propose la fiche) | les cases et leurs boutons (construits par `app.js`, DOM) : vérifiés dans le navigateur seulement |
+| D-116 | Cache v64 | non testable |  | version de cache |
+| D-117 | Carte zoomable | test existant | `decisions-reseau.test.mjs` D-064 : chaque icône de la page existe, et un bouton sans texte porte un nom (boutons +, −, vue entière) | les gestes et la conversion du toucher (DOM, canvas) : vérifiés dans le navigateur seulement |
+| D-118 | Curseur du temps dans le replay | non testable |  | `replay-view.js` dépend du DOM : glissé, reprise de la lecture et flèches vérifiés dans le navigateur seulement |
+| D-119 | Cache v65 | non testable |  | version de cache |
+| D-120 | Départ quand tous les joueurs présents sont prêts ; une seule flotte avec un colonisateur pour fonder la planète mère | nouveau test | `start.test.mjs` (11 tests, tous préfixés D-120) | Bandeau et boutons (`#pick`, `#btn-ready`, `#btn-claim`) : navigateur seulement, vérifiés dans Chromium |
+| D-121 | Cache `astra-p2p-v66` | non testable |  | version du service worker |
+| D-122 | Vaisseaux posés et estimation sur « Attaquer » / « Conquérir » | nouveau test | `end.test.mjs` « Attaquer » et « Conquérir » comptent les vaisseaux posés et estiment le combat<br>`end.test.mjs` la même planète sans vaisseaux posés : victoire probable<br>`end.test.mjs` hors de ma détection : vaisseaux posés inconnus, victoire au mieux incertaine | le cas « gagné avec de lourdes pertes » n'est pas testé ; boutons vérifiés dans le navigateur (cas visible), le cas « ? » seulement par test |
+| D-123 | Cache `astra-p2p-v67` | non testable |  | version du service worker |

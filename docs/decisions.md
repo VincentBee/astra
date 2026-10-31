@@ -646,11 +646,13 @@ Aucune conversation ne les prouve.
 - Statut : **remplacée par D-088** à 07:01 (« le chrono est une mauvaise idée »). `GOAL` retiré
   du code avant le commit.
 
-**D-087 — Les parties d'avant la course n'ont ni fin ni froid**
+**D-087 — Les parties d'avant la course n'ont ni fin ni froid** — modifiée par D-120
 - 2026-10-29 06:59. Contexte : avec la fin à 40 min après la première installation, toutes les
   vieilles sauvegardes auraient fini dès leur ouverture.
 - Choix : champ `since` écrit à l'installation ; sans `since`, pas de course.
-- Qui : Claude (signalé par le conseiller). Statut : en vigueur.
+- Qui : Claude (signalé par le conseiller). Statut : modifiée par D-120 (2026-10-31) : la course
+  part au départ commun (`go`) ; `since` est écrit quand la flotte de départ apparaît. Une partie
+  sans `go` ni `since` n'a toujours ni fin ni froid.
 
 **D-088 — Le soleil s'éteint : le froid se resserre du bord vers le soleil**
 - 2026-10-29 07:01-07:05. Demande : « il faudrait un mechanisme qui force la fin, comme dans
@@ -662,7 +664,7 @@ Aucune conversation ne les prouve.
   galaxie qui s'épuise, merveille à construire.
 - Qui : Vincent (direction), Claude (règle). Statut : en vigueur (`9b37782`).
 
-**D-089 — Sans planète, éliminé ; le dernier en vie gagne ; une colonie remplace la planète mère**
+**D-089 — Sans planète, éliminé ; le dernier en vie gagne ; une colonie remplace la planète mère** — modifiée par D-120 (un joueur qui n'a pas encore fondé sa planète reste en vie tant qu'il a un colonisateur)
 - 2026-10-29 07:07. Question de Claude : peut-on prendre la planète mère ? Réponse de Vincent :
   « a » (oui, élimination possible).
 - Choix : la plus vieille colonie en vie devient planète mère ; sans colonie, `out` ; fin quand
@@ -1078,7 +1080,129 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   réglages dans la fenêtre Joueurs (mal rangé).
 - Qui : Vincent (demande), Claude (forme). Source : session `0a3a42f6`. Statut : en vigueur.
 
-**D-115 — Les ordres d'assaut montrent les vaisseaux posés et une estimation du combat**
+**D-115 — Mes planètes dans la grille sous la carte, avec Construire et Décoller**
+- 2026-10-31 11:00. Demande de Vincent : « Je voudrais que sur la vue map, il y ait avec les
+  flottes la liste des planètes dans la grille et qu'on puisse, depuis cet endroit, créer de
+  nouveaux vaisseaux ou faire décoller des vaisseaux déjà créés. »
+- Choix : la grille `#map-fleets` (D-107, D-108) commence par une case par planète à moi (mère
+  puis colonies), suivie des flottes. La case montre le nom, les vaisseaux à quai (une icône par
+  type et son nombre, comme les flottes), le lot en chantier et son compte à rebours. Deux
+  boutons-icônes : **+** ouvre la fiche de la planète sur son chantier (×1, ×5, ×N de D-106) ;
+  **Décoller** ouvre directement le formulaire de décollage de cette planète. Toucher ailleurs sur
+  la case ouvre la fiche, comme toucher la planète sur la carte. La grille s'affiche dès qu'on a
+  une planète, même sans flotte.
+- Choix de Claude, par défaut : les planètes avant les flottes (elles ne bougent pas, les flottes
+  vont et viennent en fin de liste) ; bord vert pour les distinguer des flottes (bord bleu ou
+  rouge) ; icône « + » plutôt que la maison, déjà prise par « Bâtiments » ; **+** caché sans
+  chantier naval (la case dit « 🔒 » et le nom du bâtiment) et **Décoller** caché sans vaisseau à
+  quai ; la construction reste dans la fiche de la planète (D-106) au lieu de boutons ×1/×5 dans
+  la case, trop petite sur un téléphone (2 colonnes).
+- Alternatives écartées : une liste séparée des planètes sous la grille des flottes ; des boutons
+  de construction dans chaque case ; une case qui sélectionne la planète sans rien ouvrir.
+- Qui : Vincent (la demande), Claude (la forme). Source : session `012yisg4`.
+- Statut : en vigueur. Vérifié dans Chromium (390 × 844) : construire depuis la case, compte à
+  rebours, décollage, flotte en orbite. Sur un vrai téléphone : **non confirmé**.
+
+**D-116 — Cache `astra-p2p-v64`**
+- 2026-10-31. Choix de Claude : `index.html`, `style.css`, `js/app.js` (D-115, D-117) et
+  `js/icons.js` (D-117) changent ; nouvelle version de cache pour que les téléphones les
+  récupèrent. Une seule version pour les deux demandes, faites sur la même branche.
+- Statut : en vigueur.
+
+**D-117 — Carte zoomable**
+- 2026-10-31 11:15. Demande de Vincent : « Je veux aussi que la carte soit zoomable. »
+- Choix : zoom de 1 (toute la carte, 20 cases) à 4 (5 cases de large). Pincer à deux doigts ou
+  molette pour zoomer (autour des doigts ou du curseur) ; glisser à un doigt ou à la souris pour
+  se déplacer ; boutons +, − et « vue entière » en haut à droite de la carte. Un geste qui a
+  bougé de plus de 8 px n'est pas un toucher (pas d'ordre envoyé par erreur en se déplaçant).
+  Les cases, les traits et les noms grossissent avec le zoom. Choisir une flotte dans la grille
+  sous la carte recentre la vue sur elle si elle est hors champ.
+- Choix de Claude, par défaut : zoom maximal 4 ; facteur 1,6 par bouton ; le zoom n'est pas
+  gardé d'une ouverture à l'autre ; la molette zoome toujours (sans touche Ctrl), comme sur une
+  carte en ligne ; pas de double toucher pour zoomer (il retarderait chaque toucher simple).
+- Alternatives écartées : zoom du navigateur (agrandit toute la page, pas la carte) ; agrandir
+  le canvas dans un cadre qui défile (le défilement se bat avec les touchers) ; un curseur de
+  zoom (prend de la place).
+- Qui : Vincent (la demande), Claude (la forme). Source : session `012yisg4`.
+- Statut : en vigueur. Vérifié dans Chromium (390 × 844) : boutons, molette autour du curseur,
+  glisser à la souris sans ouvrir de fiche, pincement simulé jusqu'au zoom 4, toucher d'une
+  planète juste une fois zoomé. Pincement sur un vrai téléphone : **non confirmé**.
+
+**D-118 — Curseur du temps dans le replay, à la minute près, sans arrêter la lecture**
+- 2026-10-31 11:40. Demande de Vincent : « Je voudrais que les replay ai un slider pour aller a
+  n'importe quel moment d'une partie en cours de visionnage ».
+- Constat : `replay.html` avait déjà un curseur (`#rp-time`, D-047), mais sur 1 000 crans (une
+  partie de 3 jours : un cran ≈ 4 min 20), rendu comme un champ de saisie (bordure et marges du
+  style des `input`), et le toucher arrêtait la lecture pour de bon.
+- Choix : le curseur compte en minutes de partie (`max` = durée en minutes) : n'importe quelle
+  minute est atteignable, au doigt ou aux flèches du clavier (une minute par appui). Glisser
+  pendant la lecture la met en pause le temps du geste, puis elle reprend du nouveau moment
+  quand on lâche ; à l'arrêt, le curseur déplace seulement. Même chose pour la courbe des
+  points (D-103). Précédent / Suivant ne coupent plus la lecture. Sous le curseur : « Début » et
+  la durée totale ; la piste est colorée jusqu'à l'instant affiché ; gros pouce carré (22 px)
+  pour le doigt.
+- Choix de Claude, par défaut : reprendre la lecture en lâchant (plutôt que rester en pause) ;
+  cran d'une minute (plus fin ne sert à rien : les ordres sont espacés de minutes et le pouce
+  ne vise pas mieux qu'un pixel, soit ≈ 3 min pour 20 h de partie) ; pas de marques
+  d'événements sur la piste (la courbe des points montre déjà où ça bouge).
+- Alternatives écartées : garder 1 000 crans ; un curseur en heures ; des marques de combats
+  sur la piste ; un champ pour taper une heure.
+- Qui : Vincent (la demande), Claude (la forme). Source : session `012yisfz`.
+- Statut : en vigueur. Vérifié dans Chromium (390 × 844, partie de robots de 20 h) : glissé
+  pendant la lecture (pause puis reprise à +12 h), flèche du clavier (+1 min). Sur un vrai
+  téléphone : **non confirmé**.
+
+**D-119 — Cache `astra-p2p-v65`**
+- 2026-10-31. Choix de Claude : `replay.html`, `js/replay-view.js` et `style.css` changent
+  (D-118) ; nouvelle version de cache pour que les téléphones les récupèrent.
+- Statut : en vigueur.
+
+**D-120 — La partie part quand tous les joueurs présents sont prêts ; chacun commence avec une seule flotte, un colonisateur, pour fonder sa planète mère**
+- 2026-10-31 12:40. Demande de Vincent : « Il faudrait que la partie commence quand tous les
+  joueurs presents soient pret, il faut aussi que les joueurs aient uniquenent une flotte avec un
+  colonisateur pour prendre leur premiere planete ».
+- Contexte : jusqu'ici, la course (et le froid, D-087) partait à la première installation d'un
+  joueur (`since`), et chaque joueur s'installait d'un toucher (`claimPlanet`, « S'installer »)
+  sur la planète de son choix, à l'instant.
+- Choix :
+  - **Prêt** : après sa race, chaque joueur se dit prêt (ordre `ready`, champ `ready` de sa
+    fiche) ; il peut revenir sur « plus prêt » tant que la partie n'est pas partie. Quand un
+    téléphone voit prêts tous les joueurs **présents** (lui, et ceux en ligne avec lui), il donne
+    le départ (ordre `begin`, champ `go`). Le départ est le plus petit `go` vu, partout le même ;
+    le froid compte depuis lui. Sans arbitre, comme la fin de partie (`over`).
+  - **Absent** : un joueur hors ligne ne bloque pas le départ ; à son retour, il se dit prêt et
+    entre tout de suite, avec sa flotte à cette heure-là (le froid, lui, a déjà avancé).
+  - **Flotte de départ** : un seul colonisateur de sa race, le plein fait, sans cargaison, sur un
+    cercle de 7 cases autour du soleil ; les joueurs prêts au départ y sont à égale distance les
+    uns des autres, jamais sur une planète. Aucune planète, aucun autre vaisseau.
+  - **Planète mère** : le colonisateur, envoyé sur une planète libre (pas un petit corps), la
+    fonde à son arrivée, avec les bâtiments et le stock de départ de sa race (comme
+    l'installation d'avant) ; le carburant restant est perdu, pour un départ égal. Le premier
+    arrivé l'emporte ; le perdant garde son colonisateur en orbite. Plus de colonisateur avant
+    d'avoir fondé sa planète : éliminé.
+  - `FORMAT` 9 : un téléphone d'avant compterait le départ autrement, il est prié de recharger.
+- Choix de Claude, par défaut : « présent » = en ligne avec mon téléphone ; rayon de 7 cases
+  (assez loin du soleil pour que le froid laisse ≈ 17 min de marge au départ, assez près pour
+  atteindre toute planète avec un plein) ; carburant restant perdu à la fondation ; un joueur
+  arrivé après le départ entre seul, sans attendre ; « S'installer » remplacé dans la fiche de
+  la planète par « Y envoyer mon colonisateur » ; `claimPlanet` gardé pour les parties d'avant
+  et les tests, mais refusé à un joueur qui a `ready`.
+- Alternatives écartées : un hôte qui lance la partie (il n'y a plus de maître du jeu, D-010) ;
+  attendre tous les joueurs de la partie, même hors ligne (un absent bloquerait tout le monde) ;
+  un compte à rebours après le dernier prêt ; cases de départ tirées au hasard (inégales) ;
+  ajouter le carburant restant au stock (avantage aux départs proches d'une planète) ; donner
+  aussi des cargos ou des chasseurs au départ (la demande dit « uniquement »).
+- Qui : Vincent (la demande), Claude (la forme). Source : session `012yisg3`.
+- Statut : en vigueur. 11 tests (`tests/start.test.mjs`), contrôlés par mutation. Vérifié dans
+  Chromium (390 × 844), seul et à deux avec une vraie invitation WebRTC. Équilibre des cases de
+  départ (une planète peut être plus proche de l'un que de l'autre) : **non confirmé**.
+
+**D-121 — Cache `astra-p2p-v66`**
+- 2026-10-31. Choix de Claude : `index.html`, `js/app.js`, `js/session.js` et `style.css`
+  changent (D-120) ; nouvelle version de cache pour que les téléphones les récupèrent.
+- Statut : en vigueur.
+
+**D-122 — Les ordres d'assaut montrent les vaisseaux posés et une estimation du combat**
 - 2026-10-30 14:05. Contexte : recette (point 1.2) : « Conquérir X · défense ⚔ ◇ » ne comptait que
   les bâtiments (`fortOf`) ; un joueur a vu « ⚔54 ◇1380 » sur une planète qui avait 7 + 9
   vaisseaux posés, et a perdu des assauts d'avance.
@@ -1093,3 +1217,8 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   qui vient d'où) ; simuler à l'heure d'arrivée (on ne connaît pas ce que l'autre fera d'ici là).
 - Qui : Vincent (demande), Claude (forme et seuils). Source : session `fb0c1844`. Statut : en vigueur.
 - Tests : `tests/end.test.mjs`, trois tests « Attaquer » et « Conquérir »… / sans vaisseaux posés / hors de ma détection.
+
+**D-123 — Cache `astra-p2p-v67`**
+- 2026-10-31. Contexte : fusion de `main` (cache v66) dans la PR des ordres d'assaut (D-122).
+- Choix : `VERSION` passe à `astra-p2p-v67` pour que les téléphones prennent le nouveau `session.js`.
+- Qui : Claude, par défaut. Source : session `fb0c1844`. Statut : en vigueur.

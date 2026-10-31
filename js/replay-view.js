@@ -19,6 +19,9 @@ let film = null; // { frames, log, at: [index de la fiche de chaque joueur, par 
 let t = 0;
 let playing = false;
 let last = 0;
+let raf = 0;
+// Lecture coupée le temps de glisser le curseur (ou la courbe) : elle reprend quand on lâche.
+let resume = false;
 
 function note(text) {
   $('rp-note').textContent = text;
@@ -60,6 +63,9 @@ function load() {
     film = { frames, log: r.log, at, start: frames[0].t, end: Math.max(frames[frames.length - 1].t, saved.savedAt || 0), gid: st.gid, scores: scoreSeries(frames, st.gid) };
     const off = Object.values(st.players).filter((p) => r.faithful[p.id] === false);
     note(off.length ? `Replay approché : la fin ne retombe pas tout à fait sur la vraie partie pour ${off.map((p) => p.name).join(', ')}.` : '');
+    // Le curseur compte en minutes de partie : on peut s'arrêter sur n'importe laquelle.
+    $('rp-time').max = String(Math.max(1, Math.ceil((film.end - film.start) / MIN)));
+    $('rp-length').textContent = elapsedText(film.end - film.start);
     $('rp-main').hidden = false;
     seek(film.start);
     // Venu du bandeau « partie finie » : la courbe des points, à la fin de la partie.
@@ -109,7 +115,9 @@ function render() {
   const players = playersAt(i);
   $('rp-clock').textContent = clockText(t);
   $('rp-elapsed').textContent = elapsedText(t - film.start);
-  $('rp-time').value = String(Math.round(((t - film.start) / Math.max(1, film.end - film.start)) * 1000));
+  $('rp-time').value = String(Math.round((t - film.start) / MIN));
+  $('rp-time').style.setProperty('--pct', `${((t - film.start) / Math.max(1, film.end - film.start)) * 100}%`);
+  $('rp-time').setAttribute('aria-valuetext', `${clockText(t)}, ${elapsedText(t - film.start)}`);
   $('rp-play').textContent = playing ? '❚❚' : '▶';
   $('rp-play').setAttribute('aria-label', playing ? 'Pause' : 'Lecture');
   drawMap(players);
@@ -347,48 +355,77 @@ function step(now) {
   const upcoming = film.frames[i + 1]?.t;
   if (!anyMoving && upcoming && upcoming - t > QUIET_S * speed * 1000) next = upcoming - 0.3 * speed * 1000;
   seek(next);
-  if (t >= film.end) {
+  if (t >= film.end) return pause();
+  raf = requestAnimationFrame(step);
+}
+
+function play() {
+  if (t >= film.end) t = film.start;
+  playing = true;
+  last = performance.now();
+  cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(step);
+  render();
+}
+
+function pause() {
+  playing = false;
+  cancelAnimationFrame(raf);
+  render();
+}
+
+/** Glisser jusqu'à `time` : la lecture attend qu'on lâche. */
+function scrub(time) {
+  if (playing) {
+    resume = true;
     playing = false;
-    render();
-    return;
+    cancelAnimationFrame(raf);
   }
-  requestAnimationFrame(step);
+  seek(time);
+}
+
+/** On lâche : la lecture reprend si elle tournait, d'ici (sauf au bout de la partie). */
+function release() {
+  if (!resume) return;
+  resume = false;
+  if (t < film.end) play();
+  else render();
 }
 
 $('rp-play').onclick = () => {
   if (!film) return;
-  if (!playing && t >= film.end) t = film.start;
-  playing = !playing;
-  last = performance.now();
-  render();
-  if (playing) requestAnimationFrame(step);
+  resume = false;
+  if (playing) pause();
+  else play();
 };
 
+// Curseur : une minute de partie par cran (flèches du clavier comprises).
 $('rp-time').oninput = (e) => {
-  playing = false;
-  seek(film.start + (Number(e.target.value) / 1000) * (film.end - film.start));
+  const v = Number(e.target.value);
+  scrub(v >= Number(e.target.max) ? film.end : film.start + v * MIN);
 };
+$('rp-time').onchange = $('rp-time').onpointerup = $('rp-time').onpointercancel = release;
 
+// Précédent / suivant : on saute à l'événement, la lecture continue si elle tournait.
 $('rp-prev').onclick = () => {
-  playing = false;
   const i = frameAt(t - 1);
   seek(i >= 0 ? film.frames[i].t : film.start);
 };
 
 $('rp-next').onclick = () => {
-  playing = false;
   const i = frameAt(t);
   seek(film.frames[i + 1]?.t ?? film.end);
 };
 
-// Toucher la courbe : aller à ce moment de la partie.
+// Toucher ou glisser sur la courbe : aller à ce moment de la partie.
 $('rp-score').onpointerdown = $('rp-score').onpointermove = (e) => {
   if (!film || (e.type === 'pointermove' && !e.buttons)) return;
+  if (e.type === 'pointerdown') e.currentTarget.setPointerCapture?.(e.pointerId);
   const r = e.currentTarget.getBoundingClientRect();
   const x = (e.clientX - r.left - 44) / Math.max(1, r.width - 52);
-  playing = false;
-  seek(film.start + Math.min(1, Math.max(0, x)) * (film.end - film.start));
+  scrub(film.start + Math.min(1, Math.max(0, x)) * (film.end - film.start));
 };
+$('rp-score').onpointerup = $('rp-score').onpointercancel = release;
 
 window.addEventListener('resize', () => film && render());
 

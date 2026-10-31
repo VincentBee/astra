@@ -20,7 +20,7 @@
 import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity } from './save.js';
-import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, PLAN_MAX, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, sunFor, fortOf } from './game.js';
+import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, PLAN_MAX, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, sunFor, fortOf, seeded } from './game.js';
 import { TECHS, SHIPS, sightRange, TEMPO } from './tech.js';
 import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, firstContact, salvage, applyLosses, parkedCell, fleetPos, fleetCargo, fleetTank, ORDERS, MAX_FLEETS, STANCES, aggressive, armed } from './fleet.js';
 import { amounts, isEmpty, holdings, lacks, noRoom, take, put, outcome, OFFER_MS, MAX_OFFERS, GRACE_MS } from './trade.js';
@@ -38,10 +38,14 @@ const de = (name) => (/^[aeiouyhàâéèêëîïôöûü]/i.test(name) ? `d’${
  * 6 : échanges entre joueurs (`offers`, `answers`).
  * 7 : journal des ordres (`orders`), messages envoyés en morceaux.
  * 8 : tempo ×2,5, score de tout l'empire, froid, prise de planète, élimination (`out`) et fin (`over`).
+ * 9 : départ quand tous les joueurs présents sont prêts (`ready`, `go`), flotte de départ
+ *     avec un seul colonisateur qui fonde la planète mère.
  */
-export const FORMAT = 8;
+export const FORMAT = 9;
 
 const shipsText = (n) => `${n} vaisseau${n > 1 ? 'x' : ''}`;
+/** Technologies d'un joueur : celles de sa planète mère (aucune tant qu'il n'en a pas). */
+const techOf = (p) => p?.planet?.tech || {};
 
 /** « 173 minéraux et 37 nourriture » (vide si rien). */
 function lootText(take) {
@@ -53,6 +57,8 @@ function lootText(take) {
 
 const COLORS = ['#7aa2ff', '#ff9f6b', '#7cf0b4', '#f7d06b', '#d38bff', '#6fd3ff', '#ff7a93', '#b7e36b'];
 const MAX_PLAYERS = 8;
+/** Rayon (en cases) du cercle autour du soleil où les flottes de départ apparaissent. */
+const START_RING = 7;
 /** Une même planète ne se pille qu'une fois toutes les 2 min (au tempo d'origine). */
 const RAID_COOLDOWN_MS = (2 * 60_000) / TEMPO;
 /**
@@ -136,6 +142,8 @@ export function normalize(p) {
   // identifiants tirés, entrées des journaux des autres connues quand ce nombre a changé).
   if (!Array.isArray(p.orders)) p.orders = [];
   if (p.deathPts !== undefined && !Number.isFinite(p.deathPts)) delete p.deathPts;
+  // Prêt (heure) et départ de la partie vu par ce joueur (heure) : des nombres, ou rien.
+  for (const k of ['ready', 'go']) if (p[k] !== undefined && !Number.isFinite(p[k])) delete p[k];
   return p;
 }
 
@@ -305,7 +313,10 @@ export class Session {
     if (this.timers.length) return;
     this.timers.push(
       setInterval(() => this.heartbeat(), HEARTBEAT_MS),
-      setInterval(() => this.tick(), 250),
+      setInterval(() => {
+        this.tick();
+        this.checkStart();
+      }, 250),
     );
     this.onVisible = () => {
       if (document.visibilityState === 'hidden') return this.save();
@@ -563,6 +574,8 @@ export class Session {
   backdated(ours, rec) {
     // Une de ses colonies devenue planète mère (l'ancienne est perdue) garde sa date : ce n'est pas une installation.
     if (isCell(rec.home) && Object.keys(ours.colonies || {}).some((id) => sameCell(this.planets.find((w) => w.id === id), rec.home))) return false;
+    // Planète mère fondée par un colonisateur : datée de son arrivée, que la fiche montrait déjà en route.
+    if (isCell(rec.home) && (ours.fleets || []).some((f) => f.order?.kind === 'colonize' && sameCell(f.to, rec.home) && Math.abs(f.arrive - rec.claimAt) < 1)) return false;
     // Marge d'une minute : plusieurs ordres dans la même milliseconde font avancer l'heure de la fiche d'un cran chacun.
     return isCell(rec.home) && !sameCell(rec.home, ours.home) && Number.isFinite(rec.claimAt) && rec.claimAt < (ours.actAt || 0) - 60_000;
   }
@@ -715,7 +728,7 @@ export class Session {
       rank: now, // ordre d'arrivée
       color: COLORS.find((c) => !used.has(c)) || COLORS[others.length % COLORS.length],
       secretHash,
-      // À l'arrivée, on choisit sa race (une fois pour toutes), puis sa planète de départ.
+      // À l'arrivée, on choisit sa race (une fois pour toutes), puis on se dit prêt (D-120).
       race: null,
       planet: null,
       home: null,
@@ -735,10 +748,129 @@ export class Session {
     return empireScore(p.race, this.planetsOf(p).map((x) => x.planet), p.fleets || []);
   }
 
-  /** Début de la course : la première installation d'un joueur, ou null (partie d'avant la course, sans fin). */
+  /**
+   * Début de la course : le départ donné quand tous les joueurs présents étaient prêts (`go`, le
+   * plus ancien vu par un joueur). Une partie d'avant le départ commun partait à la première
+   * installation (`since`). null : pas encore partie (ou partie d'avant la course, sans fin).
+   */
   get startedAt() {
-    const t = Object.values(this.state?.players || {}).map((p) => p.since).filter(Number.isFinite);
+    const players = Object.values(this.state?.players || {});
+    const go = players.map((p) => p.go).filter(Number.isFinite);
+    if (go.length) return Math.min(...go);
+    const t = players.map((p) => p.since).filter(Number.isFinite);
     return t.length ? Math.min(...t) : null;
+  }
+
+  /**
+   * Le joueur est-il dans la course ? Entré (`since`), ou prêt au départ d'une partie partie
+   * (son téléphone n'a peut-être pas encore fait apparaître sa flotte).
+   */
+  inRace(p) {
+    return Number.isFinite(p?.since) || (Number.isFinite(p?.ready) && this.startedAt != null);
+  }
+
+  /** Joueurs présents (moi, et ceux en ligne avec moi) pas encore prêts ni déjà dans la course. */
+  get notReady() {
+    return Object.values(this.state?.players || {}).filter(
+      (p) => (p.id === this.me || p.online) && !p.out && !p.home && !Number.isFinite(p.ready) && !Number.isFinite(p.since),
+    );
+  }
+
+  /**
+   * Prêt à partir (`on`), ou plus prêt tant que la partie n'est pas partie. Elle part quand tous
+   * les joueurs présents sont prêts (checkStart). Prêt après le départ : ma flotte arrive aussitôt.
+   */
+  ready(on = true) {
+    if (!this.canAct) return false;
+    const p = this.state.players[this.me];
+    if (!p?.race) return this.refuse('Choisis d’abord ta race.');
+    if (p.home || Number.isFinite(p.since)) return false; // déjà dans la course
+    if (on) {
+      if (Number.isFinite(p.ready)) return false;
+      p.ready = this.now();
+      this.touch(this.addLog(`${p.name} est prêt.`));
+    } else {
+      if (!Number.isFinite(p.ready) || this.startedAt != null) return false;
+      delete p.ready;
+      this.touch(this.addLog(`${p.name} n’est plus prêt.`));
+    }
+    this.changed();
+    return true;
+  }
+
+  /** Départ de la partie, à cette heure (checkStart : tous les joueurs présents sont prêts). */
+  begin() {
+    if (!this.canAct) return false;
+    const p = this.state.players[this.me];
+    if (!Number.isFinite(p?.ready) || this.startedAt != null) return false;
+    p.go = this.now();
+    this.touch(this.addLog('Tous les joueurs présents sont prêts : la partie commence.'));
+    this.changed();
+    return true;
+  }
+
+  /** Je suis prêt, les joueurs présents aussi, et la partie n'est pas partie : je donne le départ. */
+  checkStart() {
+    if (this.status !== 'playing' || !this.state || this.startedAt != null) return false;
+    if (!Number.isFinite(this.state.players[this.me]?.ready) || this.notReady.length) return false;
+    return this.begin();
+  }
+
+  /**
+   * Partie partie, moi prêt et pas encore dans la course : ma flotte de départ, un seul
+   * colonisateur, le plein fait, apparaît sur la carte (au départ, ou quand je suis prêt si
+   * c'est après). Elle doit aller fonder ma planète mère sur une planète libre.
+   */
+  enterRace(p, now) {
+    const start = this.startedAt;
+    if (start == null || !Number.isFinite(p.ready) || Number.isFinite(p.since) || p.home || p.out) return false;
+    p.fleets ||= [];
+    if (p.fleets.length >= MAX_FLEETS) return false;
+    const at = Math.min(now, Math.max(start, p.ready));
+    const ships = { colony: 1 };
+    const cell = this.startCell(p, start);
+    p.fleets.push({ id: this.newId(6), ships, cargo: { minerals: 0, food: 0 }, fuel: fleetTank(p.race, ships), origin: 'home', from: cell, to: { ...cell }, depart: at, arrive: at, order: null, stance: 'passive' });
+    p.since = at;
+    this.addLog(`${p.name} entre dans la partie avec un seul vaisseau : ${SHIPS[p.race].colony.name}.`);
+    this.ontoast?.(`Ta flotte de départ (${SHIPS[p.race].colony.name}) est sur la carte : envoie-la fonder ta planète mère sur une planète libre.`, 8000);
+    return true;
+  }
+
+  /**
+   * Case de départ d'un joueur. Ceux qui étaient prêts au départ sont répartis à égale distance
+   * les uns des autres sur un cercle de START_RING cases autour du soleil (même chance pour
+   * tous) ; un retardataire tombe sur ce cercle à un endroit tiré de son identifiant. Jamais
+   * sur une planète : on glisse le long du cercle jusqu'à une case vide.
+   */
+  startCell(p, start) {
+    const sun = sunFor(this.state.gid);
+    const mid = { x: sun.x + sun.size / 2, y: sun.y + sun.size / 2 };
+    const first = Object.values(this.state.players)
+      .filter((o) => Number.isFinite(o.ready) && o.ready <= start)
+      .sort((a, b) => a.rank - b.rank || (a.id < b.id ? -1 : 1));
+    const i = first.findIndex((o) => o.id === p.id);
+    const k = i >= 0 ? seeded(`${this.state.gid}/depart`)() + i / first.length : seeded(`${this.state.gid}/depart/${p.id}`)();
+    const clamp = (v, hi) => Math.min(hi - 1, Math.max(0, v));
+    let cell = null;
+    for (let step = 0; step < 32; step++) {
+      // 0, +1, −1, +2, −2… crans de 1/64 de tour.
+      const a = 2 * Math.PI * (k + (step % 2 ? 1 : -1) * Math.ceil(step / 2) / 64);
+      cell = { x: clamp(Math.floor(mid.x + START_RING * Math.cos(a)), UNIVERSE.w), y: clamp(Math.floor(mid.y + START_RING * Math.sin(a)), UNIVERSE.h) };
+      if (!this.planets.some((w) => sameCell(w, cell))) break;
+    }
+    return cell;
+  }
+
+  /** Dans la course sans planète, et plus aucun colonisateur (détruit, donné) : éliminé. */
+  noColonizer(p, now) {
+    if (!Number.isFinite(p.ready) || !Number.isFinite(p.since) || p.home || p.out != null) return false;
+    if ((p.fleets || []).some((f) => f.ships?.colony > 0)) return false;
+    p.deathPts = this.scoreOf(p);
+    p.out = now;
+    this.addLog(`${p.name} n’a plus de colonisateur pour fonder sa planète : ${p.name} est éliminé.`);
+    this.ontoast?.('Plus de colonisateur pour fonder ta planète : tu es éliminé.', 8000);
+    this.note(p, { at: now, kind: 'planet', tone: 'bad', text: 'Plus de colonisateur pour fonder ta planète : tu es éliminé.' });
+    return true;
   }
 
   /** Heure à laquelle le froid prend la case `cell` (Infinity : partie sans froid). */
@@ -781,7 +913,7 @@ export class Session {
    */
   ranking(now = this.now()) {
     return Object.values(this.state?.players || {})
-      .filter((p) => p.race && p.planet)
+      .filter((p) => p.race && (p.planet || this.inRace(p)))
       .map((p) => {
         const pts = this.scoreOf(p);
         const dead = this.deadAt(p, now);
@@ -797,7 +929,7 @@ export class Session {
    */
   checkOver(p, now) {
     if (this.over || this.startedAt == null) return false;
-    const rank = this.ranking(now).filter((r) => Number.isFinite(this.state.players[r.id].since));
+    const rank = this.ranking(now).filter((r) => this.inRace(this.state.players[r.id]));
     const alive = rank.filter((r) => r.dead == null);
     if (!rank.length || alive.length > (rank.length > 1 ? 1 : 0)) return false;
     const winner = rank[0];
@@ -970,6 +1102,8 @@ export class Session {
       this.ontoast?.('Tu as déjà une planète.');
       return false;
     }
+    // Depuis le départ commun, la planète mère se fonde avec le colonisateur de départ.
+    if (Number.isFinite(p.ready)) return this.refuse('Envoie ton colonisateur sur une planète libre : il y fondera ta planète mère.');
     if (p.out) {
       this.ontoast?.('Tu as perdu toutes tes planètes : tu es éliminé.');
       return false;
@@ -1021,11 +1155,13 @@ export class Session {
     const owner = this.ownerAt(p.home);
     if (!owner || owner.id === this.me || captured(p.home)) return;
     const w = this.myWorld;
+    // Fondée par mon colonisateur : il repart en orbite (avec ce que la planète avait), pour en chercher une autre.
+    const back = Number.isFinite(p.ready) && w ? this.evacuate(p, p.planet, w) : null;
     p.home = null;
     p.planet = null;
     delete p.claimAt;
     this.touch();
-    this.ontoast?.(`${owner.name} s'est installé sur ${w?.name || 'cette planète'} juste avant toi : choisis-en une autre.`);
+    this.ontoast?.(`${owner.name} s'est installé sur ${w?.name || 'cette planète'} juste avant toi : ${back ? 'ton colonisateur reste en orbite, envoie-le sur une autre' : 'choisis-en une autre'}.`);
     this.changed();
   }
 
@@ -1154,7 +1290,7 @@ export class Session {
     // La copie des technologies d'une colonie peut avoir un passage de retard : on part des plus hautes.
     if (pl.key !== 'home' && Object.entries(p.planet.tech || {}).some(([k, n]) => n > (pl.planet.tech?.[k] || 0))) {
       settle(pl.planet, this.now());
-      pl.planet.tech = maxTech(pl.planet.tech, p.planet.tech);
+      pl.planet.tech = maxTech(pl.planet.tech, techOf(p));
     }
     const err = startResearch(pl.planet, key, this.now());
     if (err) return this.ontoast?.(err);
@@ -1220,6 +1356,7 @@ export class Session {
     if (!f) return [];
     const w = this.planets.find((x) => sameCell(x, cell));
     const here = this.planetsAt(cell)[0];
+    const me0 = this.state.players[this.me];
     const out = [];
     if (here?.owner.id === this.me) out.push({ kind: 'dock', label: `Se poser sur ${here.name}` });
     else if (here) {
@@ -1231,7 +1368,9 @@ export class Session {
       out.push({ kind: 'attack', label: `Attaquer ${here.name} (${here.owner.name})${tail}`, odds: a.odds });
       out.push({ kind: 'conquer', label: `Conquérir ${here.name}${tail}`, odds: a.odds });
     }
-    else if (w && f.ships.colony) out.push({ kind: 'colonize', label: `Coloniser ${w.name}` });
+    else if (w && f.ships.colony && !me0.home) {
+      if (!w.kind || w.kind === 'planet') out.push({ kind: 'colonize', label: `Fonder ta planète mère sur ${w.name}` });
+    } else if (w && f.ships.colony) out.push({ kind: 'colonize', label: `Coloniser ${w.name}` });
     out.push({ kind: 'move', label: w || here ? 'Juste y aller (orbite)' : 'Y aller' });
     const me = this.state.players[this.me];
     const now = this.now();
@@ -1282,14 +1421,15 @@ export class Session {
       order = { kind, key: here.key };
     } else if (kind === 'attack' || kind === 'conquer') {
       if (!here || here.owner.id === this.me) return this.refuse('Aucune planète adverse ici.');
-      if (!armed(p.race, f.ships, p.planet.tech)) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas attaquer.');
+      if (!armed(p.race, f.ships, techOf(p))) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas attaquer.');
       order = { kind, pid: here.owner.id, key: here.key };
     } else if (kind === 'colonize') {
       if (!w || here) return this.refuse('Cette planète n’est pas libre.');
       if (!f.ships.colony) return this.refuse(`Il faut un vaisseau colonisateur (${SHIPS[p.race].colony.name}) pour coloniser.`);
+      if (!p.home && w.kind && w.kind !== 'planet') return this.refuse(`${w.name} est trop petit pour une planète mère : vise une planète.`);
       order = { kind, world: w.id };
     }
-    const err = moveTo(f, p.race, p.planet.tech, cell, order, this.now());
+    const err = moveTo(f, p.race, techOf(p), cell, order, this.now());
     if (err) return this.refuse(err);
     if (f.stranded) this.ontoast?.('Pas assez de carburant : la flotte tombera en panne en route.');
     // Au journal, seulement les ordres qui comptent : les simples déplacements le noieraient.
@@ -1305,7 +1445,7 @@ export class Session {
     const p = this.state.players[this.me];
     const f = this.myFleet(id);
     if (!f || this.locked(id)) return false;
-    const err = stopAt(f, p.race, p.planet.tech, this.now());
+    const err = stopAt(f, p.race, techOf(p), this.now());
     if (err) return this.refuse(err);
     this.touch();
     this.changed();
@@ -1318,7 +1458,7 @@ export class Session {
     const p = this.state.players[this.me];
     const f = this.myFleet(id);
     if (!f || !STANCES[stance]) return false;
-    if (stance === 'aggressive' && !armed(p.race, f.ships, p.planet.tech)) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas être agressive.');
+    if (stance === 'aggressive' && !armed(p.race, f.ships, techOf(p))) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas être agressive.');
     if ((f.stance || 'passive') === stance) return false;
     f.stance = stance;
     this.tickLogs = []; // une flotte ennemie déjà au contact : le combat part avec ma fiche
@@ -1340,8 +1480,8 @@ export class Session {
    */
   eyes(now) {
     const me = this.state.players[this.me];
-    if (!me?.planet) return [];
-    const tech = me.planet.tech || {};
+    if (!me?.race) return [];
+    const tech = techOf(me);
     const out = this.planetsOf(me).map((pl) => ({ x: pl.cell.x, y: pl.cell.y, r: sightRange(me.race, tech, 'planet') }));
     for (const f of me.fleets || []) out.push({ ...fleetPos(f, now), r: sightRange(me.race, tech, 'fleet') });
     return out;
@@ -1374,7 +1514,7 @@ export class Session {
     if (!f || !target) return this.refuse('Flotte introuvable.');
     if (this.locked(id)) return false;
     if (!this.sees(enemy, target, this.now())) return this.refuse('Cette flotte est hors de ta portée de détection.');
-    if (!armed(p.race, f.ships, p.planet.tech)) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas attaquer.');
+    if (!armed(p.race, f.ships, techOf(p))) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas attaquer.');
     // Ma copie de sa flotte ne change qu'une fois mon rapport lu par son téléphone : d'ici là, ce
     // que je vois est l'état d'avant le combat, et rejouer le combat compterait les pertes deux fois.
     const pendingHit = (p.effects || []).some((e) => e.to === pid && [target.id, ...(target.absorbed || [])].includes(e.fleet) && !enemy.applied?.includes(e.id));
@@ -1421,9 +1561,9 @@ export class Session {
     if (!moving(f, now) && f.arrive > f.depart && inContact(f, target, f.arrive)) return this.fight(p, f, enemy, target, f.arrive);
     const seen = `${target.depart}:${target.arrive}:${target.to.x}:${target.to.y}`;
     if (seen === f.order.seen && moving(f, now)) return false;
-    const aim = intercept(f, p.race, p.planet.tech, target, now);
+    const aim = intercept(f, p.race, techOf(p), target, now);
     if (seen === f.order.seen && !moving(f, now) && Math.abs(aim.x - f.to.x) + Math.abs(aim.y - f.to.y) < 1e-6) return false; // j'attends au point d'interception
-    const err = moveTo(f, p.race, p.planet.tech, aim, { ...f.order, seen }, now);
+    const err = moveTo(f, p.race, techOf(p), aim, { ...f.order, seen }, now);
     if (err || f.stranded) {
       f.order = null;
       this.ontoast?.(err || 'Pas assez de carburant pour rattraper la cible : la poursuite s’arrête au point de panne.');
@@ -1437,7 +1577,7 @@ export class Session {
    * puis la flotte reprend son trajet et son ordre. Renvoie true si ma fiche a changé.
    */
   engage(p, f, now, from = now) {
-    if (!aggressive(f) || f.order?.kind === 'chase' || !armed(p.race, f.ships, p.planet.tech)) return false;
+    if (!aggressive(f) || f.order?.kind === 'chase' || !armed(p.race, f.ships, techOf(p))) return false;
     const eyes = this.eyes(now);
     const pos = fleetPos(f, now);
     let best = null;
@@ -1481,7 +1621,7 @@ export class Session {
   fight(p, f, enemy, target, now, onward = false) {
     // Combat dans le passé : le prochain passage cherche les autres rencontres à partir de là.
     if (now < (this.scanAt ?? Infinity)) this.scanAt = now;
-    const res = battle({ race: p.race, ships: f.ships, tech: p.planet.tech }, { race: enemy.race, ships: target.ships, tech: enemy.planet?.tech || {} });
+    const res = battle({ race: p.race, ships: f.ships, tech: techOf(p) }, { race: enemy.race, ships: target.ships, tech: enemy.planet?.tech || {} });
     const take = res.won ? salvage(p.race, res.attLeft, target.cargo, f.cargo) : {};
     // Lui aussi a pu livrer ce combat de son côté, sans avoir encore lu mon rapport (poursuite
     // mutuelle) : c'est le même combat, chacun ne compte alors ses pertes qu'une fois. `sim` dit
@@ -1511,11 +1651,11 @@ export class Session {
     );
     this.ontoast?.(res.won ? 'Flotte ennemie détruite !' : countShips(res.attLeft) ? 'Combat indécis.' : 'Flotte perdue.');
     if (!onward) f.order = null;
-    if (!applyLosses(f, p.race, p.planet.tech, res.attLost, null, now)) {
+    if (!applyLosses(f, p.race, techOf(p), res.attLost, null, now)) {
       p.fleets = p.fleets.filter((x) => x.id !== f.id);
       return true;
     }
-    if (!onward && moving(f, now)) stopAt(f, p.race, p.planet.tech, now);
+    if (!onward && moving(f, now)) stopAt(f, p.race, techOf(p), now);
     f.cargo = Object.fromEntries(SOIL.map((r) => [r, (f.cargo?.[r] || 0) + (take[r] || 0)]));
     return true;
   }
@@ -1881,12 +2021,15 @@ export class Session {
     if (this.status !== 'playing' || !this.state) return;
     this.checkClaim();
     const p = this.state.players[this.me];
-    if (!p?.planet) return;
+    if (!p?.race) return;
     const now = this.now();
+    const entered = this.enterRace(p, now); // départ donné : ma flotte de départ apparaît
+    const racing = Number.isFinite(p.ready) && Number.isFinite(p.since) && !p.out; // dans la course, peut-être sans planète
+    if (!p.planet && !p.fleets?.length && !racing) return;
     const from = Math.min(now, this.scanAt ?? p.actAt ?? now);
     if (this.entry && from < now) this.entry.from = from;
     this.scanAt = now;
-    let changed = false;
+    let changed = entered;
     this.tickLogs = []; // entrées du journal de ce passage, envoyées avec ma fiche
     if (this.over) {
       // Partie finie : tout s'arrête, sauf la lecture des derniers combats.
@@ -1908,7 +2051,7 @@ export class Session {
         // Trouvée dans une colonie : elle vaut aussi pour la planète mère, qui la donne aux autres.
         if (pl.key !== 'home') {
           settle(p.planet, d.end); // la planète mère profite du bonus à partir de la fin, pas avant
-          p.planet.tech = maxTech(p.planet.tech, { [d.key]: d.level });
+          p.planet.tech = maxTech(techOf(p), { [d.key]: d.level });
           colonyTech = true;
         }
         this.addLog(`${p.name} découvre ${TECHS[p.race][d.key].name} niv. ${d.level} sur ${pl.name}.`);
@@ -1918,9 +2061,9 @@ export class Session {
     // Les technologies valent pour toutes mes planètes : chaque colonie en garde une copie, à
     // partir de la fin de la recherche (et pas seulement du passage qui s'en aperçoit).
     const shareTech = (pl) => {
-      if (pl.key === 'home' || sameTech(pl.planet.tech, p.planet.tech)) return;
+      if (pl.key === 'home' || sameTech(pl.planet.tech, techOf(p))) return;
       for (const d of settle(pl.planet, Math.min(techAt, now))) report(pl, d);
-      p.planet.tech = maxTech(p.planet.tech, pl.planet.tech); // une recherche finie ici et pas encore partagée
+      p.planet.tech = maxTech(techOf(p), pl.planet.tech); // une recherche finie ici et pas encore partagée
       pl.planet.tech = { ...p.planet.tech };
       changed = true;
     };
@@ -1945,6 +2088,7 @@ export class Session {
       if (!p.fleets.includes(f)) continue; // détruite dans ce combat
       if (f.order && !moving(f, now) && this.arrive(p, f)) changed = true;
     }
+    if (this.noColonizer(p, now)) changed = true;
     if (this.settleOffers(p, now)) changed = true;
     if (this.refuseExpired(p, now)) changed = true;
     this.noticeOffers(now);
@@ -1983,6 +2127,8 @@ export class Session {
       return true;
     }
 
+    if (order.kind === 'colonize' && !p.home && !p.out) return this.found(p, f, order);
+
     if (order.kind === 'colonize') {
       const w = this.planets.find((x) => x.id === order.world);
       // Prise par un joueur arrivé après moi (son téléphone est passé avant le mien) : je
@@ -1997,7 +2143,7 @@ export class Session {
       }
       const colony = newPlanet(p.race, f.arrive, w);
       colony.stock = { minerals: 0, food: 0, ...f.cargo, energy: Math.floor(fuelAt(f, p.race, now)) };
-      colony.tech = { ...(p.planet.tech || {}) };
+      colony.tech = { ...techOf(p) };
       colony.claimAt = f.arrive;
       const ships = { ...f.ships, colony: f.ships.colony - 1 };
       if (!ships.colony) delete ships.colony;
@@ -2022,7 +2168,7 @@ export class Session {
       const def = this.defenseAt(p, enemy, pl, f.arrive);
       // La planète se défend avec ses vaisseaux posés et sa défense (ses bâtiments : canons, boucliers…).
       const fort = fortOf(enemy.race, def.levels, def.pop);
-      const res = battle({ race: p.race, ships: f.ships, tech: p.planet.tech }, { race: enemy.race, ships: def.ships, tech: def.tech, fort });
+      const res = battle({ race: p.race, ships: f.ships, tech: techOf(p) }, { race: enemy.race, ships: def.ships, tech: def.tech, fort });
       if (!res.won) this.addLog(`La défense de ${pl.name} (${enemy.name}) repousse ${de(p.name)}.`);
       // Un pillage par planète toutes les 2 min au plus : sinon, des attaques à la chaîne depuis
       // l'orbite (trajet de 0 case) vidaient tout, malgré la règle « la moitié au plus ».
@@ -2051,10 +2197,49 @@ export class Session {
         text: res.won ? `Victoire sur ${pl.name} (${enemy.name}).` : `Défaite sur ${pl.name} (${enemy.name}) : sa défense te repousse.`,
       });
       // Les soutes perdues emportent leur cargaison, comme en combat entre flottes.
-      if (!applyLosses(f, p.race, p.planet.tech, res.attLost, null, now)) return drop(), true;
+      if (!applyLosses(f, p.race, techOf(p), res.attLost, null, now)) return drop(), true;
       f.cargo =Object.fromEntries(SOIL.map((r) => [r, (f.cargo?.[r] || 0) + (take[r] || 0)]));
       return true;
     }
+    return true;
+  }
+
+  /**
+   * Mon colonisateur arrive et je n'ai pas encore de planète : il fonde ma planète mère, avec les
+   * bâtiments et le stock de départ de ma race (comme l'installation d'avant). Le colonisateur
+   * est consommé, les autres vaisseaux s'y posent, la cargaison rejoint le stock ; le carburant
+   * restant est perdu (même départ pour tous, quelle que soit la longueur du trajet).
+   */
+  found(p, f, order) {
+    const w = this.planets.find((x) => x.id === order.world);
+    if (!w || !f.ships.colony || this.takenBefore(w, f.arrive)) {
+      this.addLog(`${w?.name || 'La planète'} est déjà prise : la flotte ${de(p.name)} reste en orbite.`);
+      this.ontoast?.(`${w?.name || 'La planète'} est déjà prise : choisis-en une autre.`);
+      return true;
+    }
+    if (w.kind && w.kind !== 'planet') {
+      this.addLog(`${w.name} est trop petit pour une planète mère : la flotte ${de(p.name)} reste en orbite.`);
+      return true;
+    }
+    if (this.frostOf(w) <= f.arrive) {
+      this.addLog(`${w.name} est gelée : la flotte ${de(p.name)} reste en orbite.`);
+      return true;
+    }
+    const planet = newPlanet(p.race, f.arrive, w);
+    const ships = { ...f.ships, colony: f.ships.colony - 1 };
+    if (!ships.colony) delete ships.colony;
+    planet.ships = ships;
+    for (const r of SOIL) planet.stock[r] = (planet.stock[r] || 0) + (f.cargo?.[r] || 0);
+    p.home = { x: w.x, y: w.y };
+    p.claimAt = f.arrive;
+    p.since ??= f.arrive;
+    p.planet = planet;
+    const docked = { ...(p.docked || {}) };
+    for (const id of [f.id, ...(f.absorbed || [])]) docked[id] = 'home';
+    p.docked = Object.fromEntries(Object.entries(docked).slice(-60));
+    p.fleets = p.fleets.filter((x) => x.id !== f.id);
+    this.addLog(`${p.name} fonde sa planète mère sur ${w.name}.`);
+    this.ontoast?.(`Planète mère fondée sur ${w.name} !`);
     return true;
   }
 
@@ -2069,7 +2254,7 @@ export class Session {
     colony.stock = { minerals: 0, food: 0 };
     for (const r of SOIL) colony.stock[r] = (f.cargo?.[r] || 0) + (take[r] || 0);
     colony.stock.energy = Math.floor(fuelAt(f, p.race, now));
-    colony.tech = { ...(p.planet.tech || {}) };
+    colony.tech = { ...techOf(p) };
     colony.claimAt = f.arrive;
     colony.ships = { ...res.attLeft };
     p.colonies = { ...(p.colonies || {}), [w.id]: colony };
@@ -2197,7 +2382,7 @@ export class Session {
         tone: destroyed ? 'bad' : lost ? 'even' : 'good',
         text: destroyed ? `Ta flotte est détruite par ${other.name}.` : `${other.name} attaque ta flotte.`,
       });
-    if (!applyLosses(f, p.race, p.planet.tech, ships, e.take, now)) {
+    if (!applyLosses(f, p.race, techOf(p), ships, e.take, now)) {
       p.fleets = p.fleets.filter((x) => x.id !== f.id);
       this.addLog(`Une flotte ${de(p.name)} est détruite par ${other.name}.`);
       this.ontoast?.(`${other.name} a détruit une de tes flottes !`);
@@ -2345,7 +2530,7 @@ function maxTech(a, b) {
   return out;
 }
 
-export const ORDER_KINDS = ['chooseRace', 'claimPlanet', 'build', 'planBuild', 'unplan', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'setFleetStance', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'splitFleet', 'returnFleet', 'power'];
+export const ORDER_KINDS = ['chooseRace', 'ready', 'begin', 'claimPlanet', 'build', 'planBuild', 'unplan', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'setFleetStance', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'splitFleet', 'returnFleet', 'power'];
 for (const k of [...ORDER_KINDS, 'tick']) {
   const act = Session.prototype[k];
   Session.prototype[k] = function (...a) {
