@@ -371,6 +371,14 @@ button.close-btn svg { width: 18px; height: 18px; }
 .mf.hot { border-left-color: #ff7a93; }
 .mf.dry { opacity: 0.55; }
 .mf[aria-pressed='true'] { border-color: var(--text); background: var(--panel-2); }
+/* Case d'une de mes planètes (D-115) : bord vert, boutons Construire et Décoller en bas. */
+.mf.mp { border-left-color: var(--ok); }
+.mf-top strong { display: inline-flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mf-top .ic { width: 14px; height: 14px; color: var(--accent); }
+.mp-actions { display: flex; justify-content: flex-end; gap: 4px; }
+.mp-actions:empty { display: none; }
+.mp-actions button { min-height: 32px; padding: 0 10px; }
+.mp-actions .ic { width: 16px; height: 16px; }
 
 /* ----- Univers ----- */
 
@@ -384,6 +392,12 @@ button.close-btn svg { width: 18px; height: 18px; }
   padding: 6px;
 }
 .map-wrap canvas { display: block; width: 100%; height: auto; aspect-ratio: 1; border-radius: 0; touch-action: none; }
+/* Zoom de la carte (D-117) : boutons en colonne, en haut à droite, par-dessus le canvas. */
+.map-wrap { position: relative; }
+.map-zoom { position: absolute; top: 12px; right: 12px; display: grid; gap: 4px; }
+.map-zoom button { width: 36px; min-height: 36px; padding: 0; background: rgba(10, 14, 28, 0.82); }
+.map-zoom button:disabled { opacity: 0.35; }
+.map-zoom .ic { width: 16px; height: 16px; }
 
 
 /* ----- Feuille d'invitation ----- */

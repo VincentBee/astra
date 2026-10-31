@@ -1733,12 +1733,16 @@ function drawMap() {
   const dpr = Math.min(3, window.devicePixelRatio || 1);
   const css = canvas.clientWidth;
   if (canvas.width !== Math.round(css * dpr)) canvas.width = canvas.height = Math.round(css * dpr);
-  const W = canvas.width;
-  const cell = W / UNIVERSE.w;
+  const W0 = canvas.width;
+  // Zoom (D-117) : les cases grandissent, et le dessin se décale jusqu'au coin de la partie vue.
+  const cell = (W0 * zoom.z) / UNIVERSE.w;
+  const W = cell * UNIVERSE.w; // tout l'univers, en pixels du canvas
   const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, W, W);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, W0, W0);
   ctx.fillStyle = '#05070f';
-  ctx.fillRect(0, 0, W, W);
+  ctx.fillRect(0, 0, W0, W0);
+  ctx.setTransform(1, 0, 0, 1, -zoom.x * cell, -zoom.y * cell);
 
   // Étoiles et quadrillage : du décor, très discret, pour que seuls les objets qu'on peut toucher ressortent.
   for (let y = 0; y < UNIVERSE.h; y++) {
@@ -1916,8 +1920,121 @@ function drawMap() {
     ctx.globalAlpha = 1;
   }
 
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   $('my-coords').textContent = me?.home ? `[${me.home.x}:${me.home.y}]` : me?.out ? 'éliminé' : 'à choisir';
 }
+
+// ---------------------------------------------------------------------------
+// Zoom de la carte (D-117) : pincer ou molette pour zoomer, glisser pour se déplacer,
+// boutons + / − / vue entière. `zoom.x`, `zoom.y` : coin haut-gauche de la partie vue, en cases.
+// ---------------------------------------------------------------------------
+
+const ZOOM_MAX = 4; // 5 cases sur 20 de large, au plus près
+const zoom = { z: 1, x: 0, y: 0 };
+const gesture = { pts: new Map(), moved: false, start: null };
+
+/** Taille d'une case à l'écran, en pixels CSS, zoom compris. */
+const cellCss = () => ($('map').getBoundingClientRect().width * zoom.z) / UNIVERSE.w;
+
+/** Garde la vue dans l'univers. */
+function clampZoom() {
+  zoom.z = Math.min(ZOOM_MAX, Math.max(1, zoom.z));
+  const span = UNIVERSE.w / zoom.z;
+  zoom.x = Math.min(UNIVERSE.w - span, Math.max(0, zoom.x));
+  zoom.y = Math.min(UNIVERSE.h - span, Math.max(0, zoom.y));
+  $('btn-zoom-in').disabled = zoom.z >= ZOOM_MAX - 1e-6;
+  $('btn-zoom-out').disabled = zoom.z <= 1 + 1e-6;
+  $('btn-zoom-fit').hidden = zoom.z <= 1 + 1e-6;
+}
+
+/** Zoome d'un facteur `k` en gardant fixe le point (sx, sy) du canvas, en pixels CSS. */
+function zoomAt(k, sx, sy) {
+  const c = cellCss();
+  const wx = zoom.x + sx / c;
+  const wy = zoom.y + sy / c;
+  zoom.z = Math.min(ZOOM_MAX, Math.max(1, zoom.z * k));
+  const c2 = cellCss();
+  zoom.x = wx - sx / c2;
+  zoom.y = wy - sy / c2;
+  clampZoom();
+}
+
+/** Zoom par les boutons : autour du centre de la vue. */
+function zoomCenter(k) {
+  const r = $('map').getBoundingClientRect();
+  zoomAt(k, r.width / 2, r.height / 2);
+}
+
+/** Si la case (x, y) est hors de la vue, la vue s'y centre (flotte choisie dans la grille). */
+function reveal(x, y) {
+  if (zoom.z <= 1) return;
+  const span = UNIVERSE.w / zoom.z;
+  if (x + 0.5 >= zoom.x && x + 0.5 <= zoom.x + span && y + 0.5 >= zoom.y && y + 0.5 <= zoom.y + span) return;
+  zoom.x = x + 0.5 - span / 2;
+  zoom.y = y + 0.5 - span / 2;
+  clampZoom();
+}
+
+$('btn-zoom-in').onclick = () => zoomCenter(1.6);
+$('btn-zoom-out').onclick = () => zoomCenter(1 / 1.6);
+$('btn-zoom-fit').onclick = () => {
+  zoom.z = 1;
+  clampZoom();
+};
+
+// Doigts et souris : un doigt glisse la vue (si elle est zoomée), deux doigts pincent.
+// Un geste qui a bougé n'est pas un toucher : le clic qui suit est ignoré.
+$('map').addEventListener('pointerdown', (e) => {
+  if (!gesture.pts.size) gesture.moved = false;
+  gesture.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  gesture.start = null;
+  try {
+    e.currentTarget.setPointerCapture(e.pointerId);
+  } catch {}
+});
+$('map').addEventListener('pointermove', (e) => {
+  const p = gesture.pts.get(e.pointerId);
+  if (!p) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  const pts = [...gesture.pts.values()];
+  if (pts.length === 1) {
+    const dx = e.clientX - p.x;
+    const dy = e.clientY - p.y;
+    if (!gesture.moved && Math.hypot(dx, dy) < 8) return; // petit tremblement : c'est encore un toucher
+    gesture.moved = true;
+    const c = cellCss();
+    zoom.x -= dx / c;
+    zoom.y -= dy / c;
+    clampZoom();
+  } else if (pts.length === 2) {
+    gesture.moved = true;
+    const other = pts.find((q) => q !== p);
+    const before = Math.hypot(p.x - other.x, p.y - other.y);
+    const after = Math.hypot(e.clientX - other.x, e.clientY - other.y);
+    // Le point entre les deux doigts suit les doigts ; l'écart des doigts donne le zoom.
+    const mx0 = (p.x + other.x) / 2 - r.left;
+    const my0 = (p.y + other.y) / 2 - r.top;
+    const mx1 = (e.clientX + other.x) / 2 - r.left;
+    const my1 = (e.clientY + other.y) / 2 - r.top;
+    if (before > 0) zoomAt(after / before, mx0, my0);
+    const c = cellCss();
+    zoom.x -= (mx1 - mx0) / c;
+    zoom.y -= (my1 - my0) / c;
+    clampZoom();
+  }
+  gesture.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+});
+for (const type of ['pointerup', 'pointercancel']) $('map').addEventListener(type, (e) => gesture.pts.delete(e.pointerId));
+$('map').addEventListener(
+  'wheel',
+  (e) => {
+    e.preventDefault();
+    const r = e.currentTarget.getBoundingClientRect();
+    zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
+  },
+  { passive: false },
+);
+clampZoom();
 
 /**
  * Où dessiner chaque flotte (en cases) : sur son trajet si elle roule ;
@@ -1954,10 +2071,11 @@ function fleetSpots(now) {
  */
 $('map').addEventListener('click', (e) => {
   if (!session?.state) return;
+  if (gesture.moved) return; // fin d'un glissé ou d'un pincement, pas un toucher
   const rect = e.currentTarget.getBoundingClientRect();
-  const size = rect.width / UNIVERSE.w; // en pixels CSS (le canvas, lui, est à l'échelle de l'écran)
-  const fx = (e.clientX - rect.left) / size - 0.5;
-  const fy = (e.clientY - rect.top) / size - 0.5;
+  const size = cellCss(); // en pixels CSS, zoom compris (le canvas, lui, est à l'échelle de l'écran)
+  const fx = zoom.x + (e.clientX - rect.left) / size - 0.5;
+  const fy = zoom.y + (e.clientY - rect.top) / size - 0.5;
 
   // Planète et flotte les plus proches du doigt : la plus proche gagne (une
   // flotte en orbite est à côté du centre de sa planète, pas dessus).
@@ -2071,31 +2189,69 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
   }
 }
 
-/** Mes flottes sous la carte, en grille : une case par flotte, pour la sélectionner sans la chercher. */
+/**
+ * Mes planètes puis mes flottes sous la carte, en grille. Une case par planète (vaisseaux à
+ * quai, chantier en cours, boutons Construire et Décoller) et une par flotte, pour la
+ * sélectionner sans la chercher.
+ */
 function renderMapFleets(me = session?.state?.players[session.me], now = session?.now()) {
   const box = $('map-fleets');
   const fleets = me?.fleets || [];
-  box.hidden = !fleets.length;
+  const planets = me ? session.planetsOf(me) : [];
+  box.hidden = !fleets.length && !planets.length;
+  const shipIcons = (ships) =>
+    SHIP_KEYS.filter((k) => ships[k])
+      .map((k) => `<span title="${esc(SHIPS[me.race][k].name)}">${ic(k)}${ships[k]}</span>`)
+      .join('');
   // Le statut change rarement, le compte à rebours chaque seconde : on ne réécrit le HTML que
   // pour le premier (redessiner sous le doigt ferait rater le toucher), le reste en place.
-  const html = fleets
+  const planetHtml = planets
+    .map((pl) => {
+      const s = stateAt(pl.planet, now);
+      const yard = s.levels.yard || 0;
+      const docked = countShips(s.ships);
+      const status = s.yard
+        ? `Chantier : +${s.yard.count} ${SHIPS[me.race][s.yard.type].name}`
+        : !yard
+          ? `🔒 ${RACES[me.race].buildings.yard.name}`
+          : docked
+            ? `${docked} à quai`
+            : 'Aucun vaisseau à quai';
+      const build = yard
+        ? `<button class="secondary small icon-only" data-mp-build="${esc(pl.key)}" title="Construire des vaisseaux ${esc(de(pl.name))}" aria-label="Construire des vaisseaux ${esc(de(pl.name))}">${ic('plus')}</button>`
+        : '';
+      const go = docked
+        ? `<button class="secondary small icon-only" data-mp-go="${esc(pl.key)}" title="Faire décoller des vaisseaux ${esc(de(pl.name))}" aria-label="Faire décoller des vaisseaux ${esc(de(pl.name))}">${ic('fleet')}</button>`
+        : '';
+      return `<div class="mf mp" role="group" aria-label="${esc(pl.name)}" data-planet="${esc(pl.key)}">
+        <span class="mf-top"><strong>${ic('planet')}${esc(pl.name)}</strong><span class="mf-clock"></span></span>
+        <span class="mf-ships">${shipIcons(s.ships)}</span>
+        <span class="mf-status">${esc(status)}</span>
+        <span class="mp-actions">${build}${go}</span></div>`;
+    })
+    .join('');
+  const fleetHtml = fleets
     .map((f) => {
       const hot = ['attack', 'conquer', 'chase'].includes(f.order?.kind);
       const dry = fuelAt(f, me.race, now) < DRY;
-      const ships = SHIP_KEYS.filter((k) => f.ships[k])
-        .map((k) => `<span title="${esc(SHIPS[me.race][k].name)}">${ic(k)}${f.ships[k]}</span>`)
-        .join('');
       return `<button class="mf${hot ? ' hot' : ''}${dry ? ' dry' : ''}" data-fleet="${esc(f.id)}">
         <span class="mf-top"><strong>${esc(fleetName(f))}</strong><span class="mf-clock"></span></span>
-        <span class="mf-ships">${ships}</span>
+        <span class="mf-ships">${shipIcons(f.ships)}</span>
         <span class="mf-status">${esc(fleetStatus(me.race, f, now))}</span></button>`;
     })
     .join('');
+  const html = planetHtml + fleetHtml;
   if (box.dataset.html !== html) {
     box.innerHTML = html;
     box.dataset.html = html;
   }
   for (const b of box.children) {
+    if (b.dataset.planet) {
+      const pl = planets.find((x) => x.key === b.dataset.planet);
+      const job = pl && stateAt(pl.planet, now).yard;
+      b.querySelector('.mf-clock').textContent = job ? clock(Math.max(0, job.end - now)) : '';
+      continue;
+    }
     const f = fleets.find((x) => x.id === b.dataset.fleet);
     b.setAttribute('aria-pressed', String(b.dataset.fleet === selFleet));
     b.querySelector('.mf-clock').textContent = f && moving(f, now) ? clock(f.arrive - now) : '';
@@ -2103,11 +2259,40 @@ function renderMapFleets(me = session?.state?.players[session.me], now = session
 }
 
 $('map-fleets').addEventListener('click', (e) => {
+  if (!session?.state) return;
+  const me = session.state.players[session.me];
+  // Construire : la fiche de la planète s'ouvre sur son chantier (×1, ×5, ×N, D-106).
+  const build = e.target.closest('[data-mp-build]')?.dataset.mpBuild;
+  if (build) {
+    const pl = session.planetOf(me, build);
+    if (!pl) return;
+    selected = { x: pl.cell.x, y: pl.cell.y };
+    renderPick();
+    $('pi-yard').scrollIntoView({ block: 'nearest' });
+    return;
+  }
+  // Décoller : le formulaire de décollage de cette planète, directement.
+  const go = e.target.closest('[data-mp-go]')?.dataset.mpGo;
+  if (go) {
+    selected = null;
+    renderPick();
+    openFleetSheet(go);
+    return;
+  }
+  // Ailleurs sur la case d'une planète : sa fiche, comme en la touchant sur la carte.
+  const tile = e.target.closest('[data-planet]')?.dataset.planet;
+  const pl = tile && session.planetOf(me, tile);
+  if (pl) {
+    selected = { x: pl.cell.x, y: pl.cell.y };
+    return renderPick();
+  }
   const id = e.target.closest('[data-fleet]')?.dataset.fleet;
   if (!id) return;
   selFleet = selFleet === id ? null : id; // retoucher la flotte choisie la relâche
   pending = null;
   prey = null;
+  const spot = selFleet && fleetSpots(session.now()).find((x) => x.p.id === session.me && x.f.id === selFleet);
+  if (spot) reveal(spot.x, spot.y); // carte zoomée : la flotte choisie revient dans la vue
   renderFleetInfo();
   renderMapFleets();
 });

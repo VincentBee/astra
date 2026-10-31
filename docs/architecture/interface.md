@@ -80,7 +80,7 @@ Détail de `#screen-game` :
 | `#lost` (97-100) | Bandeau « Seul en ligne » + **Rejoindre** (rejoindre les autres par une nouvelle invitation). | `renderState` 762 (`session.alone`), `btn-rejoin` 286-289. |
 | `#view-universe` (102-148) | Vue carte : `#pick` (bandeau « Choisis ta planète »), `#trades` (offres d'échange), `.map-head` (coordonnées, aide `?`), `canvas#map`. | `drawMap` 1349-1538, `renderPick` 1876-1913, `renderTrades` 1777-1800. |
 | `#sheet-planet` | Fiche de la planète touchée : nom, coordonnées, propriétaire, places, climat, gisements, **S'installer** ou **Bâtiments**. Sur une de mes planètes, partie **Chantier** (`#pi-yard`, D-106) : vaisseaux recherchés, prix, « jusqu'à N », boutons ×1 / ×5 / ×N, et **Décoller**. | `renderPick`, `renderPickYard`, écouteur de `#pi-ships`, `btn-pi-takeoff`, `btn-claim`, `btn-open-planet`, `closePlanetSheet`. |
-| `#map-fleets` (sous `canvas#map`) | Mes flottes en grille (2 colonnes sur téléphone). Une case par flotte : nom, compte à rebours, une icône par type de vaisseau avec son nombre, statut ; bord rouge si attaque/conquête/poursuite, grisée si à sec. Toucher = sélectionner la flotte (ouvre `#fleet-info`), retoucher = la relâcher (D-107, D-108). | `renderMapFleets`, appelé par `renderLive` ; le HTML n'est réécrit que si le contenu ou le statut change, le compte à rebours et `aria-pressed` sont mis à jour en place. |
+| `#map-fleets` (sous `canvas#map`) | Mes planètes puis mes flottes en grille (2 colonnes sur téléphone). **Une case par planète** (D-115, bord vert) : nom, compte à rebours du chantier, une icône par type de vaisseau à quai avec son nombre, statut (« Chantier : +5 Frégate », « 7 à quai », « Aucun vaisseau à quai » ou « 🔒 » sans chantier naval) et deux boutons-icônes : **+** (Construire, si la planète a un chantier naval) ouvre `#sheet-planet` sur sa partie Chantier ; **Décoller** (icône `fleet`, s'il y a des vaisseaux à quai) ouvre directement le formulaire de décollage de cette planète. Toucher ailleurs sur la case ouvre la fiche de la planète. Une case par flotte : nom, compte à rebours, une icône par type de vaisseau avec son nombre, statut ; bord rouge si attaque/conquête/poursuite, grisée si à sec. Toucher = sélectionner la flotte (ouvre `#fleet-info`), retoucher = la relâcher (D-107, D-108). | `renderMapFleets`, appelé par `renderLive` ; le HTML n'est réécrit que si le contenu ou le statut change, les comptes à rebours (flotte, chantier) et `aria-pressed` sont mis à jour en place. Un seul écouteur de clic : `[data-mp-build]`, `[data-mp-go]`, `[data-planet]`, puis `[data-fleet]`. |
 | `#fleet-info` (129-145) | Fiche de la flotte sélectionnée : vaisseaux, statut (avec la vitesse et, si la flotte mêle plusieurs types, le nom du plus lent : `speedText`), carburant, choix d'ordres (`#fi-choice`), mes flottes à côté (`#fi-beside`), joueurs à côté (`#fi-partners`), boutons Arrêter / Rentrer / Se poser / Plein / Passive-Agressive (`#btn-fi-stance`, icône d'attaque, pleine quand la flotte est agressive, cachée pour une flotte sans armes ; D-100) / Scinder / Fermer. Le statut finit par « · agressive » (`fleetStatus`). | `renderFleetInfo` 1643-1687, handlers 1689-1714. |
 | `#view-planet` (150-199) | Vue planète : en-tête (retour, nom, climat), gisements `#soil-zone`, stocks `#resources`, onglets, puis les panneaux `data-pane`. | `renderPlanet` 869-988. |
 | `.tabs` (163-168) | Onglets Bâtiments / Pouvoirs (aliens seulement) / Recherche (toute planète ; « 🔒 Il faut un labo » sans labo, technologie grisée si elle est en recherche sur une autre planète) / Flottes. | `showTab` 1241-1252, flèches clavier 1255-1262. |
@@ -178,8 +178,8 @@ Table des appels de l'interface vers la session :
 | S'installer sur une planète | 1924 | `claimPlanet` |
 | Bâtiment / recherche / vaisseaux / pouvoir | 749, 610, 614, 606 | `build` (ou `planBuild`, voir §13), `research`, `buildShips`, `power` |
 | Retirer un élément du fil de construction | `#plan` (× d'un élément) | `unplan` |
-| Vaisseaux depuis la carte (D-106) | écouteur de `#pi-ships` | `buildShips(type, n, clé de la planète touchée)` ; ×N = `shipsAffordable` |
-| Décoller (onglet Flottes ou fiche de la carte) | `openFleetSheet(clé)`, `btn-fleet-go` | `takeOff(fleetKey, …)` (renvoie l'id de la flotte, sélectionnée ensuite) |
+| Vaisseaux depuis la carte (D-106, D-115) | écouteur de `#pi-ships` (fiche ouverte en touchant la planète, ou par le bouton **+** de sa case sous la carte) | `buildShips(type, n, clé de la planète touchée)` ; ×N = `shipsAffordable` |
+| Décoller (onglet Flottes, fiche de la carte, ou case de la planète sous la carte, D-115) | `openFleetSheet(clé)`, `btn-fleet-go` | `takeOff(fleetKey, …)` (renvoie l'id de la flotte, sélectionnée ensuite) |
 | Envoyer une flotte sur une case | 1619-1623, 1697 | `ordersAt` (ordres possibles) puis `moveFleet` |
 | Poursuivre une flotte ennemie | 1691 | `chaseFleet` |
 | Arrêter / plein / rentrer / se poser | 1701-1708 | `stopFleet`, `refuelFleet`, `returnFleet`, `moveFleet(…, 'dock')` |
@@ -194,7 +194,7 @@ Retour de la session vers l'interface : seulement deux rappels, `session.onchang
 
 ### 6.1 Dessin (`drawMap`, `js/app.js:1349-1538`)
 
-- Canvas carré (`aspect-ratio: 1`, `style.css:356`), redimensionné à `largeur CSS × devicePixelRatio` (max 3). Une case = `largeur / UNIVERSE.w` pixels.
+- Canvas carré (`aspect-ratio: 1`, `style.css:356`), redimensionné à `largeur CSS × devicePixelRatio` (max 3). Une case = `largeur × zoom.z / UNIVERSE.w` pixels ; tout est dessiné sous `ctx.setTransform(1, 0, 0, 1, -zoom.x × case, -zoom.y × case)` (zoom, D-117, §6.4).
 - L'image suivante est demandée **avant** de dessiner : une erreur ne fige pas la carte (1352-1353).
 - Ordre des couches :
   1. fond `#05070f`, étoiles fixes tirées de `noise(x, y)` (bruit déterministe : mêmes étoiles partout, 1305-1308) et quadrillage très pâle (1365-1387) ;
@@ -208,15 +208,23 @@ Retour de la session vers l'interface : seulement deux rappels, `session.onchang
 
 ### 6.2 Toucher (`js/app.js:1573-1640`)
 
-Le point touché est converti en cases (pixels CSS / taille d'une case). Puis, dans l'ordre :
+Le point touché est converti en cases : `zoom.x + pixels CSS / cellCss()` (taille d'une case à l'écran, zoom compris). Un clic qui termine un glissé ou un pincement (`gesture.moved`) est ignoré. Puis, dans l'ordre :
 1. **Une de mes flottes sous le doigt** (< 0,7 case, plus proche qu'une planète) → la sélectionner ; plusieurs flottes empilées : chaque toucher passe à la suivante (1592-1604). Si une flotte est déjà sélectionnée, seules celles de la case touchée comptent.
    Autre façon de sélectionner : toucher la flotte dans la grille `#map-fleets` sous la carte (D-107, D-108).
+   La même grille commence par une case par planète à moi (D-115) : construire et faire décoller sans chercher la planète sur la carte.
+   Carte zoomée : choisir une flotte dans la grille recentre la vue sur elle si elle est hors champ (`reveal`, D-117).
 2. **Une flotte sélectionnée** :
    - une flotte ennemie sous le doigt → `prey`, la fiche propose « Attaquer » (1607-1615) ;
    - sinon la case touchée : `session.ordersAt` ; un seul ordre possible sans panne → `moveFleet` direct ; sinon `pending` = la case, et la fiche affiche un bouton par ordre (1617-1625, rendu 1674-1681).
 3. **Sinon** : une planète, à moi ou non → sa fiche (`selected`) ; pour la mienne, la fiche porte le chantier, « Décoller » et « Bâtiments » (D-106 ; avant, toucher ma planète ouvrait directement la vue planète) ; le vide → ferme la fiche.
 
 État de la carte, variables de module (1208-1214) : `currentView`, `openKey` (« home » ou id d'une colonie), `mapFrame`, `selected`, `selFleet`, `pending`, `prey`.
+
+### 6.4 Zoom (D-117)
+
+- État : `zoom = { z, x, y }` (`z` de 1 à `ZOOM_MAX` = 4, soit 20 à 5 cases de large ; `x`, `y` = coin haut-gauche de la partie vue, en cases). `clampZoom` garde la vue dans l'univers et met à jour les boutons. Le zoom n'est pas sauvegardé : chaque ouverture de l'appli repart de la carte entière.
+- Gestes sur `canvas#map` (événements `pointer*`, `touch-action: none` déjà posé) : un doigt ou la souris **glisse** la vue (au-delà de 8 px, sinon c'est un toucher) ; deux doigts **pincent** (l'écart donne le zoom, le milieu suit les doigts) ; la **molette** zoome autour du curseur (`zoomAt` garde fixe le point visé).
+- Boutons `.map-zoom` en haut à droite du canvas : `#btn-zoom-in` (+), `#btn-zoom-out` (−), `#btn-zoom-fit` (vue entière, caché à zoom 1) ; facteur 1,6 autour du centre de la vue.
 
 ### 6.3 Carte du replay
 
@@ -262,7 +270,7 @@ Le fichier est **en couches** : les sections de la fin redéfinissent celles du 
 
 ### 7.4 Icônes et fond
 
-- **`js/icons.js`** : 36 tracés (dont les 4 vaisseaux `cargo`, `fighter`, `heavy`, `colony`, D-108, et la roue crantée `gear`, D-114) 24 × 24 (`PATHS`). `ic(nom)` renvoie un `<svg class="ic" aria-hidden="true">` pour le HTML généré ; `fillIcons()` remplace chaque `<i data-ic="nom"></i>` du HTML statique (appelé au tout début de `app.js`). Style `.ic` : trait 1,6, `stroke-linecap: square`, couleur du texte (`style.css:559`). Ajouter une icône = ajouter un tracé dans `PATHS`.
+- **`js/icons.js`** : 40 tracés (dont les 4 vaisseaux `cargo`, `fighter`, `heavy`, `colony`, D-108, la roue crantée `gear`, D-114, et `minus` et `fit` du zoom de la carte, D-117) 24 × 24 (`PATHS`). `ic(nom)` renvoie un `<svg class="ic" aria-hidden="true">` pour le HTML généré ; `fillIcons()` remplace chaque `<i data-ic="nom"></i>` du HTML statique (appelé au tout début de `app.js`). Style `.ic` : trait 1,6, `stroke-linecap: square`, couleur du texte (`style.css:559`). Ajouter une icône = ajouter un tracé dans `PATHS`.
 - **Ressources et races** (`js/game.js:31-52`) : `resIcon(r, nom)` (cristal, feuille, éclair, buste ; classe `.ri ri-<r>` colorée par la variable de la ressource) et `raceIcon(r)` (casque, robot, alien ; classe `.rci`). Contrairement à `ic`, elles sont nommées (`role="img"`, `<title>`) pour les lecteurs d'écran.
 - **`js/sky.js`** : `drawSun(ctx, sun, cell)` ; disque en dégradé blanc → jaune → orange qui remplit son carré de `sun.size` cases, halo qui déborde (1,7 × le rayon). Position donnée par `sunFor(gid)` de `game.js` (voir `regles.md` pour l'effet du soleil sur le climat).
 - **`js/galaxy.js`** : `startGalaxy()` crée `div.galaxy` (fixe, `z-index: -1`) avec 3 couches d'étoiles (260/90/28 étoiles pour 400 × 800 px, densité constante), dessinées une fois en canvas puis posées en image de fond répétée (tuile = taille de l'écran). Graine fixe (`rng`) : le même ciel à chaque ouverture. 45 % des étoiles suivent une bande diagonale (« Voie lactée »). Parallaxe : défilement, souris, et inclinaison du téléphone (`devicemotion`, position de repos qui s'adapte ; permission demandée au premier toucher sur iPhone). Redessiné 150 ms après un redimensionnement. Sous les couches, la nébuleuse est un dégradé CSS du `body` (`style.css:589-596`). Chargé seulement par `index.html`.

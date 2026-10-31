@@ -1077,3 +1077,51 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Alternatives écartées : garder une liste sur chaque écran (prend de la place) ; mettre les
   réglages dans la fenêtre Joueurs (mal rangé).
 - Qui : Vincent (demande), Claude (forme). Source : session `0a3a42f6`. Statut : en vigueur.
+
+**D-115 — Mes planètes dans la grille sous la carte, avec Construire et Décoller**
+- 2026-10-31 11:00. Demande de Vincent : « Je voudrais que sur la vue map, il y ait avec les
+  flottes la liste des planètes dans la grille et qu'on puisse, depuis cet endroit, créer de
+  nouveaux vaisseaux ou faire décoller des vaisseaux déjà créés. »
+- Choix : la grille `#map-fleets` (D-107, D-108) commence par une case par planète à moi (mère
+  puis colonies), suivie des flottes. La case montre le nom, les vaisseaux à quai (une icône par
+  type et son nombre, comme les flottes), le lot en chantier et son compte à rebours. Deux
+  boutons-icônes : **+** ouvre la fiche de la planète sur son chantier (×1, ×5, ×N de D-106) ;
+  **Décoller** ouvre directement le formulaire de décollage de cette planète. Toucher ailleurs sur
+  la case ouvre la fiche, comme toucher la planète sur la carte. La grille s'affiche dès qu'on a
+  une planète, même sans flotte.
+- Choix de Claude, par défaut : les planètes avant les flottes (elles ne bougent pas, les flottes
+  vont et viennent en fin de liste) ; bord vert pour les distinguer des flottes (bord bleu ou
+  rouge) ; icône « + » plutôt que la maison, déjà prise par « Bâtiments » ; **+** caché sans
+  chantier naval (la case dit « 🔒 » et le nom du bâtiment) et **Décoller** caché sans vaisseau à
+  quai ; la construction reste dans la fiche de la planète (D-106) au lieu de boutons ×1/×5 dans
+  la case, trop petite sur un téléphone (2 colonnes).
+- Alternatives écartées : une liste séparée des planètes sous la grille des flottes ; des boutons
+  de construction dans chaque case ; une case qui sélectionne la planète sans rien ouvrir.
+- Qui : Vincent (la demande), Claude (la forme). Source : session `012yisg4`.
+- Statut : en vigueur. Vérifié dans Chromium (390 × 844) : construire depuis la case, compte à
+  rebours, décollage, flotte en orbite. Sur un vrai téléphone : **non confirmé**.
+
+**D-116 — Cache `astra-p2p-v64`**
+- 2026-10-31. Choix de Claude : `index.html`, `style.css`, `js/app.js` (D-115, D-117) et
+  `js/icons.js` (D-117) changent ; nouvelle version de cache pour que les téléphones les
+  récupèrent. Une seule version pour les deux demandes, faites sur la même branche.
+- Statut : en vigueur.
+
+**D-117 — Carte zoomable**
+- 2026-10-31 11:15. Demande de Vincent : « Je veux aussi que la carte soit zoomable. »
+- Choix : zoom de 1 (toute la carte, 20 cases) à 4 (5 cases de large). Pincer à deux doigts ou
+  molette pour zoomer (autour des doigts ou du curseur) ; glisser à un doigt ou à la souris pour
+  se déplacer ; boutons +, − et « vue entière » en haut à droite de la carte. Un geste qui a
+  bougé de plus de 8 px n'est pas un toucher (pas d'ordre envoyé par erreur en se déplaçant).
+  Les cases, les traits et les noms grossissent avec le zoom. Choisir une flotte dans la grille
+  sous la carte recentre la vue sur elle si elle est hors champ.
+- Choix de Claude, par défaut : zoom maximal 4 ; facteur 1,6 par bouton ; le zoom n'est pas
+  gardé d'une ouverture à l'autre ; la molette zoome toujours (sans touche Ctrl), comme sur une
+  carte en ligne ; pas de double toucher pour zoomer (il retarderait chaque toucher simple).
+- Alternatives écartées : zoom du navigateur (agrandit toute la page, pas la carte) ; agrandir
+  le canvas dans un cadre qui défile (le défilement se bat avec les touchers) ; un curseur de
+  zoom (prend de la place).
+- Qui : Vincent (la demande), Claude (la forme). Source : session `012yisg4`.
+- Statut : en vigueur. Vérifié dans Chromium (390 × 844) : boutons, molette autour du curseur,
+  glisser à la souris sans ouvrir de fiche, pincement simulé jusqu'au zoom 4, toucher d'une
+  planète juste une fois zoomé. Pincement sur un vrai téléphone : **non confirmé**.
