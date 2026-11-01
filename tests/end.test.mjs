@@ -16,6 +16,8 @@ afterEach(() => {
 /** Froid actif : il part tout de suite et atteint le soleil en 10 min. */
 const frost = () => Object.assign(game.FROST, { delayMs: 0, durationMs: 10 * 60_000 });
 const me = (s) => s.state.players[s.me];
+/** Le propriétaire de la case `cell` vu par `s`, en lettre (A, B) : pour les étiquettes. */
+const owner = (s, cell, A, B) => ({ [A.me]: 'A', [B.me]: 'B' })[s.ownerAt(cell)?.id] || 'personne';
 
 scenario('le score compte toutes les planètes, les recherches et les vaisseaux', (film) => {
   const { players: [A] } = newGame(1, ['human']);
@@ -24,20 +26,25 @@ scenario('le score compte toutes les planètes, les recherches et les vaisseaux'
   const before = A.scoreOf(p);
   p.planet.ships = { ...(p.planet.ships || {}), fighter: 10 };
   const withShips = A.scoreOf(p);
-  film.look(A, '10 frégates à quai en plus');
+  film.look(A, '10 frégates à quai en plus : le score monte', [{ show: 'score', at: p.home, expected: `plus de ${Math.round(before)}`, got: withShips, ok: withShips > before }]);
   assert.ok(withShips > before, 'les vaisseaux comptent');
   p.colonies = { [A.planets[5].id]: { ...p.planet, levels: { mine: 3 }, ships: {} } };
-  film.look(A, 'et une colonie');
+  film.look(A, 'et une colonie : le score monte encore', [{ show: 'score', at: A.planets[5], expected: `plus de ${Math.round(withShips)}`, got: A.scoreOf(p), ok: A.scoreOf(p) > withShips }]);
   assert.ok(A.scoreOf(p) > withShips, 'les colonies comptent');
 });
 
 scenario('le froid prend d’abord les planètes loin du soleil, puis les plus proches', (film) => {
   frost();
   const { players: [A] } = newGame(1, ['human']);
-  film.look(A, 'le froid part du bord, vers le soleil');
   const at = A.planets.slice(0, 14).map((w) => A.frostOf(w));
   const near = A.planets.slice(0, 14).sort((a, b) => A.frostOf(b) - A.frostOf(a))[0];
   const far = A.planets.slice(0, 14).sort((a, b) => A.frostOf(a) - A.frostOf(b))[0];
+  const min = (w) => (A.frostOf(w) - A.startedAt) / 60_000;
+  film.look(A, 'le froid part du bord, vers le soleil : la planète du bord gèle avant celle près du soleil', [
+    { show: `${far.name} (au bord) gèle après, en min`, at: far, expected: `moins que ${near.name}`, got: min(far), ok: A.frostOf(far) < A.frostOf(near) },
+    { show: `${near.name} (près du soleil) gèle après, en min`, at: near, expected: '10 au plus', got: min(near), ok: min(near) <= 10 },
+    { show: 'tout gelé après, en min', expected: '10 au plus', got: (Math.max(...at) - A.startedAt) / 60_000, ok: Math.max(...at) <= A.startedAt + 10 * 60_000 },
+  ]);
   assert.ok(A.frostOf(far) < A.frostOf(near));
   assert.ok(Math.max(...at) <= A.startedAt + 10 * 60_000);
 });
@@ -56,13 +63,20 @@ scenario('planète mère gelée : la plus vieille colonie en vie la remplace, pu
   film.look(A, 'A : sa planète mère et deux colonies');
   clock.t = Math.max(A.frostOf(outer), A.frostOf(home)) + 1;
   A.tick();
-  film.look(A, 'la planète mère et la colonie du bord ont gelé');
+  film.look(A, 'la planète mère et la colonie du bord ont gelé : la colonie au chaud devient planète mère', [
+    { show: 'nouvelle planète mère', at: inner, expected: inner.name, got: game.sameCell(p.home, inner) ? inner.name : 'ailleurs' },
+    { show: 'colonies', expected: 0, got: Object.keys(p.colonies).length },
+    { show: 'partie finie', expected: false, got: !!A.over },
+  ]);
   assert.ok(game.sameCell(p.home, inner), 'la colonie la plus au chaud devient planète mère');
   assert.deepEqual(Object.keys(p.colonies), []);
   assert.equal(A.over, null);
   clock.t = A.frostOf(inner) + 1;
   A.tick();
-  film.look(A, 'la dernière colonie gèle : A est éliminé');
+  film.look(A, 'la dernière colonie gèle : A est éliminé', [
+    { show: 'A éliminé', at: inner, expected: `à l’heure du gel de ${inner.name}`, got: p.out === A.frostOf(inner) ? `à l’heure du gel de ${inner.name}` : 'pas à cette heure', ok: p.out === A.frostOf(inner) },
+    { show: 'partie finie, gagnant', expected: A.me, got: A.over?.winner },
+  ]);
   assert.equal(p.out, A.frostOf(inner), 'éliminé à l’heure où le froid a pris sa dernière planète');
   assert.equal(A.over?.winner, A.me, 'seul : la partie finit quand le froid a tout pris');
 });
@@ -74,13 +88,14 @@ scenario('à deux, celui que le froid prend en dernier gagne, même si l’autre
   film.look(last, 'deux joueurs, le froid arrive');
   clock.t = first.frostOf(me(first).home) + 1;
   last.tick(); // le perdant n'a pas rouvert l'appli : le gagnant voit quand même qu'il a tout perdu
-  film.look(last, 'la planète de l’autre a gelé : il gagne');
+  film.look(last, 'la planète de l’autre a gelé : il gagne', [{ show: 'gagnant', at: me(last).home, expected: last.me, got: last.over?.winner }]);
   assert.equal(last.over?.winner, last.me);
   sync(first, last);
-  film.look(first, 'le perdant reçoit la fin de partie');
+  film.look(first, 'le perdant reçoit la fin de partie', [{ show: 'gagnant, chez le perdant', expected: last.me, got: first.over?.winner }]);
   assert.equal(first.over?.winner, last.me, 'la fin se propage');
   const levels = JSON.stringify(me(first).planet.levels);
   first.build('mine');
+  film.look(first, 'le perdant ordonne une mine après la fin : rien ne change', [{ show: 'bâtiments changés', expected: false, got: JSON.stringify(me(first).planet.levels) !== levels }]);
   assert.equal(JSON.stringify(me(first).planet.levels), levels, 'plus d’ordres après la fin');
 });
 
@@ -120,27 +135,42 @@ scenario('la défense d’une planète vient de ses bâtiments, et de sa race', 
 
 scenario('conquérir la planète mère d’un joueur sans colonie l’élimine', (film) => {
   const { A, B, clock, sync, cell, id } = assault('conquer', { fighter: 30 }, {}, film);
-  film.look(A, 'combat : A a pris la planète');
+  film.look(A, 'combat : A a pris la planète, sa flotte s’y est posée', [
+    { show: 'à qui', at: cell, expected: 'A', got: owner(A, cell, A, B) },
+    { show: 'colonies de A', expected: 1, got: Object.values(me(A).colonies || {}).length },
+    { show: 'flotte posée', expected: true, got: A.myFleet(id) === null },
+  ]);
   assert.equal(A.ownerAt(cell)?.id, A.me, 'la planète est à A avant même que B lise le rapport');
   assert.equal(Object.values(me(A).colonies || {}).length, 1, 'A y a une colonie');
   assert.equal(A.myFleet(id), null, 'la flotte s’y est posée');
   sync(B, A);
   clock.t += 1000;
   B.tick();
-  film.look(B, 'B lit le rapport : il n’a plus de planète');
+  film.look(B, 'B lit le rapport : il n’a plus de planète, il est éliminé', [
+    { show: 'planète mère de B', expected: 'aucune', got: me(B).home ? 'une' : 'aucune' },
+    { show: 'B éliminé', expected: true, got: Number.isFinite(me(B).out) },
+  ]);
   assert.equal(me(B).home, null);
   assert.ok(Number.isFinite(me(B).out), 'B est éliminé');
   sync(A, B);
   clock.t += 1000;
   A.tick();
-  film.look(A, 'A apprend que B est éliminé : il gagne');
+  film.look(A, 'A apprend que B est éliminé : il gagne', [
+    { show: 'gagnant', expected: A.me, got: A.over?.winner },
+    { show: 'à qui', at: cell, expected: 'A', got: owner(A, cell, A, B) },
+  ]);
   assert.equal(A.over?.winner, A.me);
   assert.equal(A.ownerAt(cell)?.id, A.me);
 });
 
 scenario('trop peu de vaisseaux d’attaque : les tourelles tiennent, ni prise ni pillage', (film) => {
   const { A, B, cell, id } = assault('conquer', { fighter: 3 }, { turret: 3 }, film);
-  film.look(A, 'combat : les tourelles de B tiennent');
+  const left = A.myFleet(id)?.ships.fighter || 0;
+  film.look(A, 'combat : les tourelles de B tiennent', [
+    { show: 'à qui', at: cell, expected: 'B', got: owner(A, cell, A, B) },
+    { show: 'chasseurs de A restants', at: [A, id], expected: 'moins de 3', got: left, ok: left < 3 },
+    { show: 'minéraux pillés', expected: 0, got: me(A).effects.at(-1).take.minerals ?? 0 },
+  ]);
   assert.equal(A.ownerAt(cell)?.id, B.me);
   assert.ok((A.myFleet(id)?.ships.fighter || 0) < 3, 'les tourelles ont abattu des frégates');
   assert.equal(me(A).effects.at(-1).take.minerals ?? 0, 0, 'rien de pillé');
@@ -148,10 +178,10 @@ scenario('trop peu de vaisseaux d’attaque : les tourelles tiennent, ni prise n
 
 scenario('un colonisateur ne prend pas une planète habitée, une attaque pille sans prendre', (film) => {
   const colo = assault('conquer', { colony: 1 }, {}, film);
-  film.look(colo.A, 'un colonisateur seul : la planète reste à B');
+  film.look(colo.A, 'un colonisateur seul : la planète reste à B', [{ show: 'à qui', at: colo.cell, expected: 'B', got: owner(colo.A, colo.cell, colo.A, colo.B) }]);
   assert.equal(colo.A.ownerAt(colo.cell)?.id, colo.B.me, 'pas d’armes : pas de conquête');
   const raid = assault('attack', { fighter: 30 }, {}, film);
-  film.look(raid.A, 'attaque : B est pillé, mais garde sa planète');
+  film.look(raid.A, 'attaque : B est pillé, mais garde sa planète', [{ show: 'à qui', at: raid.cell, expected: 'B', got: owner(raid.A, raid.cell, raid.A, raid.B) }]);
   assert.equal(raid.A.ownerAt(raid.cell)?.id, raid.B.me, 'l’ordre « attaquer » ne prend pas la planète');
 });
 
@@ -162,7 +192,11 @@ scenario('une partie d’avant la course n’a ni froid ni fin', (film) => {
   film.look(A, 'fiche d’avant la course');
   clock.t += 60 * 60_000;
   A.tick();
-  film.look(A, 'une heure plus tard : rien n’a gelé');
+  film.look(A, 'une heure plus tard : rien n’a gelé', [
+    { show: 'planète mère', at: me(A).home, expected: 'là', got: me(A).home ? 'là' : 'gelée' },
+    { show: 'départ de la course', expected: 'aucun', got: A.startedAt === null ? 'aucun' : A.startedAt },
+    { show: 'partie finie', expected: false, got: !!A.over },
+  ]);
   assert.equal(A.over, null);
   assert.equal(A.startedAt, null);
   assert.ok(me(A).home, 'la planète mère n’a pas gelé');
@@ -179,22 +213,35 @@ scenario('mort simultanée : le meilleur score d’avant la chute gagne, les poi
   me(B).colonies = { [B.planets[5].id]: { ...game.newPlanet('machine', clock.t, B.planets[5]), levels: { drill: 12 }, claimAt: clock.t } };
   B.touch();
   sync(A, B);
-  film.look(A, 'B a une colonie, A une planète mère plus riche');
   const rich = B.scoreOf(me(B));
+  const homeOnly = game.empireScore('machine', [me(B).planet]);
+  film.look(A, 'B a une colonie, A une planète mère plus riche : B mène grâce à sa colonie', [
+    { show: 'score de B', at: B.planets[5], expected: `plus que A (${Math.round(A.scoreOf(me(A)))})`, got: rich, ok: rich > A.scoreOf(me(A)) },
+    { show: 'planète mère de B seule', at: me(B).home, expected: `moins que A`, got: homeOnly, ok: homeOnly < A.scoreOf(me(A)) },
+  ]);
   assert.ok(rich > A.scoreOf(me(A)), 'B mène');
   assert.ok(game.empireScore('machine', [me(B).planet]) < A.scoreOf(me(A)), 'sa planète mère seule ne suffit pas');
   clock.t = T + 1;
   A.tick(); // A voit sa chute, et la fiche de B pas encore à jour
-  film.look(A, 'tout l’anneau gèle : A voit sa chute');
+  film.look(A, 'tout l’anneau gèle : A voit sa chute', [
+    { show: 'score de A', expected: 0, got: A.scoreOf(me(A)) },
+    { show: 'gagnant, vu par A', expected: B.me, got: A.over?.winner },
+  ]);
   assert.equal(A.scoreOf(me(A)), 0, 'A a tout perdu : 0 point');
   assert.equal(A.over?.winner, B.me);
   B.tick();
-  film.look(B, 'B tombe aussi');
+  film.look(B, 'B tombe aussi, mais garde ses points d’avant la chute', [
+    { show: 'score de B', expected: 0, got: B.scoreOf(me(B)) },
+    { show: 'points d’avant la chute', expected: rich, got: me(B).deathPts },
+  ]);
   assert.equal(B.scoreOf(me(B)), 0, 'B aussi');
   assert.equal(me(B).deathPts, rich, 'B garde ses points d’avant la chute');
   sync(A, B);
   sync(B, A);
-  film.look(B, 'fiches échangées : B gagne aux points d’avant la chute');
+  film.look(B, 'fiches échangées : B gagne aux points d’avant la chute', [
+    { show: 'gagnant, chez B', expected: B.me, got: B.over?.winner },
+    { show: 'gagnant, chez A', expected: B.me, got: A.over?.winner },
+  ]);
   assert.equal(B.over?.winner, B.me);
   assert.equal(A.over?.winner, B.me);
 });

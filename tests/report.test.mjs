@@ -2,6 +2,7 @@
 // (pourquoi on gagne ou on perd) et son voyage jusqu'au carnet du défenseur.
 import { scenarios } from './scenario.mjs';
 import assert from 'node:assert/strict';
+import { isDeepStrictEqual } from 'node:util';
 import { battle } from '../js/fleet.js';
 import { explainBattle, sideTable, cleanReport } from '../js/report.js';
 import { newGame } from './harness.mjs';
@@ -161,16 +162,24 @@ function raid(film) {
 
 scenario('carnet : l’attaquant et le défenseur ont le même déroulé, chacun de son côté', (film) => {
   const { A, B, sync } = raid(film);
-  film.look(A, 'combat : A gagne');
   const a = A.journal.list.find((e) => e.kind === 'combat');
+  film.look(A, 'combat : A gagne ; son carnet a le déroulé, défense de la planète comprise', [
+    { show: 'passes dans le carnet de A', expected: 'au moins 1', got: a?.rep?.rounds.length || 0, ok: !!a?.rep?.rounds.length },
+    { show: 'défense de la planète de B (coque)', expected: 'plus de 0', got: a?.rep?.d.fort?.hull || 0, ok: a?.rep?.d.fort?.hull > 0 },
+    { show: 'déroulé envoyé à B', expected: true, got: P(A).effects.some((e) => e.rep) },
+    { show: 'issue pour A', expected: 'win', got: explainBattle(a.rep, 'a').outcome },
+  ]);
   assert.equal(a.side, 'a');
   assert.ok(a.rep?.rounds.length, 'le déroulé est dans le carnet de A');
   assert.ok(a.rep.d.fort?.hull > 0, 'avec la défense de la planète');
   assert.ok(P(A).effects.some((e) => e.rep), 'et dans le rapport envoyé à B');
   sync(B, A);
   B.tick();
-  film.look(B, 'B lit le rapport de A');
   const b = B.journal.list.find((e) => e.kind === 'combat');
+  film.look(B, 'B lit le rapport de A : le même déroulé, de son côté', [
+    { show: 'même déroulé que A', expected: true, got: isDeepStrictEqual(b?.rep, a.rep) },
+    { show: 'issue pour B', expected: 'loss', got: b && explainBattle(b.rep, 'd').outcome },
+  ]);
   assert.equal(b.side, 'd');
   assert.deepEqual(b.rep, a.rep, 'B lit le même déroulé');
   assert.equal(explainBattle(b.rep, 'd').outcome, 'loss');
@@ -183,8 +192,12 @@ scenario('carnet : une seconde attaque trop tôt dit pourquoi elle ne rapporte r
   clock.t += 1000;
   A.moveFleet(id, cell, 'attack');
   A.tick();
-  film.look(A, 'une seconde plus tard, A attaque encore');
   const last = A.journal.list.filter((e) => e.kind === 'combat').at(-1);
+  const why = explainBattle(last.rep, 'a', last).reasons.at(-1);
+  film.look(A, 'une seconde plus tard, A attaque encore : pas de butin, et le carnet dit pourquoi', [
+    { show: 'pas de butin, raison', at: cell, expected: 'cooldown', got: last.noLoot },
+    { show: 'explication', expected: 'Pas de butin : tu as déjà pillé…', got: why, ok: /Pas de butin : tu as déjà pillé/.test(why) },
+  ]);
   assert.equal(last.noLoot, 'cooldown');
   assert.match(explainBattle(last.rep, 'a', last).reasons.at(-1), /Pas de butin : tu as déjà pillé/);
 });

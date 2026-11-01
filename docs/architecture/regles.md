@@ -880,8 +880,17 @@ serveur à la racine du dépôt) ; en `file://`, seule la carte de contrôle (le
 sinon) est montrée. Attentes de `film.look` : `{ fleet: [propriétaire, id], visible }`,
 `{ alert: /texte/ }` ou `{ alert: null }` (bandeau d'alerte, texte de `threatText`, D-135),
 `{ sheet: case, button }` (le joueur touche cette planète : « Voir la planète » visible ou non,
-`Session.myPlanetAt`, D-139 ; la fiche s'ouvre dans le vrai jeu). Exemples :
-`tests/threat.test.mjs`, `tests/planet-button.test.mjs`.
+`Session.myPlanetAt`, D-139 ; la fiche s'ouvre dans le vrai jeu), `{ finger: { at, px, zoom },
+hits: case ou null }` (le joueur touche la carte en `at`, cases de `px` pixels : la planète la
+plus proche sous le doigt, par `underFinger` de `js/aim.js` ; le doigt et sa portée se dessinent
+sur l'image, au zoom donné, D-142), `{ show: 'carburant', at, expected, got, ok }` (une valeur
+vérifiée, montrée sur l'image : anneau ✔ / ✖ numéroté sur la case `{ x, y }` ou la flotte
+`[session, id]`, et son texte dans la légende numérotée à côté du téléphone ; sans `at`, ou si le
+joueur n'a pas cette flotte, seulement dans la légende ; `ok` quand le test compare avec une marge ;
+D-143). Exemples : `tests/threat.test.mjs`, `tests/planet-button.test.mjs`, le premier scénario
+de `tests/aim.test.mjs` (doigt), et `show` dans tous les fichiers (D-143) : chaque scénario
+montre au moins une vérification sur son image (191 sur 191). Les `assert`
+restent à côté des `show` (D-141).
 
 Un scénario d'une seule image n'a ni commandes (⏮ ▶ ⏭ et curseur) ni compteur « 1/1 · t = 0 s »
 (D-136) : seulement l'image et sa légende.

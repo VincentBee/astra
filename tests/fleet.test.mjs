@@ -37,6 +37,10 @@ scenario('deux de mes flottes sur la même cible : un seul combat, pas de butin 
     if (i % 5 === 4) film.look(A, `les deux flottes de A poursuivent le convoi (${i + 1} s)`);
   }
   const looted = P(A).fleets.reduce((t, f) => t + (f.cargo.minerals || 0), 0);
+  film.look(A, 'le convoi est pris une seule fois : 900 minéraux en tout, un seul rapport', [
+    { show: 'butin des deux flottes', at: [A, a1], expected: 900, got: looted },
+    { show: 'combats', expected: 1, got: P(A).effects.length },
+  ]);
   assert.equal(looted, 900);
   assert.equal(P(A).effects.length, 1);
 });
@@ -59,11 +63,17 @@ scenario('poursuite mutuelle livrée des deux côtés en même temps : les perte
     if (i % 5 === 4) {
       sync(A, B);
       sync(B, A);
-      film.look(A, `après ${i + 1} s, fiches échangées`);
+      film.look(A, `après ${i + 1} s, fiches échangées`, i === 59 ? once(A, B, fa) : []);
     }
   }
   for (const s of [A, B]) assert.deepEqual(P(s).fleets.map((f) => f.ships), [{ fighter: 2 }], 'comme un seul combat 10 contre 10');
 });
+
+/** Ce qui reste à A et à B (chacun chez lui) après un seul combat 10 contre 10 : 2 chasseurs chacun. */
+const once = (A, B, fa) => [
+  { show: 'flottes de A', at: [A, fa], expected: [{ fighter: 2 }], got: P(A).fleets.map((f) => f.ships) },
+  { show: 'flottes de B (chez B)', expected: [{ fighter: 2 }], got: P(B).fleets.map((f) => f.ships) },
+];
 
 scenario('flotte rattrapée juste après avoir fondé sa colonie : la colonie encaisse les pertes', (film) => {
   const { players: [A, B], clock, sync } = newGame(2, ['human', 'human']);
@@ -88,8 +98,11 @@ scenario('flotte rattrapée juste après avoir fondé sa colonie : la colonie en
   sync(B, A);
   clock.t += 1000;
   B.tick();
-  film.look(B, 'B lit le rapport : sa colonie encaisse les pertes');
   const loot = A.myFleet(aid).cargo.minerals;
+  const left = P(B).colonies[w.id].stock.minerals;
+  film.look(B, 'B lit le rapport : sa colonie encaisse les pertes, sans minéraux en double', [
+    { show: 'pillés + restés', at: cell, expected: '1200 au plus (+ 50 de production)', got: loot + left, ok: loot + left <= 1200 + 50 },
+  ]);
   assert.ok(loot + P(B).colonies[w.id].stock.minerals <= 1200 + 50, 'pas de minéraux en double');
 });
 
@@ -119,7 +132,11 @@ scenario('colonisation : le premier arrivé l’emporte, même si son téléphon
   B.tick();
   sync(A, B);
   A.tick();
-  film.look(A, 'fiches échangées : la planète est à A, chez A comme chez B');
+  film.look(A, 'fiches échangées : la planète est à A, chez A comme chez B', [
+    { show: 'à A, chez A', at: cell, expected: true, got: A.ownerAt(w)?.id === A.me },
+    { show: 'à A, chez B', expected: true, got: B.ownerAt(w)?.id === A.me },
+    { show: 'colonie chez B', expected: false, got: !!P(B).colonies[w.id] },
+  ]);
   assert.equal(A.ownerAt(w)?.id, A.me);
   assert.equal(B.ownerAt(w)?.id, A.me);
   assert.ok(P(A).colonies[w.id] && !P(B).colonies[w.id]);
@@ -131,8 +148,9 @@ scenario('flotte en panne à moins d’une demi-case de sa planète : elle peut 
   const id = park(A, { fighter: 2 }, {}, { x: home.x + 0.3, y: home.y }, 0);
   Object.assign(A.myFleet(id), { stranded: true });
   film.look(A, 'flotte de A en panne, à 0,3 case de sa planète mère');
-  assert.ok(A.refuelFleet(id));
-  film.look(A, 'A fait le plein');
+  const full = A.refuelFleet(id);
+  assert.ok(full);
+  film.look(A, 'A fait le plein', [{ show: 'plein fait', at: [A, id], expected: true, got: full }]);
 });
 
 scenario('plusieurs attaquants qui se voient ne pillent pas plus que le stock du défenseur', (film) => {
@@ -156,6 +174,7 @@ scenario('plusieurs attaquants qui se voient ne pillent pas plus que le stock du
     film.look(s, `l’attaquant ${raiders.indexOf(s) + 1} sur 3 pille la planète de D`);
   }
   const looted = raiders.reduce((t, s) => t + (P(s).fleets[0]?.cargo?.minerals || 0), 0);
+  film.look(players[0], 'les trois attaquants ont pillé : pas plus que le stock de D', [{ show: 'minéraux pillés en tout', at: cell, expected: '4000 au plus', got: looted, ok: looted <= 4000 + 1 }]);
   assert.ok(looted <= 4000 + 1, `pillé ${looted} pour un stock de 4000`);
 });
 
@@ -178,10 +197,10 @@ scenario('une revanche plus tard entre les deux mêmes flottes est un vrai comba
   film.look(B, '20 s plus tard : le rapport du combat 1 est lu puis effacé partout');
   const before = countAll(B);
   assert.ok(A.chaseFleet(fa, B.me, fb)); // revanche : A attaque
-  film.look(A, 'revanche : A attaque');
   const lost = Object.values(P(A).effects.at(-1).ships).reduce((a, b) => a + b, 0);
+  film.look(A, 'revanche : A attaque, son rapport compte des pertes chez B', [{ show: 'pertes de B dans le rapport', at: [B, fb], expected: 'plus de 0', got: lost, ok: lost > 0 }]);
   for (let i = 0; i < 20; i++) both();
-  film.look(B, '20 s plus tard : B a subi les pertes de la revanche');
+  film.look(B, '20 s plus tard : B a subi les pertes de la revanche', [{ show: 'vaisseaux perdus par B', at: [B, fb], expected: lost, got: before - countAll(B) }]);
   assert.ok(lost > 0);
   assert.equal(before - countAll(B), lost, 'B subit les pertes de la revanche');
 });
@@ -198,8 +217,9 @@ scenario('raids : pas d’attaque sans armes, et un seul pillage par planète to
   sync(A, B);
   const cell = { ...P(B).home };
   const cargo = park(A, { cargo: 5 }, {}, cell, 200);
-  film.look(A, '5 cargos de A en orbite sur la planète de B, sans défense');
-  assert.equal(A.moveFleet(cargo, cell, 'attack'), false, 'des cargos seuls ne peuvent pas attaquer');
+  const raid = A.moveFleet(cargo, cell, 'attack');
+  film.look(A, '5 cargos de A en orbite sur la planète de B, sans défense : sans armes, pas d’attaque', [{ show: 'attaque acceptée', at: [A, cargo], expected: false, got: raid }]);
+  assert.equal(raid, false, 'des cargos seuls ne peuvent pas attaquer');
   P(A).planet.ships = { fighter: 6, cargo: 10 };
   const id = A.takeOff('home', { fighter: 6, cargo: 10 }, {}, 0);
   Object.assign(A.myFleet(id), { from: { ...cell }, to: { ...cell }, fuel: 500 });
@@ -208,7 +228,8 @@ scenario('raids : pas d’attaque sans armes, et un seul pillage par planète to
     A.moveFleet(id, cell, 'attack');
     clock.t += 1000;
     A.tick();
-    film.look(A, `une flotte armée de A attaque (${i + 1} s)`);
+    const v = looted();
+    film.look(A, `une flotte armée de A attaque (${i + 1} s)${i === 4 ? ' : un seul pillage en 5 s' : ''}`, i === 4 ? [{ show: 'butin', at: [A, id], expected: 'entre 1 et 3000', got: v, ok: v > 0 && v <= 3000 }] : []);
   }
   const once = looted();
   assert.ok(once > 0 && once <= 3000, `un seul pillage en 5 s (${once})`);
@@ -216,7 +237,7 @@ scenario('raids : pas d’attaque sans armes, et un seul pillage par planète to
   A.moveFleet(id, cell, 'attack');
   clock.t += 1000;
   A.tick();
-  film.look(A, '3 min plus tard : nouvelle attaque, nouveau pillage');
+  film.look(A, '3 min plus tard : nouvelle attaque, nouveau pillage', [{ show: 'butin', at: [A, id], expected: `plus de ${once}`, got: looted(), ok: looted() > once }]);
   assert.ok(looted() > once, 'un nouveau pillage après 2 min');
 });
 
@@ -232,7 +253,11 @@ scenario('une flotte va à la vitesse de son vaisseau le plus lent', async (film
   A.moveFleet(slow, { x: 14, y: 6 }, 'move');
   film.look(A, 'les deux flottes de A partent ensemble pour 12 cases');
   clock.t = A.myFleet(fast).arrive;
-  film.look(A, 'les 5 chasseurs sont arrivés ; la flotte au colonisateur est encore en route');
+  film.look(A, 'les 5 chasseurs sont arrivés ; la flotte au colonisateur est encore en route', [
+    { show: 'arrivée', at: [A, fast], expected: true, got: !fleet.moving(A.myFleet(fast), clock.t) },
+    { show: 'encore en route', at: [A, slow], expected: true, got: fleet.moving(A.myFleet(slow), clock.t) },
+    { show: 'vaisseau le plus lent', expected: 'colony', got: slowestShip('human', mixed, {}) },
+  ]);
   clock.t = A.myFleet(slow).arrive;
   film.look(A, 'la flotte au colonisateur arrive enfin');
   assert.equal(slowestShip('human', mixed, {}), 'colony');
@@ -250,6 +275,8 @@ scenario('une flotte va à la vitesse de son vaisseau le plus lent', async (film
 // ----- Comportement en voyage : passif, agressif (D-100) ---------------------
 
 const fx = (s) => P(s).effects || [];
+/** La flotte `id` de `s` détruite, chez `s` (une étiquette en haut de la carte). */
+const gone = (s, id, name) => ({ show: name, expected: 'détruit', got: s.myFleet(id) ? 'encore là' : 'détruit' });
 
 /**
  * Fait tourner `s` (et les autres) seconde par seconde, en se passant les fiches toutes les 5 s.
@@ -273,13 +300,17 @@ scenario('flotte agressive : elle combat la flotte ennemie qu’elle croise, pui
   assert.ok(A.moveFleet(aid, { x: 10, y: 5 }, null));
   film.look(A, 'A, agressive, part vers (10:5) ; un convoi de B (400 minéraux) est sur sa route');
   for (let i = 0; i < 30 && !fx(A).length; i++) run([A], clock, () => {}, 1, () => film.look(A, `en route (${i + 1} s)`));
-  film.look(A, 'combat livré : A reprend sa route');
-  assert.equal(fx(A).length, 1, 'un combat');
   const f = A.myFleet(aid);
+  film.look(A, 'combat livré : A reprend sa route avec le butin', [
+    { show: 'combats', expected: 1, got: fx(A).length },
+    { show: 'butin', at: [A, aid], expected: 400, got: f.cargo.minerals },
+    { show: 'en route vers', at: [A, aid], expected: '10:5', got: fleet.moving(f, clock.t) ? `${f.to.x}:${f.to.y}` : 'arrêtée' },
+  ]);
+  assert.equal(fx(A).length, 1, 'un combat');
   assert.equal(f.cargo.minerals, 400, 'butin récupéré');
   assert.ok(fleet.moving(f, clock.t), 'la flotte continue');
   assert.deepEqual(f.to, { x: 10, y: 5 }, 'vers sa destination');
-  run([A, B], clock, sync, 10, (i) => i % 5 === 4 && film.look(B, `B reçoit les fiches (${i + 1} s)`));
+  run([A, B], clock, sync, 10, (i) => i % 5 === 4 && film.look(B, `B reçoit les fiches (${i + 1} s)`, i === 9 ? [gone(B, bid, 'convoi de B')] : []));
   assert.equal(B.myFleet(bid), null, 'la flotte de B est détruite chez B aussi');
 });
 
@@ -289,10 +320,15 @@ scenario('flotte passive : elle croise une flotte ennemie sans combattre', (film
   const aid = park(A, { fighter: 5 }, {}, { x: 3, y: 5 }, 300);
   sync(A, B);
   sync(B, A);
+  film.look(A, 'au décollage, la flotte de A est passive', [{ show: 'comportement', at: [A, aid], expected: 'passive', got: A.myFleet(aid).stance }]);
   assert.equal(A.myFleet(aid).stance, 'passive', 'passive au décollage');
   A.moveFleet(aid, { x: 10, y: 5 }, null);
   film.look(A, 'A, passive, part vers (10:5) en croisant 3 chasseurs de B');
-  run([A, B], clock, sync, 30, (i) => i % 3 === 2 && film.look(A, `en route (${i + 1} s)`));
+  const calm = () => [
+    { show: 'vaisseaux', at: [A, aid], expected: { fighter: 5 }, got: A.myFleet(aid).ships },
+    { show: 'combats', expected: 0, got: fx(A).length + fx(B).length },
+  ];
+  run([A, B], clock, sync, 30, (i) => i % 3 === 2 && film.look(A, `en route (${i + 1} s)`, i === 29 ? calm() : []));
   assert.equal(fx(A).length + fx(B).length, 0);
   assert.deepEqual(A.myFleet(aid).ships, { fighter: 5 }, 'aucune perte');
 });
@@ -306,7 +342,7 @@ scenario('flotte agressive à l’arrêt : elle garde la case et combat celle qu
   sync(B, A);
   B.moveFleet(bid, { x: 10, y: 5 }, null);
   film.look(B, 'A, agressive, garde (6:5) ; un chasseur de B part vers (10:5) et passe par là');
-  run([A, B], clock, sync, 40, (i) => i % 4 === 3 && film.look(B, `${i + 1} s`));
+  run([A, B], clock, sync, 40, (i) => i % 4 === 3 && film.look(B, `${i + 1} s`, i === 39 ? [gone(B, bid, 'chasseur de B')] : []));
   assert.equal(B.myFleet(bid), null, 'la flotte de passage est détruite');
 });
 
@@ -329,7 +365,7 @@ scenario('deux flottes agressives qui se croisent : les pertes ne comptent qu’
       sync(A, B);
       sync(B, A);
     }
-    if (i % 4 === 3) film.look(A, `${(i + 1) / 4} s${i % 20 === 19 ? ', fiches échangées' : ''}`);
+    if (i % 4 === 3) film.look(A, `${(i + 1) / 4} s${i % 20 === 19 ? ', fiches échangées' : ''}`, i === 59 ? once(A, B, fa) : []);
   }
   for (const s of [A, B]) assert.deepEqual(P(s).fleets.map((f) => f.ships), [{ fighter: 2 }], 'comme un seul combat 10 contre 10');
 });
@@ -337,17 +373,18 @@ scenario('deux flottes agressives qui se croisent : les pertes ne comptent qu’
 scenario('comportement : refusé sans armes, vu par les autres, gardé par la flotte qui en absorbe une autre', (film) => {
   const { players: [A, B], sync } = newGame(2, ['human', 'human']);
   const unarmed = park(A, { cargo: 2 }, {}, { x: 3, y: 5 }, 40);
-  film.look(A, 'deux cargos de A, sans armes');
-  assert.equal(A.setFleetStance(unarmed, 'aggressive'), false);
+  const refused = A.setFleetStance(unarmed, 'aggressive');
+  film.look(A, 'deux cargos de A, sans armes : ils ne peuvent pas devenir agressifs', [{ show: 'agressive acceptée', at: [A, unarmed], expected: false, got: refused }]);
+  assert.equal(refused, false);
   assert.equal(A.myFleet(unarmed).stance, 'passive');
   const aid = park(A, { fighter: 2 }, {}, { x: 3, y: 5 }, 40);
   assert.ok(A.setFleetStance(aid, 'aggressive'));
   assert.equal(A.setFleetStance(aid, 'aggressive'), false, 'déjà agressive');
   sync(B, A);
-  film.look(B, 'B voit la flotte armée de A, agressive');
+  film.look(B, 'B voit la flotte armée de A, agressive', [{ show: 'comportement vu par B', at: [A, aid], expected: 'aggressive', got: B.state.players[A.me].fleets.find((f) => f.id === aid).stance }]);
   assert.equal(B.state.players[A.me].fleets.find((f) => f.id === aid).stance, 'aggressive');
   assert.ok(A.mergeFleets(unarmed, aid));
-  film.look(A, 'A fusionne les cargos dans la flotte armée');
+  film.look(A, 'A fusionne les cargos dans la flotte armée : elle reste agressive', [{ show: 'comportement', at: [A, aid], expected: 'aggressive', got: A.myFleet(aid).stance }]);
   assert.equal(A.myFleet(aid).stance, 'aggressive');
 });
 
@@ -370,7 +407,9 @@ scenario('firstContact : l’instant où deux flottes entrent au contact, jamais
     const contact = fleet.firstContact(f, B.myFleet(bid), clock.t, f.arrive);
     if (contact) {
       clock.t = contact;
-      film.look(A, 'l’instant du contact : à une demi-case du chasseur de B');
+      const p = fleet.fleetPos(f, contact);
+      const d = Math.hypot(p.x - 6, p.y - 5);
+      film.look(A, 'l’instant du contact : à une demi-case du chasseur de B', [{ show: 'distance au chasseur de B', at: [A, aid], expected: 0.5, got: d, ok: Math.abs(d - 0.5) < 0.01 }]);
     }
     clock.t = f.arrive;
     film.look(A, 'arrivée en (10:5)');
@@ -403,18 +442,22 @@ scenario('hors ligne : la flotte agressive arrêtée combat celle qui est passé
   const passed = B.myFleet(bid).depart;
   clock.t += 3_600_000; // une heure sans aucun téléphone allumé
   A.tick();
-  film.look(A, 'une heure plus tard, A se rallume : combat daté du passage');
+  const at = fx(A)[0]?.at;
+  film.look(A, 'une heure plus tard, A se rallume : combat daté du passage', [
+    { show: 'combats', expected: 1, got: fx(A).length },
+    { show: 'combat', at: [A, aid], expected: 'dans les 30 s du passage', got: at ? `${Math.round((at - passed) / 1000)} s après le départ de B` : 'aucun', ok: at > passed && at < passed + 30_000 },
+  ]);
   assert.equal(fx(A).length, 1, 'un combat');
   assert.ok(fx(A)[0].at > passed && fx(A)[0].at < passed + 30_000, 'daté du passage');
   sync(B, A);
   B.tick();
-  film.look(B, 'B lit le rapport : sa flotte est détruite');
+  film.look(B, 'B lit le rapport : sa flotte est détruite', [gone(B, bid, 'chasseur de B')]);
   assert.equal(B.myFleet(bid), null, 'la flotte de passage est détruite');
 });
 
 scenario('hors ligne : une flotte passive laisse passer, sans combat', (film) => {
   const { players: [A, B], clock, sync } = newGame(2, ['human', 'human']);
-  park(A, { fighter: 5 }, {}, { x: 6, y: 5 }, 300);
+  const aid = park(A, { fighter: 5 }, {}, { x: 6, y: 5 }, 300);
   const bid = park(B, { fighter: 1 }, {}, { x: 3, y: 5 }, 300);
   B.moveFleet(bid, { x: 12, y: 5 }, null);
   sync(A, B);
@@ -422,7 +465,7 @@ scenario('hors ligne : une flotte passive laisse passer, sans combat', (film) =>
   film.look(A, 'A, passive, en (6:5) ; un chasseur de B part vers (12:5) et passera par là');
   clock.t += 3_600_000;
   A.tick();
-  film.look(A, 'une heure plus tard, A se rallume : aucun combat');
+  film.look(A, 'une heure plus tard, A se rallume : aucun combat', [{ show: 'combats', at: [A, aid], expected: 0, got: fx(A).length }]);
   assert.equal(fx(A).length, 0);
 });
 
@@ -434,11 +477,16 @@ scenario('hors ligne : la poursuite combat au point de rencontre, même si la ci
   sync(A, B);
   A.tick();
   assert.ok(A.chaseFleet(aid, B.me, bid));
-  film.look(A, 'A poursuit un cargo de B qui part vers (18:2)');
+  film.look(A, 'A poursuit un cargo de B qui part vers (18:2) : pas encore au contact', [{ show: 'combats', at: [A, aid], expected: 0, got: fx(A).length }]);
   assert.equal(fx(A).length, 0, 'pas encore au contact');
   clock.t += 3_600_000;
   A.tick();
-  film.look(A, 'une heure plus tard, A se rallume : combat au point de rencontre');
+  const met = fx(A)[0]?.at;
+  film.look(A, 'une heure plus tard, A se rallume : combat au point de rencontre', [
+    { show: 'combats', expected: 1, got: fx(A).length },
+    { show: 'combat', expected: 'avant l’arrivée du cargo', got: met ? `${Math.round((B.myFleet(bid).arrive - met) / 1000)} s avant` : 'aucun', ok: met < B.myFleet(bid).arrive },
+    { show: 'cible perdue de vue', expected: false, got: A.state.log.some((l) => /perd sa cible/.test(l.text)) },
+  ]);
   assert.equal(fx(A).length, 1, 'un combat');
   assert.ok(fx(A)[0].at < B.myFleet(bid).arrive, 'pendant le trajet de la cible');
   assert.ok(!A.state.log.some((l) => /perd sa cible/.test(l.text)), 'pas « perdue de vue »');
@@ -453,13 +501,14 @@ scenario('hors ligne : un combat livré en ligne ne se rejoue pas au retour', (f
   sync(A, B);
   sync(B, A);
   film.look(A, 'A, agressive, garde (6:5) ; 3 lourds de B passent vers (12:5)');
-  run([A, B], clock, sync, 40, (i) => i % 4 === 3 && film.look(A, `en ligne (${i + 1} s)`));
+  const live = () => [{ show: 'combats livrés', at: [A, aid], expected: 'au moins 1', got: fought(A).length, ok: fought(A).length >= 1 }];
+  run([A, B], clock, sync, 40, (i) => i % 4 === 3 && film.look(A, `en ligne (${i + 1} s)`, i === 39 ? live() : []));
   const before = fought(A).length;
   assert.ok(before >= 1, 'un combat en ligne');
   clock.t += 3_600_000;
   A.tick();
   B.tick();
-  film.look(A, 'une heure plus tard, au retour : rien de plus');
+  film.look(A, 'une heure plus tard, au retour : rien de plus', [{ show: 'combats livrés', expected: before, got: fought(A).length }]);
   assert.equal(fought(A).length, before, 'rien de plus au retour');
 });
 
@@ -480,6 +529,6 @@ scenario('hors ligne tous les deux : deux flottes agressives qui se sont croisé
   A.tick();
   B.tick();
   film.look(A, 'une heure plus tard, les deux téléphones se rallument');
-  run([A, B], clock, sync, 10, (i) => i % 5 === 4 && film.look(A, `fiches échangées (${i + 1} s)`));
+  run([A, B], clock, sync, 10, (i) => i % 5 === 4 && film.look(A, `fiches échangées (${i + 1} s)`, i === 9 ? once(A, B, fa) : []));
   for (const s of [A, B]) assert.deepEqual(P(s).fleets.map((f) => f.ships), [{ fighter: 2 }], 'comme un seul combat 10 contre 10');
 });

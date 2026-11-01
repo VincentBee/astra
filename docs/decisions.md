@@ -1598,3 +1598,79 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   milieu, fin de chaque scénario) rejouées dans le vrai jeu sans erreur.
 - Modifie D-132. Qui : Vincent (demande), Claude (méthode). Source : session `0cb6f324`. Statut :
   en vigueur.
+
+**D-142 — Le doigt se dessine dans la simulation**
+- 2026-11-01 21:52. Contexte : « dans le test "D-126 : le doigt a une taille fixe à l’écran,
+  jamais moins de MIN_REACH case" qu'est ce qu'il faut voir dans la simulation ? tu pourrais
+  mettre en evidence l'objet du test ? ». Réponse : rien ; l'image montrait seulement la fiche de
+  la planète mère, le doigt et le zoom n'étaient vérifiés que par les `assert`.
+- Choix : nouvelle attente de `film.look` : `{ finger: { at, px, zoom }, hits: case ou null }`.
+  Le film vérifie lui-même, avec `underFinger` (js/aim.js), quelle planète est sous le doigt, et
+  enregistre le doigt dans l'image. En lecture seule (`index.html?view`), la carte se met au zoom
+  du test, centrée sur le toucher, et un cercle blanc en pointillés montre la portée vérifiée
+  (`reach(px)`, en cases), avec sa valeur ; si le minimum `MIN_REACH` joue, un petit cercle dedans
+  montre ce que couvriraient 18 px seuls. Même cercle sur la carte de contrôle. Le scénario a trois
+  images : carte entière, toucher à 0,8 case (planète dessous, fiche ouverte) ; à 1,2 case (rien) ;
+  zoom 4, toucher à 0,5 case (planète dessous grâce au minimum de 0,6 ; 0,25 sans lui).
+- Choix de Claude, par défaut : le cercle a la taille vérifiée par le test (`px` du test : 18 ou
+  72), pas celle des cases de l'iframe (≈ 19 px) : l'image montre ce qui a été vérifié. Il passe
+  par-dessus la fiche de planète (c'est une annotation, elle doit se voir en entier). Chaque image
+  remet le zoom à 1 (sinon le zoom d'une image restait pour la suivante). Seul ce scénario utilise
+  le doigt ; les autres scénarios D-126 pourraient en profiter (non fait).
+- Vérifié : 191/191 ; une attente fausse (`hits: null` au lieu de la planète) fait échouer le
+  scénario ; les trois images vues dans le rapport servi par `node tests/ui/server.mjs`, sans
+  erreur dans la console.
+- Qui : Vincent (demande), Claude (méthode). Source : session `f2222601`. Statut : en vigueur.
+
+**D-143 — Chaque test montre ce qu'il vérifie, fichier par fichier**
+- 2026-11-01 22:09. Contexte : « est ce que chaque test a un highlight ? » → non : 124 scénarios
+  sur 191 ne montraient aucune vérification ; puis « Oui, par fichier » (bouton proposé par
+  Claude, en commençant par `decisions-flotte`, 29 sans rien).
+- Choix : nouvelle attente générique de `film.look` : `{ show: 'carburant', at, expected, got,
+  ok }`. Le film la vérifie (`isDeepStrictEqual`, ou `ok` donné par le test quand il compare avec
+  une marge) et la montre : dans la liste des vérifications, sur la carte de contrôle, et dans le
+  vrai jeu (lecture seule) par un anneau vert ✔ ou rouge ✖ posé sur la case (`at: { x, y }`) ou
+  sur la flotte (`at: [session, id]`, à l'endroit où la carte la dessine). Valeurs écrites en
+  clair (nombres arrondis, oui / non, « rien », ressources en icônes). (Première version : une
+  étiquette de texte sur la carte ; remplacée par numéro + légende, voir plus bas.)
+- `tests/decisions-flotte.test.mjs` : les 30 scénarios montrent ce qu'ils vérifient (il en
+  restait 0 sans vérification). Là où une valeur n'était connue qu'après l'image, l'appel est
+  avancé (ex. `refuelFleet`, `chaseFleet`, `answerTrade`) ou une image est ajoutée à la fin.
+- Choix de Claude, par défaut : les `assert` restent (D-141) ; `show` s'ajoute. 107 `assert`
+  avant et après ; 18 lisent maintenant une variable (la valeur calculée pour l'image) au lieu
+  d'appeler la fonction eux-mêmes. Un fichier à la fois, l'utilisateur valide avant le suivant.
+- Vérifié : 191/191 ; une valeur fausse (`expected` 75 au lieu de 74) fait échouer le scénario
+  avec « carburant : 74 (attendu : 75) » ; les 108 images du rapport rejouées dans le vrai jeu
+  sans erreur.
+- Suite (22:12, « Oui, continue ») : `tests/fleet.test.mjs`, 20/20 scénarios montrent ce qu'ils
+  vérifient ; 62 `assert` avant et après ; 135 images rejouées sans erreur. Une flotte que le
+  joueur n'a pas (détruite, posée, fusionnée, ou pas encore reçue) met son étiquette en haut de
+  la carte au lieu de faire échouer le scénario.
+- Suite (22:18, « Oui, continue ») : `tests/decisions-reseau.test.mjs`, 19/19 scénarios montrent ce
+  qu'ils vérifient ; 78 `assert` avant et après. Les fonctions sans écran (fusion, historique,
+  rendez-vous, icônes, fond) montrent leurs valeurs dans la légende.
+- Modifié en cours de route (« probleme d'affichage ? je ne vois pas tous les message, trouve une
+  autre maniere d'afficher ca », puis « une legende peut etre ? ») : les étiquettes de texte sur la
+  carte se chevauchaient et sortaient du bord. Maintenant, sur l'écran du joueur : seulement un
+  anneau vert (✔) ou rouge (✖) avec un **numéro** ; le texte est dans la **légende**, à droite du
+  téléphone dans le rapport (la liste des vérifications, numérotée : ① ② …). Une vérification
+  sans place sur la carte n'est que dans la légende. Alternatives écartées : étiquettes repoussées
+  pour ne pas se toucher (essayé : encore illisible au bord), cadre de texte par-dessus la carte
+  (cache la carte). Qui : Vincent (la légende), Claude (pastilles numérotées).
+- Suite (22:21, « Oui, continue ») : `tests/start.test.mjs`, 11/11 scénarios montrent ce qu'ils
+  vérifient ; 53 `assert` avant et après.
+- Suite (22:26, « Oui, continue ») : `tests/end.test.mjs`, 10/10 scénarios montrent ce qu'ils
+  vérifient (score, froid, élimination, conquête, gagnant) ; 39 `assert` avant et après.
+- Suite (22:32, « Oui, continue ») : `tests/decisions-planete.test.mjs`, 26/26 scénarios montrent
+  ce qu'ils vérifient (7 n'en montraient aucune : races, carte, planète mère disputée, recherche,
+  petits corps) ; 116 `assert` avant et après.
+- Suite (22:35, « Oui, continue ») : `tests/hostile.test.mjs`, 6/6 scénarios montrent ce qu'ils
+  vérifient (fiches trafiquées : nom, secret, date, race, planète antidatée, horloge) ; 15 `assert`
+  avant et après.
+- Fin (22:40, « Oui, tout d'un coup », bouton proposé par Claude) : les 10 derniers fichiers d'un
+  coup (`colony`, `combat`, `effects`, `fog`, `journal`, `peer`, `plan`, `replay`, `report`,
+  `rules`), 25 scénarios. **Plus aucun scénario sans vérification montrée** (0 sur 191, compté sur
+  les 22 rapports). Aucun fichier de test n'a perdu d'`assert`. Là où la valeur n'existait
+  qu'après la dernière image (rejeu, fiches nettoyées, sauvegarde), une image est ajoutée à la fin.
+  Valeur vide montrée « rien ».
+- Qui : Vincent (demande), Claude (méthode). Source : session `f2222601`. Statut : en vigueur.

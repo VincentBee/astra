@@ -34,11 +34,20 @@ scenario('D-120 : la partie ne part pas tant qu’un joueur présent n’est pas
   assert.ok(A.ready());
   sync(B, A);
   sync(A, B);
-  film.look(A, 'A prêt, B pas encore');
-  assert.equal(A.checkStart(), false, 'B n’est pas prêt');
-  assert.equal(B.checkStart(), false, 'B n’est pas prêt lui-même');
+  const startA = A.checkStart();
+  const startB = B.checkStart();
+  film.look(A, 'A prêt, B pas encore : personne ne peut donner le départ', [
+    { show: 'départ donné par A', expected: false, got: startA },
+    { show: 'départ donné par B', expected: false, got: startB },
+  ]);
+  assert.equal(startA, false, 'B n’est pas prêt');
+  assert.equal(startB, false, 'B n’est pas prêt lui-même');
   A.tick();
-  film.look(A, 'après un passage : toujours pas de départ, pas de flotte');
+  film.look(A, 'après un passage : toujours pas de départ, pas de flotte', [
+    { show: 'partie', expected: 'pas partie', got: A.startedAt === null ? 'pas partie' : 'partie' },
+    { show: 'flottes de A', expected: 0, got: (me(A).fleets || []).length },
+    { show: 'pas prêts', expected: ['p1'], got: A.notReady.map((p) => p.id) },
+  ]);
   assert.equal(A.startedAt, null);
   assert.equal((me(A).fleets || []).length, 0, 'pas de flotte avant le départ');
   assert.deepEqual(A.notReady.map((p) => p.id), ['p1']);
@@ -60,8 +69,12 @@ scenario('D-120 : tous prêts → départ, puis une seule flotte avec un colonis
   const cells = [];
   for (const s of players) {
     s.tick();
-    film.look(s, `départ : ${s.name} n’a qu’un colonisateur`);
     const p = me(s);
+    film.look(s, `départ : ${s.name} n’a qu’un colonisateur, au plein, et pas de planète`, [
+      { show: 'flotte', at: [s, p.fleets[0]?.id], expected: { colony: 1, fuel: fleet.fleetTank(p.race, { colony: 1 }) }, got: { ...p.fleets[0]?.ships, fuel: p.fleets[0]?.fuel } },
+      { show: 'flottes', expected: 1, got: p.fleets.length },
+      { show: 'planète mère', expected: 'aucune', got: p.home ? 'une' : 'aucune' },
+    ]);
     assert.equal(p.planet, null, 'pas de planète au départ');
     assert.equal(p.home, null);
     assert.equal(p.fleets.length, 1, 'une seule flotte');
@@ -76,7 +89,7 @@ scenario('D-120 : tous prêts → départ, puis une seule flotte avec un colonis
   assert.equal(new Set(cells).size, 3, 'chacun sa case de départ');
   // Un deuxième passage ne redonne pas de flotte.
   players[0].tick();
-  film.look(players[0], 'un deuxième passage : toujours une seule flotte');
+  film.look(players[0], 'un deuxième passage : toujours une seule flotte', [{ show: 'flottes', at: [players[0], me(players[0]).fleets[0].id], expected: 1, got: me(players[0]).fleets.length }]);
   assert.equal(me(players[0]).fleets.length, 1);
 });
 
@@ -85,16 +98,24 @@ scenario('D-120 : le colonisateur fonde la planète mère ; s’installer direct
   A.ready();
   assert.ok(A.checkStart(), 'seul présent : départ tout de suite');
   A.tick();
-  film.look(A, 'départ : le colonisateur de A en orbite');
   const w = freePlanet(A);
-  assert.equal(A.claimPlanet(w.id), false, 'plus d’installation directe');
+  const claim = A.claimPlanet(w.id);
   const small = A.planets.find((x) => x.kind === 'asteroid');
-  assert.equal(A.moveFleet(me(A).fleets[0].id, { x: small.x, y: small.y }, 'colonize'), false, 'un astéroïde ne fait pas une planète mère');
+  const rock = A.moveFleet(me(A).fleets[0].id, { x: small.x, y: small.y }, 'colonize');
+  film.look(A, 'départ : le colonisateur de A en orbite ; s’installer sans lui, ou sur un astéroïde, est refusé', [
+    { show: `s’installer directement sur ${w.name}`, at: w, expected: false, got: claim },
+    { show: 'fonder sur un astéroïde', at: small, expected: false, got: rock },
+  ]);
+  assert.equal(claim, false, 'plus d’installation directe');
+  assert.equal(rock, false, 'un astéroïde ne fait pas une planète mère');
   const labels = A.ordersAt(me(A).fleets[0].id, { x: w.x, y: w.y }).map((o) => o.label);
   assert.ok(labels.includes(`Fonder ta planète mère sur ${w.name}`));
   settleOn(A, w, clock);
-  film.look(A, `le colonisateur arrive : planète mère fondée sur ${w.name}`);
   const p = me(A);
+  film.look(A, `le colonisateur arrive : planète mère fondée sur ${w.name}`, [
+    { show: 'planète mère', at: w, expected: w.name, got: p.home && game.sameCell(p.home, w) ? w.name : 'ailleurs' },
+    { show: 'flottes (colonisateur consommé)', expected: 0, got: p.fleets.length },
+  ]);
   assert.ok(game.sameCell(p.home, w), 'planète mère fondée');
   assert.equal(p.fleets.length, 0, 'le colonisateur est consommé');
   const fresh = game.newPlanet('human', p.claimAt, w);
@@ -111,9 +132,10 @@ scenario('D-120 : un joueur absent ne bloque pas le départ ; il entre dans la c
   A.refreshOnline();
   B.refreshOnline();
   A.ready();
-  assert.ok(A.checkStart(), 'B est hors ligne : A part seul');
+  const alone = A.checkStart();
+  assert.ok(alone, 'B est hors ligne : A part seul');
   A.tick();
-  film.look(A, 'B hors ligne : A part seul');
+  film.look(A, 'B hors ligne : A part seul', [{ show: 'départ sans B', at: [A, me(A).fleets[0].id], expected: true, got: alone }]);
   clock.t += 60_000;
   // B revient, voit la partie partie, se dit prêt : sa flotte arrive à cette heure-là.
   online.add('p0');
@@ -123,11 +145,16 @@ scenario('D-120 : un joueur absent ne bloque pas le départ ; il entre dans la c
   assert.equal(B.ready(), true);
   const t = clock.t;
   B.tick();
-  film.look(B, 'B prêt : son colonisateur apparaît');
   const f = me(B).fleets[0];
+  const undo = B.ready(false);
+  film.look(B, 'B prêt : son colonisateur apparaît maintenant ; plus de retour en arrière', [
+    { show: 'vaisseaux', at: [B, f.id], expected: { colony: 1 }, got: f.ships },
+    { show: 'apparu', at: [B, f.id], expected: 'quand B est prêt', got: f.depart === t ? 'quand B est prêt' : 'au départ de A' },
+    { show: 'se dire « plus prêt »', expected: false, got: undo },
+  ]);
   assert.deepEqual(f.ships, { colony: 1 });
   assert.equal(f.depart, t, 'arrivé en retard, sa flotte apparaît quand il est prêt');
-  assert.equal(B.ready(false), false, 'plus de retour en arrière après le départ');
+  assert.equal(undo, false, 'plus de retour en arrière après le départ');
 });
 
 scenario('D-120 : on peut se dire « plus prêt » avant le départ', (film) => {
@@ -136,12 +163,14 @@ scenario('D-120 : on peut se dire « plus prêt » avant le départ', (film) => 
   assert.ok(A.ready(false));
   B.ready();
   sync(A, B);
-  film.look(A, 'A s’est dit « plus prêt », B est prêt');
-  assert.equal(A.checkStart(), false, 'A n’est plus prêt');
+  const early = A.checkStart();
+  film.look(A, 'A s’est dit « plus prêt », B est prêt : pas de départ', [{ show: 'départ', expected: false, got: early }]);
+  assert.equal(early, false, 'A n’est plus prêt');
   A.ready();
   sync(B, A);
-  film.look(B, 'A de nouveau prêt : B donne le départ');
-  assert.ok(B.checkStart());
+  const go = B.checkStart();
+  film.look(B, 'A de nouveau prêt : B donne le départ', [{ show: 'départ', expected: true, got: go }]);
+  assert.ok(go);
 });
 
 scenario('D-120 : deux colonisateurs sur la même planète : le premier arrivé l’emporte, l’autre repart en orbite', (film) => {
@@ -169,8 +198,13 @@ scenario('D-120 : deux colonisateurs sur la même planète : le premier arrivé 
   all([A, B], sync);
   first.tick();
   second.tick();
-  film.look(first, 'fiches échangées : le premier arrivé garde la planète');
-  film.look(second, 'le second repart en orbite');
+  film.look(first, 'fiches échangées : le premier arrivé garde la planète', [{ show: `planète mère de ${first.name}`, at: w, expected: w.name, got: me(first).home && game.sameCell(me(first).home, w) ? w.name : 'aucune' }]);
+  const orbit = me(second).fleets[0];
+  film.look(second, 'le second repart en orbite, avec son colonisateur', [
+    { show: `planète mère de ${second.name}`, expected: 'aucune', got: me(second).home ? 'une' : 'aucune' },
+    { show: 'colonisateurs', at: [second, orbit?.id], expected: 'au moins 1', got: orbit?.ships.colony || 0, ok: orbit?.ships.colony >= 1 },
+    { show: 'éliminé', expected: false, got: me(second).out !== undefined },
+  ]);
   assert.ok(game.sameCell(me(first).home, w), 'le premier garde la planète');
   assert.equal(me(second).home, null, 'le second la lui laisse');
   const back = me(second).fleets[0];
@@ -193,11 +227,11 @@ scenario('D-120 : plus de colonisateur avant d’avoir fondé sa planète : éli
   me(B).fleets = [];
   clock.t += 1000;
   B.tick();
-  film.look(B, 'B a perdu son colonisateur : éliminé');
+  film.look(B, 'B a perdu son colonisateur : éliminé', [{ show: 'B éliminé', expected: true, got: Number.isFinite(me(B).out) }]);
   assert.ok(Number.isFinite(me(B).out), 'B est éliminé');
   all([A, B], sync);
   A.tick();
-  film.look(A, 'A, seul en vie, gagne');
+  film.look(A, 'A, seul en vie, gagne', [{ show: 'gagnant', expected: 'p0', got: A.over?.winner }]);
   assert.equal(A.over?.winner, 'p0', 'A, seul en vie, gagne');
 });
 
@@ -214,7 +248,10 @@ scenario('D-120 : tant qu’un joueur vole vers sa planète, la partie ne finit 
   settleOn(A, freePlanet(A), clock);
   all([A, B], sync);
   A.tick();
-  film.look(A, 'A a fondé sa planète, B vole encore : la partie continue');
+  film.look(A, 'A a fondé sa planète, B vole encore : la partie continue', [
+    { show: 'partie finie', expected: false, got: !!A.over },
+    { show: 'joueurs au classement', expected: 2, got: A.ranking().length },
+  ]);
   assert.equal(A.over, null);
   assert.equal(A.ranking().length, 2, 'B, encore en vol, est dans le classement');
 });
@@ -234,10 +271,10 @@ scenario('D-120 : la planète mère fondée hors ligne est acceptée par les aut
   // A passe en arrière-plan longtemps après l'arrivée, puis fait autre chose avant de se réveiller.
   clock.t = me(A).fleets[0].arrive + 10 * 60_000;
   A.tick();
-  film.look(A, 'A se réveille 10 min après l’arrivée : planète fondée');
+  film.look(A, 'A se réveille 10 min après l’arrivée : planète fondée', [{ show: 'planète mère de A', at: w, expected: true, got: !!me(A).home }]);
   assert.ok(me(A).home);
   sync(B, A);
-  film.look(B, 'B reçoit la fiche de A');
+  film.look(B, 'B reçoit la fiche de A : il accepte sa planète mère', [{ show: 'planète mère de A, chez B', at: w, expected: w.name, got: B.state.players.p0.home && game.sameCell(B.state.players.p0.home, w) ? w.name : 'aucune' }]);
   assert.ok(game.sameCell(B.state.players.p0.home, w), 'B accepte la fiche de A');
 });
 
@@ -273,6 +310,11 @@ scenario('D-120 : une partie jouée depuis le départ commun se rejoue à l’id
   for (const k of ['chooseRace', 'ready', 'begin', 'moveFleet', 'tick']) assert.ok(kinds.has(k), `la partie contient des « ${k} »`);
   assert.equal(replayable(state).ok, true);
   const r = replay(state);
+  film.look(players[0], 'la partie rejouée depuis le départ commun : chaque fiche à l’identique', [
+    { show: 'ordres du départ dans la partie', expected: ['chooseRace', 'ready', 'begin', 'moveFleet', 'tick'], got: ['chooseRace', 'ready', 'begin', 'moveFleet', 'tick'].filter((k) => kinds.has(k)) },
+    { show: 'rejouable', expected: true, got: replayable(state).ok },
+    ...Object.values(state.players).map((p) => ({ show: `fiche de ${p.name} rejouée à l’identique`, at: p.home, expected: true, got: r.faithful[p.id] })),
+  ]);
   for (const p of Object.values(state.players)) assert.equal(r.faithful[p.id], true, `fiche de ${p.name} rejouée à l’identique`);
 });
 
@@ -291,9 +333,10 @@ scenario('D-120 : la flotte de départ a de quoi atteindre n’importe quelle pl
     all(players, sync);
     for (const s of players) {
       s.tick();
-      film.look(s, `${gid} : colonisateur de ${s.name} (${me(s).race}) au départ`);
       const p = me(s);
       const f = p.fleets[0];
+      const reach = s.planets.filter((w) => fleet.fuelNeed(f, p.race, w, f.depart) <= f.fuel).length;
+      film.look(s, `${gid} : colonisateur de ${s.name} (${p.race}) au départ`, [{ show: 'planètes à portée', at: [s, f.id], expected: s.planets.length, got: reach }]);
       for (const w of s.planets) assert.ok(fleet.fuelNeed(f, p.race, w, f.depart) <= f.fuel, `${p.race} (${gid}) atteint ${w.name}`);
     }
   }

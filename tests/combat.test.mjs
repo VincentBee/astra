@@ -46,6 +46,15 @@ function raid() {
   return { A, B, clock, cell, fleet, outcome };
 }
 
+/**
+ * Ce que montre le retour de B : drones détruits, et minéraux pillés + restés comparés au stock
+ * qu'il aurait eu sans attaque (`exact` : égaux ; sinon : pas plus).
+ */
+const loot = (r, cell, exact) => [
+  { show: 'drones de B détruits', expected: 4, got: r.killed },
+  { show: 'minéraux pillés + restés', at: cell, expected: `${exact ? '' : 'au plus '}${Math.round(r.real)}`, got: r.looted + r.left, ok: exact ? Math.abs(r.looted + r.left - r.real) <= 1 : r.looted + r.left <= r.real + 1 },
+];
+
 scenario('attaques répétées sur un défenseur hors ligne : pas de butin créé', (film) => {
   const { A, B, clock, cell, fleet, outcome } = raid();
   const id = fleet();
@@ -57,7 +66,7 @@ scenario('attaques répétées sur un défenseur hors ligne : pas de butin cré�
     film.look(A, `attaque ${i + 1} sur 5, B hors ligne`);
   }
   const r = outcome([id]);
-  film.look(B, 'B revient et lit les rapports de combat');
+  film.look(B, 'B revient et lit les rapports de combat : pas plus de pertes ni de butin qu’il n’en avait', loot(r, cell, false));
   assert.equal(r.killed, 4, 'B n’avait que 4 drones');
   assert.ok(r.looted + r.left <= r.real + 1, `pillé ${r.looted} + restant ${r.left} > stock réel ${r.real}`);
 });
@@ -71,7 +80,7 @@ scenario('plusieurs flottes arrivées au même instant : pas de butin créé', (
   A.tick();
   film.look(A, 'les trois flottes attaquent au même instant');
   const r = outcome(ids);
-  film.look(B, 'B revient et lit les rapports de combat');
+  film.look(B, 'B revient et lit les rapports de combat : pas plus de pertes ni de butin qu’il n’en avait', loot(r, cell, false));
   assert.equal(r.killed, 4, 'B n’avait que 4 drones');
   assert.ok(r.looted + r.left <= r.real + 1, `pillé ${r.looted} + restant ${r.left} > stock réel ${r.real}`);
 });
@@ -87,7 +96,7 @@ scenario('70 attaques avant le retour du défenseur : chaque pillage est subi', 
     if (i % 10 === 9) film.look(A, `après ${i + 1} attaques, B hors ligne`);
   }
   const r = outcome([id]);
-  film.look(B, 'B revient et lit les rapports de combat');
+  film.look(B, 'B revient et lit les rapports de combat : chaque pillage est subi', loot(r, cell, true));
   assert.equal(r.killed, 4, 'le rapport du premier combat est encore là');
   assert.ok(Math.abs(r.looted + r.left - r.real) <= 1, `pillé ${r.looted} + restant ${r.left} ≠ stock réel ${r.real}`);
 });
@@ -106,9 +115,12 @@ scenario('les vaisseaux perdus emportent la cargaison qu’ils portaient', (film
   film.look(A, 'A (5 cargos, 3 lourds, 2950 minéraux en soute) en orbite chez B (18 drones)');
   A.moveFleet(id, cell, 'attack');
   A.tick();
-  film.look(A, 'après le combat : A a perdu des vaisseaux');
   const f = A.myFleet(id);
   const carried = Object.values(f.cargo).reduce((t, v) => t + v, 0);
+  film.look(A, 'après le combat : A a perdu des vaisseaux, et la cargaison qu’ils portaient', [
+    { show: 'vaisseaux', at: [A, id], expected: 'moins de 8', got: countShips(f.ships), ok: countShips(f.ships) < 8 },
+    { show: 'cargaison', at: [A, id], expected: `au plus la soute (${fleet.fleetCargo('human', f.ships)})`, got: carried, ok: carried <= fleet.fleetCargo('human', f.ships) },
+  ]);
   assert.ok(countShips(f.ships) < 8, 'la flotte a perdu des vaisseaux');
   assert.ok(carried <= fleet.fleetCargo('human', f.ships), `cargaison ${carried} > soute ${fleet.fleetCargo('human', f.ships)}`);
 });

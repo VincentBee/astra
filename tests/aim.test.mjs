@@ -3,8 +3,9 @@
 // En scénario (D-129) : la visée est de la géométrie pure (js/aim.js), vérifiée par les assert
 // sur des objets posés à la main. Chaque scénario met aussi la même situation dans une vraie
 // partie (planète mère de A, flottes en orbite ou empilées, flotte ennemie) : l'image du rapport
-// montre la carte du joueur telle qu'il la touche. Le doigt lui-même, le zoom et le menu ne se
-// voient pas sur ces images : ils ne sont vérifiés que par les assert.
+// montre la carte du joueur telle qu'il la touche. Le premier scénario montre aussi le doigt (D-142) :
+// son cercle, au zoom du test, vérifié par `film.look`. Ailleurs, le doigt, le zoom et le menu ne
+// se voient pas : ils ne sont vérifiés que par les assert.
 import assert from 'node:assert/strict';
 import { reach, underFinger, contenders, readTap, menuPlace, FINGER, MIN_REACH } from '../js/aim.js';
 import { newGame, game } from './harness.mjs';
@@ -46,8 +47,18 @@ scenario('D-126 : le doigt a une taille fixe à l’écran, jamais moins de MIN_
   // Aimant : un toucher à 0,8 case d'une planète la vise encore, à zoom 1.
   assert.equal(underFinger([planet(5, 5)], { x: 5.8, y: 5 }, 18).length, 1);
   assert.equal(underFinger([planet(5, 5)], { x: 6.2, y: 5 }, 18).length, 0);
-  const { A, home } = table();
-  film.look(A, 'carte entière : A touche près de sa planète mère, l’aimant la vise et ouvre sa fiche', [{ sheet: home, button: true }]);
+  // La même chose dans la partie, doigt dessiné : à côté de la planète mère de A, du côté où la carte a la place.
+  const { A, home, at } = table();
+  const near = (d) => ({ x: at(d).x, y: home.y });
+  film.look(A, 'carte entière (case de 18 px) : le doigt couvre 1 case ; A touche à 0,8 case de sa planète mère, elle est dessous, sa fiche s’ouvre', [
+    { finger: { at: near(0.8), px: FINGER }, hits: home },
+    { sheet: home, button: true },
+  ]);
+  film.look(A, 'carte entière : A touche à 1,2 case, sa planète est hors du doigt, rien ne s’ouvre', [{ finger: { at: near(1.2), px: FINGER }, hits: null }]);
+  film.look(A, 'zoom 4 (case de 72 px) : 18 px ne couvriraient que 0,25 case, le doigt en garde 0,6 ; A touche à 0,5 case, sa planète est encore dessous', [
+    { finger: { at: near(0.5), px: 72, zoom: 4 }, hits: home },
+    { sheet: home, button: true },
+  ]);
 });
 
 scenario('D-126 : flotte en orbite et planète sous le doigt, carte entière → on demande (menu)', (film) => {
