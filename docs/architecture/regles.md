@@ -478,6 +478,11 @@ Une flotte qui attend la réponse à un échange est **bloquée** (`locked`,
   la dernière fois (même s'il l'a perdue depuis), ou rien (elle paraît libre). Vue libre :
   le souvenir s'efface. `scout` passe toutes les planètes des autres à chaque `tick`, carte
   fermée comprise. Partie finie (`over`) : tout est visible.
+- Tests : `tests/fog.test.mjs` (planètes) et `tests/vision.test.mjs` (flottes, D-128) : flotte
+  ennemie visible jusqu'à la portée d'une de mes planètes ou de mes flottes, cachée une case
+  au-delà, distance à vol d'oiseau, les miennes toujours visibles, une flotte en route qui sort
+  de ma portée puis y revient. Ils testent `sees`, pas le dessin du `canvas` (`fleetSpots`,
+  `js/app.js`), qui reste vérifié à l'œil dans le navigateur.
 
 ## 9. Combat
 
@@ -845,6 +850,8 @@ node --test tests/*.test.mjs
 Résultat le 2026-10-30 (Node v24.14.1), avec la recherche en colonie (D-098) et le comportement en voyage (D-100) : `tests 125, pass 125, fail 0` (12 fichiers, dont les `decisions-*.test.mjs` de D-082). Le harnais
 coupe le froid (`FROST.delayMs = Infinity`) : les parties de test ne finissent pas d'elles-mêmes ;
 `tests/end.test.mjs` le rallume test par test.
+
+Le 2026-10-31, avec la vision des flottes (D-128) : `tests 187, pass 187, fail 0` (20 fichiers).
 
 Avant le tempo (au commit `1eeb2c1`) : `tests 35, pass 35, fail 0`. Cette commande inclut
 `tests/peer.test.mjs` (réseau, voir reseau.md).

@@ -1326,3 +1326,25 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - 2026-10-31. Choix de Claude : `index.html`, `style.css`, `js/app.js` changent et
   `js/aim.js` apparaît (ajouté à la liste du cache) (D-126).
 - Statut : en vigueur.
+
+**D-128 — Tester la vision des flottes par un test de logique, pas par le DOM ni par des captures**
+- 2026-10-31 22:22 (UTC). Contexte : Vincent demande comment tester le projet, si Claude peut
+  faire des tests visuels (captures, DOM), puis : « je voudrais tester qu'on ne voit pas les
+  flottes enemies en dehors de notre champs de vision, quel serait le meilleur type de test
+  pour ca ? ». Constat : la règle tient dans `session.sees` (`js/session.js`) ; la carte s'en
+  sert pour sauter les flottes cachées (`fleetSpots`, `js/app.js`) ; aucun test ne vérifiait
+  directement qu'une flotte ennemie trop loin est cachée (D-030 testait la poursuite).
+- Choix : `tests/vision.test.mjs`, dans Node avec le harnais, sur les vraies portées
+  (`sightRange`) et les vrais déplacements (`moveFleet`) : à la portée d'une planète ou d'une
+  flotte, visible ; une case au-delà ou en diagonale, cachée ; les miennes toujours visibles ;
+  une flotte en route qui sort de ma portée puis y revient. Contrôlé par mutation (`sees` qui
+  dit toujours oui → 3 tests sur 4 échouent). Le dessin reste vérifié à l'œil par Claude
+  dans le navigateur intégré, à la demande, sans outil installé.
+- Écarté : lire le DOM (la carte est un `canvas`, les flottes n'y sont pas des éléments) ;
+  captures d'écran automatiques (Playwright ou autre : une dépendance et un `package.json`
+  dans un projet sans build, et des tests fragiles).
+- Qui : Vincent (« Oui, écris le test »), Claude (le type de test, par défaut). Source :
+  session `09eb6bdd`.
+- Rappel : c'est un filtre d'affichage, pas un secret (§8.6 des règles) ; la copie de la partie
+  contient toutes les flottes, ce que le test note aussi.
+- Statut : en vigueur. 4 tests (187/187).
