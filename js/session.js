@@ -923,9 +923,13 @@ export class Session {
   /** Fin de la partie, ou null : { at, winner }, la plus ancienne qu'un joueur a vue. */
   get over() {
     const players = this.state?.players || {};
-    const seen = Object.values(players).map((p) => p.over).filter((o) => isObj(o) && Number.isFinite(o.at) && Object.hasOwn(players, o.winner));
+    // winner null : partie seule perdue, personne ne gagne (D-142).
+    const seen = Object.values(players).map((p) => p.over).filter((o) => isObj(o) && Number.isFinite(o.at) && (o.winner === null || Object.hasOwn(players, o.winner)));
     if (!seen.length) return null;
-    return seen.sort((a, b) => a.at - b.at || (a.winner < b.winner ? -1 : 1))[0];
+    const first = seen.sort((a, b) => a.at - b.at || ((a.winner ?? '') < (b.winner ?? '') ? -1 : 1))[0];
+    // Partie seule finie avant D-142 : la fiche dit « gagné », mais seul, on ne finit qu'en ayant tout perdu.
+    const racers = Object.values(players).filter((p) => this.inRace(p)).length;
+    return first.winner !== null && racers <= 1 ? { ...first, winner: null } : first;
   }
 
   /**
@@ -948,17 +952,19 @@ export class Session {
   /**
    * La partie est-elle finie ? À plusieurs : quand il ne reste qu'un joueur
    * en vie (ou aucun : le dernier tombé gagne). Seul : quand le froid a tout
-   * pris. Si oui, je l'inscris dans ma fiche.
+   * pris, et alors personne ne gagne (D-142). Si oui, je l'inscris dans ma fiche.
    */
   checkOver(p, now) {
     if (this.over || this.startedAt == null) return false;
     const rank = this.ranking(now).filter((r) => this.inRace(this.state.players[r.id]));
     const alive = rank.filter((r) => r.dead == null);
     if (!rank.length || alive.length > (rank.length > 1 ? 1 : 0)) return false;
-    const winner = rank[0];
+    const winner = rank.length > 1 ? rank[0] : null; // seul et tombé : c'est perdu
     const at = Math.max(...rank.map((r) => r.dead ?? -Infinity));
-    p.over = { at: Number.isFinite(at) ? at : now, winner: winner.id };
-    this.addLog(`Fin de la partie : ${this.state.players[winner.id].name} l'emporte${alive.length ? ', dernier en vie' : ''}.`);
+    p.over = { at: Number.isFinite(at) ? at : now, winner: winner?.id ?? null };
+    this.addLog(winner
+      ? `Fin de la partie : ${this.state.players[winner.id].name} l'emporte${alive.length ? ', dernier en vie' : ''}.`
+      : 'Fin de la partie : le froid a tout pris.');
     return true;
   }
 

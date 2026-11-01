@@ -515,7 +515,7 @@ Une flotte qui attend la réponse à un échange est **bloquée** (`locked`,
   D-092) ; `ordersAt` propose les deux sur une planète adverse, avec la défense affichée
   (« Conquérir Hadar · défense ⚔ 8 ◇ 80 + 3 vaisseaux posés · victoire probable »). Les vaisseaux
   posés ne sont comptés que dans ma détection (`seesCell`), sinon « ? ». L'estimation
-  (`assaultView`, D-142) joue `battle` à l'heure présente avec ce que je vois : « bataille
+  (`assaultView`, D-146) joue `battle` à l'heure présente avec ce que je vois : « bataille
   perdue » si perdu, « victoire incertaine » si gagné sans voir les vaisseaux ou en perdant plus de
   la moitié de la flotte, sinon « victoire probable ».
 - À l'arrivée (`arrive`), le défenseur = **les vaisseaux posés sur la planète** à l'heure
@@ -1018,8 +1018,12 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
   (D-102).
 - `checkOver` : à plusieurs, la partie finit quand il reste **un seul** joueur en vie (ou
   aucun : le dernier tombé gagne, puis le meilleur `best`). Seul : quand le froid a tout
-  pris. Le téléphone qui le voit écrit `p.over = { at, winner }` dans sa fiche ;
-  `Session.over` prend la plus ancienne fin écrite par un joueur.
+  pris, et alors **personne ne gagne** : `winner: null` (D-142). Le téléphone qui le voit
+  écrit `p.over = { at, winner }` dans sa fiche ; `Session.over` prend la plus ancienne fin
+  écrite par un joueur, et lit une vieille fin seule (« gagné ») comme perdue.
+- Écran de fin : `finalBoard(session)` (`js/finish.js`, D-143) donne le classement final
+  (`ranking(over.at)`, points `best`, médailles or / argent / bronze aux trois premiers, aucune
+  sans vainqueur).
 - Partie finie : `tick` ne fait plus que lire les derniers rapports de combat ; tous les ordres
   sont refusés (`canAct`).
 
