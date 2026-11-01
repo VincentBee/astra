@@ -505,14 +505,15 @@ Aucune conversation ne les prouve.
 - 2026-10-28 22:15–22:16. Choix : le glissé du doigt ne bouge pas les étoiles (sinon elles
   sautent à chaque tap) ; parallaxe par l'accéléromètre.
 - Alternative : suivre le doigt. Qui : Claude (recommandation), Vincent choisit l'accéléromètre.
-- Source : `f4afbcd0` 22:15:19, 22:16:01 ; `1eeb2c1`. Statut : en vigueur.
+- Source : `f4afbcd0` 22:15:19, 22:16:01 ; `1eeb2c1`. Statut : remplacée par D-137 (plus de parallaxe).
 
 **D-068 — Accéléromètre sur iPhone**
 - 2026-10-28 22:17. Choix : autorisation « Mouvement » au premier tap ; position de repos qui
   s'adapte ; mouvement lissé ; fond fixe si « réduire les animations » (modifiée par D-112 :
   ce fond fixe est désormais une seule image, et chacun peut le choisir).
 - Qui : Claude (défaut). Testé avec des événements simulés seulement (**non confirmé** sur un vrai
-  iPhone). Source : `f4afbcd0` 22:15:08, 22:17:00. Statut : en vigueur.
+  iPhone). Source : `f4afbcd0` 22:15:08, 22:17:00. Statut : remplacée par D-137 (plus de parallaxe,
+  plus d'accéléromètre).
 
 **D-069 — Choix de race par icônes, Humains par défaut**
 - 2026-10-28 22:21. Choix : 3 icônes, une seule fiche visible (Humains d'abord), « Choix
@@ -1057,7 +1058,7 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Alternatives écartées : retirer la parallaxe pour tous ; fixe par défaut ; détecter
   « téléphone faible » ou « batterie faible » (pas d'API fiable sur iPhone).
 - Qui : Claude (défaut : animé reste le défaut, 3 choix). Source : session `0a3a42f6`.
-- Statut : en vigueur, modifiée par D-114 (emplacement). Effet sur la batterie d'un vrai
+- Statut : en vigueur, modifiée par D-114 (emplacement) et D-137 (plus de choix « animé »). Effet sur la batterie d'un vrai
   téléphone : **non confirmé**.
 
 **D-113 — Cache `astra-p2p-v63`**
@@ -1516,3 +1517,26 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   deux images ou plus ne changent pas.
 - Alternatives écartées : griser les commandes (elles prennent encore la place).
 - Qui : Vincent. Source : session `0cb6f324`. Statut : en vigueur.
+
+**D-137 — Plus de parallaxe, pour tout le monde**
+- 2026-11-01 20:42. Contexte : « retirer la paralaxe pour tout le monde ».
+- Choix : le fond étoilé est toujours une seule image immobile (les 3 couches d'étoiles réunies),
+  redessinée seulement quand l'écran change de taille : ni défilement, ni souris, ni
+  accéléromètre, ni autorisation « Mouvement » sur iPhone. Le réglage « Fond » garde deux choix :
+  « Étoiles » (`fixe`, par défaut) et « Sans étoiles » (`aucun`). Un téléphone qui avait gardé
+  `anime` passe à `fixe`. Code de la parallaxe retiré de `js/galaxy.js`. Cache v72.
+- Choix de Claude, par défaut : retirer le choix « animé » du réglage plutôt que seulement changer
+  le défaut (« pour tout le monde ») ; l'option « fixe » s'appelle maintenant « Étoiles ».
+- Alternatives écartées : garder la parallaxe en option (pas « pour tout le monde ») ; retirer
+  aussi les étoiles fixes (non demandé).
+- Remplace D-067 et D-068 ; modifie D-112.
+- Qui : Vincent (demande), Claude (détails). Source : session `0cb6f324`. Statut : en vigueur.
+- Tests : `tests/decisions-reseau.test.mjs` « D-137 ».
+
+**D-138 — Le bouton « Bâtiments » de la fiche de planète devient « Voir la planète »**
+- 2026-11-01 20:42. Contexte : élément `#btn-open-planet` montré par Vincent : « ce boutton doit etre
+  rename: "voir la planete" ».
+- Choix : texte « Voir la planète », icône planète (avant : icône bâtiment). Il ouvre toujours
+  l'écran de la planète (bâtiments, recherche, flottes).
+- Choix de Claude, par défaut : l'icône planète, qui va avec le nouveau texte.
+- Qui : Vincent (texte), Claude (icône). Source : session `0cb6f324`. Statut : en vigueur.

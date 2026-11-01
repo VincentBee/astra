@@ -347,7 +347,7 @@ test('D-064 : chaque icône de la page existe, et un bouton sans texte porte un 
   }
 });
 
-// ----- D-067 / D-068 : parallaxe à l'accéléromètre
+// ----- Fond étoilé (D-112, D-137 ; avant : parallaxe D-067 / D-068)
 
 /** Lance le fond étoilé dans un faux navigateur ; renvoie ses couches et ses écouteurs. */
 function galaxy({ still = false, ios = false, mode = null } = {}) {
@@ -407,44 +407,20 @@ function galaxy({ still = false, ios = false, mode = null } = {}) {
   return { layers, on, perm, prepended: prepended.n, fire: (t, e) => during(() => fire(t, e)), pos: () => layers.map((l) => l.style.transform) };
 }
 
-test('D-067 : le doigt ne bouge pas les étoiles, l’accéléromètre si', () => {
-  const g = galaxy();
-  const rest = g.pos();
-  g.fire('pointermove', { pointerType: 'touch', clientX: 390, clientY: 790 });
-  assert.deepEqual(g.pos(), rest, 'glissé du doigt : rien ne bouge');
-  g.fire('devicemotion', { accelerationIncludingGravity: { x: 0, y: 0 } });
-  g.fire('devicemotion', { accelerationIncludingGravity: { x: 3, y: 0 } });
-  assert.notDeepEqual(g.pos(), rest, 'téléphone incliné : le ciel glisse');
-});
+// D-067 et D-068 (parallaxe, accéléromètre) : remplacées par D-137, plus de tests.
 
-test('D-068 : sur iPhone, l’autorisation « Mouvement » est demandée au premier tap ; fond fixe si « réduire les animations »', () => {
-  const g = galaxy({ ios: true });
-  const tap = g.on.filter((h) => h.type === 'pointerdown');
-  assert.equal(tap.length, 1);
-  assert.equal(tap[0].opts?.once, true, 'une seule fois');
-  assert.equal(g.perm.n, 0, 'pas avant le tap');
-  g.fire('pointerdown', {});
-  assert.equal(g.perm.n, 1);
-
-  const still = galaxy({ still: true, ios: true });
-  assert.deepEqual(still.on.map((h) => h.type), ['resize'], 'ni défilement, ni capteur, ni souris');
-  const rest = still.pos();
-  still.fire('devicemotion', { accelerationIncludingGravity: { x: 3, y: 3 } });
-  assert.deepEqual(still.pos(), rest);
-});
-
-test('D-112 : réglage « Fond » — fixe = une image sans capteurs, aucun = pas d’étoiles', () => {
-  const anime = galaxy({ mode: 'anime' });
-  assert.equal(anime.layers.length, 3);
-  assert.ok(anime.on.some((h) => h.type === 'devicemotion'));
-
-  const fixe = galaxy({ mode: 'fixe' });
-  assert.equal(fixe.layers.length, 1, 'les trois couches dans une seule image');
-  assert.deepEqual(fixe.on.map((h) => h.type), ['resize'], 'ni défilement, ni capteur, ni souris');
-
+test('D-137 (modifie D-112) : plus de parallaxe — une image immobile, sans capteur ni souris, pour tout le monde', () => {
+  // « anime » (l'ancien réglage gardé dans un téléphone), rien ou n'importe quoi : le fond fixe.
+  for (const mode of ['fixe', 'anime', null, 'n’importe quoi']) {
+    const g = galaxy({ mode, ios: true });
+    assert.equal(g.layers.length, 1, `${mode} : une seule image`);
+    assert.deepEqual(g.on.map((h) => h.type), ['resize'], `${mode} : ni défilement, ni capteur, ni souris`);
+    assert.equal(g.perm.n, 0, `${mode} : pas d’autorisation « Mouvement » demandée`);
+    const rest = g.pos();
+    g.fire('devicemotion', { accelerationIncludingGravity: { x: 3, y: 3 } });
+    assert.deepEqual(g.pos(), rest, `${mode} : rien ne bouge`);
+  }
   const aucun = galaxy({ mode: 'aucun' });
-  assert.equal(aucun.prepended, 0, 'rien n’est ajouté à la page');
+  assert.equal(aucun.prepended, 0, 'aucun : rien n’est ajouté à la page');
   assert.equal(aucun.on.length, 0);
-
-  assert.equal(galaxy({ mode: 'n’importe quoi' }).layers.length, 3, 'valeur inconnue : animé');
 });

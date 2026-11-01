@@ -351,6 +351,8 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 20:35 | `0cb6f324` | « fait un test ou tu montre l'alert » | `threatText` partagé par le jeu et les tests ; `film.look` note le bandeau d'alerte et le rapport l'affiche au-dessus de la carte, avec l'effectif des flottes adverses ; attente `{ alert }` ; `tests/threat.test.mjs` en 3 scénarios filmés (conquête du « en vue » à « en orbite ») ; 192/192 ; rapport vu dans le navigateur | (cette PR) | D-135 |
 | 20:38 | `0cb6f324` | « dans les simulations, si il n'y a qu'une seule step, ne pas afficher les controls » | `tests/scenario.mjs` : pas de barre ⏮ ▶ ⏭ ni de curseur pour un scénario d'une image ; vérifié dans le navigateur | (cette PR) | D-136 |
 | 20:38 | `0cb6f324` | « ni "1/1 · t = 0 s" » (envoyé pendant le travail) | Le compteur disparaît aussi pour une seule image ; 192/192 | (cette PR) | D-136 |
+| 20:42 | `0cb6f324` | « retirer la paralaxe pour tout le monde » | Proposé en session à part ; Vincent a répondu par une autre demande, donc fait ici. Fond toujours immobile (une image), choix « animé » retiré du réglage « Fond », `anime` gardé → `fixe` ; code de la parallaxe et de l'accéléromètre retiré ; test D-137 (remplace ceux de D-067/D-068) ; 190/190 ; vérifié dans le navigateur ; cache v72 | (cette PR) | D-137 |
+| 20:42 | `0cb6f324` | « ce boutton doit etre rename: "voir la planete" » (bouton `#btn-open-planet` montré dans l'app) | « Voir la planète », icône planète ; vérifié dans le navigateur | (cette PR) | D-138 |
 
 ### Travaux en cours au 2026-10-29
 
