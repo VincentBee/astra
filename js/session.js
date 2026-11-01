@@ -1522,7 +1522,7 @@ export class Session {
   }
 
   /**
-   * Flottes armées adverses que je vois (D-128). Celles qui visent une de mes
+   * Flottes armées adverses que je vois (D-133). Celles qui visent une de mes
    * planètes (attaque, conquête, simple trajet vers sa case, ou déjà en
    * orbite) d'abord, la plus proche de l'impact en tête ; puis les autres,
    * de la plus proche à la plus lointaine de mes planètes.

@@ -1087,7 +1087,7 @@ function renderRace(now) {
 }
 
 /**
- * Bandeau rouge (D-128) : la flotte armée adverse la plus pressante, avec le
+ * Bandeau rouge (D-133) : la flotte armée adverse la plus pressante, avec le
  * compte à rebours si elle vise une de mes planètes ; il reste tant qu'elle
  * est en vue. Un toucher montre la carte.
  */
@@ -1991,7 +1991,7 @@ function drawMap() {
     ctx.restore();
     ctx.globalAlpha = 1;
     if (p.id !== session.me) {
-      // Effectif des flottes adverses (D-128), en haut à droite du triangle.
+      // Effectif des flottes adverses (D-133), en haut à droite du triangle.
       ctx.font = `700 ${Math.max(9 * dpr, cell * 0.34)}px system-ui, sans-serif`;
       ctx.textAlign = 'left';
       ctx.lineWidth = Math.max(2, cell * 0.08);

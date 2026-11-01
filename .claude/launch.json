@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "astra-tests",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["tests/ui/server.mjs"],
+      "port": 5199
+    },
+    {
+      "name": "astra",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8080"],
+      "port": 8080
+    }
+  ]
+}

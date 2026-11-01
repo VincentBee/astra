@@ -476,7 +476,7 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
 - Le bouton de l'écran de race dit **Choisir cette race** (avant : « Commencer la partie » ou
   « Rejoindre la partie »).
 
-## 16. Alerte de flotte ennemie (2026-10-30, D-128)
+## 16. Alerte de flotte ennemie (2026-10-30, D-133)
 
 - `index.html` : `<button id="threat" class="banner threat">` juste sous `#race`, hors des onglets :
   visible sur la carte comme sur l'écran d'une planète. Un toucher appelle `showView('map')`.
