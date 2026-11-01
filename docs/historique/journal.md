@@ -363,6 +363,7 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 21:19 | `1b635a47` | « il faudrait que le jeu affiche un splash screen "fin de partie" avec le classement des joueurs dans un leaderboard, avec un badge en or pour le premier, un en argent pour le deuxième, et un en bronze pour le 3e » | Fenêtre `#sheet-finish` : classement final (`js/finish.js`), médailles or / argent / bronze, moi encadré, courbe des points, **Revoir la carte**, bouton **Classement** dans le bandeau ; `tests/finish.test.mjs` (2 scénarios) ; 192/192 ; vérifié dans le navigateur (seul, à quatre, téléphone) ; cache v74 | (ce commit) | D-143, D-144 |
 | 21:26 | `1b635a47` | [Bouton] « Oui, ouvre la PR » | Branche poussée, pull request ouverte avec les captures du navigateur et les résultats des tests | (cette PR) | D-142, D-143 |
 | 21:27 | `1b635a47` | [Auto-fix] conflit avec `main` | Fusion de `main` (PR #17 : D-133 à D-141, cache v73) : mes numéros D-142 à D-144 et le cache v74 restent libres, gardés ; conflits de doc et de `js/app.js` résolus en gardant les deux côtés ; écran de fin en section 18 de `interface.md` ; 194/194 | (cette PR) | D-142, D-143, D-144 |
+| 21:30 | `1b635a47` | « as tu rajouter des tests ? » | Réponse sans code : oui, 3 scénarios filmés (`end.test.mjs` : seul et éliminé ; `finish.test.mjs` : fin à quatre, fin seul) et un test existant corrigé ; les 3 échouent sans le correctif ; 194/194 | — | D-142, D-143 |
 
 ### Travaux en cours au 2026-10-29
 
