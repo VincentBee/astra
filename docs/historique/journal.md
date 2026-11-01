@@ -349,6 +349,8 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 14:16 | `09eb6bdd` | « transforme un maximum de test existant avec des simulation » | 114 tests sur 189 en scénarios (tous ceux qui jouent une partie), par 5 agents en parallèle ; `assert` comparés ligne à ligne : identiques ; outil complété (état des joueurs sous la carte, image de l'échec, `async`, lettres stables, brouillard des planètes, couleurs de secours, flottes à l'arrêt décalées) ; 7 tests async du réseau convertis ; vérifié dans le navigateur | (ce commit) | D-132 |
 | 20:26 | `0cb6f324` | [Auto-fix] conflit avec `main` | Fusion de `main` (PR #25 : D-128 à D-132, tests en scénarios) : mes décisions deviennent D-133 (alerte) et D-134 (délai, ouvert) ; cache v70 gardé (`main` en v69) ; ma copie locale non suivie de `.claude/launch.json` mise de côté, celle de `main` prise | (cette PR) | D-133, D-134 |
 | 20:35 | `0cb6f324` | « fait un test ou tu montre l'alert » | `threatText` partagé par le jeu et les tests ; `film.look` note le bandeau d'alerte et le rapport l'affiche au-dessus de la carte, avec l'effectif des flottes adverses ; attente `{ alert }` ; `tests/threat.test.mjs` en 3 scénarios filmés (conquête du « en vue » à « en orbite ») ; 192/192 ; rapport vu dans le navigateur | (cette PR) | D-135 |
+| 20:38 | `0cb6f324` | « dans les simulations, si il n'y a qu'une seule step, ne pas afficher les controls » | `tests/scenario.mjs` : pas de barre ⏮ ▶ ⏭ ni de curseur pour un scénario d'une image ; vérifié dans le navigateur | (cette PR) | D-136 |
+| 20:38 | `0cb6f324` | « ni "1/1 · t = 0 s" » (envoyé pendant le travail) | Le compteur disparaît aussi pour une seule image ; 192/192 | (cette PR) | D-136 |
 
 ### Travaux en cours au 2026-10-29
 

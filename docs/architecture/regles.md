@@ -876,6 +876,9 @@ au-dessus de la carte de chaque image ; la carte écrit l'effectif des flottes a
 attente `{ alert: /texte/ }` vérifie le bandeau, `{ alert: null }` son absence. Exemple :
 `tests/threat.test.mjs` (une conquête filmée, du « en vue » au compte à rebours puis « en orbite »).
 
+Un scénario d'une seule image n'a ni commandes (⏮ ▶ ⏭ et curseur) ni compteur « 1/1 · t = 0 s »
+(D-136) : seulement l'image et sa légende.
+
 ```bash
 ASTRA_REPORT=1 node --test tests/vision.test.mjs
 ```

@@ -290,13 +290,13 @@ function section(s, i) {
         .map((p) => `<tr><td><span class="dot" style="background:${f.colors[p.id]}"></span>${f.L[p.id]}${p.out ? ' (éliminé)' : ''}</td><td>${p.planets.map((x) => `${esc(x.name)} ${x.res} · ${esc(x.ships)}`).join('<br>') || '—'}</td><td>${p.fleets}</td></tr>`)
         .join('');
       const table = rows ? `<table class="pl"><tr><th>Joueur</th><th>Planètes : stock · à quai</th><th>Flottes</th></tr>${rows}</table>` : '';
-      return `<figure data-frame="${k}"${f.ko ? ' class="ko"' : ''}>${banner}${svg(f)}<figcaption><b>${k + 1}/${s.frames.length} · t = ${Math.round((f.t - t0) / 1000)} s</b> · ${f.ko && !f.checks.length ? '<span class="ko">✖ </span>' : ''}${esc(f.label)} (vu par ${f.L[f.viewer]})${checks ? `<ul>${checks}</ul>` : ''}${table}</figcaption></figure>`;
+      return `<figure data-frame="${k}"${f.ko ? ' class="ko"' : ''}>${banner}${svg(f)}<figcaption>${s.frames.length < 2 ? '' : `<b>${k + 1}/${s.frames.length} · t = ${Math.round((f.t - t0) / 1000)} s</b> · `}${f.ko && !f.checks.length ? '<span class="ko">✖ </span>' : ''}${esc(f.label)} (vu par ${f.L[f.viewer]})${checks ? `<ul>${checks}</ul>` : ''}${table}</figcaption></figure>`;
     })
     .join('');
   return `<section class="scn ${s.ok ? 'ok' : 'ko'}" id="s${i}" data-name="${esc(s.name)}">
 <h2>${s.ok ? '✔' : '✖'} ${esc(s.name)}</h2>
 ${s.ok ? '' : `<p class="ko">Obtenu : ${esc(s.error)}</p>`}
-${frames ? `<div class="film"><div class="frames">${frames}</div><div class="ctl"><button data-step="-1" aria-label="Image précédente">⏮</button><button data-play aria-label="Lecture">▶</button><button data-step="1" aria-label="Image suivante">⏭</button><input type="range" min="0" max="${s.frames.length - 1}" value="0" aria-label="Image"></div></div>` : ''}
+${frames ? `<div class="film"><div class="frames">${frames}</div>${s.frames.length < 2 ? '' : `<div class="ctl"><button data-step="-1" aria-label="Image précédente">⏮</button><button data-play aria-label="Lecture">▶</button><button data-step="1" aria-label="Image suivante">⏭</button><input type="range" min="0" max="${s.frames.length - 1}" value="0" aria-label="Image"></div>`}</div>` : ''}
 </section>`;
 }
 
@@ -337,6 +337,7 @@ for (const film of document.querySelectorAll('.film')) {
   const figs = [...film.querySelectorAll('figure')];
   const range = film.querySelector('input');
   const play = film.querySelector('[data-play]');
+  if (!play) { figs[0].classList.add('on'); continue; } // une seule image : pas de commandes (rien à faire défiler)
   let i = Math.max(0, figs.findIndex((f) => f.classList.contains('ko'))), timer = 0;
   const show = (k) => { i = (k + figs.length) % figs.length; figs.forEach((f, j) => f.classList.toggle('on', j === i)); range.value = i; };
   const stop = () => { clearInterval(timer); timer = 0; play.textContent = '▶'; };

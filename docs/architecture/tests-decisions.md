@@ -157,3 +157,4 @@ que fait le code.
 | D-133 | Alerte de flotte ennemie (bandeau et effectif sur la carte) | nouveau test | `threat.test.mjs` (3 scénarios filmés : conquête du « en vue » au compte à rebours puis « en orbite » ; menace directe avant une flotte qui rôde, « +1 autre » ; pas d'alerte sans armes, hors de vue ou pour mes flottes) | le bandeau du jeu (DOM) et les chiffres du canvas sont vérifiés dans le navigateur ; le texte, lui, vient de `threatText`, testé |
 | D-134 | Délai avant une frappe depuis l'orbite | non testable |  | ouvert, rien n'est codé |
 | D-135 | Les scénarios montrent le bandeau d'alerte du joueur | nouveau test | `threat.test.mjs` (les attentes `{ alert }`) | rapport vérifié dans le navigateur |
+| D-136 | Rapport : une seule image, ni commandes ni compteur | non testable |  | rendu HTML du rapport, vérifié dans le navigateur (`threat.test.html` : 1 film à commandes, 2 scénarios d'une image sans) |

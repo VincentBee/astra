@@ -1507,3 +1507,12 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   texte dans le test (il pourrait diverger du jeu).
 - Qui : Vincent (demande), Claude (méthode). Source : session `0cb6f324`. Statut : en vigueur.
 - Tests : `tests/threat.test.mjs`.
+
+**D-136 — Rapport de scénario : une seule image, pas de commandes ni de compteur**
+- 2026-11-01 20:38. Contexte : « dans les simulations, si il n'y a qu'une seule step, ne pas
+  afficher les controls », puis « ni "1/1 · t = 0 s" ».
+- Choix : dans `tests/scenario.mjs`, un scénario d'une seule image n'a ni la barre ⏮ ▶ ⏭ et le
+  curseur, ni le compteur « 1/1 · t = 0 s » ; la légende commence directement. Les films de
+  deux images ou plus ne changent pas.
+- Alternatives écartées : griser les commandes (elles prennent encore la place).
+- Qui : Vincent. Source : session `0cb6f324`. Statut : en vigueur.
