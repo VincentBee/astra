@@ -481,7 +481,8 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
 - `index.html` : `<button id="threat" class="banner threat">` juste sous `#race`, hors des onglets :
   visible sur la carte comme sur l'écran d'une planète. Un toucher appelle `showView('map')`.
 - `renderThreat(now)` (`js/app.js`), appelé par `renderLive` (5 fois par seconde) : lit
-  `session.threats(now)` et montre la menace en tête : « N vaisseaux de X sur P dans S s »,
+  `session.threats(now)` et montre la menace en tête, texte écrit par `threatText`
+  (`js/session.js`, partagé avec les scénarios de test, D-135) : « N vaisseaux de X sur P dans S s »,
   « … en orbite de P » (arrivée, combat pas encore réglé) ou « … en vue, à C cases de P » (ne
   vise rien), puis « +N autres ». Caché s'il n'y a rien, ou en partie finie.
 - `Session.threats(now)` (`js/session.js`, à côté de `eyes`/`sees`) : flottes armées, adverses

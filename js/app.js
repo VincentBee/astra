@@ -1,4 +1,4 @@
-import { Session } from './session.js';
+import { Session, threatText } from './session.js';
 import { loadGame, listGames, selectGame, forgetGame, describeSave } from './save.js';
 import { inviteLink, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
@@ -1096,16 +1096,8 @@ function renderThreat(now) {
   const list = session.over ? [] : session.threats(now);
   el.hidden = !list.length;
   if (!list.length) return;
-  const [t] = list;
-  const who = `${t.n} vaisseau${t.n > 1 ? 'x' : ''} ${esc(de(t.p.name))}`;
-  const where = esc(t.target.name);
-  const cells = Math.max(1, Math.round(t.dist));
-  const what =
-    t.eta == null ? `${who} en vue, à ${cells} case${cells > 1 ? 's' : ''} ${esc(de(t.target.name))}`
-    : t.eta > 0 ? `${who} sur ${where} dans <span class="mono">${Math.ceil(t.eta / 1000)} s</span>`
-    : `${who} en orbite ${esc(de(t.target.name))}`;
-  const more = list.length > 1 ? ` <span class="hint">· +${list.length - 1} autre${list.length > 2 ? 's' : ''}</span>` : '';
-  setHtml($('threat-text'), `${ic('attack')} <strong>${what}</strong>${more}`);
+  const { main, more } = threatText(list);
+  setHtml($('threat-text'), `${ic('attack')} <strong>${esc(main)}</strong>${more ? ` <span class="hint">· ${more}</span>` : ''}`);
 }
 $('threat').addEventListener('click', () => showView('map'));
 // Diagnostic des planètes : famine, panne d'énergie, stock vital qui baisse (D-111).

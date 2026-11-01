@@ -1491,3 +1491,19 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Choix : **rien n'est changé pour l'instant**. Question posée à Vincent ; l'alerte de D-133
   laisse déjà voir les flottes en orbite proches (« en vue, à 1 case »).
 - Qui : en attente de Vincent. Source : session `0cb6f324`. Statut : ouvert, non tranché.
+
+**D-135 — Les scénarios de test montrent le bandeau d'alerte du joueur**
+- 2026-11-01 20:35. Contexte : « fait un test ou tu montre l'alert ».
+- Choix : le texte du bandeau sort de `app.js` dans `threatText(list)` (`js/session.js`), que le
+  jeu et `tests/scenario.mjs` utilisent tous les deux. `film.look` le note à chaque image et le
+  rapport l'affiche au-dessus de la carte (une ligne « pas d'alerte » quand il n'y en a pas, pour
+  que la carte ne saute pas) ; la carte du rapport écrit l'effectif des flottes adverses vues.
+  Nouvelle attente `{ alert: /texte/ | null }`. `tests/threat.test.mjs` passe en scénarios
+  filmés (D-132), dont une conquête suivie seconde par seconde. Cache v71 (`app.js` change).
+- Choix de Claude, par défaut : une expression régulière plutôt qu'un texte exact (les noms de
+  planètes changent d'une partie de test à l'autre) ; le texte est en clair, le jeu ajoute seul
+  l'icône et la mise en forme.
+- Alternatives écartées : capture d'écran du vrai jeu dans le test (lente, D-128) ; recopier le
+  texte dans le test (il pourrait diverger du jeu).
+- Qui : Vincent (demande), Claude (méthode). Source : session `0cb6f324`. Statut : en vigueur.
+- Tests : `tests/threat.test.mjs`.

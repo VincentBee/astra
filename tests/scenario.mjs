@@ -11,6 +11,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { basename, dirname, join } from 'node:path';
 import { game, fleet } from './harness.mjs';
 
+const { threatText } = await import('../js/session.js');
+
 const { SHIPS } = await import('../js/tech.js');
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -100,12 +102,17 @@ function known(viewer, cell, owner, now, eyes) {
   return viewer.intel?.[`${cell.x},${cell.y}`]?.pid || null;
 }
 
+/** Ce qu'un test attend du bandeau d'alerte, en clair. */
+const alertWant = (re) => (re === null ? 'aucun bandeau' : `un bandeau qui contient ${re}`);
+
 function film(s, out) {
   let last = null; // le dernier joueur regardé : l'image « au moment de l'échec » se prend de son point de vue
   const api = {
     /**
      * Ce que voit `viewer` en ce moment, et ce qu'il devrait voir :
-     * expect = [{ fleet: [session du propriétaire, id], visible }]. `eyes` remplace sa vue.
+     * expect = [{ fleet: [session du propriétaire, id], visible }, { alert: /texte/ ou null }].
+     * `alert` : le bandeau d'alerte de flotte ennemie (D-133), null = pas de bandeau.
+     * `eyes` remplace sa vue.
      */
     look(viewer, label, expect = [], { eyes } = {}) {
       last = viewer;
@@ -117,10 +124,18 @@ function film(s, out) {
       for (const p of Object.values(st.players)) {
         (p.fleets || []).forEach((f, i) => {
           const pos = fleet.fleetPos(f, now);
-          fleets.push({ pid: p.id, id: f.id, n: i + 1, x: pos.x, y: pos.y, to: f.to, moving: fleet.moving(f, now), seen: viewer.sees(p, f, now, eyes), ships: shipsText(p.race, f.ships), cargo: resText(f.cargo), order: f.order?.kind || null });
+          fleets.push({ pid: p.id, id: f.id, n: i + 1, count: fleet.countShips(f.ships), x: pos.x, y: pos.y, to: f.to, moving: fleet.moving(f, now), seen: viewer.sees(p, f, now, eyes), ships: shipsText(p.race, f.ships), cargo: resText(f.cargo), order: f.order?.kind || null });
         });
       }
-      const checks = expect.map(({ fleet: [owner, id], visible }) => {
+      // Le bandeau d'alerte, tel que le jeu l'écrit (renderThreat, js/app.js).
+      const threat = viewer.over ? null : threatText(viewer.threats(now));
+      const alert = threat ? (threat.more ? `${threat.main} · ${threat.more}` : threat.main) : null;
+      const checks = expect.map((x) => {
+        if ('alert' in x) {
+          const ok = x.alert === null ? alert === null : alert !== null && x.alert.test(alert);
+          return { kind: 'alert', what: 'le bandeau d’alerte', expected: x.alert, got: alert, ok };
+        }
+        const { fleet: [owner, id], visible } = x;
         const f = fleets.find((x) => x.pid === owner.me && x.id === id);
         const what = f ? `la flotte ${f.n} de ${L[f.pid]} en ${cell(f)}` : `la flotte ${id} de ${L[owner.me]} (introuvable)`;
         return { pid: owner.me, id, what, expected: visible, got: f?.seen ?? null, ok: f?.seen === visible };
@@ -138,6 +153,7 @@ function film(s, out) {
         }),
         eyes,
         fleets,
+        alert,
         checks,
         // L'état réel de chaque joueur (pas seulement ce que voit `viewer`) : pour comprendre.
         players: Object.values(st.players)
@@ -155,7 +171,7 @@ function film(s, out) {
       if (bad.length) {
         frame.ko = true;
         s.ok = false;
-        s.error = bad.map((c) => `${L[viewer.me]} ${c.got ? 'voit' : 'ne voit pas'} ${c.what} (attendu : ${c.expected ? 'vue' : 'cachée'})`).join(' ; ');
+        s.error = bad.map((c) => (c.kind === 'alert' ? `${L[viewer.me]} a ${c.got ? `le bandeau « ${c.got} »` : 'aucun bandeau'} (attendu : ${alertWant(c.expected)})` : `${L[viewer.me]} ${c.got ? 'voit' : 'ne voit pas'} ${c.what} (attendu : ${c.expected ? 'vue' : 'cachée'})`)).join(' ; ');
         assert.fail(`${s.error}\n  Image : « ${label} »\n  Rapport : ${pathToFileURL(out)}`);
       }
     },
@@ -244,6 +260,8 @@ function svg(f) {
         ? `<path d="${d}" fill="${color}" stroke="#05070f" stroke-width="0.05"><title>${esc(title)}</title></path>`
         : `<path d="${d}" fill="none" stroke="${color}" stroke-width="0.06" stroke-dasharray="0.08 0.06" opacity="0.8"><title>${esc(title)}</title></path>`,
     );
+    // Effectif des flottes adverses vues, comme sur la carte du jeu (D-133).
+    if (x.seen && !mine) parts.push(`<text x="${cx + 0.26}" y="${cy - 0.12}" font-size="0.42" font-weight="700" fill="#ffffff" stroke="#05070f" stroke-width="0.08" paint-order="stroke">${x.count}</text>`);
     const chk = f.checks.find((k) => k.pid === x.pid && k.id === x.id);
     if (chk) {
       const ring = chk.ok ? '#4ade80' : '#ff5a5a';
@@ -259,12 +277,20 @@ function section(s, i) {
   const t0 = s.frames[0]?.t ?? 0;
   const frames = s.frames
     .map((f, k) => {
-      const checks = f.checks.map((c) => `<li class="${c.ok ? 'ok' : 'ko'}">${c.ok ? '✔' : '✖'} ${esc(c.what)} : attendu ${c.expected ? 'vue' : 'cachée'}, obtenu ${c.got === null ? 'absente' : c.got ? 'vue' : 'cachée'}</li>`).join('');
+      const checks = f.checks
+        .map((c) =>
+          c.kind === 'alert'
+            ? `<li class="${c.ok ? 'ok' : 'ko'}">${c.ok ? '✔' : '✖'} ${esc(c.what)} : attendu ${esc(alertWant(c.expected))}, obtenu ${c.got === null ? 'aucun bandeau' : `« ${esc(c.got)} »`}</li>`
+            : `<li class="${c.ok ? 'ok' : 'ko'}">${c.ok ? '✔' : '✖'} ${esc(c.what)} : attendu ${c.expected ? 'vue' : 'cachée'}, obtenu ${c.got === null ? 'absente' : c.got ? 'vue' : 'cachée'}</li>`,
+        )
+        .join('');
+      // Bandeau d'alerte du joueur (D-133) : toujours une ligne, pour que la carte ne saute pas d'une image à l'autre.
+      const banner = s.frames.some((x) => x.alert) ? `<p class="alert${f.alert ? '' : ' none'}">${f.alert ? `⚔ ${esc(f.alert)}` : 'pas d’alerte'}</p>` : '';
       const rows = (f.players || [])
         .map((p) => `<tr><td><span class="dot" style="background:${f.colors[p.id]}"></span>${f.L[p.id]}${p.out ? ' (éliminé)' : ''}</td><td>${p.planets.map((x) => `${esc(x.name)} ${x.res} · ${esc(x.ships)}`).join('<br>') || '—'}</td><td>${p.fleets}</td></tr>`)
         .join('');
       const table = rows ? `<table class="pl"><tr><th>Joueur</th><th>Planètes : stock · à quai</th><th>Flottes</th></tr>${rows}</table>` : '';
-      return `<figure data-frame="${k}"${f.ko ? ' class="ko"' : ''}>${svg(f)}<figcaption><b>${k + 1}/${s.frames.length} · t = ${Math.round((f.t - t0) / 1000)} s</b> · ${f.ko && !f.checks.length ? '<span class="ko">✖ </span>' : ''}${esc(f.label)} (vu par ${f.L[f.viewer]})${checks ? `<ul>${checks}</ul>` : ''}${table}</figcaption></figure>`;
+      return `<figure data-frame="${k}"${f.ko ? ' class="ko"' : ''}>${banner}${svg(f)}<figcaption><b>${k + 1}/${s.frames.length} · t = ${Math.round((f.t - t0) / 1000)} s</b> · ${f.ko && !f.checks.length ? '<span class="ko">✖ </span>' : ''}${esc(f.label)} (vu par ${f.L[f.viewer]})${checks ? `<ul>${checks}</ul>` : ''}${table}</figcaption></figure>`;
     })
     .join('');
   return `<section class="scn ${s.ok ? 'ok' : 'ko'}" id="s${i}" data-name="${esc(s.name)}">
@@ -293,10 +319,11 @@ table.pl{border-collapse:collapse;margin-top:6px;font-size:12px;width:100%;max-w
 .js .frames{display:grid}.js .frames figure{grid-area:1/1;margin:0;visibility:hidden}.js .frames figure.on{visibility:visible}
 .ctl{display:none;gap:8px;align-items:center}.js .ctl{display:flex}.ctl button{background:#1b2340;color:#e8ebf7;border:0;border-radius:8px;padding:6px 12px;font-size:15px}.ctl input{flex:1}
 .legend{color:#aab2cf;font-size:13px;margin:0 0 16px}
+p.alert{max-width:420px;box-sizing:border-box;margin:0 0 8px;padding:6px 10px;border:1px solid #ff6b7a;background:rgba(255,107,122,0.14);color:#ff6b7a;font-weight:700;font-size:14px}p.alert.none{border-color:#1f2742;background:none;color:#7d86a8;font-weight:400}
 </style></head><body>
 <h1>${esc(file)}</h1>
 <p class="sum">${list.length} scénario${list.length > 1 ? 's' : ''}, ${ko ? `<b class="ko">${ko} en échec</b>` : 'tous réussis'} · ${esc(new Date().toISOString().slice(0, 16).replace('T', ' '))} UTC · relancer : <code>ASTRA_REPORT=1 node --test tests/${esc(file)}</code></p>
-<p class="legend">Carte vue par le joueur qui regarde : son halo = sa portée de détection ; losange plein = flotte qu'il voit ; losange en pointillés = flotte qu'il ne voit pas (dessinée pour comprendre) ; anneau en pointillés autour d'une planète = son vrai propriétaire, que le joueur ignore (hors de portée) ; tableau = l'état réel de chaque joueur ; anneau vert ✔ / rouge ✖ = la vérification du test.</p>
+<p class="legend">Carte vue par le joueur qui regarde : son halo = sa portée de détection ; losange plein = flotte qu'il voit ; losange en pointillés = flotte qu'il ne voit pas (dessinée pour comprendre) ; anneau en pointillés autour d'une planète = son vrai propriétaire, que le joueur ignore (hors de portée) ; tableau = l'état réel de chaque joueur ; anneau vert ✔ / rouge ✖ = la vérification du test ; chiffre blanc = nombre de vaisseaux d'une flotte adverse vue ; cadre rouge au-dessus de la carte = le bandeau d'alerte du joueur, tel que le jeu l'affiche.</p>
 ${list.map(section).join('\n')}
 <script>
 document.documentElement.classList.add('js');
