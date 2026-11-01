@@ -5,7 +5,7 @@ import { scanQr } from './scanner.js';
 import {
   RACES, RACE_KEYS, RES_INFO, resIcon, raceIcon, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
   powerReadyAt, powerCost, liftGain, fmt, UNIVERSE, SOIL, sameCell, sunFor, climateName, kindLabel, usedPlaces, TEMPO, frostLine, planForecast, PLAN_MAX,
-  shipsAffordable, planetAlerts,
+  shipsAffordable, planetAlerts, FROST,
 } from './game.js';
 import { drawSun } from './sky.js';
 import { readTap, underFinger, contenders, menuPlace } from './aim.js';
@@ -220,7 +220,7 @@ $('games').addEventListener('click', (e) => {
   showAbsence(Date.now() - saved.savedAt);
 });
 
-window.addEventListener('pagehide', () => session?.save?.());
+window.addEventListener('pagehide', () => session?.save?.()); // en lecture seule (D-139), `save` ne fait rien
 
 $('btn-create').onclick = async () => {
   const name = playerName();
@@ -2870,8 +2870,9 @@ function renderPick(me = session?.state?.players[session.me], now = session?.now
   // Départ (D-120) : la planète mère se fonde avec le colonisateur, envoyé d'ici.
   $('btn-claim').hidden = !colonizer || !!o || (w.kind && w.kind !== 'planet') || session.locked(colonizer.id) || session.frostOf(w) <= now;
   setHtml($('btn-claim'), `${ic('fleet')}Y envoyer mon colonisateur · ${esc(w.name)}`);
-  $('btn-open-planet').hidden = o?.id !== session.me || !w.pl;
-  $('btn-open-planet').dataset.key = w.pl?.key || 'home';
+  const mine = session.myPlanetAt(w); // « Voir la planète » : seulement sur une de mes planètes (D-139)
+  $('btn-open-planet').hidden = !mine;
+  $('btn-open-planet').dataset.key = mine?.key || 'home';
   renderPickYard(me, o?.id === session.me && w.pl ? w.pl : null, s, now);
 }
 
@@ -2973,11 +2974,56 @@ async function boot() {
   show('home');
 }
 
-showSaved();
-boot();
-// Lien d'invitation ouvert alors que l'appli est déjà affichée dans cet onglet.
-window.addEventListener('hashchange', () => location.hash.length > 1 && !session && boot());
+// ---------------------------------------------------------------------------
+// Lecture seule (D-139) : index.html?view montre une partie enregistrée par un scénario de test,
+// image par image, avec le vrai écran du jeu. La page qui l'embarque (le rapport du test, même
+// origine) envoie chaque image par postMessage : { astraView: { state, me, t, intel, selected, view } }.
+// Pas de réseau, pas de sauvegarde, horloge arrêtée à l'heure de l'image, rien n'est écrit.
+// ---------------------------------------------------------------------------
 
-if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+const VIEW = new URLSearchParams(location.search).has('view');
+
+function showSnapshot(snap) {
+  stopGame();
+  // Les règles du froid du test (coupé : delayMs null), pour voir la même partie que lui.
+  if (snap.frost) Object.assign(FROST, snap.frost, { delayMs: snap.frost.delayMs ?? Infinity });
+  const s = new Session(snap.state.players[snap.me]?.name || 'Commandant');
+  Object.assign(s, { me: snap.me, state: snap.state, status: 'playing', intel: snap.intel || {} });
+  s.now = () => snap.t;
+  s.save = s.scheduleSave = s.start = s.tick = () => {};
+  // Les autres joueurs comptent comme connectés : pas de « Seul en ligne » qui n'existe pas dans le test.
+  for (const pid of Object.keys(snap.state.players)) if (pid !== snap.me) s.links.set(pid, {});
+  session = s;
+  show('game');
+  buildStatic();
+  selected = null;
+  selFleet = null;
+  showView(snap.view || 'map', snap.key || 'home');
+  selected = snap.selected || null;
+  clearInterval(liveTimer);
+  liveTimer = setInterval(renderLive, 200);
+  renderState();
+}
+
+if (VIEW) {
+  document.documentElement.classList.add('view-only');
+  addEventListener('message', (e) => {
+    if (e.origin !== location.origin || !e.data?.astraView) return;
+    try {
+      showSnapshot(e.data.astraView);
+    } catch (err) {
+      console.error(err);
+      document.body.dataset.viewError = err.message;
+    }
+  });
+  parent.postMessage({ astraViewReady: true }, location.origin);
+} else {
+  showSaved();
+  boot();
+  // Lien d'invitation ouvert alors que l'appli est déjà affichée dans cet onglet.
+  window.addEventListener('hashchange', () => location.hash.length > 1 && !session && boot());
+
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
 }

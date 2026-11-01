@@ -353,6 +353,11 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 20:38 | `0cb6f324` | « ni "1/1 · t = 0 s" » (envoyé pendant le travail) | Le compteur disparaît aussi pour une seule image ; 192/192 | (cette PR) | D-136 |
 | 20:42 | `0cb6f324` | « retirer la paralaxe pour tout le monde » | Proposé en session à part ; Vincent a répondu par une autre demande, donc fait ici. Fond toujours immobile (une image), choix « animé » retiré du réglage « Fond », `anime` gardé → `fixe` ; code de la parallaxe et de l'accéléromètre retiré ; test D-137 (remplace ceux de D-067/D-068) ; 190/190 ; vérifié dans le navigateur ; cache v72 | (cette PR) | D-137 |
 | 20:42 | `0cb6f324` | « ce boutton doit etre rename: "voir la planete" » (bouton `#btn-open-planet` montré dans l'app) | « Voir la planète », icône planète ; vérifié dans le navigateur | (cette PR) | D-138 |
+| 20:53 | `0cb6f324` | « fait un test qui montre le boutton "voir la planete" si la planette nous appartiens » | `Session.myPlanetAt`, lue par `renderPick` et par le test | (cette PR) | D-139 |
+| 20:53 | `0cb6f324` | « avec une simulation » (envoyé pendant le travail) | `tests/planet-button.test.mjs` : scénario filmé (ma planète, celle de B, une libre, colonisation puis ma colonie) ; attente `{ sheet, button }` | (cette PR) | D-139 |
+| 20:53 | `0cb6f324` | « non il faut que les simulation reprennent exactement ce que voit l'utilisateur » | Imitation de la fiche abandonnée ; deux options proposées (vrai jeu dans le rapport, ou captures) | — | D-140 |
+| 20:53 | `0cb6f324` | [Bouton] « Vrai jeu dans le rapport » | `index.html?view` (lecture seule, `showSnapshot`) ; `film.look` enregistre l'état ; le rapport embarque le vrai jeu ; carte SVG gardée en « carte de contrôle » ; serveur de test qui sert le jeu ; 19 rapports rejoués sans erreur (382 images) ; 191/191 | (cette PR) | D-140 |
+| 20:53 | `0cb6f324` | « apres absolument tous les tests doivent etre des simulations » (envoyé pendant le travail) | Noté ; à faire après ce commit | — | — |
 
 ### Travaux en cours au 2026-10-29
 

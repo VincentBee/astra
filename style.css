@@ -715,6 +715,8 @@ body {
 }
 .galaxy { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
 .galaxy > div { position: absolute; inset: 0; } /* une seule image immobile (D-137) */
+/* Lecture seule (index.html?view, D-139) : l'écran d'un scénario de test, rien ne se touche. */
+html.view-only .screen { pointer-events: none; }
 .topbar { background: transparent; }
 
 /* ----- Choix de la race : trois icônes, une seule fiche ----- */

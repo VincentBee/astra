@@ -1494,6 +1494,15 @@ export class Session {
     return eyes.some((e) => Math.hypot(pos.x - e.x, pos.y - e.y) <= e.r + 1e-9);
   }
 
+  /**
+   * Ma planète (mère ou colonie) sur la case `cell`, ou null : la fiche de la
+   * carte n'y montre « Voir la planète » que dans ce cas (D-138, D-139).
+   * { key, planet, cell, name }
+   */
+  myPlanetAt(cell) {
+    return this.planetsOf(this.state.players[this.me]).find((pl) => sameCell(pl.cell, cell)) || null;
+  }
+
   /** Une case est-elle dans ma portée de détection ? */
   seesCell(cell, now, eyes = this.eyes(now)) {
     return eyes.some((e) => Math.hypot(cell.x - e.x, cell.y - e.y) <= e.r + 1e-9);

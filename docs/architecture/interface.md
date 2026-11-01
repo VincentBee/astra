@@ -496,3 +496,15 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   rebours qui descend, puis « en orbite », « +1 autre », chiffres 12 et 7 sur la carte. Pas
   vérifié à deux vrais téléphones.
 
+## 17. Lecture seule pour les rapports de test (2026-11-01, D-140)
+
+- `index.html?view` : `app.js` ne montre ni l'accueil ni l'historique, n'enregistre pas le
+  service worker, ajoute `html.view-only` (`pointer-events: none` sur les écrans) et prévient la
+  page parente (`{ astraViewReady: true }`).
+- Message `{ astraView: { state, me, t, intel, selected, frost } }` (même origine seulement) →
+  `showSnapshot` : nouvelle `Session` sur cet état, `now()` figé à `t`, `save`, `scheduleSave`,
+  `start`, `tick` neutralisés, les autres joueurs dans `links` (connectés), réglages du froid
+  appliqués, puis le même rendu qu'en jeu (`buildStatic`, `showView`, `renderState`, `renderLive`
+  toutes les 200 ms) ; `selected` ouvre la fiche de la planète touchée. Une erreur est notée dans
+  `body.dataset.viewError`.
+- Bouton « Voir la planète » : `renderPick` lit `session.myPlanetAt(w)` (D-139).

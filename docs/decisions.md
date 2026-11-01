@@ -1375,7 +1375,7 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Limite : la carte montre ce que dit la règle (`sees`), pas le dessin du vrai `canvas`.
 - Qui : Vincent (le besoin, pas d'ASCII ni de capture, pas de Given / When / Then), Claude (la
   forme). Source : session `09eb6bdd`.
-- Statut : en vigueur. `tests/vision.test.mjs` réécrit en 6 scénarios. Contrôlé par mutation
+- Statut : en vigueur, modifiée par D-140 (le rapport montre le vrai jeu ; la carte SVG devient la « carte de contrôle »). `tests/vision.test.mjs` réécrit en 6 scénarios. Contrôlé par mutation
   (`sees` qui dit toujours oui → 4 scénarios en échec, rapport écrit, image fautive en rouge).
 
 **D-130 — Interface de test locale (`tests/ui/`), notre mini framework de test**
@@ -1506,7 +1506,7 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   l'icône et la mise en forme.
 - Alternatives écartées : capture d'écran du vrai jeu dans le test (lente, D-128) ; recopier le
   texte dans le test (il pourrait diverger du jeu).
-- Qui : Vincent (demande), Claude (méthode). Source : session `0cb6f324`. Statut : en vigueur.
+- Qui : Vincent (demande), Claude (méthode). Source : session `0cb6f324`. Statut : en vigueur, modifiée par D-140 (le bandeau se voit dans le vrai jeu, plus au-dessus d'une carte dessinée).
 - Tests : `tests/threat.test.mjs`.
 
 **D-136 — Rapport de scénario : une seule image, pas de commandes ni de compteur**
@@ -1540,3 +1540,41 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   l'écran de la planète (bâtiments, recherche, flottes).
 - Choix de Claude, par défaut : l'icône planète, qui va avec le nouveau texte.
 - Qui : Vincent (texte), Claude (icône). Source : session `0cb6f324`. Statut : en vigueur.
+
+**D-139 — « Voir la planète » seulement sur mes planètes, et sa simulation**
+- 2026-11-01 20:53. Contexte : « fait un test qui montre le boutton "voir la planete" si la planette
+  nous appartiens », puis « avec une simulation ».
+- Choix : la règle sort de `renderPick` dans `Session.myPlanetAt(cell)` (ma planète mère ou une
+  de mes colonies sur la case, sinon null), lue par le jeu et par le test. `tests/planet-button.test.mjs` :
+  un scénario filmé — A touche sa planète (bouton), celle de B et une planète libre (pas de
+  bouton), y envoie un colonisateur (film seconde par seconde, 43 s), touche sa nouvelle colonie
+  (bouton, qui ouvre cette colonie). Attente `{ sheet: case, button }` dans `film.look`. Cache v73.
+- Qui : Vincent (demande), Claude (méthode). Source : session `0cb6f324`. Statut : en vigueur.
+- Tests : `tests/planet-button.test.mjs`.
+
+**D-140 — Les rapports de scénario montrent le vrai jeu, image par image**
+- 2026-11-01 20:53. Contexte : Claude avait dessiné dans le rapport une imitation de la fiche de
+  planète ; Vincent : « non il faut que les simulation reprennent exactement ce que voit
+  l'utilisateur ». Deux options proposées (A : le vrai jeu dans le rapport ; B : captures d'écran
+  d'un vrai navigateur) ; Vincent choisit A, « Vrai jeu dans le rapport ».
+- Choix : `film.look` enregistre à chaque image l'état de la partie du joueur (`state`, `me`,
+  heure, renseignements du brouillard, planète touchée, réglages du froid du test). Le rapport
+  embarque le vrai jeu, `index.html?view`, dans un cadre de téléphone (390 × 780) et lui envoie
+  l'image choisie par `postMessage`. En lecture seule (`showSnapshot`, `js/app.js`) : nouvelle
+  `Session` sur cet état, horloge arrêtée à l'heure de l'image, pas de réseau, pas de sauvegarde,
+  pas de service worker, rien ne se touche ; les autres joueurs comptent comme connectés. Le vrai
+  écran montre donc le vrai bandeau d'alerte, la vraie fiche, le vrai bouton. La carte SVG du
+  test reste, repliée, comme « carte de contrôle » (vérité : flottes cachées, vrais propriétaires).
+  Les imitations (bandeau et fiche dessinés par le rapport) sont retirées. `tests/ui/server.mjs`
+  sert aussi les fichiers du jeu (liste fermée). Ouvert en `file://`, le rapport ne peut pas
+  charger le jeu (modules JS) : il le dit et déplie la carte de contrôle.
+- Choix de Claude, par défaut : un seul cadre de jeu par scénario (pas un par image) ; les autres
+  joueurs « connectés » (sinon le bandeau « Seul en ligne », qui n'existe pas dans un test) ; le
+  froid du test transmis (sinon le vrai jeu afficherait un froid que le test a coupé).
+- Alternatives écartées : captures d'écran (lentes, D-128) ; garder la carte dessinée seule (pas
+  ce que voit le joueur).
+- Vérifié : tous les rapports générés (`ASTRA_REPORT=1`, 19 fichiers) rejoués dans le vrai jeu,
+  382 images essayées, aucune erreur. Tests : 191/191 en ~6,6 s (avant : ~6,4 s). Rapports de
+  5,6 Mo en tout (le plus gros 1,2 Mo), écrits seulement en cas d'échec ou avec `ASTRA_REPORT=1`.
+- Modifie D-129 et D-135. Qui : Vincent (choix A), Claude (méthode). Source : session `0cb6f324`.
+  Statut : en vigueur.

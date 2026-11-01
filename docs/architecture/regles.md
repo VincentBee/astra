@@ -870,11 +870,16 @@ tableau donne l'état réel de chaque joueur (stock à l'heure de l'image, vaiss
 flottes). Si un scénario échoue, une image « au moment de l'échec » est ajoutée. Un test de pure
 fonction reste un `test(…)`.
 
-Bandeau d'alerte (D-135) : `film.look` note aussi le bandeau d'alerte de flotte ennemie du
-joueur, écrit par `threatText` (`js/session.js`, la même fonction que le jeu), et l'affiche
-au-dessus de la carte de chaque image ; la carte écrit l'effectif des flottes adverses vues. Une
-attente `{ alert: /texte/ }` vérifie le bandeau, `{ alert: null }` son absence. Exemple :
-`tests/threat.test.mjs` (une conquête filmée, du « en vue » au compte à rebours puis « en orbite »).
+Le vrai jeu dans le rapport (D-140) : à chaque image, `film.look` enregistre l'état de la partie
+du joueur ; le rapport embarque `index.html?view` (lecture seule, `showSnapshot` dans
+`js/app.js`) et lui envoie l'image choisie : on voit exactement l'écran du joueur (bandeau
+d'alerte, fiche de planète, bouton…). Il faut l'ouvrir en http (`node tests/ui/server.mjs`, ou un
+serveur à la racine du dépôt) ; en `file://`, seule la carte de contrôle (le SVG du test, repliée
+sinon) est montrée. Attentes de `film.look` : `{ fleet: [propriétaire, id], visible }`,
+`{ alert: /texte/ }` ou `{ alert: null }` (bandeau d'alerte, texte de `threatText`, D-135),
+`{ sheet: case, button }` (le joueur touche cette planète : « Voir la planète » visible ou non,
+`Session.myPlanetAt`, D-139 ; la fiche s'ouvre dans le vrai jeu). Exemples :
+`tests/threat.test.mjs`, `tests/planet-button.test.mjs`.
 
 Un scénario d'une seule image n'a ni commandes (⏮ ▶ ⏭ et curseur) ni compteur « 1/1 · t = 0 s »
 (D-136) : seulement l'image et sa légende.
