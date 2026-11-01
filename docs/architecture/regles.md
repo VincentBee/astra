@@ -865,6 +865,11 @@ d'erreur donne son chemin. Entre deux `look`, `film.roll(joueur, horloge, jusqu'
 chaqueSeconde)` fait passer le temps seconde par seconde (sans attendre) et ajoute une image par
 seconde, sans vérification (D-131). Exemple : `tests/vision.test.mjs` (la flotte en route).
 
+Tous les tests qui jouent une partie sont des scénarios (D-132) : 114 sur 189. Sous la carte, un
+tableau donne l'état réel de chaque joueur (stock à l'heure de l'image, vaisseaux à quai,
+flottes). Si un scénario échoue, une image « au moment de l'échec » est ajoutée. Un test de pure
+fonction reste un `test(…)`.
+
 ```bash
 ASTRA_REPORT=1 node --test tests/vision.test.mjs
 ```

@@ -11,6 +11,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { basename, dirname, join } from 'node:path';
 import { game, fleet } from './harness.mjs';
 
+const { SHIPS } = await import('../js/tech.js');
+
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const cell = (p) => `[${+p.x.toFixed(1)}:${+p.y.toFixed(1)}]`;
 
@@ -32,35 +34,81 @@ export function scenarios(url) {
   });
 
   return (name, fn) =>
-    test(name, () => {
+    test(name, async () => {
       const s = { name, frames: [], ok: true, error: null };
       done.push(s);
+      const f = film(s, out);
       try {
-        fn(film(s, out));
+        await fn(f); // un scénario peut être async : on attend sa fin (et son échec)
       } catch (e) {
         s.ok = false;
         s.error ||= e.message;
+        f.failed();
         throw e;
       }
     });
 }
 
-/** Lettre de chaque joueur (A, B…), dans l'ordre d'arrivée. */
+// Couleurs de secours, par lettre : dans les tests, chaque Session choisit sa couleur seule, et deux joueurs ont souvent la même.
+const PALETTE = ['#7aa2ff', '#ff9f43', '#4ade80', '#e879f9', '#facc15', '#22d3ee', '#f87171', '#a3a3a3'];
+
+/** Couleur de chaque joueur : la sienne, sauf si un autre a la même (alors une par lettre). */
+function colors(state, L) {
+  const ps = Object.values(state.players);
+  const same = new Set(ps.map((p) => p.color)).size < ps.length;
+  return Object.fromEntries(ps.map((p) => [p.id, same ? PALETTE[(L[p.id].charCodeAt(0) - 65) % PALETTE.length] : p.color]));
+}
+
+/** Joueurs dans l'ordre d'arrivée, puis par identifiant, comme le jeu : le même ordre pour tous. */
+const byRank = (a, b) => a.rank - b.rank || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+/** Lettre de chaque joueur (A, B…) : la même quel que soit le joueur qui regarde. */
 function letters(state) {
-  const ps = Object.values(state.players).sort((a, b) => a.rank - b.rank);
+  const ps = Object.values(state.players).sort(byRank);
   return Object.fromEntries(ps.map((p, i) => [p.id, String.fromCharCode(65 + i)]));
 }
 
 /** Au plus tant d'images par `roll` : au-delà, le pas s'allonge (un long trajet reste léger). */
 const MAX_ROLL = 240;
 
+/** « 2 Chasseurs, 1 Cargo » (noms de la race). */
+function shipsText(race, ships) {
+  const parts = Object.entries(ships || {})
+    .filter(([, n]) => n > 0)
+    .map(([k, n]) => `${n} ${SHIPS[race]?.[k]?.name || k}`);
+  return parts.join(', ') || 'aucun vaisseau';
+}
+
+/** Stock à l'heure de l'image (production comprise), sans rien écrire dans la planète. */
+function stockAt(planet, now) {
+  try {
+    return game.stateAt(planet, now)?.stock || planet.stock;
+  } catch {
+    return planet.stock; // planète abîmée exprès (tests anti-triche) : le stock enregistré
+  }
+}
+
+const RES = [['minerals', '⛏'], ['energy', '⚡'], ['food', '🌾']];
+const resText = (stock) => RES.filter(([k]) => Number.isFinite(stock?.[k])).map(([k, icon]) => `${icon} ${Math.floor(stock[k])}`).join(' ');
+
+/**
+ * Propriétaire d'une planète tel que `viewer` le connaît (brouillard, D-124) : le vrai dans sa
+ * portée, sinon son souvenir. Comme `knownOwner`, mais sans écrire dans ses renseignements.
+ */
+function known(viewer, cell, owner, now, eyes) {
+  if (owner === viewer.me || viewer.over || viewer.seesCell(cell, now, eyes)) return owner;
+  return viewer.intel?.[`${cell.x},${cell.y}`]?.pid || null;
+}
+
 function film(s, out) {
+  let last = null; // le dernier joueur regardé : l'image « au moment de l'échec » se prend de son point de vue
   const api = {
     /**
      * Ce que voit `viewer` en ce moment, et ce qu'il devrait voir :
      * expect = [{ fleet: [session du propriétaire, id], visible }]. `eyes` remplace sa vue.
      */
     look(viewer, label, expect = [], { eyes } = {}) {
+      last = viewer;
       const now = viewer.now();
       const st = viewer.state;
       eyes ||= viewer.eyes(now);
@@ -69,7 +117,7 @@ function film(s, out) {
       for (const p of Object.values(st.players)) {
         (p.fleets || []).forEach((f, i) => {
           const pos = fleet.fleetPos(f, now);
-          fleets.push({ pid: p.id, id: f.id, n: i + 1, x: pos.x, y: pos.y, to: f.to, moving: fleet.moving(f, now), seen: viewer.sees(p, f, now, eyes) });
+          fleets.push({ pid: p.id, id: f.id, n: i + 1, x: pos.x, y: pos.y, to: f.to, moving: fleet.moving(f, now), seen: viewer.sees(p, f, now, eyes), ships: shipsText(p.race, f.ships), cargo: resText(f.cargo), order: f.order?.kind || null });
         });
       }
       const checks = expect.map(({ fleet: [owner, id], visible }) => {
@@ -82,16 +130,30 @@ function film(s, out) {
         label,
         viewer: viewer.me,
         L,
-        colors: Object.fromEntries(Object.values(st.players).map((p) => [p.id, p.color])),
+        colors: colors(st, L),
         sun: game.sunFor(st.gid),
-        planets: viewer.planets.map((w) => ({ name: w.name, x: w.x, y: w.y, small: !!w.kind && w.kind !== 'planet', owner: viewer.ownerAt(w)?.id || null, home: Object.values(st.players).find((p) => game.sameCell(p.home, w))?.id || null })),
+        planets: viewer.planets.map((w) => {
+          const owner = viewer.ownerAt(w)?.id || null;
+          return { name: w.name, x: w.x, y: w.y, small: !!w.kind && w.kind !== 'planet', owner, known: known(viewer, w, owner, now, eyes), home: Object.values(st.players).find((p) => game.sameCell(p.home, w))?.id || null };
+        }),
         eyes,
         fleets,
         checks,
+        // L'état réel de chaque joueur (pas seulement ce que voit `viewer`) : pour comprendre.
+        players: Object.values(st.players)
+          .sort(byRank)
+          .map((p) => ({
+            id: p.id,
+            race: p.race,
+            out: Number.isFinite(p.out),
+            planets: viewer.planetsOf(p).map((x) => ({ name: x.name, res: resText(stockAt(x.planet, now)), ships: shipsText(p.race, x.planet.ships) })),
+            fleets: (p.fleets || []).length,
+          })),
       };
       s.frames.push(frame);
       const bad = checks.filter((c) => !c.ok);
       if (bad.length) {
+        frame.ko = true;
         s.ok = false;
         s.error = bad.map((c) => `${L[viewer.me]} ${c.got ? 'voit' : 'ne voit pas'} ${c.what} (attendu : ${c.expected ? 'vue' : 'cachée'})`).join(' ; ');
         assert.fail(`${s.error}\n  Image : « ${label} »\n  Rapport : ${pathToFileURL(out)}`);
@@ -113,6 +175,18 @@ function film(s, out) {
       }
       clock.t = until;
       each();
+    },
+
+    /** Le test a échoué : une dernière image, telle qu'au moment de l'échec (sauf si la dernière le montre déjà). */
+    failed() {
+      const prev = s.frames.at(-1);
+      if (!last || prev?.ko) return;
+      try {
+        api.look(last, 'au moment de l’échec');
+        s.frames.at(-1).ko = true;
+      } catch {
+        // l'état est trop abîmé pour être dessiné : on garde les images d'avant
+      }
     },
   };
   return api;
@@ -142,26 +216,33 @@ function svg(f) {
   parts.push(`<g fill="none" stroke="${col}" stroke-width="0.05" opacity="0.5">${f.eyes.map((e) => `<circle cx="${c(e.x)}" cy="${c(e.y)}" r="${e.r}"><title>Vision de ${f.L[me]} : ${e.r} cases autour de ${cell(e)}</title></circle>`).join('')}</g>`);
 
   for (const w of f.planets) {
-    const o = w.owner;
+    // Dessinée comme le joueur la connaît ; si la vérité diffère (brouillard), un anneau en pointillés à la couleur du vrai propriétaire.
+    const real = w.owner;
+    const o = w.known === undefined ? real : w.known;
+    const who = (id) => (id ? `planète de ${f.L[id]}` : 'libre');
     const rad = w.small ? 0.12 : o ? 0.26 : 0.18;
-    parts.push(`<circle cx="${c(w.x)}" cy="${c(w.y)}" r="${rad}" fill="${o ? f.colors[o] : '#8d95b3'}" opacity="${o ? 1 : 0.5}"><title>${esc(w.name)} ${cell(w)}${o ? ` : planète de ${f.L[o]}` : ' : libre'}</title></circle>`);
-    if (w.home) parts.push(`<ellipse cx="${c(w.x)}" cy="${c(w.y)}" rx="0.42" ry="0.14" transform="rotate(-20 ${c(w.x)} ${c(w.y)})" fill="none" stroke="${f.colors[w.home]}" stroke-width="0.06"/>`);
-    if (o) parts.push(`<text x="${c(w.x)}" y="${c(w.y) + 0.8}" font-size="0.42" fill="#e8ebf7" text-anchor="middle">${esc(w.name)}</text>`);
+    const fog = o !== real ? ` ; en vrai : ${who(real)} (${f.L[me]} ne le sait pas, hors de portée)` : '';
+    parts.push(`<circle cx="${c(w.x)}" cy="${c(w.y)}" r="${rad}" fill="${o ? f.colors[o] : '#8d95b3'}" opacity="${o ? 1 : 0.5}"><title>${esc(w.name)} ${cell(w)} : ${who(o)} pour ${f.L[me]}${fog}</title></circle>`);
+    if (o !== real && real) parts.push(`<circle cx="${c(w.x)}" cy="${c(w.y)}" r="0.34" fill="none" stroke="${f.colors[real]}" stroke-width="0.06" stroke-dasharray="0.08 0.06" opacity="0.8"/>`);
+    if (w.home && (w.home === o || w.home === me)) parts.push(`<ellipse cx="${c(w.x)}" cy="${c(w.y)}" rx="0.42" ry="0.14" transform="rotate(-20 ${c(w.x)} ${c(w.y)})" fill="none" stroke="${f.colors[w.home]}" stroke-width="0.06"/>`);
+    if (o || real) parts.push(`<text x="${c(w.x)}" y="${c(w.y) + 0.8}" font-size="0.42" fill="#e8ebf7" text-anchor="middle" opacity="${o ? 1 : 0.6}">${esc(w.name)}</text>`);
   }
 
   for (const x of f.fleets) {
-    const cx = c(x.x);
-    const cy = c(x.y);
+    // À l'arrêt, souvent sur une planète : décalée en haut à droite pour ne pas être cachée (comme le replay).
+    const cx = c(x.x) + (x.moving ? 0 : 0.3);
+    const cy = c(x.y) - (x.moving ? 0 : 0.3);
     const color = f.colors[x.pid];
     if (x.moving) parts.push(`<line x1="${cx}" y1="${cy}" x2="${c(x.to.x)}" y2="${c(x.to.y)}" stroke="${color}" stroke-width="0.05" stroke-dasharray="0.15 0.12" opacity="0.5"/>`);
     const d = `M${cx} ${cy - 0.24}L${cx + 0.2} ${cy}L${cx} ${cy + 0.24}L${cx - 0.2} ${cy}Z`;
     const mine = x.pid === me;
     const state = mine ? `à ${f.L[me]}` : x.seen ? `vue par ${f.L[me]}` : `cachée pour ${f.L[me]} (dessinée ici pour comprendre)`;
+    const title = `Flotte ${x.n} de ${f.L[x.pid]} en ${cell(x)} : ${state} ; ${x.ships}${x.cargo ? ` ; soute ${x.cargo}` : ''}${x.moving ? ` ; en route vers ${cell(x.to)}` : ''}${x.order ? ` ; ordre ${x.order}` : ''}`;
     // Une flotte que le joueur ne voit pas : en pointillés, comme un fantôme.
     parts.push(
       x.seen
-        ? `<path d="${d}" fill="${color}" stroke="#05070f" stroke-width="0.05"><title>Flotte ${x.n} de ${f.L[x.pid]} en ${cell(x)} : ${state}</title></path>`
-        : `<path d="${d}" fill="none" stroke="${color}" stroke-width="0.06" stroke-dasharray="0.08 0.06" opacity="0.8"><title>Flotte ${x.n} de ${f.L[x.pid]} en ${cell(x)} : ${state}</title></path>`,
+        ? `<path d="${d}" fill="${color}" stroke="#05070f" stroke-width="0.05"><title>${esc(title)}</title></path>`
+        : `<path d="${d}" fill="none" stroke="${color}" stroke-width="0.06" stroke-dasharray="0.08 0.06" opacity="0.8"><title>${esc(title)}</title></path>`,
     );
     const chk = f.checks.find((k) => k.pid === x.pid && k.id === x.id);
     if (chk) {
@@ -179,7 +260,11 @@ function section(s, i) {
   const frames = s.frames
     .map((f, k) => {
       const checks = f.checks.map((c) => `<li class="${c.ok ? 'ok' : 'ko'}">${c.ok ? '✔' : '✖'} ${esc(c.what)} : attendu ${c.expected ? 'vue' : 'cachée'}, obtenu ${c.got === null ? 'absente' : c.got ? 'vue' : 'cachée'}</li>`).join('');
-      return `<figure data-frame="${k}"${f.checks.some((c) => !c.ok) ? ' class="ko"' : ''}>${svg(f)}<figcaption><b>${k + 1}/${s.frames.length} · t = ${Math.round((f.t - t0) / 1000)} s</b> · ${esc(f.label)} (vu par ${f.L[f.viewer]})${checks ? `<ul>${checks}</ul>` : ''}</figcaption></figure>`;
+      const rows = (f.players || [])
+        .map((p) => `<tr><td><span class="dot" style="background:${f.colors[p.id]}"></span>${f.L[p.id]}${p.out ? ' (éliminé)' : ''}</td><td>${p.planets.map((x) => `${esc(x.name)} ${x.res} · ${esc(x.ships)}`).join('<br>') || '—'}</td><td>${p.fleets}</td></tr>`)
+        .join('');
+      const table = rows ? `<table class="pl"><tr><th>Joueur</th><th>Planètes : stock · à quai</th><th>Flottes</th></tr>${rows}</table>` : '';
+      return `<figure data-frame="${k}"${f.ko ? ' class="ko"' : ''}>${svg(f)}<figcaption><b>${k + 1}/${s.frames.length} · t = ${Math.round((f.t - t0) / 1000)} s</b> · ${f.ko && !f.checks.length ? '<span class="ko">✖ </span>' : ''}${esc(f.label)} (vu par ${f.L[f.viewer]})${checks ? `<ul>${checks}</ul>` : ''}${table}</figcaption></figure>`;
     })
     .join('');
   return `<section class="scn ${s.ok ? 'ok' : 'ko'}" id="s${i}" data-name="${esc(s.name)}">
@@ -201,7 +286,9 @@ h1{font-size:20px;margin:0 0 4px}.sum{color:#aab2cf;margin:0 0 16px}code{font:13
 h2{font-size:16px;margin:0 0 8px}.scn.ok h2{color:#4ade80}.scn.ko h2{color:#ff5a5a}
 .ko{color:#ff8a8a}p.ko{margin:0 0 10px}
 figure{margin:0}svg{display:block;width:100%;max-width:420px;aspect-ratio:1;border-radius:8px}figcaption{color:#aab2cf;font-size:13px;margin:6px 0}
-figcaption ul{margin:4px 0 0;padding-left:18px}li.ok{color:#4ade80}li.ko{color:#ff8a8a}
+figcaption ul{margin:4px 0 0;padding-left:18px}
+table.pl{border-collapse:collapse;margin-top:6px;font-size:12px;width:100%;max-width:420px}table.pl th,table.pl td{text-align:left;padding:2px 6px 2px 0;vertical-align:top;border-top:1px solid #1f2742}table.pl th{color:#7d86a8;font-weight:600}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}li.ok{color:#4ade80}li.ko{color:#ff8a8a}
 .film figure+figure{margin-top:12px}
 .js .frames{display:grid}.js .frames figure{grid-area:1/1;margin:0;visibility:hidden}.js .frames figure.on{visibility:visible}
 .ctl{display:none;gap:8px;align-items:center}.js .ctl{display:flex}.ctl button{background:#1b2340;color:#e8ebf7;border:0;border-radius:8px;padding:6px 12px;font-size:15px}.ctl input{flex:1}
@@ -209,7 +296,7 @@ figcaption ul{margin:4px 0 0;padding-left:18px}li.ok{color:#4ade80}li.ko{color:#
 </style></head><body>
 <h1>${esc(file)}</h1>
 <p class="sum">${list.length} scénario${list.length > 1 ? 's' : ''}, ${ko ? `<b class="ko">${ko} en échec</b>` : 'tous réussis'} · ${esc(new Date().toISOString().slice(0, 16).replace('T', ' '))} UTC · relancer : <code>ASTRA_REPORT=1 node --test tests/${esc(file)}</code></p>
-<p class="legend">Carte vue par le joueur qui regarde : son halo = sa portée de détection ; losange plein = flotte qu'il voit ; losange en pointillés = flotte qu'il ne voit pas (dessinée pour comprendre) ; anneau vert ✔ / rouge ✖ = la vérification du test.</p>
+<p class="legend">Carte vue par le joueur qui regarde : son halo = sa portée de détection ; losange plein = flotte qu'il voit ; losange en pointillés = flotte qu'il ne voit pas (dessinée pour comprendre) ; anneau en pointillés autour d'une planète = son vrai propriétaire, que le joueur ignore (hors de portée) ; tableau = l'état réel de chaque joueur ; anneau vert ✔ / rouge ✖ = la vérification du test.</p>
 ${list.map(section).join('\n')}
 <script>
 document.documentElement.classList.add('js');

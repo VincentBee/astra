@@ -1431,3 +1431,32 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Qui : Vincent (le film, pas de saut de hauteur), Claude (la forme). Source : session `09eb6bdd`.
 - Statut : en vigueur. Vérifié dans le navigateur intégré : hauteur du film identique sur les
   33 images (456 px), cadre gardé à 690 px pendant un nouveau lancement.
+
+**D-132 — Tous les tests qui jouent une partie deviennent des scénarios filmés**
+- 2026-11-01 14:16 (UTC). Demande de Vincent : « transforme un maximum de test existant avec des
+  simulation ».
+- Choix : tout test qui joue une partie (`newGame`, `newLobby`, des `Session`) passe en
+  `scenario(…)` avec des `film.look` aux moments utiles ; un test de pure fonction (calcul sur
+  une planète seule, géométrie, texte, sauvegarde seule) reste en `test(…)` : on n'invente pas
+  de partie pour lui. Résultat : 114 scénarios sur 189 tests (17 fichiers), environ 480 images.
+  Les `assert` sont identiques à ceux d'avant dans chaque fichier (comparés ligne à ligne) ;
+  seules changent les lignes `test(` → `scenario(`, les imports, et des aides (`run`, `play`,
+  `raid`, `assault`) qui prennent un paramètre facultatif pour filmer, sans changer les passages
+  ni l'horloge. Deux sauts d'horloge (`clock.t = arrivée`) sont devenus `film.roll` sans
+  passage, qui finit à la même heure.
+- Outil (`tests/scenario.mjs`), complété en même temps : sous la carte, un tableau de l'état réel
+  de chaque joueur (stock à l'heure de l'image, calculé avec `stateAt` sans rien écrire ;
+  vaisseaux à quai ; nombre de flottes) ; une image « au moment de l'échec » ajoutée toute
+  seule ; les scénarios `async` sont attendus ; lettres A, B… départagées par identifiant
+  (avant, deux joueurs de même rang changeaient de lettre selon qui regardait) ; brouillard des
+  planètes montré sans toucher aux renseignements du joueur (anneau en pointillés = vrai
+  propriétaire inconnu) ; couleurs de secours quand deux joueurs ont la même ; flottes à
+  l'arrêt décalées pour ne pas être cachées par leur planète ; contenu des flottes dans leur
+  description (vaisseaux, soute, destination, ordre).
+- Fait par : 5 agents en parallèle, un groupe de fichiers chacun, puis vérifié par Claude
+  (comparaison des `assert`, suite complète, échec provoqué dans un test async).
+- Écarté : filmer les tests de pure fonction (rien à montrer sur une carte) ; remplacer les
+  boucles de temps des tests par `film.roll` (risque de changer les passages).
+- Mesuré : `node --test tests/*.test.mjs` 6,4 s avant et après ; avec `ASTRA_REPORT=1`, 6,5 s.
+- Qui : Vincent (la demande), Claude (le partage). Source : session `09eb6bdd`.
+- Statut : en vigueur. 189/189.
