@@ -1326,3 +1326,137 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - 2026-10-31. Choix de Claude : `index.html`, `style.css`, `js/app.js` changent et
   `js/aim.js` apparaît (ajouté à la liste du cache) (D-126).
 - Statut : en vigueur.
+
+**D-128 — Tester la vision des flottes par un test de logique, pas par le DOM ni par des captures**
+- 2026-10-31 22:22 (UTC). Contexte : Vincent demande comment tester le projet, si Claude peut
+  faire des tests visuels (captures, DOM), puis : « je voudrais tester qu'on ne voit pas les
+  flottes enemies en dehors de notre champs de vision, quel serait le meilleur type de test
+  pour ca ? ». Constat : la règle tient dans `session.sees` (`js/session.js`) ; la carte s'en
+  sert pour sauter les flottes cachées (`fleetSpots`, `js/app.js`) ; aucun test ne vérifiait
+  directement qu'une flotte ennemie trop loin est cachée (D-030 testait la poursuite).
+- Choix : `tests/vision.test.mjs`, dans Node avec le harnais, sur les vraies portées
+  (`sightRange`) et les vrais déplacements (`moveFleet`) : à la portée d'une planète ou d'une
+  flotte, visible ; une case au-delà ou en diagonale, cachée ; les miennes toujours visibles ;
+  une flotte en route qui sort de ma portée puis y revient. Contrôlé par mutation (`sees` qui
+  dit toujours oui → 3 tests sur 4 échouent). Le dessin reste vérifié à l'œil par Claude
+  dans le navigateur intégré, à la demande, sans outil installé.
+- Écarté : lire le DOM (la carte est un `canvas`, les flottes n'y sont pas des éléments) ;
+  captures d'écran automatiques (Playwright ou autre : une dépendance et un `package.json`
+  dans un projet sans build, et des tests fragiles).
+- Qui : Vincent (« Oui, écris le test »), Claude (le type de test, par défaut). Source :
+  session `09eb6bdd`.
+- Rappel : c'est un filtre d'affichage, pas un secret (§8.6 des règles) ; la copie de la partie
+  contient toutes les flottes, ce que le test note aussi.
+- Statut : en vigueur, modifiée par D-129 (les 4 tests deviennent 6 scénarios avec rapport ; 189/189).
+
+**D-129 — Scénarios de test avec un rapport HTML de la carte vue par le joueur**
+- 2026-11-01 13:55 (UTC). Contexte : Vincent veut que le test de vision (D-128) soit
+  « verifiable facilement par un humain » : un mini replay et, si le test échoue, « un rapport
+  html avec un petit embed qui montre le replay et une description du comportement attendu ».
+  Puis : « le screen shot coute chere pour les tests, il faut une solution rapid que les humain
+  et les agents puisse utiliser » ; « l'ascii n'est pas une bonne idée car c'est pas
+  representatif pour l'humain […] travaile sur de l'inline html » ; « a quoi sert le { given,
+  when, then } dans le code ? je pense que seul l'intitulé du test suffi ».
+- Choix : `tests/scenario.mjs`. `scenarios(import.meta.url)` donne `scenario(intitulé, (film) =>
+  …)`, un `test` de node:test. L'intitulé dit le comportement attendu. `film.look(joueur,
+  légende, [{ fleet: [propriétaire, id], visible }], { eyes })` photographie ce que voit le
+  joueur (sa portée, les planètes, toutes les flottes, vues ou non) et vérifie chaque attente.
+  Si un scénario échoue, ou avec `ASTRA_REPORT=1`, `tests/reports/<fichier>.html` est écrit :
+  un fichier HTML autonome, sans dépendance, une section par scénario (intitulé, « Obtenu »,
+  une carte SVG par image, ▶ / ⏮ / ⏭ / curseur), l'image fautive montrée d'abord. Les agents
+  le lisent comme du texte (`<title>` de chaque planète et flotte, légendes, attendu /
+  obtenu) ; un humain l'ouvre dans un navigateur. `#scn=<intitulé>` ne montre qu'un scénario.
+  Tout vert sans `ASTRA_REPORT` : le rapport est effacé. `tests/reports/` est ignoré par git.
+- Écarté : captures d'écran (coûteuses, Vincent) ; carte en ASCII (« pas representatif »,
+  Vincent) ; Given / When / Then en paramètres (essayé, retiré à la demande de Vincent :
+  l'intitulé suffit) ; réutiliser `replay.html` (il montre toutes les flottes, pas la vue
+  d'un joueur, et lit la partie dans la mémoire du navigateur : il aurait fallu changer le jeu).
+- Limite : la carte montre ce que dit la règle (`sees`), pas le dessin du vrai `canvas`.
+- Qui : Vincent (le besoin, pas d'ASCII ni de capture, pas de Given / When / Then), Claude (la
+  forme). Source : session `09eb6bdd`.
+- Statut : en vigueur. `tests/vision.test.mjs` réécrit en 6 scénarios. Contrôlé par mutation
+  (`sees` qui dit toujours oui → 4 scénarios en échec, rapport écrit, image fautive en rouge).
+
+**D-130 — Interface de test locale (`tests/ui/`), notre mini framework de test**
+- 2026-11-01 13:55 (UTC). Demande de Vincent : « faire un petit serveur qui tourne en local
+  pour avoir une interface de test, un peu comme ce que fait vitest avec son mode UI, avec la
+  liste des test, la possibilité d'en lancer un et le rendu de la simulation pour les humain » ;
+  puis « ca sera notre mini framework de test, il faut que les tests restent rapide, je vais
+  en avoir vraiment beaucoup, mais il faut que l'interface soit intuitive ».
+- Choix : `node tests/ui/server.mjs` → http://localhost:5199 (`PORT` pour changer ; écoute
+  sur 127.0.0.1 seulement). Sans dépendance ni build : `node:http`. Les tests tournent comme
+  d'habitude (`node --test`, un processus par fichier, en parallèle) avec un reporter à nous
+  (`tests/ui/reporter.mjs`, une ligne JSON par test), et `ASTRA_REPORT=1` pour avoir la
+  simulation. Les résultats arrivent au fil de l'eau. Page `tests/ui/index.html` : compteurs
+  ✔ / ✖ / ○ (le ✖ filtre les échecs), recherche (`/`), fichiers repliables, ▶ par test et par
+  fichier, « Tout lancer », « Arrêter » ; à droite, le test choisi : statut, durée, erreur et
+  ligne du test, puis la simulation (le rapport de D-129) pour un scénario. Après « Tout
+  lancer », le premier échec est choisi. Un lancement remplace le précédent.
+- Liste des tests : lue dans le source (premier texte de chaque `test(` ou `scenario(` en
+  début de ligne), car node:test ne sait pas lister sans lancer : `--test-skip-pattern` et
+  `--test-only` filtrent sans rien rapporter (vérifié avec Node 24.14.1). Un test au nom
+  calculé n'apparaît donc pas dans la liste avant d'avoir tourné ; lancé par fichier, il
+  tourne quand même.
+- Un scénario est déclaré dans `tests/scenario.mjs` : node:test le rapporte à ce fichier ; le
+  serveur le rend à son fichier par son nom.
+- `.claude/launch.json` : `astra-tests` (cette interface) et `astra` (le jeu,
+  `python3 -m http.server 8080`) pour le navigateur intégré de Claude.
+- Écarté : vitest ou un autre outil (une dépendance, un `package.json`, un build) ; lancer tous
+  les tests à l'ouverture (avec beaucoup de tests, on choisit quoi lancer).
+- Mesuré : 189 tests en 6,5 s depuis l'interface (6,4 s en ligne de commande) ; un test seul
+  en 0,1 s.
+- Qui : Vincent (la demande), Claude (la forme). Source : session `09eb6bdd`.
+- Statut : en vigueur. Vérifié dans le navigateur intégré (règle cassée exprès puis remise).
+
+**D-131 — Film seconde par seconde entre deux vérifications, et simulation à hauteur fixe**
+- 2026-11-01 14:02 (UTC). Contexte : question de Vincent sur le scénario « flotte ennemie en
+  route » : « dans ce test, il y a 4 ticks de temps ? pourquoi ce n'est pas en temps reel ?
+  autent de tick que de secondes ? ». Réponse : le test sautait d'un moment à l'autre (5 images,
+  sans `tick`), ce qui suffit pour la règle, puisque la position d'une flotte se calcule à partir
+  de l'heure (`fleetPos`). Puis : « il ne faut pas rajouter/enlever du test dans la simulations,
+  cela fait du flickering sur l'ecran et change la hauteur de la div ; oui rajoute un film ».
+- Choix : `film.roll(joueur, horloge, jusqu'à, légende, chaqueSeconde)` fait avancer la fausse
+  horloge seconde par seconde, sans attendre : à chaque seconde, `chaqueSeconde()` (dans le
+  scénario : `B.tick()`, A reçoit la fiche de B, `A.tick()`), puis une image sans vérification.
+  Au plus 240 images par `roll` (au-delà, le pas s'allonge). Les vérifications restent dans
+  `look`. Le scénario de la flotte en route passe de 5 à 33 images (≈ 9 ms).
+- Rapport : les images sont empilées au même endroit (grille CSS, `visibility`) : la hauteur
+  est celle de la plus grande image et ne change pas pendant la lecture ; lecture en ≈ 8 s quel
+  que soit le nombre d'images (0,12 à 0,9 s par image), arrêt sur la dernière.
+- Interface : pendant un lancement, la simulation affichée reste en place ; le nouveau rapport
+  se charge dans le même cadre, qui garde sa hauteur ; seul le rapport du fichier relancé est
+  rechargé.
+- Écarté : le temps réel (32 vraies secondes d'attente pour ce seul test) ; vérifier
+  « vue / cachée » à chaque seconde (il faudrait recalculer la règle dans le test).
+- Qui : Vincent (le film, pas de saut de hauteur), Claude (la forme). Source : session `09eb6bdd`.
+- Statut : en vigueur. Vérifié dans le navigateur intégré : hauteur du film identique sur les
+  33 images (456 px), cadre gardé à 690 px pendant un nouveau lancement.
+
+**D-132 — Tous les tests qui jouent une partie deviennent des scénarios filmés**
+- 2026-11-01 14:16 (UTC). Demande de Vincent : « transforme un maximum de test existant avec des
+  simulation ».
+- Choix : tout test qui joue une partie (`newGame`, `newLobby`, des `Session`) passe en
+  `scenario(…)` avec des `film.look` aux moments utiles ; un test de pure fonction (calcul sur
+  une planète seule, géométrie, texte, sauvegarde seule) reste en `test(…)` : on n'invente pas
+  de partie pour lui. Résultat : 114 scénarios sur 189 tests (17 fichiers), environ 480 images.
+  Les `assert` sont identiques à ceux d'avant dans chaque fichier (comparés ligne à ligne) ;
+  seules changent les lignes `test(` → `scenario(`, les imports, et des aides (`run`, `play`,
+  `raid`, `assault`) qui prennent un paramètre facultatif pour filmer, sans changer les passages
+  ni l'horloge. Deux sauts d'horloge (`clock.t = arrivée`) sont devenus `film.roll` sans
+  passage, qui finit à la même heure.
+- Outil (`tests/scenario.mjs`), complété en même temps : sous la carte, un tableau de l'état réel
+  de chaque joueur (stock à l'heure de l'image, calculé avec `stateAt` sans rien écrire ;
+  vaisseaux à quai ; nombre de flottes) ; une image « au moment de l'échec » ajoutée toute
+  seule ; les scénarios `async` sont attendus ; lettres A, B… départagées par identifiant
+  (avant, deux joueurs de même rang changeaient de lettre selon qui regardait) ; brouillard des
+  planètes montré sans toucher aux renseignements du joueur (anneau en pointillés = vrai
+  propriétaire inconnu) ; couleurs de secours quand deux joueurs ont la même ; flottes à
+  l'arrêt décalées pour ne pas être cachées par leur planète ; contenu des flottes dans leur
+  description (vaisseaux, soute, destination, ordre).
+- Fait par : 5 agents en parallèle, un groupe de fichiers chacun, puis vérifié par Claude
+  (comparaison des `assert`, suite complète, échec provoqué dans un test async).
+- Écarté : filmer les tests de pure fonction (rien à montrer sur une carte) ; remplacer les
+  boucles de temps des tests par `film.roll` (risque de changer les passages).
+- Mesuré : `node --test tests/*.test.mjs` 6,4 s avant et après ; avec `ASTRA_REPORT=1`, 6,5 s.
+- Qui : Vincent (la demande), Claude (le partage). Source : session `09eb6bdd`.
+- Statut : en vigueur. 189/189.

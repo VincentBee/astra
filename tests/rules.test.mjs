@@ -2,7 +2,11 @@
 // entrées abîmées ne doivent ni créer ni faire perdre de ressources.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { game, fleet, clone } from './harness.mjs';
+import { game, fleet, clone, newGame } from './harness.mjs';
+import { scenarios } from './scenario.mjs';
+
+const { normalize } = await import('../js/session.js');
+const scenario = scenarios(import.meta.url);
 
 const T0 = 10_000_000;
 const MIN = 60_000;
@@ -125,16 +129,17 @@ test('chaque niveau de bâtiment prend une place : une planète pleine ne constr
   assert.match(game.startBuild(p, 'mine', T0), /Plus de place/);
 });
 
-test('les places viennent de la carte : les effacer ou un niveau négatif ne libère rien', async () => {
-  const { newGame } = await import('./harness.mjs');
+scenario('les places viennent de la carte : les effacer ou un niveau négatif ne libère rien', (film) => {
   const { players: [A] } = newGame(1, ['human']);
   const pl = A.state.players[A.me].planet;
+  film.look(A, 'départ : A sur sa planète mère');
   pl.stock = { minerals: 1e6, food: 1e6, energy: 1e6 };
   pl.levels.mine += pl.places - game.usedPlaces(pl.levels); // pleine
   delete pl.places; // fiche trafiquée
+  film.look(A, 'planète pleine de mines, stock plein, places effacées de la fiche');
   A.build('farm');
+  film.look(A, 'A tente une ferme : refusée, la planète reste pleine');
   assert.equal(pl.queue, null, 'toujours pleine');
-  const { normalize } = await import('../js/session.js');
   const p = normalize({ race: 'human', planet: { ...pl, levels: { ...pl.levels, mine: -20, x: 1e9 } } });
   assert.equal(p.planet.levels.mine, 0);
   assert.equal(p.planet.levels.x, undefined);
