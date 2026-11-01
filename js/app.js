@@ -14,6 +14,7 @@ import { startGalaxy, skyMode, setSkyMode } from './galaxy.js';
 import { TECHS, SHIPS, SHIP_KEYS, techCost, techMissing, researchDuration, shipUnlock, shipUnlocked, shipStats, shipDuration } from './tech.js';
 import { TRADE_RES, TRADE_NAMES } from './trade.js';
 import { explainBattle, sideTable } from './report.js';
+import { finalBoard } from './finish.js';
 import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fleetSpeed, slowestShip, fuelAt, moving, aggressive, armed } from './fleet.js';
 
 fillIcons(); // les icônes du HTML statique, avant tout le reste
@@ -1066,7 +1067,9 @@ function renderRace(now) {
   if (over) {
     const mine = over.winner === session.me;
     hot = !mine;
-    html = `<strong>${mine ? 'Victoire !' : `${esc(players[over.winner].name)} gagne.`}</strong> <span class="hint">· partie finie ·</span> <a href="replay.html#points" class="race-link">Voir la courbe des points</a>`;
+    const what = mine ? 'Victoire !' : over.winner == null ? 'Perdu.' : `${esc(players[over.winner].name)} gagne.`; // seul : personne ne gagne (D-142)
+    html = `<strong>${what}</strong> <span class="hint">· partie finie ·</span> <button type="button" class="race-link" data-finish>Classement</button> <span class="hint">·</span> <a href="replay.html#points" class="race-link">Voir la courbe des points</a>`;
+    showFinish(over);
   } else if (me?.out) {
     hot = true;
     const alive = session.ranking(now).filter((r) => r.dead == null).length;
@@ -1100,6 +1103,36 @@ function renderThreat(now) {
   setHtml($('threat-text'), `${ic('attack')} <strong>${esc(main)}</strong>${more ? ` <span class="hint">· ${more}</span>` : ''}`);
 }
 $('threat').addEventListener('click', () => showView('map'));
+// Fin de partie (D-143) : l'écran s'ouvre une fois par partie ; le bandeau le rouvre.
+let finishSeen = null; // « gid@heure de fin » déjà montré
+function showFinish(over, again = false) {
+  const key = `${session.state.gid}@${over.at}`;
+  if (finishSeen === key && !again) return;
+  finishSeen = key;
+  const board = finalBoard(session);
+  if (!board) return;
+  $('finish-board').innerHTML = board.rows
+    .map((r) => `<li class="finish-row${r.me ? ' me' : ''}${r.dead ? ' dead' : ''}" data-place="${r.place}">
+        <span class="medal${r.medal ? ' ' + r.medal : ''}" title="${r.medal ? { gold: 'Or', silver: 'Argent', bronze: 'Bronze' }[r.medal] : ''}">${r.place}</span>
+        <span class="dot" style="background:${esc(r.color)}"></span>
+        <div class="f-main">
+          <div class="f-name">${esc(r.name)}${r.me ? ' <span class="you">toi</span>' : ''}</div>
+          <div class="f-sub">${r.race ? `${raceIcon(r.race)} ${RACES[r.race].name} · ` : ''}${r.dead ? 'éliminé' : 'en vie'}</div>
+        </div>
+        <span class="f-pts">${fmt(r.pts)} pts</span>
+      </li>`)
+    .join('');
+  $('sheet-finish').hidden = false;
+}
+$('race').addEventListener('click', (e) => {
+  if (e.target.closest('[data-finish]') && session?.over) showFinish(session.over, true);
+});
+$('btn-finish-close').onclick = () => ($('sheet-finish').hidden = true);
+$('btn-finish-map').onclick = () => {
+  $('sheet-finish').hidden = true;
+  showView('map');
+};
+
 // Diagnostic des planètes : famine, panne d'énergie, stock vital qui baisse (D-111).
 let alertsNow = new Map(); // case « x:y » → { key, name, cell, list } : mes planètes à problème
 let alertsSeen = new Map(); // problème déjà annoncé → dernière fois vu (évite de répéter le toast)
@@ -2998,7 +3031,7 @@ function showSnapshot(snap) {
   buildStatic();
   selected = null;
   selFleet = null;
-  // Zoom du test (D-142) : carte entière, sauf si le scénario montre un doigt sur une carte zoomée.
+  // Zoom du test (D-146) : carte entière, sauf si le scénario montre un doigt sur une carte zoomée.
   const f = snap.finger;
   Object.assign(zoom, { z: f?.zoom || 1, x: 0, y: 0 });
   if (f) Object.assign(zoom, { x: f.x + 0.5 - UNIVERSE.w / zoom.z / 2, y: f.y + 0.5 - UNIVERSE.h / zoom.z / 2 });
@@ -3013,9 +3046,9 @@ function showSnapshot(snap) {
 
 /**
  * Ce que le scénario vérifie, posé sur la carte (lecture seule seulement : jamais en jeu).
- * - le doigt (D-142) : le cercle que le test a vérifié (portée `r` en cases, autour du point
+ * - le doigt (D-146) : le cercle que le test a vérifié (portée `r` en cases, autour du point
  *   touché) ; si le minimum `MIN_REACH` joue, un petit cercle dedans (portée `raw` sans lui) ;
- * - les valeurs vérifiées (D-143) : un anneau vert (✔) ou rouge (✖) sur la case ou la flotte, avec le
+ * - les valeurs vérifiées (D-147) : un anneau vert (✔) ou rouge (✖) sur la case ou la flotte, avec le
  *   numéro de la vérification ; le texte est dans la légende du rapport, à côté du téléphone.
  */
 function showMarks(snap) {

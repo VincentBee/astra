@@ -130,8 +130,8 @@ function film(s, out) {
      * « Voir la planète » (D-139) ?
      * { finger: { at, px, zoom }, hits: case ou null } : le joueur touche la carte en `at` (en cases,
      * décimales permises), avec des cases de `px` pixels (zoom `zoom`) : la planète la plus proche
-     * sous le doigt est-elle celle de `hits` (null : aucune) ? Le doigt se dessine sur l'image (D-142).
-     * { show: 'carburant', at, expected, got, ok } : une valeur vérifiée, montrée sur l'image (D-143) :
+     * sous le doigt est-elle celle de `hits` (null : aucune) ? Le doigt se dessine sur l'image (D-146).
+     * { show: 'carburant', at, expected, got, ok } : une valeur vérifiée, montrée sur l'image (D-147) :
      * une étiquette ✔ / ✖ posée en `at` (une case { x, y }, ou une flotte [session du propriétaire, id]),
      * ou, sans `at` (ou flotte que le joueur n'a pas), dans un cadre en haut de la carte. `ok` : par défaut, `expected` et `got` égaux
      * (isDeepStrictEqual) ; le test le donne quand il compare avec une marge.
@@ -155,7 +155,7 @@ function film(s, out) {
       const alert = threat ? (threat.more ? `${threat.main} · ${threat.more}` : threat.main) : null;
       let sheet = null; // la fiche de planète ouverte par le joueur, s'il en touche une
       let finger = null; // le doigt posé sur la carte, avec sa portée en cases
-      const marks = []; // les valeurs vérifiées, posées sur la carte (D-143)
+      const marks = []; // les valeurs vérifiées, posées sur la carte (D-147)
       const checks = expect.map((x, i) => {
         if ('finger' in x) {
           const { at, px, zoom = 1 } = x.finger;
@@ -309,7 +309,7 @@ function svg(f) {
   // Planète touchée (fiche ouverte) : un doigt, en anneau blanc.
   if (f.sheet) parts.push(`<circle cx="${c(f.sheet.x)}" cy="${c(f.sheet.y)}" r="0.6" fill="none" stroke="#ffffff" stroke-width="0.08"><title>${esc(f.L[me])} touche ${esc(f.sheet.name)}</title></circle>`);
 
-  // Valeurs vérifiées (D-143) : un anneau et son numéro (celui de la légende) sur la case ou la flotte.
+  // Valeurs vérifiées (D-147) : un anneau et son numéro (celui de la légende) sur la case ou la flotte.
   for (const m of f.marks || []) {
     if (m.x === undefined) continue; // sans place sur la carte : seulement dans la légende
     const color = m.ok ? '#4ade80' : '#ff5a5a';
@@ -318,7 +318,7 @@ function svg(f) {
     parts.push(`<circle cx="${cx}" cy="${cy}" r="0.55" fill="none" stroke="${color}" stroke-width="0.08"/><circle cx="${cx + 0.5}" cy="${cy - 0.5}" r="0.3" fill="${color}"/><text x="${cx + 0.5}" y="${cy - 0.36}" font-size="0.4" font-weight="700" text-anchor="middle" fill="#05070f">${m.n}<title>${esc(`${m.ok ? '✔' : '✖'} ${m.text}`)}</title></text>`);
   }
 
-  // Le doigt (D-142) : sa portée en cases, autour du point touché.
+  // Le doigt (D-146) : sa portée en cases, autour du point touché.
   if (f.finger) parts.push(`<circle cx="${c(f.finger.x)}" cy="${c(f.finger.y)}" r="${f.finger.r}" fill="rgba(255,255,255,0.12)" stroke="#ffffff" stroke-width="0.06" stroke-dasharray="0.15 0.1"><title>${esc(f.L[me])} touche ${cell(f.finger)} : ${esc(f.finger.text)}</title></circle><circle cx="${c(f.finger.x)}" cy="${c(f.finger.y)}" r="0.08" fill="#ffffff"/>`);
   if (f.finger?.raw < f.finger?.r) parts.push(`<circle cx="${c(f.finger.x)}" cy="${c(f.finger.y)}" r="${f.finger.raw}" fill="none" stroke="#ffffff" stroke-width="0.04" opacity="0.6"><title>${FINGER} px seuls : ${+f.finger.raw.toFixed(2)} case</title></circle>`);
 

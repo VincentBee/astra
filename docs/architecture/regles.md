@@ -883,13 +883,13 @@ sinon) est montrée. Attentes de `film.look` : `{ fleet: [propriétaire, id], vi
 `Session.myPlanetAt`, D-139 ; la fiche s'ouvre dans le vrai jeu), `{ finger: { at, px, zoom },
 hits: case ou null }` (le joueur touche la carte en `at`, cases de `px` pixels : la planète la
 plus proche sous le doigt, par `underFinger` de `js/aim.js` ; le doigt et sa portée se dessinent
-sur l'image, au zoom donné, D-142), `{ show: 'carburant', at, expected, got, ok }` (une valeur
+sur l'image, au zoom donné, D-146), `{ show: 'carburant', at, expected, got, ok }` (une valeur
 vérifiée, montrée sur l'image : anneau ✔ / ✖ numéroté sur la case `{ x, y }` ou la flotte
 `[session, id]`, et son texte dans la légende numérotée à côté du téléphone ; sans `at`, ou si le
 joueur n'a pas cette flotte, seulement dans la légende ; `ok` quand le test compare avec une marge ;
-D-143). Exemples : `tests/threat.test.mjs`, `tests/planet-button.test.mjs`, le premier scénario
-de `tests/aim.test.mjs` (doigt), et `show` dans tous les fichiers (D-143) : chaque scénario
-montre au moins une vérification sur son image (191 sur 191). Les `assert`
+D-147). Exemples : `tests/threat.test.mjs`, `tests/planet-button.test.mjs`, le premier scénario
+de `tests/aim.test.mjs` (doigt), et `show` dans tous les fichiers (D-147) : chaque scénario
+montre au moins une vérification sur son image (194 sur 194). Les `assert`
 restent à côté des `show` (D-141).
 
 Un scénario d'une seule image n'a ni commandes (⏮ ▶ ⏭ et curseur) ni compteur « 1/1 · t = 0 s »
@@ -1023,8 +1023,12 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
   (D-102).
 - `checkOver` : à plusieurs, la partie finit quand il reste **un seul** joueur en vie (ou
   aucun : le dernier tombé gagne, puis le meilleur `best`). Seul : quand le froid a tout
-  pris. Le téléphone qui le voit écrit `p.over = { at, winner }` dans sa fiche ;
-  `Session.over` prend la plus ancienne fin écrite par un joueur.
+  pris, et alors **personne ne gagne** : `winner: null` (D-142). Le téléphone qui le voit
+  écrit `p.over = { at, winner }` dans sa fiche ; `Session.over` prend la plus ancienne fin
+  écrite par un joueur, et lit une vieille fin seule (« gagné ») comme perdue.
+- Écran de fin : `finalBoard(session)` (`js/finish.js`, D-143) donne le classement final
+  (`ranking(over.at)`, points `best`, médailles or / argent / bronze aux trois premiers, aucune
+  sans vainqueur).
 - Partie finie : `tick` ne fait plus que lire les derniers rapports de combat ; tous les ordres
   sont refusés (`canAct`).
 

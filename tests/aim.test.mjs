@@ -3,7 +3,7 @@
 // En scénario (D-129) : la visée est de la géométrie pure (js/aim.js), vérifiée par les assert
 // sur des objets posés à la main. Chaque scénario met aussi la même situation dans une vraie
 // partie (planète mère de A, flottes en orbite ou empilées, flotte ennemie) : l'image du rapport
-// montre la carte du joueur telle qu'il la touche. Le premier scénario montre aussi le doigt (D-142) :
+// montre la carte du joueur telle qu'il la touche. Le premier scénario montre aussi le doigt (D-146) :
 // son cercle, au zoom du test, vérifié par `film.look`. Ailleurs, le doigt, le zoom et le menu ne
 // se voient pas : ils ne sont vérifiés que par les assert.
 import assert from 'node:assert/strict';

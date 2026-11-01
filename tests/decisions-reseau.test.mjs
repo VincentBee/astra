@@ -5,7 +5,7 @@
 // Tous sont écrits en scénarios (D-129) : en cas d'échec, le rapport
 // tests/reports/decisions-reseau.test.html montre la partie vue par le joueur concerné. Ceux qui
 // vérifient une fonction pure (fusion, historique, rendez-vous, icônes, fond) montrent la partie
-// où le joueur les rencontre, et les valeurs vérifiées en étiquettes (D-143) ; les asserts restent.
+// où le joueur les rencontre, et les valeurs vérifiées en étiquettes (D-147) ; les asserts restent.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { newGame, game, Session } from './harness.mjs';

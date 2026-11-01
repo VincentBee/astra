@@ -75,10 +75,31 @@ scenario('planète mère gelée : la plus vieille colonie en vie la remplace, pu
   A.tick();
   film.look(A, 'la dernière colonie gèle : A est éliminé', [
     { show: 'A éliminé', at: inner, expected: `à l’heure du gel de ${inner.name}`, got: p.out === A.frostOf(inner) ? `à l’heure du gel de ${inner.name}` : 'pas à cette heure', ok: p.out === A.frostOf(inner) },
-    { show: 'partie finie, gagnant', expected: A.me, got: A.over?.winner },
+    { show: 'partie finie', expected: true, got: !!A.over },
+    { show: 'gagnant (seul et éliminé : personne, D-142)', expected: null, got: A.over?.winner },
   ]);
   assert.equal(p.out, A.frostOf(inner), 'éliminé à l’heure où le froid a pris sa dernière planète');
-  assert.equal(A.over?.winner, A.me, 'seul : la partie finit quand le froid a tout pris');
+  assert.ok(A.over, 'seul : la partie finit quand le froid a tout pris');
+  assert.equal(A.over.winner, null, 'seul et éliminé : personne ne gagne (D-142)');
+});
+
+scenario('seul et éliminé : la partie finit sur une défaite, pas une victoire', (film) => {
+  frost();
+  const { players: [A], clock } = newGame(1, ['human']);
+  film.look(A, 'A joue seul ; le froid arrive');
+  clock.t = A.frostOf(me(A).home) + 1;
+  A.tick();
+  film.look(A, 'le froid a pris sa planète : A est éliminé, la partie est finie, sans gagnant', [
+    { show: 'A éliminé', expected: true, got: Number.isFinite(me(A).out) },
+    { show: 'gagnant', expected: null, got: A.over?.winner },
+  ]);
+  assert.ok(Number.isFinite(me(A).out), 'A est éliminé');
+  assert.equal(A.over?.winner, null, 'pas de « Victoire ! » pour un joueur seul qui a tout perdu');
+  assert.ok(A.state.log.some((e) => /le froid a tout pris/.test(e.text)), 'le journal le dit');
+  // Partie seule finie avant D-142 : la fiche dit encore « A gagne ».
+  me(A).over = { at: me(A).out, winner: A.me };
+  film.look(A, 'vieille fiche : « A gagne » écrit avant la correction ; lue comme perdue', [{ show: 'gagnant', expected: null, got: A.over.winner }]);
+  assert.equal(A.over.winner, null, 'une vieille partie seule se lit aussi comme perdue');
 });
 
 scenario('à deux, celui que le froid prend en dernier gagne, même si l’autre est hors ligne', (film) => {

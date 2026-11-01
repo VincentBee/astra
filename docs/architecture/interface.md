@@ -392,7 +392,7 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
 - **Bandeau de course** `#race` (`index.html`, sous `#lost`), rempli par `renderRace(now)` dans
   `renderLive` (chaque seconde) : avant le départ du froid « Le soleil s'éteint · dernier en vie
   gagne · n en vie » ; ensuite « Ta planète la plus exposée gèle dans m:ss · va vers le
-  soleil » ; « Éliminé · encore n en vie » ; « Victoire ! » ou « X gagne. · partie finie », suivi du lien **Voir la courbe des points**
+  soleil » ; « Éliminé · encore n en vie » ; « Victoire ! », « X gagne. » ou, seul, « Perdu. » (D-142) · partie finie, suivi du bouton **Classement** (rouvre l'écran de fin, D-143) et du lien **Voir la courbe des points**
   (`replay.html#points`, D-104). Classe
   `hot` (bordure orange) à moins de 3 min du gel, quand on est éliminé ou qu'un autre a gagné.
   Caché pour une partie d'avant la course.
@@ -508,13 +508,31 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   toutes les 200 ms) ; `selected` ouvre la fiche de la planète touchée. Une erreur est notée dans
   `body.dataset.viewError`.
 - Bouton « Voir la planète » : `renderPick` lit `session.myPlanetAt(w)` (D-139).
+
+## 18. Écran « Fin de partie » (2026-11-01, D-143)
+
+- `#sheet-finish` (`index.html`, après la fenêtre Joueurs) : fenêtre `.sheet` centrée
+  (`.finish`), titre « Fin de partie » avec l'icône `trophy`, la liste `#finish-board` (pas de ligne
+  « X gagne. » : le bandeau `#race` le dit, D-145), le lien **Voir la courbe des points** (`replay.html#points`) et le bouton
+  **Revoir la carte**.
+- `showFinish(over, again)` (`js/app.js`) : appelé par `renderRace` quand la partie est finie ;
+  ne s'ouvre qu'une fois par partie (`finishSeen` = « gid@heure de fin », en mémoire : un
+  rechargement le remontre une fois). Le bouton **Classement** du bandeau `#race` le rouvre
+  (délégation sur `#race`, `data-finish`). Croix, Échap, toucher du fond, **Revoir la carte**
+  (qui revient aussi sur la carte) le ferment.
+- Chaque ligne `.finish-row` : médaille `.medal` (carré avec la place ; `.gold`, `.silver`,
+  `.bronze` aux trois premiers s'il y a un vainqueur), pastille de couleur, nom (« toi » pour
+  moi), race · « éliminé » ou « en vie », points (`best`). Ma ligne : `.me` (bordure et trait
+  bleus à gauche). Données : `finalBoard` (`js/finish.js`), testé dans `tests/finish.test.mjs`.
+- Couleurs : `--gold` `#f5c542`, `--silver` `#c9d1e3`, `--bronze` `#d08a52` (`style.css`,
+  `:root`).
 - Ce que le test vérifie, posé sur la carte par `showMarks` dans `#view-marks` (dans
   `.map-wrap`, z-index 25 : par-dessus la fiche ; vidé à chaque image ; jamais en jeu) :
-  - doigt (D-142) : chaque image remet le zoom à 1, sauf si elle porte `finger: { x, y, zoom, r,
+  - doigt (D-146) : chaque image remet le zoom à 1, sauf si elle porte `finger: { x, y, zoom, r,
     raw, text }` : alors zoom du test, centré sur le toucher, et `.view-finger` : cercle blanc en
     pointillés de rayon `r` cases, point au centre, texte au-dessus, petit cercle de rayon `raw`
     quand le minimum `MIN_REACH` joue ;
-  - valeurs vérifiées (D-143) : `marks: [{ n, text, ok, x, y, pid, id }]` → `.view-mark`
+  - valeurs vérifiées (D-147) : `marks: [{ n, text, ok, x, y, pid, id }]` → `.view-mark`
     (anneau vert ou rouge, pastille au numéro `n` en haut à droite, texte en `title`) sur la case,
     ou sur la flotte là où `fleetSpots` la dessine ; sans case, rien sur la carte. Le texte est
     dans la légende du rapport (`tests/scenario.mjs`, liste numérotée à côté du téléphone).
