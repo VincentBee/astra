@@ -14,6 +14,7 @@ import { startGalaxy, skyMode, setSkyMode } from './galaxy.js';
 import { TECHS, SHIPS, SHIP_KEYS, techCost, techMissing, researchDuration, shipUnlock, shipUnlocked, shipStats, shipDuration } from './tech.js';
 import { TRADE_RES, TRADE_NAMES } from './trade.js';
 import { explainBattle, sideTable } from './report.js';
+import { finalBoard } from './finish.js';
 import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fleetSpeed, slowestShip, fuelAt, moving, aggressive, armed } from './fleet.js';
 
 fillIcons(); // les icônes du HTML statique, avant tout le reste
@@ -1065,7 +1066,9 @@ function renderRace(now) {
   if (over) {
     const mine = over.winner === session.me;
     hot = !mine;
-    html = `<strong>${mine ? 'Victoire !' : `${esc(players[over.winner].name)} gagne.`}</strong> <span class="hint">· partie finie ·</span> <a href="replay.html#points" class="race-link">Voir la courbe des points</a>`;
+    const what = mine ? 'Victoire !' : over.winner == null ? 'Perdu.' : `${esc(players[over.winner].name)} gagne.`; // seul : personne ne gagne (D-142)
+    html = `<strong>${what}</strong> <span class="hint">· partie finie ·</span> <button type="button" class="race-link" data-finish>Classement</button> <span class="hint">·</span> <a href="replay.html#points" class="race-link">Voir la courbe des points</a>`;
+    showFinish(over);
   } else if (me?.out) {
     hot = true;
     const alive = session.ranking(now).filter((r) => r.dead == null).length;
@@ -1084,6 +1087,39 @@ function renderRace(now) {
   el.classList.toggle('hot', hot);
   setHtml($('race-text'), html);
 }
+
+// Fin de partie (D-143) : l'écran s'ouvre une fois par partie ; le bandeau le rouvre.
+let finishSeen = null; // « gid@heure de fin » déjà montré
+function showFinish(over, again = false) {
+  const key = `${session.state.gid}@${over.at}`;
+  if (finishSeen === key && !again) return;
+  finishSeen = key;
+  const board = finalBoard(session);
+  if (!board) return;
+  const result = $('finish-result');
+  result.textContent = board.title;
+  result.className = `finish-result ${board.won ? 'won' : 'lost'}`;
+  $('finish-board').innerHTML = board.rows
+    .map((r) => `<li class="finish-row${r.me ? ' me' : ''}${r.dead ? ' dead' : ''}" data-place="${r.place}">
+        <span class="medal${r.medal ? ' ' + r.medal : ''}" title="${r.medal ? { gold: 'Or', silver: 'Argent', bronze: 'Bronze' }[r.medal] : ''}">${r.place}</span>
+        <span class="dot" style="background:${esc(r.color)}"></span>
+        <div class="f-main">
+          <div class="f-name">${esc(r.name)}${r.me ? ' <span class="you">toi</span>' : ''}</div>
+          <div class="f-sub">${r.race ? `${raceIcon(r.race)} ${RACES[r.race].name} · ` : ''}${r.dead ? 'éliminé' : 'en vie'}</div>
+        </div>
+        <span class="f-pts">${fmt(r.pts)} pts</span>
+      </li>`)
+    .join('');
+  $('sheet-finish').hidden = false;
+}
+$('race').addEventListener('click', (e) => {
+  if (e.target.closest('[data-finish]') && session?.over) showFinish(session.over, true);
+});
+$('btn-finish-close').onclick = () => ($('sheet-finish').hidden = true);
+$('btn-finish-map').onclick = () => {
+  $('sheet-finish').hidden = true;
+  showView('map');
+};
 
 // Diagnostic des planètes : famine, panne d'énergie, stock vital qui baisse (D-111).
 let alertsNow = new Map(); // case « x:y » → { key, name, cell, list } : mes planètes à problème

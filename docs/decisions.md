@@ -664,7 +664,7 @@ Aucune conversation ne les prouve.
   galaxie qui s'épuise, merveille à construire.
 - Qui : Vincent (direction), Claude (règle). Statut : en vigueur (`9b37782`).
 
-**D-089 — Sans planète, éliminé ; le dernier en vie gagne ; une colonie remplace la planète mère** — modifiée par D-120 (un joueur qui n'a pas encore fondé sa planète reste en vie tant qu'il a un colonisateur)
+**D-089 — Sans planète, éliminé ; le dernier en vie gagne ; une colonie remplace la planète mère** — modifiée par D-120 (un joueur qui n'a pas encore fondé sa planète reste en vie tant qu'il a un colonisateur) et par D-142 (seul et éliminé : personne ne gagne)
 - 2026-10-29 07:07. Question de Claude : peut-on prendre la planète mère ? Réponse de Vincent :
   « a » (oui, élimination possible).
 - Choix : la plus vieille colonie en vie devient planète mère ; sans colonie, `out` ; fin quand
@@ -1460,3 +1460,53 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Mesuré : `node --test tests/*.test.mjs` 6,4 s avant et après ; avec `ASTRA_REPORT=1`, 6,5 s.
 - Qui : Vincent (la demande), Claude (le partage). Source : session `09eb6bdd`.
 - Statut : en vigueur. 189/189.
+
+**D-142 — Seul dans la partie et éliminé : c'est perdu, personne ne gagne** (modifie D-089)
+- 2026-11-01 21:19 (UTC). Bug signalé par Vincent : « je suis tout seul dans la partie, et je
+  viens d'être éliminé, mais le jeu me dit Victoire ».
+- Cause : `checkOver` prenait toujours le premier du classement comme vainqueur. Seul, la partie
+  ne finit que quand le froid a tout pris, et le premier (le seul) est donc le joueur éliminé.
+- Choix : seul (un seul joueur dans la course, `inRace`), `p.over = { at, winner: null }` ;
+  journal « Fin de la partie : le froid a tout pris. » ; `Session.over` accepte `winner: null`
+  et lit aussi une vieille fiche seule (« A gagne » écrit avant ce correctif) comme perdue ;
+  bandeau « Perdu. · partie finie ». À plusieurs, rien ne change (le dernier en vie gagne ; tous
+  tombés : le dernier tombé, D-089 et D-102).
+- Pas de nouveau `FORMAT` : seul, aucun autre téléphone ne lit ma fiche. Une partie à deux où un
+  seul joueur est entré dans la course compte comme « seul » (non confirmé en vrai jeu).
+- Écarté : laisser la victoire et changer seulement le texte (le classement et la courbe
+  diraient encore « gagné ») ; donner la victoire à un joueur seul qui a survécu longtemps (il
+  n'y a pas d'autre fin seul que tout perdre).
+- Qui : Vincent (le bug), Claude (la correction). Source : session `1b635a47`.
+- Numéro pris après D-133 à D-141 de la PR VincentBee/astra#17, pas encore fusionnée : à
+  renuméroter si besoin à la fusion.
+- Statut : en vigueur. Test : `end.test.mjs` « seul et éliminé : la partie finit sur une
+  défaite, pas une victoire ».
+
+**D-143 — Écran « Fin de partie » : classement final et médailles or, argent, bronze**
+- 2026-11-01 21:19 (UTC). Demande de Vincent : « il faudrait que le jeu affiche un splash screen
+  "fin de partie" avec le classement des joueurs dans un leaderboard, avec un badge en or pour
+  le premier, un en argent pour le deuxième, et un en bronze pour le 3e ».
+- Choix : une fenêtre `#sheet-finish` (même modèle que les autres fenêtres `.sheet`, centrée)
+  s'ouvre une fois par partie quand elle finit (clé « gid@heure de fin », en mémoire) ;
+  bouton **Classement** dans le bandeau pour la rouvrir ; croix, Échap, toucher du fond ou
+  **Revoir la carte** pour la fermer ; lien **Voir la courbe des points**.
+- Classement : `session.ranking(over.at)` (l'ordre du jeu) ; points affichés = `best` (points
+  d'avant la chute pour un joueur tombé, sinon ses points), pour que le nombre suive l'ordre ;
+  « éliminé » ou « en vie » ; mon joueur encadré, avec « toi ».
+- Médailles carrées (angles droits) en couleurs `--gold`, `--silver`, `--bronze`, avec la place
+  écrite dedans ; les suivants ont la place sans couleur. **Pas de médaille sans vainqueur**
+  (seul et éliminé, D-142) : une médaille d'or sur une défaite referait le bug.
+- Le calcul est dans `js/finish.js` (`finalBoard`), sans DOM, pour être testé en scénario ;
+  `js/app.js` ne fait que l'afficher.
+- Écarté : un nouvel écran plein (`#screen-…`) : on ne pourrait plus revoir la carte derrière ;
+  une icône de médaille dessinée (le carré coloré avec le chiffre se lit mieux en petit).
+- Qui : Vincent (la demande), Claude (la forme). Source : session `1b635a47`.
+- Numéro à renuméroter si besoin à la fusion de la PR VincentBee/astra#17.
+- Statut : en vigueur. Tests : `finish.test.mjs` (2 scénarios). Vérifié dans le navigateur
+  intégré (fin seul : « Perdu », sans médaille ; fin à quatre : or, argent, bronze, moi encadré ;
+  format téléphone ; fermeture et réouverture).
+
+**D-144 — Cache `astra-p2p-v74`**
+- 2026-11-01 21:19 (UTC). Nouveau fichier `js/finish.js` et changements de `index.html`,
+  `style.css`, `js/app.js`, `js/session.js` : le service worker passe à `astra-p2p-v74` (v70 à
+  v73 sont pris par la PR VincentBee/astra#17). Qui : Claude par défaut. Statut : en vigueur.

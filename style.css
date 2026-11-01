@@ -16,6 +16,9 @@
   --ok: #7cf0b4;
   --warn: #ffb36b;
   --danger: #ff6b7a;
+  --gold: #f5c542;
+  --silver: #c9d1e3;
+  --bronze: #d08a52;
   --radius: 0;
   --mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', Menlo, monospace;
   --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -313,6 +316,27 @@ button.close-btn svg { width: 18px; height: 18px; }
 .banner.warn { border-color: rgba(255, 179, 107, 0.5); margin-bottom: 10px; }
 .banner.race { margin-bottom: 10px; padding: 8px 14px; }
 .race-link { color: var(--accent); font-weight: 600; }
+.race .race-link { background: none; border: 0; padding: 0; min-height: 0; font: inherit; text-decoration: underline; cursor: pointer; }
+/* Fin de partie (D-143) : classement final, médailles carrées */
+.finish .sheet-panel { align-self: center; border-bottom: 1px solid var(--line); }
+.finish h2 { display: inline-flex; align-items: center; gap: 8px; }
+.finish-result { margin: 0; font-size: 1.15rem; font-weight: 700; }
+.finish-result.won { color: var(--gold); }
+.finish-result.lost { color: var(--danger); }
+.finish-board { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.finish-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); background: var(--panel); }
+.finish-row.me { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.finish-row.dead .f-name { color: var(--muted); }
+.medal { width: 32px; height: 32px; flex: none; display: grid; place-items: center; font: 700 0.95rem var(--mono); border: 1px solid var(--line); color: var(--muted); }
+.medal.gold, .medal.silver, .medal.bronze { color: var(--accent-ink); border-color: transparent; }
+.medal.gold { background: var(--gold); box-shadow: 0 0 12px rgba(245, 197, 66, 0.45); }
+.medal.silver { background: var(--silver); }
+.medal.bronze { background: var(--bronze); }
+.f-main { flex: 1; min-width: 0; }
+.f-name { font-weight: 600; overflow-wrap: anywhere; }
+.f-sub { font-size: 0.75rem; color: var(--muted); }
+.f-pts { font: 0.9rem var(--mono); color: var(--energy); white-space: nowrap; }
+.finish-points { display: inline-flex; align-items: center; gap: 6px; justify-self: start; }
 /* Bandeau du départ (D-120) : joueurs présents, prêts ou non */
 .pick-who { display: flex; flex-wrap: wrap; gap: 6px 12px; }
 .pick-who .pw { display: inline-flex; align-items: center; gap: 4px; }
