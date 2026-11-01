@@ -1,11 +1,11 @@
-import { Session } from './session.js';
+import { Session, threatText } from './session.js';
 import { loadGame, listGames, selectGame, forgetGame, describeSave } from './save.js';
 import { inviteLink, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
 import {
   RACES, RACE_KEYS, RES_INFO, resIcon, raceIcon, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
   powerReadyAt, powerCost, liftGain, fmt, UNIVERSE, SOIL, sameCell, sunFor, climateName, kindLabel, usedPlaces, TEMPO, frostLine, planForecast, PLAN_MAX,
-  shipsAffordable, planetAlerts,
+  shipsAffordable, planetAlerts, FROST,
 } from './game.js';
 import { drawSun } from './sky.js';
 import { readTap, underFinger, contenders, menuPlace } from './aim.js';
@@ -220,7 +220,7 @@ $('games').addEventListener('click', (e) => {
   showAbsence(Date.now() - saved.savedAt);
 });
 
-window.addEventListener('pagehide', () => session?.save?.());
+window.addEventListener('pagehide', () => session?.save?.()); // en lecture seule (D-139), `save` ne fait rien
 
 $('btn-create').onclick = async () => {
   const name = playerName();
@@ -972,6 +972,7 @@ function renderLive() {
   const me = st.players[session.me];
   const now = session.now();
   renderRace(now);
+  renderThreat(now);
   renderAlerts(me, now);
 
   {
@@ -1085,6 +1086,20 @@ function renderRace(now) {
   setHtml($('race-text'), html);
 }
 
+/**
+ * Bandeau rouge (D-133) : la flotte armée adverse la plus pressante, avec le
+ * compte à rebours si elle vise une de mes planètes ; il reste tant qu'elle
+ * est en vue. Un toucher montre la carte.
+ */
+function renderThreat(now) {
+  const el = $('threat');
+  const list = session.over ? [] : session.threats(now);
+  el.hidden = !list.length;
+  if (!list.length) return;
+  const { main, more } = threatText(list);
+  setHtml($('threat-text'), `${ic('attack')} <strong>${esc(main)}</strong>${more ? ` <span class="hint">· ${more}</span>` : ''}`);
+}
+$('threat').addEventListener('click', () => showView('map'));
 // Diagnostic des planètes : famine, panne d'énergie, stock vital qui baisse (D-111).
 let alertsNow = new Map(); // case « x:y » → { key, name, cell, list } : mes planètes à problème
 let alertsSeen = new Map(); // problème déjà annoncé → dernière fois vu (évite de répéter le toast)
@@ -1967,6 +1982,17 @@ function drawMap() {
     ctx.fill();
     ctx.restore();
     ctx.globalAlpha = 1;
+    if (p.id !== session.me) {
+      // Effectif des flottes adverses (D-133), en haut à droite du triangle.
+      ctx.font = `700 ${Math.max(9 * dpr, cell * 0.34)}px system-ui, sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.lineWidth = Math.max(2, cell * 0.08);
+      ctx.strokeStyle = 'rgba(5,8,18,0.9)';
+      ctx.fillStyle = '#ffffff';
+      const n = String(countShips(f.ships));
+      ctx.strokeText(n, cx + cell * 0.2, cy - cell * 0.14);
+      ctx.fillText(n, cx + cell * 0.2, cy - cell * 0.14);
+    }
   }
   // Case visée, en attente d'un choix (se poser, coloniser, attaquer…).
   if (menu?.cell) {
@@ -2844,8 +2870,9 @@ function renderPick(me = session?.state?.players[session.me], now = session?.now
   // Départ (D-120) : la planète mère se fonde avec le colonisateur, envoyé d'ici.
   $('btn-claim').hidden = !colonizer || !!o || (w.kind && w.kind !== 'planet') || session.locked(colonizer.id) || session.frostOf(w) <= now;
   setHtml($('btn-claim'), `${ic('fleet')}Y envoyer mon colonisateur · ${esc(w.name)}`);
-  $('btn-open-planet').hidden = o?.id !== session.me || !w.pl;
-  $('btn-open-planet').dataset.key = w.pl?.key || 'home';
+  const mine = session.myPlanetAt(w); // « Voir la planète » : seulement sur une de mes planètes (D-139)
+  $('btn-open-planet').hidden = !mine;
+  $('btn-open-planet').dataset.key = mine?.key || 'home';
   renderPickYard(me, o?.id === session.me && w.pl ? w.pl : null, s, now);
 }
 
@@ -2947,11 +2974,56 @@ async function boot() {
   show('home');
 }
 
-showSaved();
-boot();
-// Lien d'invitation ouvert alors que l'appli est déjà affichée dans cet onglet.
-window.addEventListener('hashchange', () => location.hash.length > 1 && !session && boot());
+// ---------------------------------------------------------------------------
+// Lecture seule (D-139) : index.html?view montre une partie enregistrée par un scénario de test,
+// image par image, avec le vrai écran du jeu. La page qui l'embarque (le rapport du test, même
+// origine) envoie chaque image par postMessage : { astraView: { state, me, t, intel, selected, view } }.
+// Pas de réseau, pas de sauvegarde, horloge arrêtée à l'heure de l'image, rien n'est écrit.
+// ---------------------------------------------------------------------------
 
-if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+const VIEW = new URLSearchParams(location.search).has('view');
+
+function showSnapshot(snap) {
+  stopGame();
+  // Les règles du froid du test (coupé : delayMs null), pour voir la même partie que lui.
+  if (snap.frost) Object.assign(FROST, snap.frost, { delayMs: snap.frost.delayMs ?? Infinity });
+  const s = new Session(snap.state.players[snap.me]?.name || 'Commandant');
+  Object.assign(s, { me: snap.me, state: snap.state, status: 'playing', intel: snap.intel || {} });
+  s.now = () => snap.t;
+  s.save = s.scheduleSave = s.start = s.tick = () => {};
+  // Les autres joueurs comptent comme connectés : pas de « Seul en ligne » qui n'existe pas dans le test.
+  for (const pid of Object.keys(snap.state.players)) if (pid !== snap.me) s.links.set(pid, {});
+  session = s;
+  show('game');
+  buildStatic();
+  selected = null;
+  selFleet = null;
+  showView(snap.view || 'map', snap.key || 'home');
+  selected = snap.selected || null;
+  clearInterval(liveTimer);
+  liveTimer = setInterval(renderLive, 200);
+  renderState();
+}
+
+if (VIEW) {
+  document.documentElement.classList.add('view-only');
+  addEventListener('message', (e) => {
+    if (e.origin !== location.origin || !e.data?.astraView) return;
+    try {
+      showSnapshot(e.data.astraView);
+    } catch (err) {
+      console.error(err);
+      document.body.dataset.viewError = err.message;
+    }
+  });
+  parent.postMessage({ astraViewReady: true }, location.origin);
+} else {
+  showSaved();
+  boot();
+  // Lien d'invitation ouvert alors que l'appli est déjà affichée dans cet onglet.
+  window.addEventListener('hashchange', () => location.hash.length > 1 && !session && boot());
+
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
 }

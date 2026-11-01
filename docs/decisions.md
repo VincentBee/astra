@@ -505,14 +505,15 @@ Aucune conversation ne les prouve.
 - 2026-10-28 22:15–22:16. Choix : le glissé du doigt ne bouge pas les étoiles (sinon elles
   sautent à chaque tap) ; parallaxe par l'accéléromètre.
 - Alternative : suivre le doigt. Qui : Claude (recommandation), Vincent choisit l'accéléromètre.
-- Source : `f4afbcd0` 22:15:19, 22:16:01 ; `1eeb2c1`. Statut : en vigueur.
+- Source : `f4afbcd0` 22:15:19, 22:16:01 ; `1eeb2c1`. Statut : remplacée par D-137 (plus de parallaxe).
 
 **D-068 — Accéléromètre sur iPhone**
 - 2026-10-28 22:17. Choix : autorisation « Mouvement » au premier tap ; position de repos qui
   s'adapte ; mouvement lissé ; fond fixe si « réduire les animations » (modifiée par D-112 :
   ce fond fixe est désormais une seule image, et chacun peut le choisir).
 - Qui : Claude (défaut). Testé avec des événements simulés seulement (**non confirmé** sur un vrai
-  iPhone). Source : `f4afbcd0` 22:15:08, 22:17:00. Statut : en vigueur.
+  iPhone). Source : `f4afbcd0` 22:15:08, 22:17:00. Statut : remplacée par D-137 (plus de parallaxe,
+  plus d'accéléromètre).
 
 **D-069 — Choix de race par icônes, Humains par défaut**
 - 2026-10-28 22:21. Choix : 3 icônes, une seule fiche visible (Humains d'abord), « Choix
@@ -1057,7 +1058,7 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Alternatives écartées : retirer la parallaxe pour tous ; fixe par défaut ; détecter
   « téléphone faible » ou « batterie faible » (pas d'API fiable sur iPhone).
 - Qui : Claude (défaut : animé reste le défaut, 3 choix). Source : session `0a3a42f6`.
-- Statut : en vigueur, modifiée par D-114 (emplacement). Effet sur la batterie d'un vrai
+- Statut : en vigueur, modifiée par D-114 (emplacement) et D-137 (plus de choix « animé »). Effet sur la batterie d'un vrai
   téléphone : **non confirmé**.
 
 **D-113 — Cache `astra-p2p-v63`**
@@ -1374,7 +1375,7 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Limite : la carte montre ce que dit la règle (`sees`), pas le dessin du vrai `canvas`.
 - Qui : Vincent (le besoin, pas d'ASCII ni de capture, pas de Given / When / Then), Claude (la
   forme). Source : session `09eb6bdd`.
-- Statut : en vigueur. `tests/vision.test.mjs` réécrit en 6 scénarios. Contrôlé par mutation
+- Statut : en vigueur, modifiée par D-140 (le rapport montre le vrai jeu ; la carte SVG devient la « carte de contrôle »). `tests/vision.test.mjs` réécrit en 6 scénarios. Contrôlé par mutation
   (`sees` qui dit toujours oui → 4 scénarios en échec, rapport écrit, image fautive en rouge).
 
 **D-130 — Interface de test locale (`tests/ui/`), notre mini framework de test**
@@ -1459,4 +1460,141 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   boucles de temps des tests par `film.roll` (risque de changer les passages).
 - Mesuré : `node --test tests/*.test.mjs` 6,4 s avant et après ; avec `ASTRA_REPORT=1`, 6,5 s.
 - Qui : Vincent (la demande), Claude (le partage). Source : session `09eb6bdd`.
-- Statut : en vigueur. 189/189.
+- Statut : modifiée par D-141 (plus d'exception : tous les tests sont des scénarios). 189/189.
+
+**D-133 — Alerte quand une flotte ennemie arrive sur une de mes planètes**
+- 2026-10-30 14:10. Contexte : retour de 7 testeurs (point 1.3 de leur synthèse) : une conquête
+  tombe sans préavis, le seul signal est un toast de 3,2 s à l'impact, et l'effectif des flottes
+  ennemies ne se voit pas sur la carte. Demande : un bandeau rouge persistant avec compte à
+  rebours, et l'effectif des flottes ennemies sur la carte.
+- Choix : `Session.threats(now)` liste les flottes **armées**, **adverses**, **visibles** (dans
+  ma zone de détection, la même règle que la carte). Deux niveaux : d'abord celles qui visent une
+  de mes planètes (ordre attaque ou conquête sur moi, simple trajet vers la case de ma planète, ou
+  déjà en orbite), la plus proche de l'impact en tête ; puis les autres, de la plus proche à la
+  plus lointaine de mes planètes. Bandeau `#threat` sous celui du froid, sur tous les onglets : la
+  plus pressante (« 12 vaisseaux de Zorg sur Pollux dans 8 s », « … en orbite de Pollux »,
+  « … en vue, à 3 cases de Pollux ») et « +N autres ». Un toucher montre la carte. Compte à
+  rebours en secondes (les trajets durent 2 à 10 s). Sur la carte, le nombre de vaisseaux est
+  écrit à côté de chaque flotte adverse visible. Cache v70.
+- Choix de Claude, par défaut : la cible et l'ordre d'une flotte visible sont montrés (ils sont
+  déjà dans la copie de la partie ; la carte, elle, ne montrait que la direction) ; une flotte
+  arrivée dont le combat n'est pas encore réglé garde l'alerte à « en orbite » ; une flotte d'un
+  joueur éliminé ne compte pas ; pas d'alerte sans armes ; rien en partie finie.
+- Alternatives écartées : un toast de plus (disparaît, c'était le problème) ; alerter sur toutes
+  les flottes de la partie, même hors de vue (révèle ce que la carte cache) ; vibration ou son
+  (non demandé).
+- Qui : Vincent (demande), Claude (détails). Source : session `0cb6f324`. Statut : en vigueur.
+- Tests : `tests/threat.test.mjs`.
+
+**D-134 — Délai avant qu'une flotte en orbite frappe une case voisine**
+- 2026-10-30 14:10. Contexte : même point 1.3 : depuis l'orbite, une conquête de la case voisine
+  prend 2 à 3 s (plancher `MIN_TRIP` de 2 s). La synthèse le met « à discuter ».
+- Choix : **rien n'est changé pour l'instant**. Question posée à Vincent ; l'alerte de D-133
+  laisse déjà voir les flottes en orbite proches (« en vue, à 1 case »).
+- Qui : en attente de Vincent. Source : session `0cb6f324`. Statut : ouvert, non tranché.
+
+**D-135 — Les scénarios de test montrent le bandeau d'alerte du joueur**
+- 2026-11-01 20:35. Contexte : « fait un test ou tu montre l'alert ».
+- Choix : le texte du bandeau sort de `app.js` dans `threatText(list)` (`js/session.js`), que le
+  jeu et `tests/scenario.mjs` utilisent tous les deux. `film.look` le note à chaque image et le
+  rapport l'affiche au-dessus de la carte (une ligne « pas d'alerte » quand il n'y en a pas, pour
+  que la carte ne saute pas) ; la carte du rapport écrit l'effectif des flottes adverses vues.
+  Nouvelle attente `{ alert: /texte/ | null }`. `tests/threat.test.mjs` passe en scénarios
+  filmés (D-132), dont une conquête suivie seconde par seconde. Cache v71 (`app.js` change).
+- Choix de Claude, par défaut : une expression régulière plutôt qu'un texte exact (les noms de
+  planètes changent d'une partie de test à l'autre) ; le texte est en clair, le jeu ajoute seul
+  l'icône et la mise en forme.
+- Alternatives écartées : capture d'écran du vrai jeu dans le test (lente, D-128) ; recopier le
+  texte dans le test (il pourrait diverger du jeu).
+- Qui : Vincent (demande), Claude (méthode). Source : session `0cb6f324`. Statut : en vigueur, modifiée par D-140 (le bandeau se voit dans le vrai jeu, plus au-dessus d'une carte dessinée).
+- Tests : `tests/threat.test.mjs`.
+
+**D-136 — Rapport de scénario : une seule image, pas de commandes ni de compteur**
+- 2026-11-01 20:38. Contexte : « dans les simulations, si il n'y a qu'une seule step, ne pas
+  afficher les controls », puis « ni "1/1 · t = 0 s" ».
+- Choix : dans `tests/scenario.mjs`, un scénario d'une seule image n'a ni la barre ⏮ ▶ ⏭ et le
+  curseur, ni le compteur « 1/1 · t = 0 s » ; la légende commence directement. Les films de
+  deux images ou plus ne changent pas.
+- Alternatives écartées : griser les commandes (elles prennent encore la place).
+- Qui : Vincent. Source : session `0cb6f324`. Statut : en vigueur.
+
+**D-137 — Plus de parallaxe, pour tout le monde**
+- 2026-11-01 20:42. Contexte : « retirer la paralaxe pour tout le monde ».
+- Choix : le fond étoilé est toujours une seule image immobile (les 3 couches d'étoiles réunies),
+  redessinée seulement quand l'écran change de taille : ni défilement, ni souris, ni
+  accéléromètre, ni autorisation « Mouvement » sur iPhone. Le réglage « Fond » garde deux choix :
+  « Étoiles » (`fixe`, par défaut) et « Sans étoiles » (`aucun`). Un téléphone qui avait gardé
+  `anime` passe à `fixe`. Code de la parallaxe retiré de `js/galaxy.js`. Cache v72.
+- Choix de Claude, par défaut : retirer le choix « animé » du réglage plutôt que seulement changer
+  le défaut (« pour tout le monde ») ; l'option « fixe » s'appelle maintenant « Étoiles ».
+- Alternatives écartées : garder la parallaxe en option (pas « pour tout le monde ») ; retirer
+  aussi les étoiles fixes (non demandé).
+- Remplace D-067 et D-068 ; modifie D-112.
+- Qui : Vincent (demande), Claude (détails). Source : session `0cb6f324`. Statut : en vigueur.
+- Tests : `tests/decisions-reseau.test.mjs` « D-137 ».
+
+**D-138 — Le bouton « Bâtiments » de la fiche de planète devient « Voir la planète »**
+- 2026-11-01 20:42. Contexte : élément `#btn-open-planet` montré par Vincent : « ce boutton doit etre
+  rename: "voir la planete" ».
+- Choix : texte « Voir la planète », icône planète (avant : icône bâtiment). Il ouvre toujours
+  l'écran de la planète (bâtiments, recherche, flottes).
+- Choix de Claude, par défaut : l'icône planète, qui va avec le nouveau texte.
+- Qui : Vincent (texte), Claude (icône). Source : session `0cb6f324`. Statut : en vigueur.
+
+**D-139 — « Voir la planète » seulement sur mes planètes, et sa simulation**
+- 2026-11-01 20:53. Contexte : « fait un test qui montre le boutton "voir la planete" si la planette
+  nous appartiens », puis « avec une simulation ».
+- Choix : la règle sort de `renderPick` dans `Session.myPlanetAt(cell)` (ma planète mère ou une
+  de mes colonies sur la case, sinon null), lue par le jeu et par le test. `tests/planet-button.test.mjs` :
+  un scénario filmé — A touche sa planète (bouton), celle de B et une planète libre (pas de
+  bouton), y envoie un colonisateur (film seconde par seconde, 43 s), touche sa nouvelle colonie
+  (bouton, qui ouvre cette colonie). Attente `{ sheet: case, button }` dans `film.look`. Cache v73.
+- Qui : Vincent (demande), Claude (méthode). Source : session `0cb6f324`. Statut : en vigueur.
+- Tests : `tests/planet-button.test.mjs`.
+
+**D-140 — Les rapports de scénario montrent le vrai jeu, image par image**
+- 2026-11-01 20:53. Contexte : Claude avait dessiné dans le rapport une imitation de la fiche de
+  planète ; Vincent : « non il faut que les simulation reprennent exactement ce que voit
+  l'utilisateur ». Deux options proposées (A : le vrai jeu dans le rapport ; B : captures d'écran
+  d'un vrai navigateur) ; Vincent choisit A, « Vrai jeu dans le rapport ».
+- Choix : `film.look` enregistre à chaque image l'état de la partie du joueur (`state`, `me`,
+  heure, renseignements du brouillard, planète touchée, réglages du froid du test). Le rapport
+  embarque le vrai jeu, `index.html?view`, dans un cadre de téléphone (390 × 780) et lui envoie
+  l'image choisie par `postMessage`. En lecture seule (`showSnapshot`, `js/app.js`) : nouvelle
+  `Session` sur cet état, horloge arrêtée à l'heure de l'image, pas de réseau, pas de sauvegarde,
+  pas de service worker, rien ne se touche ; les autres joueurs comptent comme connectés. Le vrai
+  écran montre donc le vrai bandeau d'alerte, la vraie fiche, le vrai bouton. La carte SVG du
+  test reste, repliée, comme « carte de contrôle » (vérité : flottes cachées, vrais propriétaires).
+  Les imitations (bandeau et fiche dessinés par le rapport) sont retirées. `tests/ui/server.mjs`
+  sert aussi les fichiers du jeu (liste fermée). Ouvert en `file://`, le rapport ne peut pas
+  charger le jeu (modules JS) : il le dit et déplie la carte de contrôle.
+- Choix de Claude, par défaut : un seul cadre de jeu par scénario (pas un par image) ; les autres
+  joueurs « connectés » (sinon le bandeau « Seul en ligne », qui n'existe pas dans un test) ; le
+  froid du test transmis (sinon le vrai jeu afficherait un froid que le test a coupé).
+- Alternatives écartées : captures d'écran (lentes, D-128) ; garder la carte dessinée seule (pas
+  ce que voit le joueur).
+- Vérifié : tous les rapports générés (`ASTRA_REPORT=1`, 19 fichiers) rejoués dans le vrai jeu,
+  382 images essayées, aucune erreur. Tests : 191/191 en ~6,6 s (avant : ~6,4 s). Rapports de
+  5,6 Mo en tout (le plus gros 1,2 Mo), écrits seulement en cas d'échec ou avec `ASTRA_REPORT=1`.
+- Modifie D-129 et D-135. Qui : Vincent (choix A), Claude (méthode). Source : session `0cb6f324`.
+  Statut : en vigueur.
+
+**D-141 — Tous les tests sont des simulations**
+- 2026-11-01 21:04. Contexte : « apres absolument tous les tests doivent etre des simulations »
+  (73 tests restaient des `test(…)` simples, D-132 les laissait ainsi).
+- Choix : les 73 deviennent des `scenario(…)` : 191 scénarios sur 191 tests. Chaque `assert`
+  d'avant est gardé tel quel (aucun retiré ni modifié, titres inchangés). Chaque scénario installe
+  la situation dans une vraie partie (`newGame`) et fait au moins une image de l'écran du joueur
+  là où l'effet se voit (fiche de planète, carte, bandeaux, journal) ; le rapport la rejoue dans
+  le vrai jeu (D-140). Quand l'effet n'a pas d'écran (tables de coûts, géométrie du doigt, combat
+  calculé à part, données trafiquées), l'image montre où le joueur le rencontre et un commentaire
+  le dit ; la valeur reste vérifiée par les `assert`. Quelques vérifications ajoutées (alertes de
+  la planète en jeu = celles du test ; rapport trafiqué lu par B borné ; départs de flotte
+  acceptés). `tests/peer.test.mjs` : le gros message est maintenant une vraie copie de partie
+  (alourdie à plus de 600 000 caractères) que B fusionne.
+- Choix de Claude, par défaut : conversion faite par 4 agents en parallèle, un groupe de fichiers
+  chacun, relue ensuite (aucune ligne `assert` retirée dans le diff).
+- Vérifié : 191/191 en ~6,5 s ; avec `ASTRA_REPORT=1`, 22 rapports (13 Mo) ; 438 images (début,
+  milieu, fin de chaque scénario) rejouées dans le vrai jeu sans erreur.
+- Modifie D-132. Qui : Vincent (demande), Claude (méthode). Source : session `0cb6f324`. Statut :
+  en vigueur.

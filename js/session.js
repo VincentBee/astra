@@ -209,6 +209,24 @@ function clean(state) {
   return st;
 }
 
+/**
+ * Texte du bandeau d'alerte (D-133), en clair : `main` décrit la menace en tête de
+ * `threats()`, `more` compte les autres. null s'il n'y a rien. Le jeu et les
+ * scénarios de test l'affichent tel quel.
+ */
+export function threatText(list) {
+  if (!list?.length) return null;
+  const [t] = list;
+  const who = `${t.n} vaisseau${t.n > 1 ? 'x' : ''} ${de(t.p.name)}`;
+  const cells = Math.max(1, Math.round(t.dist));
+  const main =
+    t.eta == null ? `${who} en vue, à ${cells} case${cells > 1 ? 's' : ''} ${de(t.target.name)}`
+    : t.eta > 0 ? `${who} sur ${t.target.name} dans ${Math.ceil(t.eta / 1000)} s`
+    : `${who} en orbite ${de(t.target.name)}`;
+  const more = list.length > 1 ? `+${list.length - 1} autre${list.length > 2 ? 's' : ''}` : '';
+  return { main, more };
+}
+
 export class Session {
   constructor(name) {
     this.name = name;
@@ -1476,6 +1494,15 @@ export class Session {
     return eyes.some((e) => Math.hypot(pos.x - e.x, pos.y - e.y) <= e.r + 1e-9);
   }
 
+  /**
+   * Ma planète (mère ou colonie) sur la case `cell`, ou null : la fiche de la
+   * carte n'y montre « Voir la planète » que dans ce cas (D-138, D-139).
+   * { key, planet, cell, name }
+   */
+  myPlanetAt(cell) {
+    return this.planetsOf(this.state.players[this.me]).find((pl) => sameCell(pl.cell, cell)) || null;
+  }
+
   /** Une case est-elle dans ma portée de détection ? */
   seesCell(cell, now, eyes = this.eyes(now)) {
     return eyes.some((e) => Math.hypot(cell.x - e.x, cell.y - e.y) <= e.r + 1e-9);
@@ -1519,6 +1546,39 @@ export class Session {
       const [x, y] = k.split(',').map(Number);
       this.knownOwner({ x, y }, now, eyes); // perdue ou abandonnée sous mes yeux : oubliée
     }
+  }
+
+  /**
+   * Flottes armées adverses que je vois (D-133). Celles qui visent une de mes
+   * planètes (attaque, conquête, simple trajet vers sa case, ou déjà en
+   * orbite) d'abord, la plus proche de l'impact en tête ; puis les autres,
+   * de la plus proche à la plus lointaine de mes planètes.
+   * [{ p, f, target, eta, dist, n }] : target est la planète visée (ou la
+   * plus proche si la flotte n'en vise aucune), eta le temps avant l'arrivée
+   * en ms (0 en orbite ; null si elle ne vise rien), n le nombre de vaisseaux.
+   */
+  threats(now) {
+    const me = this.state.players[this.me];
+    const mine = this.planetsOf(me);
+    if (!mine.length) return [];
+    const eyes = this.eyes(now);
+    const out = [];
+    for (const p of Object.values(this.state.players)) {
+      if (p.id === this.me || this.deadAt(p, now) != null) continue;
+      for (const f of p.fleets || []) {
+        if (!armed(p.race, f.ships, p.planet?.tech || {}) || !this.sees(p, f, now, eyes)) continue;
+        const pos = fleetPos(f, now);
+        const order = f.order;
+        // Le résultat d'une frappe peut arriver un peu après l'heure prévue : on garde l'alerte à 0 s en attendant.
+        let target = ['attack', 'conquer'].includes(order?.kind) && order.pid === this.me ? mine.find((pl) => pl.key === order.key) : null;
+        target ||= mine.find((pl) => sameCell(pl.cell, f.to));
+        const dist = (pl) => Math.hypot(pl.cell.x - pos.x, pl.cell.y - pos.y);
+        const eta = target ? Math.max(0, f.arrive - now) : null;
+        target ||= mine.reduce((a, b) => (dist(b) < dist(a) ? b : a));
+        out.push({ p, f, target, eta, dist: dist(target), n: countShips(f.ships) });
+      }
+    }
+    return out.sort((a, b) => (a.eta == null) - (b.eta == null) || (a.eta ?? 0) - (b.eta ?? 0) || a.dist - b.dist);
   }
 
   /** La flotte `id` d'un joueur, ou celle qui l'a absorbée en fusionnant. */

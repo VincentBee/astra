@@ -10,12 +10,13 @@ import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { dirname, join, extname } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..');
 const tests = join(root, 'tests');
 const PORT = Number(process.env.PORT) || 5199;
+const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png' };
 
 /**
  * Les tests de chaque fichier, lus dans le source (node:test ne sait pas les
@@ -87,6 +88,13 @@ const server = createServer((req, res) => {
   if (req.method === 'GET' && report) {
     const p = join(tests, 'reports', report[1]);
     return existsSync(p) ? send(res, 200, 'text/html; charset=utf-8', readFileSync(p)) : send(res, 404, 'text/plain; charset=utf-8', 'Pas de rapport.');
+  }
+  // Le vrai jeu, que les rapports embarquent en lecture seule (index.html?view, D-139) : seulement
+  // ses fichiers, par une liste fermée de noms (pas de « .. » possible).
+  const game = url.pathname.match(/^\/(index\.html|style\.css|manifest\.json|(?:js|vendor|icons)\/[\w-]+\.(?:js|mjs|svg|png))$/);
+  if (req.method === 'GET' && game) {
+    const p = join(root, game[1]);
+    return existsSync(p) ? send(res, 200, TYPES[extname(p)], readFileSync(p)) : send(res, 404, 'text/plain; charset=utf-8', 'Introuvable.');
   }
   if (req.method === 'POST' && url.pathname === '/api/run') {
     let body = '';

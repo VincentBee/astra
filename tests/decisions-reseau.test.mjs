@@ -2,10 +2,10 @@
 // sauvegarde et historique, journal des ordres, rendez-vous, icônes, fond étoilé.
 // Chaque test dit ce que la doc décide, pas seulement ce que fait le code.
 //
-// Ceux qui jouent une partie synchrone sont écrits en scénarios (D-129) : en cas d'échec, le
-// rapport tests/reports/decisions-reseau.test.html montre la partie vue par le joueur concerné.
-// Les tests sans partie (sauvegarde seule, fonctions pures) restent en test().
-import { test } from 'node:test';
+// Tous sont écrits en scénarios (D-129) : en cas d'échec, le rapport
+// tests/reports/decisions-reseau.test.html montre la partie vue par le joueur concerné. Ceux qui
+// vérifient une fonction pure (fusion, historique, rendez-vous, icônes, fond) montrent la partie
+// où le joueur les rencontre ; la vérification, elle, reste faite par les asserts.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { newGame, game, Session } from './harness.mjs';
@@ -53,6 +53,32 @@ async function withStore(fn) {
     return await fn(m);
   } finally {
     globalThis.localStorage = old;
+  }
+}
+
+/**
+ * Une partie à un joueur, datée de maintenant (Date.now) : une fois sauvegardée, Session.resume
+ * la reprend sans rattraper des années de temps de jeu.
+ */
+function soloNow(gid) {
+  const t = Date.now();
+  const s = new Session('J0');
+  Object.assign(s, { now: () => t, start() {}, meet() {}, me: 'p0', status: 'playing' });
+  s.state = { gid, key: 'k', players: {}, log: [] };
+  s.addPlayer('p0', 'J0', 'x'.repeat(64));
+  s.chooseRace('human');
+  s.claimPlanet(s.planets[0].id);
+  return s;
+}
+
+/** Reprend la sauvegarde `saved` comme au lancement de l'appli, sans minuteurs ni rendez-vous. */
+function resumeQuiet(saved) {
+  const start = Session.prototype.start;
+  Session.prototype.start = () => {};
+  try {
+    return Session.resume(saved);
+  } finally {
+    Session.prototype.start = start;
   }
 }
 
@@ -182,7 +208,14 @@ scenario('D-007 : la reprise rattrape le temps écoulé', (film) => {
   }
 });
 
-test('D-007 : fusion de deux copies, la plus récente action par joueur gagne', () => {
+scenario('D-007 : fusion de deux copies, la plus récente action par joueur gagne', (film) => {
+  // Les images : A avant puis après avoir fusionné la copie de B, qui a joué entre-temps.
+  // La règle de fusion est vérifiée par les asserts, sur des copies écrites à la main.
+  const { players: [A, B], sync } = newGame(2);
+  B.build(firstBuilding(B));
+  film.look(A, 'avant la fusion : A ne sait pas que B a lancé un chantier');
+  sync(A, B);
+  film.look(A, 'après la fusion : la fiche de B, plus récente, a gagné');
   const base = { gid: 'g', players: { a: { id: 'a', rank: 0, actAt: 10, name: 'A-base', online: true }, b: { id: 'b', rank: 1, actAt: 50, name: 'B-base' } }, log: [{ at: 1, text: 'x' }] };
   const other = { gid: 'g', players: { a: { id: 'a', rank: 0, actAt: 20, name: 'A-autre' }, b: { id: 'b', rank: 1, actAt: 50, name: 'B-autre' }, c: { id: 'c', rank: 2, actAt: 5, name: 'C' } }, log: [{ at: 1, text: 'x' }, { at: 0, text: 'y' }] };
   const m = save.mergeStates(base, other);
@@ -196,7 +229,11 @@ test('D-007 : fusion de deux copies, la plus récente action par joueur gagne', 
 
 // ----- D-066 : historique des 10 dernières parties
 
-test('D-066 : 10 parties gardées, une nouvelle n’efface pas l’ancienne', async () => {
+scenario('D-066 : 10 parties gardées, une nouvelle n’efface pas l’ancienne', async (film) => {
+  // Les images : une vraie partie, puis la même reprise depuis l'historique (comme au relancement).
+  // Le tri et le plafond de l'historique sont vérifiés par les asserts, sur des parties minimales.
+  const real = soloNow('ghisto');
+  film.look(real, 'une partie en cours, avant de passer à d’autres');
   await withStore(() => {
     const now = Date.now;
     let t = 1_000;
@@ -214,10 +251,16 @@ test('D-066 : 10 parties gardées, une nouvelle n’efface pas l’ancienne', as
     } finally {
       Date.now = now;
     }
+    save.saveGame(real.me, real.state);
+    film.look(resumeQuiet(save.selectGame('ghisto')), 'la partie reprise depuis l’historique');
   });
 });
 
-test('D-066 : l’identité est gardée par partie ; reprendre et oublier', async () => {
+scenario('D-066 : l’identité est gardée par partie ; reprendre et oublier', async (film) => {
+  // Les images : une vraie partie, puis la même reprise depuis l'historique. Identités, reprise et
+  // oubli sont vérifiés par les asserts, sur des parties minimales.
+  const real = soloNow('greprise');
+  film.look(real, 'une partie en cours');
   await withStore(() => {
     const st = (gid) => ({ gid, players: { me: { id: 'me', name: 'Moi', rank: 0 } }, log: [] });
     save.saveGame('me', st('A'));
@@ -232,6 +275,8 @@ test('D-066 : l’identité est gardée par partie ; reprendre et oublier', asyn
     assert.deepEqual(save.listGames().map((x) => x.state.gid), ['B']);
     assert.equal(save.selectGame('A'), null);
     assert.equal(JSON.parse(localStorage.getItem('astra.identities')).A, undefined, 'son identité aussi');
+    save.saveGame(real.me, real.state);
+    film.look(resumeQuiet(save.selectGame('greprise')), 'la partie reprise depuis l’historique');
   });
 });
 
@@ -276,7 +321,11 @@ scenario('D-050 : journal plafonné à 1 500 entrées, les plus anciennes s’ef
 
 // ----- D-009 : rendez-vous propre à la partie
 
-test('D-009 : au rendez-vous, seuls les joueurs de la même partie sont reliés', () => {
+scenario('D-009 : au rendez-vous, seuls les joueurs de la même partie sont reliés', (film) => {
+  // Le rendez-vous ne se voit pas à l'écran : l'image montre la partie dont les joueurs se
+  // retrouvent (même gid) ; le tri des pairs est vérifié par les asserts.
+  const { players: [A] } = newGame(2);
+  film.look(A, 'A et B, de la même partie : eux seuls sont reliés au rendez-vous');
   const linked = [];
   const sent = [];
   const rdv = new Rendezvous({ gid: 'g1', key: 'k', me: 'moi', onLink: (link, pid) => linked.push(pid) });
@@ -317,7 +366,11 @@ scenario('D-009 : salon protégé par la clé de la partie ; le lien rendez-vous
 
 // ----- D-052 / D-064 : icônes nommées
 
-test('D-052 : icônes de ressources nommées (survol et lecteur d’écran), couleur par ressource', () => {
+scenario('D-052 : icônes de ressources nommées (survol et lecteur d’écran), couleur par ressource', (film) => {
+  // L'image montre l'écran du joueur, avec ses icônes de ressources (fiche de sa planète ouverte) ;
+  // le balisage des icônes et leurs couleurs sont vérifiés par les asserts.
+  const { players: [A] } = newGame(1);
+  film.look(A, 'A ouvre sa planète : stock en icônes de ressources', [{ sheet: P(A).home, button: true }]);
   for (const [r, name] of [['minerals', 'Minéraux'], ['food', 'Nourriture'], ['energy', 'Énergie'], ['pop', 'Habitants']]) {
     const svg = game.resIcon(r, name);
     assert.match(svg, new RegExp(`class="ri ri-${r}"`));
@@ -330,7 +383,11 @@ test('D-052 : icônes de ressources nommées (survol et lecteur d’écran), cou
   for (const r of ['minerals', 'food', 'energy', 'pop']) assert.match(css, new RegExp(`\\.ri-${r}\\s*\\{\\s*color:`));
 });
 
-test('D-064 : chaque icône de la page existe, et un bouton sans texte porte un nom', () => {
+scenario('D-064 : chaque icône de la page existe, et un bouton sans texte porte un nom', (film) => {
+  // L'image montre l'écran du joueur et ses boutons à icône ; le balisage de index.html est
+  // vérifié par les asserts.
+  const { players: [A] } = newGame(1);
+  film.look(A, 'l’écran de A, ses boutons à icône');
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const names = [...html.matchAll(/data-ic="([^"]+)"/g)].map((m) => m[1]);
   assert.ok(names.length > 20);
@@ -347,7 +404,7 @@ test('D-064 : chaque icône de la page existe, et un bouton sans texte porte un 
   }
 });
 
-// ----- D-067 / D-068 : parallaxe à l'accéléromètre
+// ----- Fond étoilé (D-112, D-137 ; avant : parallaxe D-067 / D-068)
 
 /** Lance le fond étoilé dans un faux navigateur ; renvoie ses couches et ses écouteurs. */
 function galaxy({ still = false, ios = false, mode = null } = {}) {
@@ -407,44 +464,24 @@ function galaxy({ still = false, ios = false, mode = null } = {}) {
   return { layers, on, perm, prepended: prepended.n, fire: (t, e) => during(() => fire(t, e)), pos: () => layers.map((l) => l.style.transform) };
 }
 
-test('D-067 : le doigt ne bouge pas les étoiles, l’accéléromètre si', () => {
-  const g = galaxy();
-  const rest = g.pos();
-  g.fire('pointermove', { pointerType: 'touch', clientX: 390, clientY: 790 });
-  assert.deepEqual(g.pos(), rest, 'glissé du doigt : rien ne bouge');
-  g.fire('devicemotion', { accelerationIncludingGravity: { x: 0, y: 0 } });
-  g.fire('devicemotion', { accelerationIncludingGravity: { x: 3, y: 0 } });
-  assert.notDeepEqual(g.pos(), rest, 'téléphone incliné : le ciel glisse');
-});
+// D-067 et D-068 (parallaxe, accéléromètre) : remplacées par D-137, plus de tests.
 
-test('D-068 : sur iPhone, l’autorisation « Mouvement » est demandée au premier tap ; fond fixe si « réduire les animations »', () => {
-  const g = galaxy({ ios: true });
-  const tap = g.on.filter((h) => h.type === 'pointerdown');
-  assert.equal(tap.length, 1);
-  assert.equal(tap[0].opts?.once, true, 'une seule fois');
-  assert.equal(g.perm.n, 0, 'pas avant le tap');
-  g.fire('pointerdown', {});
-  assert.equal(g.perm.n, 1);
-
-  const still = galaxy({ still: true, ios: true });
-  assert.deepEqual(still.on.map((h) => h.type), ['resize'], 'ni défilement, ni capteur, ni souris');
-  const rest = still.pos();
-  still.fire('devicemotion', { accelerationIncludingGravity: { x: 3, y: 3 } });
-  assert.deepEqual(still.pos(), rest);
-});
-
-test('D-112 : réglage « Fond » — fixe = une image sans capteurs, aucun = pas d’étoiles', () => {
-  const anime = galaxy({ mode: 'anime' });
-  assert.equal(anime.layers.length, 3);
-  assert.ok(anime.on.some((h) => h.type === 'devicemotion'));
-
-  const fixe = galaxy({ mode: 'fixe' });
-  assert.equal(fixe.layers.length, 1, 'les trois couches dans une seule image');
-  assert.deepEqual(fixe.on.map((h) => h.type), ['resize'], 'ni défilement, ni capteur, ni souris');
-
+scenario('D-137 (modifie D-112) : plus de parallaxe — une image immobile, sans capteur ni souris, pour tout le monde', (film) => {
+  // L'image montre l'écran du joueur sur son fond étoilé ; le module du fond est vérifié par les
+  // asserts, dans un faux navigateur.
+  const { players: [A] } = newGame(1);
+  film.look(A, 'l’écran de A sur le fond étoilé, immobile');
+  // « anime » (l'ancien réglage gardé dans un téléphone), rien ou n'importe quoi : le fond fixe.
+  for (const mode of ['fixe', 'anime', null, 'n’importe quoi']) {
+    const g = galaxy({ mode, ios: true });
+    assert.equal(g.layers.length, 1, `${mode} : une seule image`);
+    assert.deepEqual(g.on.map((h) => h.type), ['resize'], `${mode} : ni défilement, ni capteur, ni souris`);
+    assert.equal(g.perm.n, 0, `${mode} : pas d’autorisation « Mouvement » demandée`);
+    const rest = g.pos();
+    g.fire('devicemotion', { accelerationIncludingGravity: { x: 3, y: 3 } });
+    assert.deepEqual(g.pos(), rest, `${mode} : rien ne bouge`);
+  }
   const aucun = galaxy({ mode: 'aucun' });
-  assert.equal(aucun.prepended, 0, 'rien n’est ajouté à la page');
+  assert.equal(aucun.prepended, 0, 'aucun : rien n’est ajouté à la page');
   assert.equal(aucun.on.length, 0);
-
-  assert.equal(galaxy({ mode: 'n’importe quoi' }).layers.length, 3, 'valeur inconnue : animé');
 });

@@ -1,7 +1,6 @@
 // Flottes entre plusieurs téléphones : un même combat ne doit pas compter deux
 // fois, une colonie va au premier arrivé, et une flotte en panne tout près de
 // sa planète peut y faire le plein. Cas trouvés en faisant jouer des robots.
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame, fleet } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
@@ -221,9 +220,21 @@ scenario('raids : pas d’attaque sans armes, et un seul pillage par planète to
   assert.ok(looted() > once, 'un nouveau pillage après 2 min');
 });
 
-test('une flotte va à la vitesse de son vaisseau le plus lent', async () => {
+scenario('une flotte va à la vitesse de son vaisseau le plus lent', async (film) => {
   const { fleetSpeed, slowestShip, tripMs } = await import('../js/fleet.js');
   const mixed = { fighter: 5, colony: 1, cargo: 2 };
+  // Sur la carte : deux flottes de A partent ensemble pour 12 cases, l'une de 5 chasseurs, l'autre
+  // avec un colonisateur en plus ; la rapide arrive la première. Les vitesses sont vérifiées par les asserts.
+  const { players: [A], clock } = newGame(1, ['human']);
+  const fast = park(A, { fighter: 5 }, {}, { x: 2, y: 3 }, 300);
+  const slow = park(A, mixed, {}, { x: 2, y: 6 }, 300);
+  A.moveFleet(fast, { x: 14, y: 3 }, 'move');
+  A.moveFleet(slow, { x: 14, y: 6 }, 'move');
+  film.look(A, 'les deux flottes de A partent ensemble pour 12 cases');
+  clock.t = A.myFleet(fast).arrive;
+  film.look(A, 'les 5 chasseurs sont arrivés ; la flotte au colonisateur est encore en route');
+  clock.t = A.myFleet(slow).arrive;
+  film.look(A, 'la flotte au colonisateur arrive enfin');
   assert.equal(slowestShip('human', mixed, {}), 'colony');
   assert.equal(fleetSpeed('human', mixed, {}), fleetSpeed('human', { colony: 1 }, {}));
   assert.ok(fleetSpeed('human', mixed, {}) < fleetSpeed('human', { fighter: 5 }, {}));
@@ -345,7 +356,25 @@ scenario('comportement : refusé sans armes, vu par les autres, gardé par la fl
 /** Mes combats livrés (pas les rapports lus). */
 const fought = (s) => (P(s).engaged || []).filter((g) => g.id && !g.got);
 
-test('firstContact : l’instant où deux flottes entrent au contact, jamais un contact déjà en cours', () => {
+scenario('firstContact : l’instant où deux flottes entrent au contact, jamais un contact déjà en cours', (film) => {
+  // Sur la carte : une flotte de A part de (0:5) vers (10:5), devant un chasseur de B arrêté en (6:5) ;
+  // une image à l'instant du contact. Le calcul est vérifié par les asserts, sur des trajets à plat.
+  {
+    const { players: [A, B], clock, sync } = newGame(2, ['human', 'human']);
+    const aid = park(A, { fighter: 2 }, {}, { x: 0, y: 5 }, 300);
+    const bid = park(B, { fighter: 1 }, {}, { x: 6, y: 5 }, 300);
+    A.moveFleet(aid, { x: 10, y: 5 }, 'move');
+    sync(A, B);
+    film.look(A, 'la flotte de A part de (0:5) vers (10:5) ; un chasseur de B attend en (6:5)');
+    const f = A.myFleet(aid);
+    const contact = fleet.firstContact(f, B.myFleet(bid), clock.t, f.arrive);
+    if (contact) {
+      clock.t = contact;
+      film.look(A, 'l’instant du contact : à une demi-case du chasseur de B');
+    }
+    clock.t = f.arrive;
+    film.look(A, 'arrivée en (10:5)');
+  }
   const seg = (from, to, depart, arrive) => ({ from, to, depart, arrive });
   const still = (at) => seg(at, at, 0, 0);
   // De (0,5) à (10,5) en 10 s, devant une flotte arrêtée en (6,5) : contact à 5,5 cases, soit 5,5 s.
