@@ -1460,7 +1460,7 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   boucles de temps des tests par `film.roll` (risque de changer les passages).
 - Mesuré : `node --test tests/*.test.mjs` 6,4 s avant et après ; avec `ASTRA_REPORT=1`, 6,5 s.
 - Qui : Vincent (la demande), Claude (le partage). Source : session `09eb6bdd`.
-- Statut : en vigueur. 189/189.
+- Statut : modifiée par D-141 (plus d'exception : tous les tests sont des scénarios). 189/189.
 
 **D-133 — Alerte quand une flotte ennemie arrive sur une de mes planètes**
 - 2026-10-30 14:10. Contexte : retour de 7 testeurs (point 1.3 de leur synthèse) : une conquête
@@ -1578,3 +1578,23 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   5,6 Mo en tout (le plus gros 1,2 Mo), écrits seulement en cas d'échec ou avec `ASTRA_REPORT=1`.
 - Modifie D-129 et D-135. Qui : Vincent (choix A), Claude (méthode). Source : session `0cb6f324`.
   Statut : en vigueur.
+
+**D-141 — Tous les tests sont des simulations**
+- 2026-11-01 21:04. Contexte : « apres absolument tous les tests doivent etre des simulations »
+  (73 tests restaient des `test(…)` simples, D-132 les laissait ainsi).
+- Choix : les 73 deviennent des `scenario(…)` : 191 scénarios sur 191 tests. Chaque `assert`
+  d'avant est gardé tel quel (aucun retiré ni modifié, titres inchangés). Chaque scénario installe
+  la situation dans une vraie partie (`newGame`) et fait au moins une image de l'écran du joueur
+  là où l'effet se voit (fiche de planète, carte, bandeaux, journal) ; le rapport la rejoue dans
+  le vrai jeu (D-140). Quand l'effet n'a pas d'écran (tables de coûts, géométrie du doigt, combat
+  calculé à part, données trafiquées), l'image montre où le joueur le rencontre et un commentaire
+  le dit ; la valeur reste vérifiée par les `assert`. Quelques vérifications ajoutées (alertes de
+  la planète en jeu = celles du test ; rapport trafiqué lu par B borné ; départs de flotte
+  acceptés). `tests/peer.test.mjs` : le gros message est maintenant une vraie copie de partie
+  (alourdie à plus de 600 000 caractères) que B fusionne.
+- Choix de Claude, par défaut : conversion faite par 4 agents en parallèle, un groupe de fichiers
+  chacun, relue ensuite (aucune ligne `assert` retirée dans le diff).
+- Vérifié : 191/191 en ~6,5 s ; avec `ASTRA_REPORT=1`, 22 rapports (13 Mo) ; 438 images (début,
+  milieu, fin de chaque scénario) rejouées dans le vrai jeu sans erreur.
+- Modifie D-132. Qui : Vincent (demande), Claude (méthode). Source : session `0cb6f324`. Statut :
+  en vigueur.

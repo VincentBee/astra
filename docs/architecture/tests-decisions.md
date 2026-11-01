@@ -162,3 +162,4 @@ que fait le code.
 | D-138 | Bouton « Voir la planète » | non testable |  | texte d'un bouton : vérifié dans le navigateur |
 | D-139 | « Voir la planète » seulement sur mes planètes | nouveau test | `planet-button.test.mjs` (scénario filmé : ma planète, celle de B, une libre, puis ma nouvelle colonie) | l'écran est montré par le vrai jeu dans le rapport (D-140) |
 | D-140 | Les rapports montrent le vrai jeu | test existant | tous les scénarios (`ASTRA_REPORT=1`) : 382 images de 19 rapports rejouées dans `index.html?view` sans erreur (vérifié dans le navigateur, pas de test automatique) | le mode lecture seule dépend du DOM |
+| D-141 | Tous les tests sont des simulations | test existant | les 191 tests sont des `scenario(…)` ; `grep -E "^test\(" tests/*.test.mjs` ne trouve rien | 438 images rejouées dans le vrai jeu sans erreur (navigateur) |

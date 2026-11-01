@@ -357,7 +357,8 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 20:53 | `0cb6f324` | « avec une simulation » (envoyé pendant le travail) | `tests/planet-button.test.mjs` : scénario filmé (ma planète, celle de B, une libre, colonisation puis ma colonie) ; attente `{ sheet, button }` | (cette PR) | D-139 |
 | 20:53 | `0cb6f324` | « non il faut que les simulation reprennent exactement ce que voit l'utilisateur » | Imitation de la fiche abandonnée ; deux options proposées (vrai jeu dans le rapport, ou captures) | — | D-140 |
 | 20:53 | `0cb6f324` | [Bouton] « Vrai jeu dans le rapport » | `index.html?view` (lecture seule, `showSnapshot`) ; `film.look` enregistre l'état ; le rapport embarque le vrai jeu ; carte SVG gardée en « carte de contrôle » ; serveur de test qui sert le jeu ; 19 rapports rejoués sans erreur (382 images) ; 191/191 | (cette PR) | D-140 |
-| 20:53 | `0cb6f324` | « apres absolument tous les tests doivent etre des simulations » (envoyé pendant le travail) | Noté ; à faire après ce commit | — | — |
+| 20:53 | `0cb6f324` | « apres absolument tous les tests doivent etre des simulations » (envoyé pendant le travail) | Noté ; fait après le commit du vrai jeu (ligne suivante) | — | D-141 |
+| 21:04 | `0cb6f324` | (suite de la demande précédente) | Les 73 `test(…)` restants deviennent des scénarios (4 agents, un groupe de fichiers chacun, relus) : 191/191 scénarios, aucun `assert` retiré ; 438 images rejouées dans le vrai jeu sans erreur | (cette PR) | D-141 |
 
 ### Travaux en cours au 2026-10-29
 
