@@ -1,16 +1,22 @@
 // Décisions du domaine réseau (docs/decisions.md) : invitations, fiches,
 // sauvegarde et historique, journal des ordres, rendez-vous, icônes, fond étoilé.
 // Chaque test dit ce que la doc décide, pas seulement ce que fait le code.
+//
+// Ceux qui jouent une partie synchrone sont écrits en scénarios (D-129) : en cas d'échec, le
+// rapport tests/reports/decisions-reseau.test.html montre la partie vue par le joueur concerné.
+// Les tests sans partie (sauvegarde seule, fonctions pures) restent en test().
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { newGame, game, Session } from './harness.mjs';
+import { scenarios } from './scenario.mjs';
 
 const { MAX_ORDERS } = await import('../js/session.js');
 const save = await import('../js/save.js');
 const { Rendezvous } = await import('../js/rendezvous.js');
 const { ic } = await import('../js/icons.js');
 const { startGalaxy } = await import('../js/galaxy.js');
+const scenario = scenarios(import.meta.url);
 
 const P = (s) => s.state.players[s.me];
 const firstBuilding = (s) => Object.keys(game.RACES[P(s).race].buildings)[0];
@@ -52,20 +58,24 @@ async function withStore(fn) {
 
 // ----- D-006 : les deux scans valent accord, 8 joueurs au plus, invitation à usage unique
 
-test('D-006 : un nouveau venu entre sans validation de l’hôte', async () => {
+scenario('D-006 : un nouveau venu entre sans validation de l’hôte', async (film) => {
   const { players: [A] } = newGame(2);
+  film.look(A, 'partie à deux, avant l’arrivée de Zoé');
   const link = fakeLink();
   await A.onHello(link, { type: 'hello', name: 'Zoé', secretHash: 'a'.repeat(64) });
+  film.look(A, 'Zoé dit bonjour : elle entre tout de suite');
   const welcome = link.sent.find((m) => m.type === 'welcome');
   assert.ok(welcome, 'welcome envoyé tout de suite');
   assert.equal(A.state.players[welcome.you].name, 'Zoé');
   assert.equal(Object.keys(A.state.players).length, 3);
 });
 
-test('D-006 : 8 joueurs au plus, le 9e est refusé', async () => {
+scenario('D-006 : 8 joueurs au plus, le 9e est refusé', async (film) => {
   const { players: [A] } = newGame(8);
+  film.look(A, 'partie pleine : 8 joueurs');
   const link = fakeLink();
   await A.onHello(link, { type: 'hello', name: 'Neuf', secretHash: 'a'.repeat(64) });
+  film.look(A, 'un 9e dit bonjour : refusé');
   const refused = link.sent.find((m) => m.type === 'refused');
   assert.ok(refused, 'refused envoyé');
   assert.match(refused.reason, /8/);
@@ -73,67 +83,79 @@ test('D-006 : 8 joueurs au plus, le 9e est refusé', async () => {
   assert.equal(Object.keys(A.state.players).length, 8);
 });
 
-test('D-006 : une invitation ne sert qu’une fois', async () => {
+scenario('D-006 : une invitation ne sert qu’une fois', async (film) => {
   const { players: [A] } = newGame(1);
+  film.look(A, 'A seul, une invitation prête');
   A.invite = { accept: async () => fakeLink(), cancel() {} };
   await A.acceptAnswer('a2.x');
+  film.look(A, 'première réponse acceptée ; la seconde sera refusée');
   await assert.rejects(A.acceptAnswer('a2.y'), (e) => e.used === true);
 });
 
 // ----- D-005 (partie restée) / D-010 : retour par le secret local
 
-test('D-005/D-010 : un joueur revient avec son secret, sans devenir un nouveau joueur', async () => {
+scenario('D-005/D-010 : un joueur revient avec son secret, sans devenir un nouveau joueur', async (film) => {
   const { players: [A] } = newGame(2);
   A.state.players.p1.secretHash = await sha256('mon-secret');
+  film.look(A, 'B (p1) est parti ; A garde sa place');
   const back = fakeLink();
   await A.onHello(back, { type: 'hello', name: 'J1', gid: 'gtest', pid: 'p1', secret: 'mon-secret', secretHash: 'b'.repeat(64) });
+  film.look(A, 'B revient avec son secret : toujours deux joueurs');
   assert.equal(back.sent.find((m) => m.type === 'welcome')?.you, 'p1');
   assert.equal(Object.keys(A.state.players).length, 2);
   // Mauvais secret : ce n'est pas p1, il entre comme un nouveau.
   const liar = fakeLink();
   await A.onHello(liar, { type: 'hello', name: 'J1', gid: 'gtest', pid: 'p1', secret: 'faux', secretHash: 'c'.repeat(64) });
+  film.look(A, 'mauvais secret : il entre comme un nouveau joueur');
   assert.notEqual(liar.sent.find((m) => m.type === 'welcome')?.you, 'p1');
 });
 
 // ----- D-010 : plus de maître du jeu
 
-test('D-010 : une fiche plus récente passe de proche en proche, sauf vers sa source', () => {
+scenario('D-010 : une fiche plus récente passe de proche en proche, sauf vers sa source', (film) => {
   const { players: [A, B] } = newGame(3);
   const l1 = fakeLink();
   const l2 = fakeLink();
   A.attach(l1, 'p1');
   A.attach(l2, 'p2');
+  film.look(A, 'A relié à B (l1) et à C (l2)');
   B.build(firstBuilding(B));
   const rec = B.snapshot().players.p1;
   A.onRecord(l1, rec);
+  film.look(A, 'A reçoit la fiche de B par l1');
   assert.equal(A.state.players.p1.actAt, rec.actAt, 'la plus récente gagne');
   assert.ok(l2.sent.some((m) => m.type === 'rec' && m.rec.id === 'p1'), 'relayée au voisin');
   assert.equal(l1.sent.some((m) => m.type === 'rec'), false, 'pas renvoyée à sa source');
   // Une fiche plus ancienne est ignorée.
   l2.sent.length = 0;
   A.onRecord(l1, { ...rec, actAt: rec.actAt - 5, name: 'Vieux' });
+  film.look(A, 'A reçoit une fiche plus ancienne de B, nommée « Vieux »');
   assert.equal(A.state.players.p1.name, 'J1');
   assert.equal(l2.sent.length, 0);
 });
 
-test('D-010 : plus de relève ni d’époques dans une copie reçue', () => {
+scenario('D-010 : plus de relève ni d’époques dans une copie reçue', (film) => {
   const { players: [A, B] } = newGame(2);
+  film.look(A, 'au départ');
   A.mergeIn({ ...B.snapshot(), leader: 'p1', epoch: 5, nextRank: 9 }, { pid: 'p1' });
+  film.look(A, 'A reçoit une copie de B avec leader, epoch et nextRank');
   for (const k of ['leader', 'epoch', 'nextRank']) assert.equal(k in A.state, false, k);
 });
 
 // ----- D-007 : sauvegarde locale, reprise, fusion des copies
 
-test('D-007 : la partie est sauvegardée à chaque changement', () => {
+scenario('D-007 : la partie est sauvegardée à chaque changement', (film) => {
   const { players: [A] } = newGame(1);
+  film.look(A, 'au départ');
   A.build(firstBuilding(A));
+  film.look(A, 'A lance un chantier : la partie est sauvegardée');
   const saved = JSON.parse(localStorage.getItem('astra.save'));
   assert.equal(saved.v, 1);
   assert.equal(saved.me, 'p0');
   assert.equal(saved.state.players.p0.actAt, P(A).actAt);
 });
 
-test('D-007 : la reprise rattrape le temps écoulé', () => {
+scenario('D-007 : la reprise rattrape le temps écoulé', (film) => {
   const t0 = Date.now() - 6 * 3_600_000; // partie laissée il y a 6 h
   const s = new Session('J0');
   Object.assign(s, { now: () => t0, start() {}, meet() {}, me: 'p0', status: 'playing' });
@@ -145,12 +167,14 @@ test('D-007 : la reprise rattrape le temps écoulé', () => {
   P(s).planet.stock = { minerals: 1e6, food: 1e6, energy: 1e6 };
   const level = P(s).planet.levels[key] || 0;
   s.build(key);
+  film.look(s, 'il y a 6 h : chantier lancé, puis la partie est laissée');
   assert.ok(P(s).planet.queue, 'chantier en cours');
   const saved = { v: 1, me: 'p0', savedAt: t0, state: JSON.parse(JSON.stringify(s.state)) };
   const start = Session.prototype.start;
   Session.prototype.start = () => {}; // pas de minuteurs ni de rendez-vous dans Node
   try {
     const r = Session.resume(saved);
+    film.look(r, 'reprise de la sauvegarde, 6 h plus tard');
     assert.equal(P(r).planet.queue, null, 'le chantier fini pendant l’absence est terminé');
     assert.equal(P(r).planet.levels[key], level + 1);
   } finally {
@@ -213,33 +237,39 @@ test('D-066 : l’identité est gardée par partie ; reprendre et oublier', asyn
 
 // ----- D-045 / D-049 / D-050 : journal des ordres
 
-test('D-045 : un ordre refusé est noté et date la fiche', () => {
+scenario('D-045 : un ordre refusé est noté et date la fiche', (film) => {
   const { players: [A] } = newGame(1);
   const n = P(A).orders.length;
   const before = P(A).actAt;
+  film.look(A, 'au départ');
   assert.equal(A.build('inconnu'), undefined);
+  film.look(A, 'A ordonne de construire « inconnu » : refusé');
   assert.equal(P(A).orders.length, n + 1);
   assert.equal(P(A).orders.at(-1).k, 'build');
   assert.deepEqual(P(A).orders.at(-1).a, ['inconnu']);
   assert.ok(P(A).actAt > before, 'nouvel actAt pour que les autres l’adoptent');
 });
 
-test('D-049 : chaque entrée note ce que le joueur avait reçu des autres', () => {
+scenario('D-049 : chaque entrée note ce que le joueur avait reçu des autres', (film) => {
   const { players: [A, B], sync } = newGame(2);
   B.build(firstBuilding(B));
   sync(A, B);
+  film.look(A, 'A reçoit la fiche de B');
   A.build(firstBuilding(A));
+  film.look(A, 'A lance un chantier à son tour');
   assert.equal(P(A).orders.at(-1).s?.p1, P(B).orders.length);
   A.build('inconnu'); // rien de neuf chez B : pas de `s`
   assert.equal(P(A).orders.at(-1).s, undefined);
 });
 
-test('D-050 : journal plafonné à 1 500 entrées, les plus anciennes s’effacent', () => {
+scenario('D-050 : journal plafonné à 1 500 entrées, les plus anciennes s’effacent', (film) => {
   assert.equal(MAX_ORDERS, 1500);
   const { players: [A] } = newGame(1);
   P(A).orders = Array.from({ length: 1499 }, (_, i) => ({ t: i, k: 'tick' }));
+  film.look(A, 'le journal de A compte 1 499 entrées');
   A.build('inconnu');
   A.build('inconnu');
+  film.look(A, 'deux ordres de plus : le journal reste à 1 500');
   assert.equal(P(A).orders.length, 1500);
   assert.equal(P(A).orders[0].t, 1, 'la plus vieille entrée est partie');
 });
@@ -270,8 +300,9 @@ test('D-009 : au rendez-vous, seuls les joueurs de la même partie sont reliés'
   }
 });
 
-test('D-009 : salon protégé par la clé de la partie ; le lien rendez-vous est gardé', () => {
+scenario('D-009 : salon protégé par la clé de la partie ; le lien rendez-vous est gardé', (film) => {
   const { players: [A] } = newGame(2);
+  film.look(A, 'au départ, partie à clé « k »');
   assert.equal(A.gameKey, 'k');
   delete A.state.key;
   assert.equal(A.gameKey, 'k-gtest', 'parties sans clé');
@@ -279,6 +310,7 @@ test('D-009 : salon protégé par la clé de la partie ; le lien rendez-vous est
   const direct = fakeLink();
   A.attach(room, 'p1');
   A.attach(direct, 'p1');
+  film.look(A, 'B relié deux fois à A : par le salon, puis en direct');
   assert.equal(A.links.get('p1'), room);
   assert.equal(direct.closed, true);
 });

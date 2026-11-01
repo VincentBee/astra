@@ -1,1 +1,3 @@
 .DS_Store
+# Rapports des scénarios (tests/scenario.mjs) : écrits à chaque échec, refaits à la demande.
+tests/reports/

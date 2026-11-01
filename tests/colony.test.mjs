@@ -1,11 +1,13 @@
 // Deux joueurs colonisent la même planète sans se voir (partie coupée en
 // deux). Au recollage, le perdant retrouve son escorte et sa cargaison en
 // orbite, au lieu de tout perdre avec la colonie.
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame } from './harness.mjs';
+import { scenarios } from './scenario.mjs';
 
-test('colonie perdue au recollage : les vaisseaux et la cargaison restent en orbite', () => {
+const scenario = scenarios(import.meta.url);
+
+scenario('colonie perdue au recollage : les vaisseaux et la cargaison restent en orbite', (film) => {
   const { players: [A, B], clock, sync } = newGame(2, ['human', 'human']);
   const target = A.planets[5];
   const cell = { x: target.x, y: target.y };
@@ -19,14 +21,18 @@ test('colonie perdue au recollage : les vaisseaux et la cargaison restent en orb
     f.arrive += late; // A arrive 30 s après B
     f.depart += late;
   }
+  film.look(A, 'A et B envoient chacun un colon vers la même planète (A arrivera 30 s après B)');
   clock.t += 31_000;
   A.tick();
   B.tick();
+  film.look(A, 'après 31 s, sans se voir : A a fondé sa colonie');
   assert.ok(A.state.players[A.me].colonies[target.id], 'A a fondé sa colonie sans voir celle de B');
 
   sync(A, B);
+  film.look(A, 'recollage : A reçoit la fiche de B, arrivé le premier');
   clock.t += 250;
   A.tick();
+  film.look(A, 'A perd la colonie : sa flotte attend en orbite');
   const pa = A.state.players[A.me];
   assert.equal(pa.colonies[target.id], undefined, 'B, arrivé le premier, garde la planète');
   const back = pa.fleets.find((f) => f.to.x === cell.x && f.to.y === cell.y);

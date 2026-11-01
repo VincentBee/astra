@@ -1,11 +1,13 @@
 // Rapport de combat détaillé (D-122) : le déroulé de `battle`, son explication
 // (pourquoi on gagne ou on perd) et son voyage jusqu'au carnet du défenseur.
 import { test } from 'node:test';
+import { scenarios } from './scenario.mjs';
 import assert from 'node:assert/strict';
 import { battle } from '../js/fleet.js';
 import { explainBattle, sideTable, cleanReport } from '../js/report.js';
 import { newGame } from './harness.mjs';
 
+const scenario = scenarios(import.meta.url);
 const P = (s) => s.state.players[s.me];
 
 test('battle : le déroulé donne les forces au départ et chaque passe, cohérent avec les pertes', () => {
@@ -89,7 +91,7 @@ test('cleanReport : un déroulé trafiqué est borné, un déroulé illisible é
 });
 
 /** A (humain) en orbite sur la planète de B (machine, 4 drones, 4000 minéraux), qui attaque. */
-function raid() {
+function raid(film) {
   const { players: [A, B], clock, sync } = newGame(2, ['human', 'machine']);
   const bp = P(B).planet;
   Object.assign(bp, { stock: { minerals: 4000, food: 0, energy: 500 }, ships: { fighter: 4 } });
@@ -101,13 +103,15 @@ function raid() {
   const id = A.takeOff('home', { fighter: 20, cargo: 20 }, {}, 0);
   Object.assign(A.myFleet(id), { from: { ...cell }, to: { ...cell }, fuel: 1000 });
   clock.t += 1000;
+  film?.look(A, 'la flotte de A en orbite de la planète de B, qui attaque');
   A.moveFleet(id, cell, 'attack');
   A.tick();
   return { A, B, clock, sync, id, cell };
 }
 
-test('carnet : l’attaquant et le défenseur ont le même déroulé, chacun de son côté', () => {
-  const { A, B, sync } = raid();
+scenario('carnet : l’attaquant et le défenseur ont le même déroulé, chacun de son côté', (film) => {
+  const { A, B, sync } = raid(film);
+  film.look(A, 'combat : A gagne');
   const a = A.journal.list.find((e) => e.kind === 'combat');
   assert.equal(a.side, 'a');
   assert.ok(a.rep?.rounds.length, 'le déroulé est dans le carnet de A');
@@ -115,6 +119,7 @@ test('carnet : l’attaquant et le défenseur ont le même déroulé, chacun de 
   assert.ok(P(A).effects.some((e) => e.rep), 'et dans le rapport envoyé à B');
   sync(B, A);
   B.tick();
+  film.look(B, 'B lit le rapport de A');
   const b = B.journal.list.find((e) => e.kind === 'combat');
   assert.equal(b.side, 'd');
   assert.deepEqual(b.rep, a.rep, 'B lit le même déroulé');
@@ -122,11 +127,13 @@ test('carnet : l’attaquant et le défenseur ont le même déroulé, chacun de 
   assert.equal(explainBattle(a.rep, 'a').outcome, 'win');
 });
 
-test('carnet : une seconde attaque trop tôt dit pourquoi elle ne rapporte rien', () => {
-  const { A, clock, id, cell } = raid();
+scenario('carnet : une seconde attaque trop tôt dit pourquoi elle ne rapporte rien', (film) => {
+  const { A, clock, id, cell } = raid(film);
+  film.look(A, 'premier combat : A pille');
   clock.t += 1000;
   A.moveFleet(id, cell, 'attack');
   A.tick();
+  film.look(A, 'une seconde plus tard, A attaque encore');
   const last = A.journal.list.filter((e) => e.kind === 'combat').at(-1);
   assert.equal(last.noLoot, 'cooldown');
   assert.match(explainBattle(last.rep, 'a', last).reasons.at(-1), /Pas de butin : tu as déjà pillé/);

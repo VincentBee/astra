@@ -1,9 +1,11 @@
 // Rapports de combat entre téléphones : chaque rapport est appliqué une fois
 // et une seule par sa cible, quel que soit le nombre d'attaquants et de
 // combats, puis oublié des deux côtés.
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame } from './harness.mjs';
+import { scenarios } from './scenario.mjs';
+
+const scenario = scenarios(import.meta.url);
 
 /** Chaque attaquant inscrit `count` rapports « 1 drone détruit » visant la planète mère de `target`. */
 function strike(attackers, target, count, clock) {
@@ -18,15 +20,17 @@ function strike(attackers, target, count, clock) {
 
 const fighters = (s) => s.state.players[s.me].planet.ships.fighter;
 
-test('5 joueurs, 4 attaquants × 70 combats : chaque perte subie une seule fois', () => {
+scenario('5 joueurs, 4 attaquants × 70 combats : chaque perte subie une seule fois', (film) => {
   const { players, clock, sync } = newGame(5);
   const [D, ...attackers] = players;
   D.state.players[D.me].planet.ships = { fighter: 1000 };
   strike(attackers, D, 70, clock);
   for (const a of attackers) sync(D, a);
+  film.look(D, 'D (1000 drones) reçoit 4 × 70 rapports « 1 drone détruit »');
   for (let i = 0; i < 20; i++) {
     clock.t += 250;
     D.tick();
+    if (i % 5 === 4) film.look(D, `D applique les rapports (${(i + 1) / 4} s)`);
   }
   assert.equal(fighters(D), 1000 - 4 * 70, 'chaque rapport appliqué exactement une fois');
 
@@ -36,12 +40,14 @@ test('5 joueurs, 4 attaquants × 70 combats : chaque perte subie une seule fois'
     a.tick();
     assert.equal(a.state.players[a.me].effects.length, 0);
   }
+  film.look(D, 'les attaquants ont vu que D a tout appliqué : ils oublient leurs rapports');
   // D le voit à son tour : il oublie la liste des rapports appliqués, sans rien réappliquer.
   for (const a of attackers) sync(D, a);
   for (let i = 0; i < 20; i++) {
     clock.t += 250;
     D.tick();
   }
+  film.look(D, 'D oublie la liste des rapports appliqués, sans rien réappliquer');
   assert.equal(D.state.players[D.me].applied.length, 0);
   assert.equal(fighters(D), 1000 - 4 * 70);
 });

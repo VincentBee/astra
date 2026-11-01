@@ -4,8 +4,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame, game, clone } from './harness.mjs';
+import { scenarios } from './scenario.mjs';
 
 const { replay, comparable } = await import('../js/replay.js');
+const { normalize } = await import('../js/session.js');
+const scenario = scenarios(import.meta.url);
 
 const T0 = 10_000_000;
 const SEC = 1000;
@@ -96,12 +99,14 @@ test('estimation : dans l’ordre, après le chantier en cours, et identique au 
   assert.ok(Math.abs(real.start - f[0].start) <= 2 * SEC);
 });
 
-test('le joueur : fil par ordre, lancement au passage, retrait, et la partie se rejoue à l’identique', () => {
+scenario('le joueur : fil par ordre, lancement au passage, retrait, et la partie se rejoue à l’identique', (film) => {
   const { players, clock, sync } = newGame(2);
   const [a, b] = players;
   const pa = () => a.state.players[a.me].planet;
+  film.look(a, 'départ : A et B sur leur planète mère');
   // Le stock de départ paie la première mine (lancée tout de suite) ; les suivantes attendent.
   for (let i = 0; i < 4; i++) a.planBuild('mine');
+  film.look(a, 'A met 4 mines au fil : la 1ʳᵉ est lancée, 3 attendent');
   assert.equal(pa().queue.key, 'mine');
   assert.deepEqual(pa().plan, ['mine', 'mine', 'mine']);
   a.unplan('farm', 2); // ce n'est pas ce qui est à cette place : refusé
@@ -110,12 +115,15 @@ test('le joueur : fil par ordre, lancement au passage, retrait, et la partie se 
   assert.deepEqual(pa().plan, ['mine', 'mine']);
   a.unplan('mine', 5); // refusé, sans dégâts
   assert.equal(pa().plan.length, 2);
+  film.look(a, 'A retire une mine du fil : il en reste 2');
   for (let i = 0; i < 40; i++) {
     clock.t += 30 * SEC;
     a.tick();
     b.tick();
     sync(b, a);
     sync(a, b);
+    const sec = (i + 1) * 30;
+    if ((i + 1) % 5 === 0) film.look(a, `${Math.floor(sec / 60)} min${sec % 60 ? ` ${sec % 60} s` : ''} plus tard`);
   }
   const log = a.state.log.map((l) => l.text);
   assert.ok(log.some((t) => t.includes('(fil)')), 'lancement automatique noté au journal');
@@ -125,9 +133,9 @@ test('le joueur : fil par ordre, lancement au passage, retrait, et la partie se 
   for (const p of Object.values(a.state.players)) assert.equal(comparable(r.players[p.id]), comparable(p), `fiche de ${p.name}`);
 });
 
-test('un fil abîmé reçu d’un autre est nettoyé', async () => {
-  const { normalize } = await import('../js/session.js');
+scenario('un fil abîmé reçu d’un autre est nettoyé', (film) => {
   const { players } = newGame(1);
+  film.look(players[0], 'la fiche de A, avant qu’on abîme son fil');
   const p = clone(players[0].state.players[players[0].me]);
   p.planet.plan = ['mine', '__proto__', 42, 'nope', ...Array(20).fill('mine')];
   const n = normalize(p);
