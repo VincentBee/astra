@@ -1,7 +1,7 @@
 // Fin de partie : le froid part du bord et se resserre vers le soleil ; une
 // planète qu'il atteint est perdue, une planète peut aussi être conquise.
 // Sans planète, on est éliminé ; le dernier joueur en vie gagne.
-import { test, afterEach } from 'node:test';
+import { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame, game, fleet } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
@@ -102,7 +102,16 @@ function assault(kind, ships, defense = {}, film) {
   return { ...g, A, B, cell, id };
 }
 
-test('la défense d’une planète vient de ses bâtiments, et de sa race', () => {
+scenario('la défense d’une planète vient de ses bâtiments, et de sa race', (film) => {
+  // Trois joueurs, un par race, dont la planète mère a exactement les bâtiments des assert (et,
+  // pour l'alien, 5,7 de population psionique) : chaque image ouvre la fiche de l'une d'elles.
+  const { players: [H, M, X] } = newGame(3, ['human', 'machine', 'alien']);
+  me(H).planet.levels = { mine: 2, cannon: 1, shield: 1 };
+  me(M).planet.levels = { turret: 2 };
+  Object.assign(me(X).planet, { levels: { spines: 1, dome: 1 }, pop: 5.7 });
+  film.look(H, 'humain : 2 mines, 1 canon, 1 bouclier', [{ sheet: me(H).home, button: true }]);
+  film.look(M, 'machine : 2 tourelles', [{ sheet: me(M).home, button: true }]);
+  film.look(X, 'alien : 1 épine, 1 dôme, 5,7 psioniques', [{ sheet: me(X).home, button: true }]);
   assert.deepEqual(game.fortOf('human', { mine: 2, cannon: 1, shield: 1 }), { attack: 2 * 2 + 12, hull: 2 * 20 + 40 + 150 });
   assert.deepEqual(game.fortOf('machine', { turret: 2 }), { attack: 36, hull: 30 });
   assert.deepEqual(game.fortOf('alien', { spines: 1, dome: 1 }, 5.7), { attack: 8 + 5, hull: 60 + 260 }, 'les épines mordent plus avec plus de psioniques');

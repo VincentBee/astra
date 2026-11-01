@@ -4,7 +4,6 @@
 //
 // Les tests qui jouent une partie sont écrits en scénarios (D-129) : en cas d'échec, le
 // rapport tests/reports/decisions-flotte.test.html montre la carte, image par image.
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame, game, fleet, clone } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
@@ -198,7 +197,15 @@ scenario('D-028 : changement de cap en route, arrêt, rappel et stationnement', 
 
 // ----- D-029 : interception en route -------------------------------------------
 
-test('D-029 : le point d’interception est sur le trajet de la cible, avant son arrivée', () => {
+scenario('D-029 : le point d’interception est sur le trajet de la cible, avant son arrivée', (film) => {
+  // Dans une partie : le cargo de B part de [2:5] vers [19:5], le chasseur de A attend en [3:7].
+  // Les images montrent la scène ; le calcul du point est vérifié sur les mêmes trajets, à plat.
+  const { players: [A, B], sync } = newGame(2, ['human', 'human']);
+  const bid = park(B, { cargo: 1 }, {}, { x: 2, y: 5 }, 40);
+  assert.ok(B.moveFleet(bid, { x: 19, y: 5 }, 'move'));
+  park(A, { fighter: 1 }, {}, { x: 3, y: 7 }, 40);
+  sync(A, B);
+  film.look(A, 'le cargo de B part de [2:5] vers [19:5] ; le chasseur de A attend en [3:7]');
   const t0 = 1_000_000;
   const target = { ships: { cargo: 1 }, from: { x: 2, y: 5 }, to: { x: 19, y: 5 }, depart: t0, arrive: t0 + 17 * 12_000 };
   const chaser = { ships: { fighter: 1 }, from: { x: 3, y: 7 }, to: { x: 3, y: 7 }, depart: t0, arrive: t0 };
@@ -225,7 +232,11 @@ scenario('D-029 : une flotte en route est rattrapée et combattue avant d’arri
 
 // ----- D-030 : ordres, réservoir, rencontre, vision ------------------------------
 
-test('D-030 : un seul réservoir par flotte, la somme de ceux de ses vaisseaux', () => {
+scenario('D-030 : un seul réservoir par flotte, la somme de ceux de ses vaisseaux', (film) => {
+  // L'image montre une flotte de 2 chasseurs et 1 lourd, au plein ; les sommes sont vérifiées par les asserts.
+  const { players: [A] } = newGame(1, ['human']);
+  park(A, { fighter: 2, heavy: 1 }, {}, { x: 5, y: 5 }, fleet.fleetTank('human', { fighter: 2, heavy: 1 }));
+  film.look(A, 'une flotte de A : 2 chasseurs et 1 lourd, un seul réservoir plein');
   assert.equal(fleet.fleetTank('human', { fighter: 2, heavy: 1 }), 2 * SHIPS.human.fighter.tank + SHIPS.human.heavy.tank);
   assert.equal(fleet.fleetBurn('human', { fighter: 2, heavy: 1 }), 2 * SHIPS.human.fighter.burn + SHIPS.human.heavy.burn);
 });
@@ -344,7 +355,10 @@ scenario('D-031 : une flotte à sec reste bloquée jusqu’à ce qu’on la seco
   film.look(A, 'A accepte : ravitaillée, sa flotte repart vers [6:5]');
 });
 
-test('D-031 : une technologie de détection par race', () => {
+scenario('D-031 : une technologie de détection par race', (film) => {
+  // Une partie à trois races : chaque joueur voit sa portée de détection (halo) ; le compte des technologies est vérifié par les asserts.
+  const { players } = newGame(3, ['human', 'machine', 'alien']);
+  for (const s of players) film.look(s, `le joueur ${P(s).race} et sa portée de détection`);
   for (const race of ['human', 'machine', 'alien']) {
     assert.equal(Object.values(TECHS[race]).filter((t) => t.range).length, 1, race);
   }
@@ -473,13 +487,28 @@ scenario('D-062 : une flotte sans armes ne peut pas en prendre une autre en chas
   assert.equal(A.chaseFleet(aid, B.me, bid), false);
 });
 
-test('D-062 : sans armes, pas de victoire, même contre personne', () => {
+scenario('D-062 : sans armes, pas de victoire, même contre personne', (film) => {
+  // Où le joueur le rencontre : 5 cargos, sans armes, et 1 chasseur de A devant la planète de B, vide.
+  // Les combats eux-mêmes sont calculés à plat par les asserts.
+  const { players: [A, B], sync } = newGame(2, ['human', 'machine']);
+  const bp = P(B).planet;
+  Object.assign(bp, { ships: {}, levels: {} });
+  B.touch();
+  sync(A, B);
+  const home = { ...P(B).home };
+  park(A, { cargo: 5 }, {}, home, 40);
+  park(A, { fighter: 1 }, {}, { x: home.x + 1, y: home.y }, 40);
+  film.look(A, '5 cargos de A sur la planète de B, sans défense ; un chasseur de A à côté');
   const none = { race: 'machine', ships: {}, tech: {} };
   assert.equal(fleet.battle({ race: 'human', ships: { cargo: 5 }, tech: {} }, none).won, false);
   assert.equal(fleet.battle({ race: 'human', ships: { fighter: 1 }, tech: {} }, none).won, true);
 });
 
-test('D-062 : coûts des vaisseaux', () => {
+scenario('D-062 : coûts des vaisseaux', (film) => {
+  // Le joueur lit ces coûts sur la fiche de sa planète (chantier naval) : chacun touche la sienne.
+  // Les valeurs sont vérifiées par les asserts.
+  const { players } = newGame(3, ['human', 'machine', 'alien']);
+  for (const s of players) film.look(s, `le joueur ${P(s).race} ouvre la fiche de sa planète mère`, [{ sheet: P(s).home, button: true }]);
   assert.deepEqual(SHIPS.human.fighter.cost, { minerals: 150, energy: 50 });
   assert.deepEqual(SHIPS.human.cargo.cost, { minerals: 110, energy: 40 });
   assert.deepEqual(SHIPS.human.heavy.cost, { minerals: 470, energy: 180 });
@@ -487,7 +516,12 @@ test('D-062 : coûts des vaisseaux', () => {
   assert.deepEqual(SHIPS.alien.heavy.cost, { minerals: 900, food: 270 });
 });
 
-test('D-062 : machines +20 % d’autonomie (30 → 36 cases par plein)', () => {
+scenario('D-062 : machines +20 % d’autonomie (30 → 36 cases par plein)', (film) => {
+  // Une flotte machine au plein (cargo, chasseur, lourd) ; l'autonomie par vaisseau est vérifiée par les asserts.
+  const { players: [A] } = newGame(1, ['machine']);
+  const ships = { cargo: 1, fighter: 1, heavy: 1 };
+  park(A, ships, {}, { x: 5, y: 5 }, fleet.fleetTank('machine', ships));
+  film.look(A, 'une flotte machine au plein : 36 cases d’autonomie par vaisseau');
   for (const k of ['cargo', 'fighter', 'heavy']) {
     const s = SHIPS.machine[k];
     assert.equal(s.tank / s.burn, 30 * 1.2, k);
@@ -495,6 +529,9 @@ test('D-062 : machines +20 % d’autonomie (30 → 36 cases par plein)', () => {
 });
 
 // Ressources échangeables : le carburant en fait partie (plein « par échange », D-031).
-test('D-031 : le carburant s’échange comme les ressources', () => {
+scenario('D-031 : le carburant s’échange comme les ressources', (film) => {
+  // Deux cargos sur la même case, qui peuvent échanger ; la liste des ressources échangeables est vérifiée par l'assert.
+  const { A } = meeting();
+  film.look(A, 'un cargo de A et un de B sur la même case : ils peuvent échanger du carburant');
   assert.ok(TRADE_RES.includes('fuel'));
 });

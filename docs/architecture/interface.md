@@ -28,7 +28,7 @@ Fichiers d'interface partagés :
 | `js/icons.js` | Icônes d'interface (`ic`, `fillIcons`). |
 | `js/game.js:31-52` | Icônes des ressources (`resIcon`) et des races (`raceIcon`), à côté des données qu'elles illustrent. |
 | `js/sky.js` | `drawSun` : le soleil, dessiné par la carte du jeu et celle du replay. |
-| `js/galaxy.js` | `startGalaxy` : fond étoilé en parallaxe, derrière toutes les vues du jeu. |
+| `js/galaxy.js` | `startGalaxy` : fond étoilé immobile, derrière toutes les vues du jeu (D-137). |
 | `icons/` | `icon.svg` (favicon), `icon-192.png`, `icon-512.png` (icônes PWA, `manifest.json`). |
 
 ## 2. Lancer le jeu en local et le tester à deux
@@ -87,7 +87,7 @@ Détail de `#screen-game` :
 | `#net` (91-93) | Compteur de joueurs en ligne (vert, orange si un lien > 250 ms). `showView` le **déplace** dans la première ligne de la vue affichée (`js/app.js:1223`). Ouvre `#sheet-players`. | `renderLive` 811-821, clic 319-322. |
 | `#lost` (97-100) | Bandeau « Seul en ligne » + **Rejoindre** (rejoindre les autres par une nouvelle invitation). | `renderState` 762 (`session.alone`), `btn-rejoin` 286-289. |
 | `#view-universe` (102-148) | Vue carte : `#pick` (bandeau du départ, D-120 : « Prépare-toi » / « Prêt · on attend … » avec les joueurs, prêts en vert, absents grisés, et les boutons **Je suis prêt** / **Plus prêt** / **Inviter** ; après le départ « Envoie ton colonisateur » et **Ma flotte** ; caché dès la planète mère fondée), `#trades` (offres d'échange), `.map-head` (coordonnées, aide `?`), `canvas#map`. | `drawMap` 1349-1538, `renderPick` 1876-1913, `renderTrades` 1777-1800. |
-| `#sheet-planet` | Fiche de la planète touchée : nom, coordonnées, propriétaire, places, climat, gisements, **Y envoyer mon colonisateur** (`#btn-claim` : planète libre, pas un petit corps, tant que je n'ai pas de planète mère, D-120) ou **Bâtiments**. Sur une de mes planètes, partie **Chantier** (`#pi-yard`, D-106) : vaisseaux recherchés, prix, « jusqu'à N », boutons ×1 / ×5 / ×N, et **Décoller**. | `renderPick`, `renderPickYard`, écouteur de `#pi-ships`, `btn-pi-takeoff`, `btn-claim`, `btn-open-planet`, `closePlanetSheet`. |
+| `#sheet-planet` | Fiche de la planète touchée : nom, coordonnées, propriétaire, places, climat, gisements, **Y envoyer mon colonisateur** (`#btn-claim` : planète libre, pas un petit corps, tant que je n'ai pas de planète mère, D-120) ou **Voir la planète** (`#btn-open-planet`, D-138 ; avant : « Bâtiments »). Sur une de mes planètes, partie **Chantier** (`#pi-yard`, D-106) : vaisseaux recherchés, prix, « jusqu'à N », boutons ×1 / ×5 / ×N, et **Décoller**. | `renderPick`, `renderPickYard`, écouteur de `#pi-ships`, `btn-pi-takeoff`, `btn-claim`, `btn-open-planet`, `closePlanetSheet`. |
 | `#map-fleets` (sous `canvas#map`) | Mes planètes puis mes flottes en grille (2 colonnes sur téléphone). **Une case par planète** (D-115, bord vert) : nom, compte à rebours du chantier, une icône par type de vaisseau à quai avec son nombre, statut (« Chantier : +5 Frégate », « 7 à quai », « Aucun vaisseau à quai » ou « 🔒 » sans chantier naval) et deux boutons-icônes : **+** (Construire, si la planète a un chantier naval) ouvre `#sheet-planet` sur sa partie Chantier ; **Décoller** (icône `fleet`, s'il y a des vaisseaux à quai) ouvre directement le formulaire de décollage de cette planète. Toucher ailleurs sur la case ouvre la fiche de la planète. Une case par flotte : nom, compte à rebours, une icône par type de vaisseau avec son nombre, statut ; bord rouge si attaque/conquête/poursuite, grisée si à sec. Toucher = sélectionner la flotte (ouvre `#fleet-info`), retoucher = la relâcher (D-107, D-108). | `renderMapFleets`, appelé par `renderLive` ; le HTML n'est réécrit que si le contenu ou le statut change, les comptes à rebours (flotte, chantier) et `aria-pressed` sont mis à jour en place. Un seul écouteur de clic : `[data-mp-build]`, `[data-mp-go]`, `[data-planet]`, puis `[data-fleet]`. |
 | `#fleet-info` (129-145) | Fiche de la flotte sélectionnée : vaisseaux, statut (avec la vitesse et, si la flotte mêle plusieurs types, le nom du plus lent : `speedText`), carburant, choix d'ordres (`#fi-choice`), mes flottes à côté (`#fi-beside`), joueurs à côté (`#fi-partners`), boutons Arrêter / Rentrer / Se poser / Plein / Passive-Agressive (`#btn-fi-stance`, icône d'attaque, pleine quand la flotte est agressive, cachée pour une flotte sans armes ; D-100) / Scinder / Fermer. Le statut finit par « · agressive » (`fleetStatus`). | `renderFleetInfo` 1643-1687, handlers 1689-1714. |
 | `#view-planet` (150-199) | Vue planète : en-tête (retour, nom, climat), gisements `#soil-zone`, stocks `#resources`, onglets, puis les panneaux `data-pane`. | `renderPlanet` 869-988. |
@@ -333,9 +333,9 @@ Le fichier est **en couches** : les sections de la fin redéfinissent celles du 
 - **`js/icons.js`** : 40 tracés (dont les 4 vaisseaux `cargo`, `fighter`, `heavy`, `colony`, D-108, la roue crantée `gear`, D-114, et `minus` et `fit` du zoom de la carte, D-117) 24 × 24 (`PATHS`). `ic(nom)` renvoie un `<svg class="ic" aria-hidden="true">` pour le HTML généré ; `fillIcons()` remplace chaque `<i data-ic="nom"></i>` du HTML statique (appelé au tout début de `app.js`). Style `.ic` : trait 1,6, `stroke-linecap: square`, couleur du texte (`style.css:559`). Ajouter une icône = ajouter un tracé dans `PATHS`.
 - **Ressources et races** (`js/game.js:31-52`) : `resIcon(r, nom)` (cristal, feuille, éclair, buste ; classe `.ri ri-<r>` colorée par la variable de la ressource) et `raceIcon(r)` (casque, robot, alien ; classe `.rci`). Contrairement à `ic`, elles sont nommées (`role="img"`, `<title>`) pour les lecteurs d'écran.
 - **`js/sky.js`** : `drawSun(ctx, sun, cell)` ; disque en dégradé blanc → jaune → orange qui remplit son carré de `sun.size` cases, halo qui déborde (1,7 × le rayon). Position donnée par `sunFor(gid)` de `game.js` (voir `regles.md` pour l'effet du soleil sur le climat).
-- **`js/galaxy.js`** : `startGalaxy()` crée `div.galaxy` (fixe, `z-index: -1`) avec 3 couches d'étoiles (260/90/28 étoiles pour 400 × 800 px, densité constante), dessinées une fois en canvas puis posées en image de fond répétée (tuile = taille de l'écran). Graine fixe (`rng`) : le même ciel à chaque ouverture. 45 % des étoiles suivent une bande diagonale (« Voie lactée »). Parallaxe : défilement, souris, et inclinaison du téléphone (`devicemotion`, position de repos qui s'adapte ; permission demandée au premier toucher sur iPhone). Redessiné 150 ms après un redimensionnement. Sous les couches, la nébuleuse est un dégradé CSS du `body` (`style.css:589-596`). Chargé seulement par `index.html`.
-  - **Réglage « Fond »** (D-112) : `skyMode()` lit `localStorage['astra.sky']` (`anime` par défaut, `fixe`, `aucun`) ; `setSkyMode(m)` le garde et refait le fond tout de suite (l'ancien fond et ses écouteurs sont retirés par un `AbortController`). La liste `#sky` est dans la fenêtre Réglages (`#sheet-settings`, D-114), ouverte par la roue crantée ; `app.js` la remet sur `skyMode()` à chaque ouverture. `fixe` (ou « réduire les animations ») : `div.galaxy.still`, une seule image de la taille de l'écran avec les 3 couches, sans `will-change` ni capteurs. `aucun` : pas de `div.galaxy`, seul le dégradé reste. En animé, la translation est arrondie au pixel de l'écran et n'est écrite que si elle change.
-  - **Coût mesuré** le 2026-10-30 (Chrome, 390 × 844, densité 3, processeur × 4) : animé = 3 calques de 2 × 2 écrans (≈ 142 Mo de surface, estimation), 3 images de 12 Mo, 103 ms de dessin, jusqu'à 180 écritures de style/s quand le téléphone bouge (≈ 120/s après l'arrondi) ; fixe = 1 image de 12 Mo, 38 ms, 0 ensuite ; aucun = 0. Effet réel sur la batterie : non confirmé.
+- **`js/galaxy.js`** : `startGalaxy()` crée `div.galaxy` (fixe, `z-index: -1`) avec une seule image : 3 couches d'étoiles (260/90/28 étoiles pour 400 × 800 px, densité constante) dessinées ensemble dans un canvas de la taille de l'écran. Graine fixe (`rng`) : le même ciel à chaque ouverture. 45 % des étoiles suivent une bande diagonale (« Voie lactée »). Immobile (D-137) : plus de parallaxe, ni défilement, ni souris, ni accéléromètre. Redessiné 150 ms après un redimensionnement. Sous l'image, la nébuleuse est un dégradé CSS du `body`. Chargé seulement par `index.html`.
+  - **Réglage « Fond »** (D-112, D-137) : `skyMode()` lit `localStorage['astra.sky']` (`fixe` par défaut, `aucun` ; l'ancien `anime` devient `fixe`) ; `setSkyMode(m)` le garde et refait le fond tout de suite (l'ancien fond et son écouteur sont retirés par un `AbortController`). La liste `#sky` (« Étoiles », « Sans étoiles ») est dans la fenêtre Réglages (`#sheet-settings`, D-114) ; `app.js` la remet sur `skyMode()` à chaque ouverture. `aucun` : pas de `div.galaxy`, seul le dégradé reste.
+  - **Coût mesuré** le 2026-10-30 (Chrome, 390 × 844, densité 3, processeur × 4), avant D-137 : l'ancien fond animé = 3 calques de 2 × 2 écrans (≈ 142 Mo de surface, estimation), jusqu'à 180 écritures de style/s quand le téléphone bougeait ; le fond fixe, seul gardé = 1 image de 12 Mo, 38 ms de dessin, 0 ensuite ; aucun = 0.
 - **`icons/`** : favicon SVG et icônes PWA 192/512, cités par `index.html:11-12`, `manifest.json` et la liste de cache de `sw.js`.
 
 ### 7.5 `technologies.html`
@@ -404,7 +404,7 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   affichés sont `session.scoreOf(p)` (tout l'empire).
 - **Flottes** : sur une planète adverse, deux boutons « Attaquer X (joueur) » et « Conquérir X »,
   suivis tous deux de « · défense ⚔ a ◇ c + N vaisseaux posés · victoire probable » (`ordersAt`,
-  `assaultView`, D-133) : « + ? vaisseaux » hors de ma détection ; issue « victoire probable »,
+  `assaultView`, D-142) : « + ? vaisseaux » hors de ma détection ; issue « victoire probable »,
   « victoire incertaine » ou « bataille perdue ». Une flotte en conquête est dessinée en rouge comme une attaque.
 - **Bâtiments** : les bâtiments de défense de la race apparaissent dans la liste comme les autres.
   Carte dépliée (toucher le nom) : bouton « Déconstruire un niveau » (`data-demolish`), caché au
@@ -478,3 +478,35 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
 - Le bouton de l'écran de race dit **Choisir cette race** (avant : « Commencer la partie » ou
   « Rejoindre la partie »).
 
+## 16. Alerte de flotte ennemie (2026-10-30, D-133)
+
+- `index.html` : `<button id="threat" class="banner threat">` juste sous `#race`, hors des onglets :
+  visible sur la carte comme sur l'écran d'une planète. Un toucher appelle `showView('map')`.
+- `renderThreat(now)` (`js/app.js`), appelé par `renderLive` (5 fois par seconde) : lit
+  `session.threats(now)` et montre la menace en tête, texte écrit par `threatText`
+  (`js/session.js`, partagé avec les scénarios de test, D-135) : « N vaisseaux de X sur P dans S s »,
+  « … en orbite de P » (arrivée, combat pas encore réglé) ou « … en vue, à C cases de P » (ne
+  vise rien), puis « +N autres ». Caché s'il n'y a rien, ou en partie finie.
+- `Session.threats(now)` (`js/session.js`, à côté de `eyes`/`sees`) : flottes armées, adverses
+  (joueur pas éliminé), visibles ; triées cible d'abord (par heure d'arrivée), puis distance.
+- Carte (`drawMap`, boucle des flottes) : le nombre de vaisseaux en blanc, cerné de sombre, en
+  haut à droite du triangle de chaque flotte adverse visible. Pas sur mes flottes (leur grille
+  `#map-fleets` le montre déjà).
+- Style : `.banner.threat` (fond rouge pâle, bord `--danger`), après `.banner.race.hot`.
+- Vérifié dans le navigateur (vue 400 × 850, 2026-10-30) : un faux joueur ajouté par la console
+  avec une flotte de 12 en route pour conquérir ma planète et une de 7 arrêtée à côté : compte à
+  rebours qui descend, puis « en orbite », « +1 autre », chiffres 12 et 7 sur la carte. Pas
+  vérifié à deux vrais téléphones.
+
+## 17. Lecture seule pour les rapports de test (2026-11-01, D-140)
+
+- `index.html?view` : `app.js` ne montre ni l'accueil ni l'historique, n'enregistre pas le
+  service worker, ajoute `html.view-only` (`pointer-events: none` sur les écrans) et prévient la
+  page parente (`{ astraViewReady: true }`).
+- Message `{ astraView: { state, me, t, intel, selected, frost } }` (même origine seulement) →
+  `showSnapshot` : nouvelle `Session` sur cet état, `now()` figé à `t`, `save`, `scheduleSave`,
+  `start`, `tick` neutralisés, les autres joueurs dans `links` (connectés), réglages du froid
+  appliqués, puis le même rendu qu'en jeu (`buildStatic`, `showView`, `renderState`, `renderLive`
+  toutes les 200 ms) ; `selected` ouvre la fiche de la planète touchée. Une erreur est notée dans
+  `body.dataset.viewError`.
+- Bouton « Voir la planète » : `renderPick` lit `session.myPlanetAt(w)` (D-139).
