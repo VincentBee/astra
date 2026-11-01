@@ -861,7 +861,9 @@ Le 2026-11-01, en scénarios (D-129) : `tests 189, pass 189, fail 0` (≈ 6,4 s)
 `film.look(joueur, légende, [{ fleet: [propriétaire, id], visible }])` photographie ce que voit
 le joueur et vérifie les attentes. En cas d'échec (ou avec `ASTRA_REPORT=1`), le rapport
 `tests/reports/<fichier>.html` montre la carte vue par le joueur, image par image ; le message
-d'erreur donne son chemin. Exemple : `tests/vision.test.mjs`.
+d'erreur donne son chemin. Entre deux `look`, `film.roll(joueur, horloge, jusqu'à, légende,
+chaqueSeconde)` fait passer le temps seconde par seconde (sans attendre) et ajoute une image par
+seconde, sans vérification (D-131). Exemple : `tests/vision.test.mjs` (la flotte en route).
 
 ```bash
 ASTRA_REPORT=1 node --test tests/vision.test.mjs

@@ -51,8 +51,11 @@ function letters(state) {
   return Object.fromEntries(ps.map((p, i) => [p.id, String.fromCharCode(65 + i)]));
 }
 
+/** Au plus tant d'images par `roll` : au-delà, le pas s'allonge (un long trajet reste léger). */
+const MAX_ROLL = 240;
+
 function film(s, out) {
-  return {
+  const api = {
     /**
      * Ce que voit `viewer` en ce moment, et ce qu'il devrait voir :
      * expect = [{ fleet: [session du propriétaire, id], visible }]. `eyes` remplace sa vue.
@@ -94,7 +97,25 @@ function film(s, out) {
         assert.fail(`${s.error}\n  Image : « ${label} »\n  Rapport : ${pathToFileURL(out)}`);
       }
     },
+
+    /**
+     * Le temps passe seconde par seconde jusqu'à `until` : à chaque seconde, `each()` (ce que
+     * fait le jeu : passages `tick`, échanges de fiches), puis une image de ce que voit
+     * `viewer`. Ces images ne vérifient rien : c'est le film entre deux `look`, qui, lui,
+     * vérifie. L'horloge finit sur `until`, `each()` compris, sans image (le `look` suivant la prend).
+     */
+    roll(viewer, clock, until, label, each = () => {}) {
+      const step = Math.max(1000, Math.ceil((until - clock.t) / MAX_ROLL / 1000) * 1000);
+      while (clock.t + step < until) {
+        clock.t += step;
+        each();
+        api.look(viewer, label);
+      }
+      clock.t = until;
+      each();
+    },
   };
+  return api;
 }
 
 // ----- le rapport ----------------------------------------------------------
@@ -164,7 +185,7 @@ function section(s, i) {
   return `<section class="scn ${s.ok ? 'ok' : 'ko'}" id="s${i}" data-name="${esc(s.name)}">
 <h2>${s.ok ? '✔' : '✖'} ${esc(s.name)}</h2>
 ${s.ok ? '' : `<p class="ko">Obtenu : ${esc(s.error)}</p>`}
-${frames ? `<div class="film">${frames}<div class="ctl"><button data-step="-1" aria-label="Image précédente">⏮</button><button data-play aria-label="Lecture">▶</button><button data-step="1" aria-label="Image suivante">⏭</button><input type="range" min="0" max="${s.frames.length - 1}" value="0" aria-label="Image"></div></div>` : ''}
+${frames ? `<div class="film"><div class="frames">${frames}</div><div class="ctl"><button data-step="-1" aria-label="Image précédente">⏮</button><button data-play aria-label="Lecture">▶</button><button data-step="1" aria-label="Image suivante">⏭</button><input type="range" min="0" max="${s.frames.length - 1}" value="0" aria-label="Image"></div></div>` : ''}
 </section>`;
 }
 
@@ -181,7 +202,8 @@ h2{font-size:16px;margin:0 0 8px}.scn.ok h2{color:#4ade80}.scn.ko h2{color:#ff5a
 .ko{color:#ff8a8a}p.ko{margin:0 0 10px}
 figure{margin:0}svg{display:block;width:100%;max-width:420px;aspect-ratio:1;border-radius:8px}figcaption{color:#aab2cf;font-size:13px;margin:6px 0}
 figcaption ul{margin:4px 0 0;padding-left:18px}li.ok{color:#4ade80}li.ko{color:#ff8a8a}
-.js .film figure:not(.on){display:none}.film figure+figure{margin-top:12px}.js .film figure+figure{margin-top:0}
+.film figure+figure{margin-top:12px}
+.js .frames{display:grid}.js .frames figure{grid-area:1/1;margin:0;visibility:hidden}.js .frames figure.on{visibility:visible}
 .ctl{display:none;gap:8px;align-items:center}.js .ctl{display:flex}.ctl button{background:#1b2340;color:#e8ebf7;border:0;border-radius:8px;padding:6px 12px;font-size:15px}.ctl input{flex:1}
 .legend{color:#aab2cf;font-size:13px;margin:0 0 16px}
 </style></head><body>
@@ -206,7 +228,14 @@ for (const film of document.querySelectorAll('.film')) {
   const stop = () => { clearInterval(timer); timer = 0; play.textContent = '▶'; };
   film.querySelectorAll('[data-step]').forEach((b) => (b.onclick = () => { stop(); show(i + +b.dataset.step); }));
   range.oninput = () => { stop(); show(+range.value); };
-  play.onclick = () => { if (timer) return stop(); play.textContent = '❚❚'; timer = setInterval(() => show(i + 1), 900); };
+  // Toutes les images tiennent dans ~8 s de lecture (entre 0,12 et 0,9 s par image) ; arrêt sur la dernière.
+  const pace = Math.min(900, Math.max(120, 8000 / figs.length));
+  play.onclick = () => {
+    if (timer) return stop();
+    if (i === figs.length - 1) show(0);
+    play.textContent = '❚❚';
+    timer = setInterval(() => (i === figs.length - 1 ? stop() : show(i + 1)), pace);
+  };
   show(i);
 }
 </script>

@@ -1407,3 +1407,27 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   en 0,1 s.
 - Qui : Vincent (la demande), Claude (la forme). Source : session `09eb6bdd`.
 - Statut : en vigueur. Vérifié dans le navigateur intégré (règle cassée exprès puis remise).
+
+**D-131 — Film seconde par seconde entre deux vérifications, et simulation à hauteur fixe**
+- 2026-11-01 14:02 (UTC). Contexte : question de Vincent sur le scénario « flotte ennemie en
+  route » : « dans ce test, il y a 4 ticks de temps ? pourquoi ce n'est pas en temps reel ?
+  autent de tick que de secondes ? ». Réponse : le test sautait d'un moment à l'autre (5 images,
+  sans `tick`), ce qui suffit pour la règle, puisque la position d'une flotte se calcule à partir
+  de l'heure (`fleetPos`). Puis : « il ne faut pas rajouter/enlever du test dans la simulations,
+  cela fait du flickering sur l'ecran et change la hauteur de la div ; oui rajoute un film ».
+- Choix : `film.roll(joueur, horloge, jusqu'à, légende, chaqueSeconde)` fait avancer la fausse
+  horloge seconde par seconde, sans attendre : à chaque seconde, `chaqueSeconde()` (dans le
+  scénario : `B.tick()`, A reçoit la fiche de B, `A.tick()`), puis une image sans vérification.
+  Au plus 240 images par `roll` (au-delà, le pas s'allonge). Les vérifications restent dans
+  `look`. Le scénario de la flotte en route passe de 5 à 33 images (≈ 9 ms).
+- Rapport : les images sont empilées au même endroit (grille CSS, `visibility`) : la hauteur
+  est celle de la plus grande image et ne change pas pendant la lecture ; lecture en ≈ 8 s quel
+  que soit le nombre d'images (0,12 à 0,9 s par image), arrêt sur la dernière.
+- Interface : pendant un lancement, la simulation affichée reste en place ; le nouveau rapport
+  se charge dans le même cadre, qui garde sa hauteur ; seul le rapport du fichier relancé est
+  rechargé.
+- Écarté : le temps réel (32 vraies secondes d'attente pour ce seul test) ; vérifier
+  « vue / cachée » à chaque seconde (il faudrait recalculer la règle dans le test).
+- Qui : Vincent (le film, pas de saut de hauteur), Claude (la forme). Source : session `09eb6bdd`.
+- Statut : en vigueur. Vérifié dans le navigateur intégré : hauteur du film identique sur les
+  33 images (456 px), cadre gardé à 690 px pendant un nouveau lancement.

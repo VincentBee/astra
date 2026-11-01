@@ -89,21 +89,22 @@ scenario('flotte ennemie en route : cachée en sortant de ma portée, visible en
   const outside = at(PLANET + 3);
   const id = park(B, { cargo: 1 }, inside);
   const theirs = () => A.state.players[B.me].fleets.find((f) => f.id === id);
+  // Chaque seconde, comme dans le jeu : les deux téléphones passent, A reçoit la fiche de B.
+  const second = () => {
+    B.tick();
+    sync(A, B);
+    A.tick();
+  };
   sync(A, B);
   film.look(A, 'au départ, dans la portée de A', [{ fleet: [B, id], visible: true }]);
 
   assert.equal(B.moveFleet(id, outside), true, 'départ accepté');
   sync(A, B);
-  const { depart, arrive } = theirs();
-  clock.t = (depart + arrive) / 2;
-  film.look(A, 'en route vers l’extérieur');
-  clock.t = arrive;
+  film.roll(A, clock, theirs().arrive, 'aller', second);
   film.look(A, 'arrivée hors de la portée de A', [{ fleet: [B, id], visible: false }]);
 
   assert.equal(B.moveFleet(id, inside), true, 'retour accepté');
   sync(A, B);
-  clock.t = (theirs().depart + theirs().arrive) / 2;
-  film.look(A, 'sur le chemin du retour');
-  clock.t = theirs().arrive;
+  film.roll(A, clock, theirs().arrive, 'retour', second);
   film.look(A, 'revenue dans la portée de A', [{ fleet: [B, id], visible: true }]);
 });

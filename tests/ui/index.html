@@ -85,7 +85,7 @@ const res = new Map(); // clé → { st, ms, error }
 let sel = null;        // { file, name }
 let running = false;
 let lastRun = null;    // le dernier message de fin de lancement
-let reportStamp = Date.now();
+const stamps = new Map(); // fichier → heure de son dernier rapport (recharger seulement ce qui a changé)
 const closed = new Set();
 let onlyKo = false;
 let runId = 0;         // un nouveau lancement remplace l'ancien (le serveur l'arrête)
@@ -133,33 +133,43 @@ function render() {
 function detail() {
   const d = $('detail');
   if (!sel) {
+    d.dataset.k = '';
     d.innerHTML = `<div class="empty"><p><b>Choisis un test à gauche</b>, ou lance tout avec <b>▶ Tout lancer</b>.</p><p>Les tests marqués <span class="badge">simulation</span> montrent la carte vue par le joueur, image par image.</p><p class="hint"><kbd>/</kbd> chercher · <kbd>Entrée</kbd> lancer le test choisi</p>${lastRun?.stderr ? `<pre class="err" style="text-align:left">${esc(lastRun.stderr)}</pre>` : ''}</div>`;
     return;
   }
   const f = files.find((x) => x.file === sel.file);
   const t = f?.tests.find((x) => x.name === sel.name);
   if (!t) { sel = null; return detail(); }
-  const r = res.get(key(f.file, t.name));
+  const k = key(f.file, t.name);
+  const r = res.get(k);
   const s = r?.st || 'idle';
-  const err = r?.error ? `<pre class="err">${esc(r.error.message)}${r.error.at ? `\n\n→ ${esc(r.error.at)}` : ''}</pre>` : '';
-  let sim = '';
-  if (t.scenario) {
-    sim = s === 'idle' || s === 'run' || s === 'lost'
-      ? `<p class="hint">${s === 'run' ? 'Simulation en préparation…' : 'Lance ce test pour voir sa simulation.'}</p>`
-      : `<iframe id="sim" title="Simulation du scénario" src="/reports/${esc(f.file.replace(/^tests\//, '').replace(/\.mjs$/, '.html'))}?v=${reportStamp}#scn=${encodeURIComponent(t.name)}"></iframe>`;
-  } else {
-    sim = '<p class="hint">Ce test n’a pas de simulation. Pour en avoir une, écris-le avec <code>scenario()</code> (<code>tests/scenario.mjs</code>) : l’intitulé dit ce qui est attendu, et <code>film.look(…)</code> photographie chaque vérification.</p>';
+  // Autre test choisi : on refait le panneau. Même test : on ne touche qu'à l'en-tête, et la
+  // simulation reste en place (pas de clignotement ni de saut de hauteur pendant un lancement).
+  if (d.dataset.k !== k) {
+    d.dataset.k = k;
+    d.innerHTML = '<div id="d-head"></div><div id="d-sim"></div>';
   }
-  const old = $('sim');
-  // Même simulation déjà affichée : on la garde (pas de clignotement pendant les autres lancements).
-  if (old && old.getAttribute('src') && d.dataset.k === key(f.file, t.name) + reportStamp + s) {
-    d.querySelector('.status').outerHTML = statusHtml(s, r);
+  const err = r?.error ? `<pre class="err">${esc(r.error.message)}${r.error.at ? `\n\n→ ${esc(r.error.at)}` : ''}</pre>` : '';
+  $('d-head').innerHTML = `<h2>${esc(t.name)}</h2><p class="where"><code>${esc(f.file)}:${t.line}</code></p>${statusHtml(s, r)}${err}<div class="actions"><button class="primary" data-run-sel ${running ? 'disabled' : ''}>▶ Lancer ce test</button><button class="secondary" data-run-file="${esc(f.file)}" ${running ? 'disabled' : ''}>▶ Lancer le fichier</button></div>`;
+  const box = $('d-sim');
+  if (!t.scenario) {
+    box.innerHTML = '<p class="hint">Ce test n’a pas de simulation. Pour en avoir une, écris-le avec <code>scenario()</code> (<code>tests/scenario.mjs</code>) : l’intitulé dit ce qui est attendu, et <code>film.look(…)</code> photographie chaque vérification.</p>';
     return;
   }
-  d.dataset.k = key(f.file, t.name) + reportStamp + s;
-  d.innerHTML = `<h2>${esc(t.name)}</h2><p class="where"><code>${esc(f.file)}:${t.line}</code></p>${statusHtml(s, r)}${err}<div class="actions"><button class="primary" data-run-sel ${running ? 'disabled' : ''}>▶ Lancer ce test</button><button class="secondary" data-run-file="${esc(f.file)}" ${running ? 'disabled' : ''}>▶ Lancer le fichier</button></div>${sim}`;
   const frame = $('sim');
-  if (frame) frame.onload = () => fit(frame);
+  if (s === 'run') return; // la simulation d'avant reste affichée jusqu'au nouveau rapport
+  if (s !== 'ok' && s !== 'ko') {
+    if (!frame) box.innerHTML = '<p class="hint">Lance ce test pour voir sa simulation.</p>';
+    return;
+  }
+  const src = `/reports/${f.file.replace(/^tests\//, '').replace(/\.mjs$/, '.html')}?v=${stamps.get(f.file) || 0}#scn=${encodeURIComponent(t.name)}`;
+  if (frame) {
+    // Nouveau rapport : on le charge dans le même cadre, qui garde sa hauteur jusqu'au chargement.
+    if (frame.getAttribute('src') !== src) frame.setAttribute('src', src);
+    return;
+  }
+  box.innerHTML = `<iframe id="sim" title="Simulation du scénario" src="${esc(src)}"></iframe>`;
+  $('sim').onload = (e) => fit(e.target);
 }
 
 const statusHtml = (s, r) => `<p class="status ${s === 'lost' ? 'run' : s}">${ICON[s]} ${LABEL[s]}${r?.ms != null && s !== 'run' ? ` · ${r.ms} ms` : ''}</p>`;
@@ -214,7 +224,7 @@ async function run(q) {
   for (const k of targets) if (!seen.has(k)) res.set(k, { st: end?.stopped ? 'idle' : 'lost' });
   running = false;
   lastRun = end;
-  reportStamp = Date.now();
+  for (const file of new Set(targets.map((k) => k.split('\u0000')[0]))) stamps.set(file, Date.now());
   $('all').disabled = false; $('stop').hidden = true;
   // Après « Tout lancer » : on montre le premier échec.
   if (!q.file && !q.name) {
