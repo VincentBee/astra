@@ -1,7 +1,9 @@
 // Fil de construction d'une planète (D-105) : chantier libre, le bâtiment
 // suivant se lance tout seul dès que le stock couvre son prix, même pendant
 // une absence ; les estimations disent quand.
-import { test } from 'node:test';
+//
+// En scénario (D-129) : la planète testée devient celle du joueur A dans une vraie partie, et
+// l'image ouvre sa fiche (fil et chantier compris), telle que le vrai jeu la dessine à cet instant.
 import assert from 'node:assert/strict';
 import { newGame, game, clone } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
@@ -22,9 +24,30 @@ function poor() {
   return p;
 }
 
-test('le premier du fil se lance quand le stock suffit, pas avant', () => {
+/**
+ * Une vraie partie à un joueur humain, A, sur la case de `poor()` (la première de la carte
+ * « gtest ») ; l'horloge part de T0. show(p, intitulé, heure) : la planète de A devient `p`, et A
+ * la touche à cette heure-là ; l'image ouvre sa fiche (avec « Voir la planète », D-139).
+ */
+function stage(film) {
+  const { players: [A], clock } = newGame(1, ['human']);
+  const P = A.state.players[A.me];
+  const show = (p, label, t = clock.t) => {
+    P.planet = p;
+    clock.t = t;
+    film.look(A, label, [{ sheet: P.home, button: true }]);
+  };
+  return { A, clock, show };
+}
+
+scenario('le premier du fil se lance quand le stock suffit, pas avant', (film) => {
+  const { A, clock, show } = stage(film);
   const p = poor();
   p.plan = ['mine'];
+  show(p, 'A met une mine au fil, sans minéraux pour la payer');
+  // Le film : le vrai jeu recalcule la planète à chaque image, la mine se lance quand le stock suffit.
+  film.roll(A, clock, T0 + 30 * MIN, 'les minéraux arrivent');
+  show(p, '30 min plus tard : la mine est lancée, le fil est vide');
   const cost = game.upgradeCost('human', 'mine', 4);
   const early = game.stateAt(p, T0 + SEC);
   assert.equal(early.queue, null);
@@ -42,11 +65,15 @@ test('le premier du fil se lance quand le stock suffit, pas avant', () => {
   assert.equal(later.plan.length, 0);
 });
 
-test('le fil garde son ordre et enchaîne sans attendre un passage du joueur', () => {
+scenario('le fil garde son ordre et enchaîne sans attendre un passage du joueur', (film) => {
+  const { A, clock, show } = stage(film);
   const p = poor();
   p.stock.minerals = 5000;
   p.stock.energy = 5000;
   p.plan = ['solar', 'mine', 'solar'];
+  show(p, 'A met centrale, mine, centrale au fil ; le stock paie tout');
+  film.roll(A, clock, T0 + 60 * MIN, 'A est absent, le fil enchaîne');
+  show(p, '1 h plus tard : les trois chantiers faits, dans l’ordre');
   const s = game.stateAt(p, T0 + 60 * MIN);
   const starts = s.done.filter((d) => d.kind === 'start');
   assert.deepEqual(starts.map((d) => d.key), ['solar', 'mine', 'solar']);
@@ -58,26 +85,33 @@ test('le fil garde son ordre et enchaîne sans attendre un passage du joueur', (
   assert.equal(s.levels.solar, 4);
 });
 
-test('settle écrit le fil restant, et ne recompte rien en heure qui recule', () => {
+scenario('settle écrit le fil restant, et ne recompte rien en heure qui recule', (film) => {
+  const { show } = stage(film);
   const p = poor();
   p.stock.minerals = 5000;
   p.stock.energy = 5000;
   p.plan = ['solar', 'mine'];
+  show(p, 'A met centrale puis mine au fil', T0);
   const done = game.settle(p, T0 + SEC);
+  show(p, 'une seconde plus tard : la centrale est au chantier, la mine attend', T0 + SEC);
   assert.equal(done.filter((d) => d.kind === 'start').length, 1);
   assert.deepEqual(p.plan, ['mine']);
   assert.equal(p.queue.key, 'solar');
   const copy = clone(p);
   game.settle(p, T0); // l'horloge recule : rien ne change
+  show(p, 'l’horloge du téléphone recule d’une seconde : rien ne change', T0);
   assert.deepEqual(p, copy);
 });
 
-test('plus de place : le fil attend, et l’estimation dit pourquoi', () => {
+scenario('plus de place : le fil attend, et l’estimation dit pourquoi', (film) => {
+  const { show } = stage(film);
   const p = poor();
   p.stock.minerals = 5000;
   p.stock.energy = 5000;
   p.places = game.usedPlaces(p.levels);
   p.plan = ['mine'];
+  show(p, 'planète pleine, une mine au fil : l’estimation dit « Plus de place »', T0);
+  show(p, '10 min plus tard : la mine attend toujours', T0 + 10 * MIN);
   const s = game.stateAt(p, T0 + 10 * MIN);
   assert.equal(s.queue, null);
   assert.deepEqual(s.plan, ['mine']);
@@ -86,10 +120,14 @@ test('plus de place : le fil attend, et l’estimation dit pourquoi', () => {
   assert.equal(f.why, 'Plus de place');
 });
 
-test('estimation : dans l’ordre, après le chantier en cours, et identique au vrai calcul', () => {
+scenario('estimation : dans l’ordre, après le chantier en cours, et identique au vrai calcul', (film) => {
+  const { A, clock, show } = stage(film);
   const p = poor();
   p.plan = ['mine', 'solar'];
   const f = game.planForecast(p, T0);
+  show(p, 'A met mine puis centrale au fil : la fiche annonce quand chacune se lance');
+  film.roll(A, clock, f[0].start + 1, 'on attend l’heure annoncée pour la mine');
+  show(p, 'l’heure annoncée : la mine est lancée');
   assert.equal(f.length, 2);
   assert.ok(f[0].start > T0);
   assert.ok(f[1].start >= f[0].end);

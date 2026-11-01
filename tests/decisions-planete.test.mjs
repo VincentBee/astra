@@ -1,7 +1,10 @@
 // Décisions de docs/decisions.md sur l'économie, la planète, les races, le
 // climat, le soleil, les places et les technologies : chaque test vérifie ce
 // que dit la décision (son numéro est dans le nom du test).
-import { test } from 'node:test';
+//
+// Tous sont des scénarios (D-129) : chacun filme ce que voit un joueur d'une vraie partie. Quand
+// la décision porte sur une planète, cette planète devient celle du joueur, et le joueur touche
+// sa planète mère : le rapport ouvre sa fiche, avec les stocks et la production vérifiés.
 import assert from 'node:assert/strict';
 import { game, fleet, newGame, Session, clone } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
@@ -18,14 +21,33 @@ const close = (a, b, eps = 1e-6) => assert.ok(Math.abs(a - b) < eps, `${a} ≠ $
 /** Planète posée sur un monde de la carte `gtest` (gisements et climat compris). */
 const onWorld = (race, i = 0) => game.newPlanet(race, T0, game.planetsFor('gtest')[i]);
 
-test('D-002 (modifiée par D-083) : une heure de jeu dure 1 / TEMPO minute réelle (SPEED = 60 × TEMPO)', () => {
+/**
+ * Partie à un joueur (horloge à T0) dont la planète mère devient `p` : ce que le test vérifie sur
+ * `p`, le joueur le voit dans la fiche de sa planète. `onWorld(race)` est d'ailleurs le monde même
+ * de sa planète mère (le premier de la carte).
+ */
+function playing(p) {
+  const { players: [A], clock } = newGame(1, [p.race]);
+  const me = A.state.players[A.me];
+  me.planet = p;
+  return { A, clock, me, home: { ...me.home } };
+}
+
+/** Le joueur touche sa planète mère : sa fiche s'ouvre, avec le bouton « Voir la planète ». */
+const mine = (home) => [{ sheet: home, button: true }];
+
+scenario('D-002 (modifiée par D-083) : une heure de jeu dure 1 / TEMPO minute réelle (SPEED = 60 × TEMPO)', (film) => {
   assert.equal(game.SPEED, 60 * game.TEMPO);
   // Planète sans gisement ni population : la production est linéaire.
   const p = game.newPlanet('machine', T0);
+  const { A, clock, home } = playing(p);
   const perHour = game.flows('machine', p.levels, 0, p.stock, 1).net.minerals;
   assert.ok(perHour > 0);
   const before = p.stock.minerals;
+  film.look(A, `planète de A sans gisement : ${perHour} minéraux par heure de jeu`, mine(home));
+  film.roll(A, clock, T0 + GH, `une heure de jeu passe (${GH / 1000} s réelles)`);
   game.settle(p, T0 + GH);
+  film.look(A, 'une heure de jeu plus tard : une heure de production en plus', mine(home));
   close(p.stock.minerals - before, perHour);
 });
 
@@ -39,10 +61,11 @@ scenario('D-011 : trois races, trois ressources, race choisie une fois pour tout
   assert.equal(A.myRace, 'human');
 });
 
-test('D-012 : départ serré, entrepôts limités', () => {
+scenario('D-012 : départ serré, entrepôts limités', (film) => {
   assert.equal(game.storageCap(0), 1000);
   assert.equal(game.storageCap(1), 1700);
   // Au départ, aucune race ne peut payer à la fois le labo et le chantier naval.
+  // (Coûts des tables : vérifiés par les asserts seulement ; l'image montre le stock de départ.)
   for (const r of game.RACE_KEYS) {
     const R = game.RACES[r];
     const need = game.upgradeCost(r, 'lab', 0).minerals + game.upgradeCost(r, 'yard', 0).minerals;
@@ -50,11 +73,16 @@ test('D-012 : départ serré, entrepôts limités', () => {
   }
   // Sans entrepôt, le stock ne dépasse jamais 1 000, même après 10 h.
   const p = game.newPlanet('machine', T0);
+  const { A, clock, home } = playing(p);
+  film.look(A, 'A, machine, au départ : stock de départ, sans entrepôt', mine(home));
+  // 10 h réelles : deux images (avant, après), pas un film de 240 images.
+  clock.t = T0 + 600 * MIN;
   game.settle(p, T0 + 600 * MIN);
+  film.look(A, '10 h plus tard : les minéraux plafonnent à 1 000', mine(home));
   assert.equal(p.stock.minerals, game.storageCap(0));
 });
 
-test('D-015 : seuls minéraux et nourriture viennent d’un gisement, l’énergie est sans limite', () => {
+scenario('D-015 : seuls minéraux et nourriture viennent d’un gisement, l’énergie est sans limite', (film) => {
   assert.deepEqual(game.SOIL, ['minerals', 'food']);
   for (const w of game.planetsFor('gtest')) assert.deepEqual(Object.keys(w.nature).sort(), ['food', 'minerals']);
   // Sol vide et sans repousse : l'énergie produite ne change pas.
@@ -65,8 +93,13 @@ test('D-015 : seuls minéraux et nourriture viennent d’un gisement, l’énerg
   const free = clone(dry);
   delete free.nature;
   delete free.reserve;
+  // Deux parties : A sur la planète au sol vide, B (une autre partie) sur la même sans gisement.
+  const a1 = playing(dry);
+  const b1 = playing(free);
   const a = game.stateAt(dry, T0).prod.in;
   const b = game.stateAt(free, T0).prod.in;
+  film.look(a1.A, 'planète au sol vide : plus de minéraux, l’énergie continue', mine(a1.home));
+  film.look(b1.A, 'la même sans gisement (d’avant D-018) : même énergie, minéraux sans limite', mine(b1.home));
   assert.ok(a.energy > 0);
   assert.equal(a.energy, b.energy);
   assert.equal(a.minerals, 0);
@@ -76,24 +109,37 @@ test('D-015 : seuls minéraux et nourriture viennent d’un gisement, l’énerg
   assert.equal(b.minerals, want);
 });
 
-test('D-016 : gisement vide = production de base ; sans exploitation, il remonte jusqu’au maximum', () => {
+scenario('D-016 : gisement vide = production de base ; sans exploitation, il remonte jusqu’au maximum', (film) => {
   // Vide : on n'obtient que la repousse, même si les bâtiments en veulent plus.
   const p = onWorld('human');
   p.reserve.minerals = 0;
   p.nature.minerals.regen = 5;
+  const { A, clock, home } = playing(p);
+  film.look(A, 'gisement de minéraux vide, repousse 5 par heure de jeu', mine(home));
   close(game.stateAt(p, T0).prod.in.minerals, 5);
   const before = p.stock.minerals;
+  film.roll(A, clock, T0 + 10 * GH, '10 heures de jeu passent');
   game.settle(p, T0 + 10 * GH);
+  film.look(A, '10 heures de jeu plus tard : 50 minéraux de plus, rien que la repousse', mine(home));
   close(p.stock.minerals - before, 5 * 10);
-  // Peu exploité : il se remplit, sans dépasser son maximum.
+  // Peu exploité : il se remplit, sans dépasser son maximum (une autre partie, une machine sans foreuse).
   const q = onWorld('machine');
   q.levels.drill = 0;
   q.reserve.minerals = q.nature.minerals.max - 5000;
+  const m = playing(q);
+  film.look(m.A, 'machine sans foreuse : gisement 5 000 sous son maximum', mine(m.home));
+  m.clock.t = T0 + 120 * MIN;
   game.settle(q, T0 + 120 * MIN);
+  film.look(m.A, '2 h plus tard : gisement plein, pas au-delà', mine(m.home));
   assert.equal(q.reserve.minerals, q.nature.minerals.max);
 });
 
-test('D-018 : 14 planètes tirées de l’identifiant de la partie, les mêmes partout', () => {
+scenario('D-018 : 14 planètes tirées de l’identifiant de la partie, les mêmes partout', (film) => {
+  // L'image montre la carte de la partie `gtest` et ses planètes ; l'identique d'un téléphone à
+  // l'autre et la différence avec une autre partie sont vérifiés par les asserts.
+  const { players: [A, B] } = newGame(2);
+  film.look(A, 'la carte de la partie gtest, vue par A');
+  film.look(B, 'la même carte, vue par B');
   assert.equal(game.PLANET_COUNT, 14);
   assert.deepEqual(game.planetsFor('gtest'), game.planetsFor('gtest'));
   assert.notDeepEqual(game.planetsFor('gtest'), game.planetsFor('gautre'));
@@ -131,7 +177,11 @@ scenario('D-018 : deux joueurs sur la même planète mère, le premier l’empor
   assert.equal(B.state.players[B.me].home, null, 'B la lui laisse');
 });
 
-test('D-018 / D-060 : repousse des gisements ×10 (minéraux 150–450/min, nourriture 80–250/min)', () => {
+scenario('D-018 / D-060 : repousse des gisements ×10 (minéraux 150–450/min, nourriture 80–250/min)', (film) => {
+  // L'image montre la fiche de la planète mère de A, dont le gisement est l'un de ceux vérifiés ;
+  // les bornes des 14 planètes sont vérifiées par les asserts.
+  const { players: [A] } = newGame(1, ['human']);
+  film.look(A, 'A touche sa planète mère : gisements et repousse dans les bornes', mine({ ...A.state.players[A.me].home }));
   assert.deepEqual(game.NATURE.minerals.regen, [150, 450]);
   assert.deepEqual(game.NATURE.food.regen, [80, 250]);
   assert.deepEqual(game.NATURE.minerals.max, [60000, 200000]);
@@ -145,32 +195,45 @@ test('D-018 / D-060 : repousse des gisements ×10 (minéraux 150–450/min, nour
   }
 });
 
-test('D-019 : tout ce qui entre au stock sort du gisement, revenu de base compris', () => {
+scenario('D-019 : tout ce qui entre au stock sort du gisement, revenu de base compris', (film) => {
   const p = onWorld('human');
   p.reserve.minerals = 30000; // loin du maximum : la repousse n'est pas rognée
+  const { A, clock, home } = playing(p);
   const h = 10;
   const stock0 = p.stock.minerals;
   const soil0 = p.reserve.minerals;
+  film.look(A, 'gisement de minéraux à 30 000', mine(home));
+  film.roll(A, clock, T0 + h * GH, `${h} heures de jeu passent`);
   game.settle(p, T0 + h * GH);
+  film.look(A, `${h} heures de jeu plus tard : le stock a pris au gisement ce qu’il a gagné`, mine(home));
   const gained = p.stock.minerals - stock0;
   assert.ok(gained > 0);
   close(gained, soil0 + p.nature.minerals.regen * h - p.reserve.minerals, 1e-6);
 });
 
-test('D-019 : l’arrachement ne dépasse ni le gisement ni la place en entrepôt', () => {
+scenario('D-019 : l’arrachement ne dépasse ni le gisement ni la place en entrepôt', (film) => {
   const p = onWorld('alien');
   p.stock.energy = 500;
   p.reserve.minerals = 15;
+  const a = playing(p);
+  film.look(a.A, 'alien, 15 minéraux dans le sol', mine(a.home));
   assert.equal(game.liftGain(p), 15, 'pas plus que le sol');
   const r = game.usePower(p, 'lift', T0);
+  film.look(a.A, 'après l’arrachement : 15 minéraux pris, sol vide', mine(a.home));
   assert.ok(!r.error);
   assert.equal(p.reserve.minerals, 0, 'pris au sol');
   const q = onWorld('alien');
   q.stock.minerals = game.storageCap(0) - 10;
+  const b = playing(q);
+  film.look(b.A, 'autre partie : entrepôt à 10 minéraux du plein, l’arrachement n’en donnerait que 10', mine(b.home));
   assert.equal(game.liftGain(q), 10, 'pas plus que la place libre');
 });
 
-test('D-021 / D-031 : labo et chantier par race, 7 technologies et 4 vaisseaux par race', () => {
+scenario('D-021 / D-031 : labo et chantier par race, 7 technologies et 4 vaisseaux par race', (film) => {
+  // Les tables des races ne se voient pas sur la carte : une image par race montre la planète mère
+  // du joueur (fiche ouverte), où il trouve labo et chantier ; le reste est vérifié par les asserts.
+  const { players } = newGame(3, ['human', 'machine', 'alien']);
+  for (const s of players) film.look(s, `${s.myRace} : sa planète mère, avec labo et chantier`, mine({ ...s.state.players[s.me].home }));
   const labs = new Set();
   for (const r of game.RACE_KEYS) {
     const b = game.RACES[r].buildings;
@@ -258,14 +321,31 @@ scenario('D-098 : recherche sur toute planète qui a un labo, selon le niveau de
   assert.equal(changed, 0);
 });
 
-test('D-038 : consommation des machines doublée (carburant par case)', () => {
+scenario('D-038 : consommation des machines doublée (carburant par case)', (film) => {
+  // Le carburant par case est une table : l'image montre un chasseur machine en route (son
+  // réservoir baisse case après case) ; la valeur exacte est vérifiée par les asserts.
+  const { players: [A], clock } = newGame(1, ['machine']);
+  const pl = A.state.players[A.me].planet;
+  Object.assign(pl, { ships: { fighter: 1 }, stock: { ...pl.stock, energy: 900 } });
+  const id = A.takeOff('home', { fighter: 1 }, {}, fleet.fleetTank('machine', { fighter: 1 }));
+  assert.ok(id, 'décollage accepté');
+  const f = A.myFleet(id);
+  assert.ok(A.moveFleet(id, { x: f.from.x + 3, y: f.from.y }), 'départ accepté');
+  film.look(A, 'un chasseur machine part à 3 cases, le plein fait', [{ fleet: [A, id], visible: true }]);
+  clock.t = A.myFleet(id).arrive;
+  film.look(A, 'arrivé : 3 cases de carburant brûlées', [{ fleet: [A, id], visible: true }]);
   // Avant le lot 7 : 0,5 / 1,5 / 0,5 / 1,5 par case.
   const m = SHIPS.machine;
   assert.deepEqual([m.cargo.burn, m.colony.burn, m.fighter.burn, m.heavy.burn], [1, 3, 1, 3]);
   assert.equal(m.fighter.burn, SHIPS.human.fighter.burn, 'autant par case que les humains');
 });
 
-test('D-048 : l’arbre des technologies est un graphe avec bâtiments, technologies, vaisseaux et pouvoirs', async () => {
+scenario('D-048 : l’arbre des technologies est un graphe avec bâtiments, technologies, vaisseaux et pouvoirs', async (film) => {
+  // L'arbre est une page à part (techtree.html), pas l'écran de jeu : l'image montre la planète
+  // mère de chaque race (fiche ouverte), d'où le joueur ouvre l'arbre ; le graphe est vérifié par
+  // les asserts. Les images d'abord : le faux DOM ci-dessous remplace celui du harnais.
+  const { players } = newGame(3, ['human', 'machine', 'alien']);
+  for (const s of players) film.look(s, `${s.myRace} : sa planète mère, d’où il ouvre l’arbre des technologies`, mine({ ...s.state.players[s.me].home }));
   // La page tourne dans le navigateur : un faux DOM juste assez grand.
   const els = new Map();
   const el = () => ({ innerHTML: '', textContent: '', style: { setProperty() {} }, addEventListener() {}, querySelectorAll: () => [], classList: { toggle() {} } });
@@ -295,15 +375,31 @@ test('D-048 : l’arbre des technologies est un graphe avec bâtiments, technolo
   }
 });
 
-test('D-053 : le soleil 3 × 3 est décalé d’une demi-case, et les flottes le traversent en ligne droite', () => {
+scenario('D-053 : le soleil 3 × 3 est décalé d’une demi-case, et les flottes le traversent en ligne droite', (film) => {
   let gid = 0;
   while (game.sunFor(`s${gid}`).size !== 3) gid++;
   const sun = game.sunFor(`s${gid}`);
   assert.equal(sun.x + sun.size / 2 - game.UNIVERSE.w / 2, -0.5);
+  // Une partie sur cette carte-là (soleil 3 × 3), comme newGame mais avec son identifiant : la
+  // flotte du test est celle du joueur, et l'on voit sa traversée.
+  const clock = { t: T0 };
+  const A = new Session('J0');
+  Object.assign(A, { now: () => clock.t, start() {}, meet() {}, me: 'p0', status: 'playing' });
+  A.state = { gid: `s${gid}`, key: 'k', players: {}, log: [] };
+  A.addPlayer(A.me, A.name, 'x'.repeat(64));
+  A.chooseRace('human');
+  A.claimPlanet(A.planets.find((w) => w.kind === 'planet').id);
   // De part et d'autre du soleil, à travers lui : trajet direct, sans détour.
   const y = sun.y + 1;
   const f = { ships: { fighter: 1 }, cargo: {}, fuel: 1000, from: { x: 0, y }, to: { x: 0, y }, depart: T0, arrive: T0 };
+  Object.assign(f, { id: 'sun', origin: 'home', order: null, stance: 'passive' }); // ce qu'a une flotte du jeu
+  (A.state.players[A.me].fleets ||= []).push(f);
+  film.look(A, 'un chasseur de A à l’ouest du soleil', [{ fleet: [A, 'sun'], visible: true }]);
   assert.equal(fleet.moveTo(f, 'human', {}, { x: 19, y }, null, T0), null);
+  clock.t = (f.depart + f.arrive) / 2;
+  film.look(A, 'à mi-chemin : il traverse le soleil en ligne droite', [{ fleet: [A, 'sun'], visible: true }]);
+  clock.t = f.arrive;
+  film.look(A, 'arrivé à l’est, sans détour', [{ fleet: [A, 'sun'], visible: true }]);
   assert.deepEqual(f.to, { x: 19, y });
   assert.equal(f.arrive - T0, fleet.tripMs({ x: 0, y }, { x: 19, y }, fleet.fleetSpeed('human', f.ships, {})));
   close(f.arrive - T0, ((19 / SHIPS.human.fighter.speed) * MIN) / game.TEMPO, 1); // vitesse en cases par heure de jeu (D-083)
@@ -338,7 +434,11 @@ scenario('D-056 : un astéroïde se colonise', (film) => {
   assert.ok(A.state.players[A.me].colonies?.[target.id], 'colonie fondée sur l’astéroïde');
 });
 
-test('D-058 : planètes 14–22 places, astéroïdes 7–10, comètes 6–8 avec des minéraux', () => {
+scenario('D-058 : planètes 14–22 places, astéroïdes 7–10, comètes 6–8 avec des minéraux', (film) => {
+  // L'image montre la carte (planètes, astéroïdes et comètes) et la fiche de la planète mère de
+  // A, avec ses places ; les bornes de toutes les planètes sont vérifiées par les asserts.
+  const { players: [A] } = newGame(1, ['human']);
+  film.look(A, 'la carte : planètes, astéroïdes et comètes ; A touche sa planète mère', mine({ ...A.state.players[A.me].home }));
   assert.deepEqual(game.PLANET_PLACES, [14, 22]);
   assert.deepEqual(game.SMALL_BODIES.asteroid.places, [7, 10]);
   assert.deepEqual(game.SMALL_BODIES.comet.places, [6, 8]);
@@ -346,7 +446,12 @@ test('D-058 : planètes 14–22 places, astéroïdes 7–10, comètes 6–8 avec
   for (const w of game.planetsFor('gtest').filter((x) => x.kind === 'comet')) assert.ok(w.nature.minerals.max > 0);
 });
 
-test('D-058 : tirage uniforme des places (les bornes sortent aussi souvent que le reste)', () => {
+scenario('D-058 : tirage uniforme des places (les bornes sortent aussi souvent que le reste)', (film) => {
+  // Le tirage porte sur 600 cartes : aucun écran ne le montre. L'image montre une partie et la
+  // fiche de la planète mère de A (ses places sont l'un de ces tirages) ; l'uniformité est
+  // vérifiée par les asserts.
+  const { players: [A] } = newGame(1, ['human']);
+  film.look(A, 'A touche sa planète mère : son nombre de places est l’un des tirages', mine({ ...A.state.players[A.me].home }));
   const seen = {};
   for (let i = 0; i < 600; i++) for (const w of game.planetsFor(`u${i}`)) if (w.kind === 'planet') seen[w.places] = (seen[w.places] || 0) + 1;
   const counts = Object.values(seen);
@@ -355,7 +460,13 @@ test('D-058 : tirage uniforme des places (les bornes sortent aussi souvent que l
   assert.ok(Math.min(...counts) / Math.max(...counts) > 0.8, JSON.stringify(seen));
 });
 
-test('D-060 : entrepôts hors du score, mine humaine 36, impôt 0,4 par habitant', () => {
+scenario('D-060 : entrepôts hors du score, mine humaine 36, impôt 0,4 par habitant', (film) => {
+  // L'image montre la planète d'un humain avec une mine niv. 1 et 100 habitants, dont la fiche
+  // donne la production vérifiée ; le score est vérifié par les asserts.
+  const { players: [A] } = newGame(1, ['human']);
+  const me = A.state.players[A.me];
+  Object.assign(me.planet, { levels: { ...me.planet.levels, mine: 1 }, pop: 100 });
+  film.look(A, 'humain, mine niv. 1 et 100 habitants : sa production de minéraux', mine({ ...me.home }));
   assert.equal(game.score('human', { mine: 2, store: 6 }), game.score('human', { mine: 2 }));
   assert.ok(game.score('human', { mine: 2 }) > 0);
   const r = game.RACES.human.rates({ mine: 1 }, 100);
@@ -363,7 +474,11 @@ test('D-060 : entrepôts hors du score, mine humaine 36, impôt 0,4 par habitant
   close(r.mineralsBase, 10 + 0.4 * 100);
 });
 
-test('D-060 : climat adouci (énergie ×0,8–×1,2, minéraux ×0,9–×1,1, nourriture ×0,6–×1,3)', () => {
+scenario('D-060 : climat adouci (énergie ×0,8–×1,2, minéraux ×0,9–×1,1, nourriture ×0,6–×1,3)', (film) => {
+  // L'image montre la carte (soleil au centre) et la fiche de la planète mère de A, dont le climat
+  // vient de sa distance au soleil ; les bornes, case par case, sont vérifiées par les asserts.
+  const { players: [A] } = newGame(1, ['human']);
+  film.look(A, 'A touche sa planète mère : son climat, selon sa distance au soleil', mine({ ...A.state.players[A.me].home }));
   const sun = game.sunFor('gtest');
   const all = [];
   for (let x = 0; x < game.UNIVERSE.w; x++) for (let y = 0; y < game.UNIVERSE.h; y++) all.push(game.climateAt(sun, { x, y }));
@@ -380,33 +495,42 @@ test('D-060 : climat adouci (énergie ×0,8–×1,2, minéraux ×0,9–×1,1, no
   assert.deepEqual([hot.heat, hot.energy, hot.minerals, hot.food], [1, 1.2, 1.1, 0.6]);
 });
 
-test('D-060 : pouvoirs aliens (arrachement 40, transe 25 par psionique), transe refusée sur sol vide', () => {
+scenario('D-060 : pouvoirs aliens (arrachement 40, transe 25 par psionique), transe refusée sur sol vide', (film) => {
   const p = onWorld('alien');
   p.pop = 2;
+  const { A, home } = playing(p);
+  film.look(A, 'alien avec 2 psioniques', mine(home));
   assert.equal(game.liftGain(p, 1), 80);
   assert.equal(game.powerCost(p, 'trance', 3).energy, 75);
   p.stock.energy = 500;
   p.reserve.minerals = 0;
   p.nature.minerals.regen = 0;
   const before = clone(p);
+  film.look(A, 'sol vide et sans repousse, 500 d’énergie', mine(home));
   assert.ok(game.usePower(p, 'trance', T0).error, 'sol vide : refusée');
+  film.look(A, 'transe refusée : rien payé, pas de transe', mine(home));
   assert.equal(p.stock.energy, before.stock.energy, 'rien payé');
   assert.equal(p.trance, undefined);
 });
 
-test('D-070 : « Nourriture » dans les stocks du joueur', () => {
+scenario('D-070 : « Nourriture » dans les stocks du joueur', (film) => {
+  // La fiche de la planète mère montre les stocks, dont la nourriture ; le nom est vérifié par l'assert.
+  const { players: [A] } = newGame(1, ['human']);
+  film.look(A, 'A touche sa planète mère : ses stocks, dont « Nourriture »', mine({ ...A.state.players[A.me].home }));
   assert.equal(game.RES_INFO.food.name, 'Nourriture');
 });
 
-test('D-074 : seuls les aliens ont des pouvoirs', () => {
+scenario('D-074 : seuls les aliens ont des pouvoirs', (film) => {
   for (const r of ['human', 'machine']) {
     const p = onWorld(r);
     p.stock.energy = 500;
+    const { A, home } = playing(p);
     assert.ok(game.usePower(p, 'lift', T0).error, r);
+    film.look(A, `${r} : l’arrachement est refusé, rien n’a changé`, mine(home));
   }
 });
 
-test('D-099 : chez les humains, l’Agronomie et les Arches coloniales coûtent aussi de la nourriture', () => {
+scenario('D-099 : chez les humains, l’Agronomie et les Arches coloniales coûtent aussi de la nourriture', (film) => {
   assert.deepEqual(TECHS.human.agro.base, { minerals: 120, food: 40 });
   assert.deepEqual(TECHS.human.colonies.base, { minerals: 400, food: 120 });
   for (const k of ['forage', 'propulsion', 'blindage', 'armement', 'radar']) {
@@ -416,8 +540,11 @@ test('D-099 : chez les humains, l’Agronomie et les Arches coloniales coûtent 
   p.levels.lab = 1;
   p.stock.minerals = 900;
   p.stock.food = 0;
+  const { A, home } = playing(p);
+  film.look(A, 'humain avec labo, 900 minéraux et aucune nourriture', mine(home));
   assert.match(game.startResearch(p, 'agro', T0), /insuffisantes/);
   p.stock.food = 100;
   assert.equal(game.startResearch(p, 'agro', T0), null);
+  film.look(A, 'avec 100 de nourriture : Agronomie lancée, 40 de nourriture payés', mine(home));
   close(p.stock.food, 60);
 });
