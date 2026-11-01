@@ -166,3 +166,4 @@ que fait le code.
 | D-142 | Seul et éliminé : perdu, personne ne gagne | nouveau test | `end.test.mjs` seul et éliminé : la partie finit sur une défaite, pas une victoire ; « planète mère gelée… » vérifie `winner: null` (avant : le vainqueur était le joueur seul) | le texte du bandeau : navigateur seulement |
 | D-143 | Écran « Fin de partie » : classement, médailles or, argent, bronze | nouveau test | `finish.test.mjs` fin à quatre (ordre, médailles, moi repéré, points d'avant la chute) ; fin seul (« Perdu », sans médaille) | la fenêtre elle-même (DOM) : vérifiée dans le navigateur intégré |
 | D-144 | Cache `astra-p2p-v74` | non testable |  | version du service worker |
+| D-145 | L'écran de fin ne répète pas qui gagne | test modifié | `finish.test.mjs` : les vérifications du titre retirées ; « fin seul » vérifie `over.winner === null` | l'absence de la ligne (DOM) : vue dans le rapport du test |

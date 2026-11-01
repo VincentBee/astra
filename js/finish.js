@@ -4,7 +4,7 @@ const MEDALS = ['gold', 'silver', 'bronze'];
 
 /**
  * Tableau de fin d'une partie finie, ou null si elle ne l'est pas.
- * { title, won, rows: [{ id, place, name, race, color, pts, dead, me, medal }] }
+ * { rows: [{ id, place, name, race, color, pts, dead, me, medal }] }
  * Ordre de `ranking` à l'heure de la fin ; `pts` : points d'avant la chute pour un joueur
  * tombé (`best`), sinon ses points. Médailles or, argent, bronze aux trois premiers, seulement
  * s'il y a un vainqueur : seul et éliminé, personne n'en a (D-142).
@@ -27,7 +27,5 @@ export function finalBoard(session) {
       medal: over.winner != null ? MEDALS[i] || null : null,
     };
   });
-  const won = over.winner === session.me;
-  const title = won ? 'Victoire !' : over.winner == null ? 'Perdu : le froid a tout pris.' : `${players[over.winner].name} gagne.`;
-  return { title, won, rows };
+  return { rows }; // qui gagne : le bandeau `#race` le dit déjà (D-145)
 }

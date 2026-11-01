@@ -320,9 +320,6 @@ button.close-btn svg { width: 18px; height: 18px; }
 /* Fin de partie (D-143) : classement final, médailles carrées */
 .finish .sheet-panel { align-self: center; border-bottom: 1px solid var(--line); }
 .finish h2 { display: inline-flex; align-items: center; gap: 8px; }
-.finish-result { margin: 0; font-size: 1.15rem; font-weight: 700; }
-.finish-result.won { color: var(--gold); }
-.finish-result.lost { color: var(--danger); }
 .finish-board { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .finish-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); background: var(--panel); }
 .finish-row.me { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }

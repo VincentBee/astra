@@ -512,9 +512,8 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
 ## 18. Écran « Fin de partie » (2026-11-01, D-143)
 
 - `#sheet-finish` (`index.html`, après la fenêtre Joueurs) : fenêtre `.sheet` centrée
-  (`.finish`), titre « Fin de partie » avec l'icône `trophy`, le résultat (`#finish-result` :
-  « Victoire ! » en or, « X gagne. » ou « Perdu : le froid a tout pris. » en rouge), la liste
-  `#finish-board`, le lien **Voir la courbe des points** (`replay.html#points`) et le bouton
+  (`.finish`), titre « Fin de partie » avec l'icône `trophy`, la liste `#finish-board` (pas de ligne
+  « X gagne. » : le bandeau `#race` le dit, D-145), le lien **Voir la courbe des points** (`replay.html#points`) et le bouton
   **Revoir la carte**.
 - `showFinish(over, again)` (`js/app.js`) : appelé par `renderRace` quand la partie est finie ;
   ne s'ouvre qu'une fois par partie (`finishSeen` = « gid@heure de fin », en mémoire : un

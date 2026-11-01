@@ -364,6 +364,7 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 21:26 | `1b635a47` | [Bouton] « Oui, ouvre la PR » | Branche poussée, pull request ouverte avec les captures du navigateur et les résultats des tests | (cette PR) | D-142, D-143 |
 | 21:27 | `1b635a47` | [Auto-fix] conflit avec `main` | Fusion de `main` (PR #17 : D-133 à D-141, cache v73) : mes numéros D-142 à D-144 et le cache v74 restent libres, gardés ; conflits de doc et de `js/app.js` résolus en gardant les deux côtés ; écran de fin en section 18 de `interface.md` ; 194/194 | (cette PR) | D-142, D-143, D-144 |
 | 21:30 | `1b635a47` | « as tu rajouter des tests ? » | Réponse sans code : oui, 3 scénarios filmés (`end.test.mjs` : seul et éliminé ; `finish.test.mjs` : fin à quatre, fin seul) et un test existant corrigé ; les 3 échouent sans le correctif ; 194/194 | — | D-142, D-143 |
+| 21:37 | `1b635a47` | « retire ca » (ligne « J0 gagne. » de l'écran de fin, montrée dans le rapport du test) | Ligne `#finish-result` retirée (HTML, CSS, `app.js`), `finalBoard` ne donne plus le titre ; tests adaptés ; 194/194 ; vu dans le rapport du test ; cache v75 | (cette PR) | D-145 |
 
 ### Travaux en cours au 2026-10-29
 

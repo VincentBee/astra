@@ -1621,7 +1621,7 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Statut : en vigueur. Test : `end.test.mjs` « seul et éliminé : la partie finit sur une
   défaite, pas une victoire ».
 
-**D-143 — Écran « Fin de partie » : classement final et médailles or, argent, bronze**
+**D-143 — Écran « Fin de partie » : classement final et médailles or, argent, bronze** — modifiée par D-145 (plus de ligne « X gagne. » dans l'écran)
 - 2026-11-01 21:19 (UTC). Demande de Vincent : « il faudrait que le jeu affiche un splash screen
   "fin de partie" avec le classement des joueurs dans un leaderboard, avec un badge en or pour
   le premier, un en argent pour le deuxième, et un en bronze pour le 3e ».
@@ -1649,3 +1649,14 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - 2026-11-01 21:19 (UTC). Nouveau fichier `js/finish.js` et changements de `index.html`,
   `style.css`, `js/app.js`, `js/session.js` : le service worker passe à `astra-p2p-v74` (v70 à
   v73 pris par la PR VincentBee/astra#17, fusionnée dans `main`). Qui : Claude par défaut. Statut : en vigueur.
+
+**D-145 — L'écran de fin ne répète pas qui gagne** (modifie D-143)
+- 2026-11-01 21:37 (UTC). Demande de Vincent, en montrant la ligne « J0 gagne. » de l'écran de
+  fin : « retire ca ».
+- Choix : la ligne `#finish-result` (« Victoire ! », « X gagne. », « Perdu : le froid a tout
+  pris. ») est retirée de l'écran ; `finalBoard` ne donne plus que `rows`. Le classement et la
+  médaille d'or disent qui gagne ; le bandeau `#race` garde « Victoire ! », « X gagne. » ou
+  « Perdu. » (D-142).
+- Cache `astra-p2p-v75` (changement de `index.html`, `style.css`, `js/app.js`, `js/finish.js`).
+- Qui : Vincent. Source : session `1b635a47`. Statut : en vigueur. Vérifié dans le rapport du
+  test (`finish.test.html`, vrai jeu) : l'écran commence par le classement.

@@ -40,21 +40,17 @@ scenario('fin à quatre : le classement dans l’ordre, or, argent, bronze, et m
   assert.deepEqual(board.rows.map((r) => r.me), [false, true, false, false], 'B se repère dans la liste');
   assert.deepEqual(board.rows.map((r) => r.dead), [false, true, true, true]);
   assert.ok(board.rows.slice(1).every((r) => r.pts > 0), 'un joueur tombé garde ses points d’avant la chute');
-  assert.equal(board.title, `${me(A).name} gagne.`);
-  assert.equal(board.won, false);
-  assert.equal(finalBoard(A).title, 'Victoire !');
-  assert.equal(finalBoard(A).rows[0].me, true);
+  assert.equal(finalBoard(A).rows[0].me, true, 'A, le gagnant, se voit en tête');
 });
 
-scenario('fin seul : l’écran dit « Perdu », sans médaille', (film) => {
+scenario('fin seul : pas de médaille, je ne suis pas le gagnant', (film) => {
   Object.assign(game.FROST, { delayMs: 0, durationMs: 10 * 60_000 });
   const { players: [A], clock } = newGame(1, ['human']);
   clock.t = A.frostOf(me(A).home) + 1;
   A.tick();
   film.look(A, 'A, seul, a tout perdu : la partie est finie');
   const board = finalBoard(A);
-  assert.equal(board.won, false);
-  assert.equal(board.title, 'Perdu : le froid a tout pris.');
+  assert.equal(A.over.winner, null, 'personne ne gagne');
   assert.equal(board.rows.length, 1);
   assert.equal(board.rows[0].medal, null, 'pas de médaille d’or pour une défaite');
   assert.equal(board.rows[0].me, true);

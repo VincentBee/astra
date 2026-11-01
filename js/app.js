@@ -1111,9 +1111,6 @@ function showFinish(over, again = false) {
   finishSeen = key;
   const board = finalBoard(session);
   if (!board) return;
-  const result = $('finish-result');
-  result.textContent = board.title;
-  result.className = `finish-result ${board.won ? 'won' : 'lost'}`;
   $('finish-board').innerHTML = board.rows
     .map((r) => `<li class="finish-row${r.me ? ' me' : ''}${r.dead ? ' dead' : ''}" data-place="${r.place}">
         <span class="medal${r.medal ? ' ' + r.medal : ''}" title="${r.medal ? { gold: 'Or', silver: 'Argent', bronze: 'Bronze' }[r.medal] : ''}">${r.place}</span>
