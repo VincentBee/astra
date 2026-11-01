@@ -1,7 +1,7 @@
 // Cache hors ligne : une fois l'appli ouverte une fois, elle se lance sans réseau.
 // Penser à changer VERSION à chaque mise en ligne pour que les téléphones
 // récupèrent les nouveaux fichiers.
-const VERSION = 'astra-p2p-v73';
+const VERSION = 'astra-p2p-v75';
 const FILES = [
   './',
   'index.html',
@@ -14,6 +14,7 @@ const FILES = [
   'js/tech.js',
   'js/fleet.js',
   'js/report.js',
+  'js/finish.js',
   'js/trade.js',
   'js/session.js',
   'js/save.js',

@@ -1014,8 +1014,12 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
   (D-102).
 - `checkOver` : à plusieurs, la partie finit quand il reste **un seul** joueur en vie (ou
   aucun : le dernier tombé gagne, puis le meilleur `best`). Seul : quand le froid a tout
-  pris. Le téléphone qui le voit écrit `p.over = { at, winner }` dans sa fiche ;
-  `Session.over` prend la plus ancienne fin écrite par un joueur.
+  pris, et alors **personne ne gagne** : `winner: null` (D-142). Le téléphone qui le voit
+  écrit `p.over = { at, winner }` dans sa fiche ; `Session.over` prend la plus ancienne fin
+  écrite par un joueur, et lit une vieille fin seule (« gagné ») comme perdue.
+- Écran de fin : `finalBoard(session)` (`js/finish.js`, D-143) donne le classement final
+  (`ranking(over.at)`, points `best`, médailles or / argent / bronze aux trois premiers, aucune
+  sans vainqueur).
 - Partie finie : `tick` ne fait plus que lire les derniers rapports de combat ; tous les ordres
   sont refusés (`canAct`).
 
