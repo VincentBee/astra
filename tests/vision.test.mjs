@@ -1,18 +1,24 @@
-// Champ de vision des flottes (règles §8.6, D-030) : une flotte ennemie n'est
-// visible que dans ma portée de détection, autour de mes planètes et de mes
-// flottes ; les miennes le sont toujours. La carte ne dessine que les flottes
-// pour lesquelles `sees` dit oui (`fleetSpots`, js/app.js) : ces tests
+// Champ de vision des flottes (règles §8.6, D-030, D-128) : une flotte ennemie
+// n'est visible que dans ma portée de détection, autour de mes planètes et de
+// mes flottes ; les miennes le sont toujours. La carte ne dessine que les
+// flottes pour lesquelles `sees` dit oui (`fleetSpots`, js/app.js) : ces tests
 // vérifient la règle, pas le dessin du canvas.
-import { test } from 'node:test';
+//
+// Écrits en scénarios (D-129) : l'intitulé dit ce qui est attendu ; en cas d'échec, le rapport
+// tests/reports/vision.test.html montre la carte vue par A, image par image.
 import assert from 'node:assert/strict';
-import { newGame, game, fleet } from './harness.mjs';
+import { newGame, game } from './harness.mjs';
+import { scenarios } from './scenario.mjs';
 
 const { sightRange } = await import('../js/tech.js');
+const scenario = scenarios(import.meta.url);
 
 const P = (s) => s.state.players[s.me];
+const PLANET = sightRange('human', {}, 'planet');
+const FLEET = sightRange('human', {}, 'fleet');
 
 /** Une flotte de `s`, arrêtée en `at`. */
-function park(s, ships, at, fuel) {
+function park(s, ships, at, fuel = 40) {
   const pl = P(s).planet;
   pl.ships = { ...ships };
   pl.stock = { ...pl.stock, energy: 5000 };
@@ -21,12 +27,6 @@ function park(s, ships, at, fuel) {
   s.touch();
   return id;
 }
-
-/** La flotte `id` de `b`, telle que `a` la connaît. */
-const theirs = (a, b, id) => a.state.players[b.me].fleets.find((f) => f.id === id);
-
-/** `a` voit-il, en ce moment, la flotte `id` de `b` ? */
-const sees = (a, b, id) => a.sees(a.state.players[b.me], theirs(a, b, id), a.now());
 
 /**
  * Deux humains sans technologie ; A n'a que sa planète mère comme yeux.
@@ -42,64 +42,68 @@ function duel() {
   return { ...g, at: (dx, dy = 0) => ({ x: home.x + sx * dx, y: home.y + sy * dy }) };
 }
 
-test('flotte ennemie près de ma planète : visible jusqu’à la portée, cachée au-delà', () => {
+scenario('flotte ennemie au bord de la portée de ma planète : visible', (film) => {
   const { players: [A, B], sync, at } = duel();
-  const r = sightRange('human', {}, 'planet');
-
-  const edge = park(B, { cargo: 1 }, at(r), 40);
+  const id = park(B, { cargo: 1 }, at(PLANET));
   sync(A, B);
-  assert.equal(sees(A, B, edge), true, `à ${r} cases : visible`);
-
-  const beyond = park(B, { cargo: 1 }, at(r + 1), 40);
-  sync(A, B);
-  assert.equal(sees(A, B, beyond), false, `à ${r + 1} cases : cachée`);
-
-  // Distance à vol d'oiseau, pas en cases : en diagonale, r cases en x et en y, c'est trop loin.
-  const diag = park(B, { cargo: 1 }, at(r, r), 40);
-  sync(A, B);
-  assert.equal(sees(A, B, diag), false, 'en diagonale à r + r : cachée');
-
-  // Filtre d'affichage, pas un secret : ma copie de la partie connaît quand même la flotte.
-  assert.ok(theirs(A, B, beyond), 'la flotte cachée est dans la copie de A');
+  film.look(A, `flotte de B à ${PLANET} cases`, [{ fleet: [B, id], visible: true }]);
 });
 
-test('flotte ennemie près de ma flotte : visible dans la portée de ma flotte', () => {
+scenario('flotte ennemie une case trop loin de ma planète : cachée', (film) => {
   const { players: [A, B], sync, at } = duel();
-  const r = sightRange('human', {}, 'fleet');
+  const id = park(B, { cargo: 1 }, at(PLANET + 1));
+  sync(A, B);
+  film.look(A, `flotte de B à ${PLANET + 1} cases`, [{ fleet: [B, id], visible: false }]);
+  assert.ok(A.state.players[B.me].fleets.some((f) => f.id === id), 'la flotte cachée est dans la copie de A');
+});
+
+scenario('flotte ennemie en diagonale : la distance se mesure à vol d’oiseau', (film) => {
+  const { players: [A, B], sync, at } = duel();
+  const id = park(B, { cargo: 1 }, at(PLANET, PLANET));
+  sync(A, B);
+  film.look(A, 'flotte de B en diagonale', [{ fleet: [B, id], visible: false }]);
+});
+
+scenario('flottes ennemies près de ma flotte : vues dans sa portée, cachées au-delà', (film) => {
+  const { players: [A, B], sync, at } = duel();
   const far = 8; // à 8 cases de la planète mère de A : hors de sa portée, même un peu à côté
-  park(A, { fighter: 1 }, at(far), 40);
-
-  const near = park(B, { cargo: 1 }, at(far, r), 40);
-  const out = park(B, { cargo: 1 }, at(far, r + 1), 40);
+  park(A, { fighter: 1 }, at(far));
+  const near = park(B, { cargo: 1 }, at(far, FLEET));
+  const out = park(B, { cargo: 1 }, at(far, FLEET + 1));
   sync(A, B);
-  assert.equal(sees(A, B, near), true, `à ${r} cases de ma flotte : visible`);
-  assert.equal(sees(A, B, out), false, `à ${r + 1} cases : cachée`);
+  film.look(A, 'deux flottes de B autour de la flotte de A', [
+    { fleet: [B, near], visible: true },
+    { fleet: [B, out], visible: false },
+  ]);
 });
 
-test('mes flottes sont toujours visibles, même loin de tout', () => {
+scenario('mes flottes sont toujours visibles, même loin de tout', (film) => {
   const { players: [A], at } = duel();
-  const id = park(A, { fighter: 1 }, at(8, 8), 40);
-  assert.equal(A.sees(P(A), A.myFleet(id), A.now(), []), true, 'sans aucun œil : la mienne reste visible');
+  const id = park(A, { fighter: 1 }, at(8, 8));
+  film.look(A, 'A sans aucun œil', [{ fleet: [A, id], visible: true }], { eyes: [] });
 });
 
-test('une flotte ennemie en route disparaît en sortant de ma portée, et réapparaît en revenant', () => {
+scenario('flotte ennemie en route : cachée en sortant de ma portée, visible en revenant', (film) => {
   const { players: [A, B], sync, clock, at } = duel();
-  const r = sightRange('human', {}, 'planet');
-  const inside = at(r - 1);
-  const outside = at(r + 3);
-
-  const id = park(B, { cargo: 1 }, inside, 40);
+  const inside = at(PLANET - 1);
+  const outside = at(PLANET + 3);
+  const id = park(B, { cargo: 1 }, inside);
+  const theirs = () => A.state.players[B.me].fleets.find((f) => f.id === id);
   sync(A, B);
-  assert.equal(sees(A, B, id), true, 'au départ, dans ma portée');
+  film.look(A, 'au départ, dans la portée de A', [{ fleet: [B, id], visible: true }]);
 
   assert.equal(B.moveFleet(id, outside), true, 'départ accepté');
   sync(A, B);
-  assert.equal(fleet.moving(theirs(A, B, id), clock.t), true, 'elle roule');
-  clock.t = theirs(A, B, id).arrive;
-  assert.equal(sees(A, B, id), false, 'arrivée hors de ma portée : cachée');
+  const { depart, arrive } = theirs();
+  clock.t = (depart + arrive) / 2;
+  film.look(A, 'en route vers l’extérieur');
+  clock.t = arrive;
+  film.look(A, 'arrivée hors de la portée de A', [{ fleet: [B, id], visible: false }]);
 
   assert.equal(B.moveFleet(id, inside), true, 'retour accepté');
   sync(A, B);
-  clock.t = theirs(A, B, id).arrive;
-  assert.equal(sees(A, B, id), true, 'revenue dans ma portée : visible');
+  clock.t = (theirs().depart + theirs().arrive) / 2;
+  film.look(A, 'sur le chemin du retour');
+  clock.t = theirs().arrive;
+  film.look(A, 'revenue dans la portée de A', [{ fleet: [B, id], visible: true }]);
 });

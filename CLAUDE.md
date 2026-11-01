@@ -7,7 +7,9 @@ Toute la documentation est dans [docs/](docs/README.md) : architecture du code
 (`docs/architecture/`), journal des demandes (`docs/historique/journal.md`), décisions
 (`docs/decisions.md`). Lire `docs/README.md` d'abord.
 
-Tests : `node --test tests/*.test.mjs`.
+Tests : `node --test tests/*.test.mjs`. Interface de test : `node tests/ui/server.mjs`
+(http://localhost:5199). Un test qui a besoin d'être compris par un humain s'écrit en scénario
+(`tests/scenario.mjs`, voir `docs/architecture/regles.md` §16).
 
 ## Règle : tout noter, dans le même commit
 

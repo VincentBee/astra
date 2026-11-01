@@ -478,7 +478,7 @@ Une flotte qui attend la réponse à un échange est **bloquée** (`locked`,
   la dernière fois (même s'il l'a perdue depuis), ou rien (elle paraît libre). Vue libre :
   le souvenir s'efface. `scout` passe toutes les planètes des autres à chaque `tick`, carte
   fermée comprise. Partie finie (`over`) : tout est visible.
-- Tests : `tests/fog.test.mjs` (planètes) et `tests/vision.test.mjs` (flottes, D-128) : flotte
+- Tests : `tests/fog.test.mjs` (planètes) et `tests/vision.test.mjs` (flottes, D-128, 6 scénarios D-129) : flotte
   ennemie visible jusqu'à la portée d'une de mes planètes ou de mes flottes, cachée une case
   au-delà, distance à vol d'oiseau, les miennes toujours visibles, une flotte en route qui sort
   de ma portée puis y revient. Ils testent `sees`, pas le dessin du `canvas` (`fleetSpots`,
@@ -852,6 +852,31 @@ coupe le froid (`FROST.delayMs = Infinity`) : les parties de test ne finissent p
 `tests/end.test.mjs` le rallume test par test.
 
 Le 2026-10-31, avec la vision des flottes (D-128) : `tests 187, pass 187, fail 0` (20 fichiers).
+Le 2026-11-01, en scénarios (D-129) : `tests 189, pass 189, fail 0` (≈ 6,4 s).
+
+### Scénarios et rapport (D-129)
+
+`tests/scenario.mjs` : `const scenario = scenarios(import.meta.url)`, puis
+`scenario(intitulé, (film) => { … })`. L'intitulé dit ce qui est attendu. Chaque
+`film.look(joueur, légende, [{ fleet: [propriétaire, id], visible }])` photographie ce que voit
+le joueur et vérifie les attentes. En cas d'échec (ou avec `ASTRA_REPORT=1`), le rapport
+`tests/reports/<fichier>.html` montre la carte vue par le joueur, image par image ; le message
+d'erreur donne son chemin. Exemple : `tests/vision.test.mjs`.
+
+```bash
+ASTRA_REPORT=1 node --test tests/vision.test.mjs
+```
+
+### Interface de test (D-130)
+
+```bash
+node tests/ui/server.mjs
+```
+
+Puis ouvrir http://localhost:5199 : liste des tests, ▶ pour un test, un fichier ou tout,
+résultats au fil de l'eau, erreur et ligne du test, simulation des scénarios. Fichiers :
+`tests/ui/server.mjs` (serveur `node:http`, liste lue dans le source), `tests/ui/reporter.mjs`
+(reporter de node:test, une ligne JSON par test), `tests/ui/index.html` (la page).
 
 Avant le tempo (au commit `1eeb2c1`) : `tests 35, pass 35, fail 0`. Cette commande inclut
 `tests/peer.test.mjs` (réseau, voir reseau.md).

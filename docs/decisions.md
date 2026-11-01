@@ -1347,4 +1347,63 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   session `09eb6bdd`.
 - Rappel : c'est un filtre d'affichage, pas un secret (§8.6 des règles) ; la copie de la partie
   contient toutes les flottes, ce que le test note aussi.
-- Statut : en vigueur. 4 tests (187/187).
+- Statut : en vigueur, modifiée par D-129 (les 4 tests deviennent 6 scénarios avec rapport ; 189/189).
+
+**D-129 — Scénarios de test avec un rapport HTML de la carte vue par le joueur**
+- 2026-11-01 13:55 (UTC). Contexte : Vincent veut que le test de vision (D-128) soit
+  « verifiable facilement par un humain » : un mini replay et, si le test échoue, « un rapport
+  html avec un petit embed qui montre le replay et une description du comportement attendu ».
+  Puis : « le screen shot coute chere pour les tests, il faut une solution rapid que les humain
+  et les agents puisse utiliser » ; « l'ascii n'est pas une bonne idée car c'est pas
+  representatif pour l'humain […] travaile sur de l'inline html » ; « a quoi sert le { given,
+  when, then } dans le code ? je pense que seul l'intitulé du test suffi ».
+- Choix : `tests/scenario.mjs`. `scenarios(import.meta.url)` donne `scenario(intitulé, (film) =>
+  …)`, un `test` de node:test. L'intitulé dit le comportement attendu. `film.look(joueur,
+  légende, [{ fleet: [propriétaire, id], visible }], { eyes })` photographie ce que voit le
+  joueur (sa portée, les planètes, toutes les flottes, vues ou non) et vérifie chaque attente.
+  Si un scénario échoue, ou avec `ASTRA_REPORT=1`, `tests/reports/<fichier>.html` est écrit :
+  un fichier HTML autonome, sans dépendance, une section par scénario (intitulé, « Obtenu »,
+  une carte SVG par image, ▶ / ⏮ / ⏭ / curseur), l'image fautive montrée d'abord. Les agents
+  le lisent comme du texte (`<title>` de chaque planète et flotte, légendes, attendu /
+  obtenu) ; un humain l'ouvre dans un navigateur. `#scn=<intitulé>` ne montre qu'un scénario.
+  Tout vert sans `ASTRA_REPORT` : le rapport est effacé. `tests/reports/` est ignoré par git.
+- Écarté : captures d'écran (coûteuses, Vincent) ; carte en ASCII (« pas representatif »,
+  Vincent) ; Given / When / Then en paramètres (essayé, retiré à la demande de Vincent :
+  l'intitulé suffit) ; réutiliser `replay.html` (il montre toutes les flottes, pas la vue
+  d'un joueur, et lit la partie dans la mémoire du navigateur : il aurait fallu changer le jeu).
+- Limite : la carte montre ce que dit la règle (`sees`), pas le dessin du vrai `canvas`.
+- Qui : Vincent (le besoin, pas d'ASCII ni de capture, pas de Given / When / Then), Claude (la
+  forme). Source : session `09eb6bdd`.
+- Statut : en vigueur. `tests/vision.test.mjs` réécrit en 6 scénarios. Contrôlé par mutation
+  (`sees` qui dit toujours oui → 4 scénarios en échec, rapport écrit, image fautive en rouge).
+
+**D-130 — Interface de test locale (`tests/ui/`), notre mini framework de test**
+- 2026-11-01 13:55 (UTC). Demande de Vincent : « faire un petit serveur qui tourne en local
+  pour avoir une interface de test, un peu comme ce que fait vitest avec son mode UI, avec la
+  liste des test, la possibilité d'en lancer un et le rendu de la simulation pour les humain » ;
+  puis « ca sera notre mini framework de test, il faut que les tests restent rapide, je vais
+  en avoir vraiment beaucoup, mais il faut que l'interface soit intuitive ».
+- Choix : `node tests/ui/server.mjs` → http://localhost:5199 (`PORT` pour changer ; écoute
+  sur 127.0.0.1 seulement). Sans dépendance ni build : `node:http`. Les tests tournent comme
+  d'habitude (`node --test`, un processus par fichier, en parallèle) avec un reporter à nous
+  (`tests/ui/reporter.mjs`, une ligne JSON par test), et `ASTRA_REPORT=1` pour avoir la
+  simulation. Les résultats arrivent au fil de l'eau. Page `tests/ui/index.html` : compteurs
+  ✔ / ✖ / ○ (le ✖ filtre les échecs), recherche (`/`), fichiers repliables, ▶ par test et par
+  fichier, « Tout lancer », « Arrêter » ; à droite, le test choisi : statut, durée, erreur et
+  ligne du test, puis la simulation (le rapport de D-129) pour un scénario. Après « Tout
+  lancer », le premier échec est choisi. Un lancement remplace le précédent.
+- Liste des tests : lue dans le source (premier texte de chaque `test(` ou `scenario(` en
+  début de ligne), car node:test ne sait pas lister sans lancer : `--test-skip-pattern` et
+  `--test-only` filtrent sans rien rapporter (vérifié avec Node 24.14.1). Un test au nom
+  calculé n'apparaît donc pas dans la liste avant d'avoir tourné ; lancé par fichier, il
+  tourne quand même.
+- Un scénario est déclaré dans `tests/scenario.mjs` : node:test le rapporte à ce fichier ; le
+  serveur le rend à son fichier par son nom.
+- `.claude/launch.json` : `astra-tests` (cette interface) et `astra` (le jeu,
+  `python3 -m http.server 8080`) pour le navigateur intégré de Claude.
+- Écarté : vitest ou un autre outil (une dépendance, un `package.json`, un build) ; lancer tous
+  les tests à l'ouverture (avec beaucoup de tests, on choisit quoi lancer).
+- Mesuré : 189 tests en 6,5 s depuis l'interface (6,4 s en ligne de commande) ; un test seul
+  en 0,1 s.
+- Qui : Vincent (la demande), Claude (la forme). Source : session `09eb6bdd`.
+- Statut : en vigueur. Vérifié dans le navigateur intégré (règle cassée exprès puis remise).
