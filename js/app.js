@@ -1663,6 +1663,7 @@ function showView(view, key = openKey) {
   (view === 'map' ? head.querySelector('.pi-head-right') : head).append($('btn-journal'), $('alerts-btn'), $('btn-settings'), $('net'));
   head.append($('alerts-panel'));
   window.scrollTo(0, 0);
+  if (view === 'planet') showTab('build'); // une planète s'ouvre toujours sur ses bâtiments (D-156)
   if (view === 'map') {
     if (!mapFrame) mapFrame = requestAnimationFrame(drawMap);
   } else stopMap();
@@ -1677,19 +1678,12 @@ function stopMap() {
 $('btn-back-map').onclick = () => showView('map');
 
 /** Onglet de l'écran planète : bâtiments, pouvoirs (aliens), recherche ou flottes. */
-/** Onglet choisi par le joueur (un changement forcé peut en afficher un autre un moment). */
-let chosenTab = 'build';
-function showTab(tab, persist = true) {
+function showTab(tab) {
   $('view-planet').dataset.tab = tab;
-  if (persist) chosenTab = tab;
   for (const b of document.querySelectorAll('[data-tab-btn]')) {
     b.setAttribute('aria-selected', String(b.dataset.tabBtn === tab));
     b.tabIndex = b.dataset.tabBtn === tab ? 0 : -1;
   }
-  if (!persist) return; // changement forcé : l'onglet choisi reste mémorisé
-  try {
-    localStorage.setItem('astra.tab', tab);
-  } catch {}
 }
 for (const b of document.querySelectorAll('[data-tab-btn]')) b.onclick = () => showTab(b.dataset.tabBtn);
 // Flèches gauche et droite : onglet voisin (visible).
@@ -1702,8 +1696,7 @@ document.querySelector('.tabs').addEventListener('keydown', (e) => {
   next.focus();
 });
 try {
-  const saved = localStorage.getItem('astra.tab');
-  if (['build', 'power', 'research', 'fleet'].includes(saved)) showTab(saved);
+  localStorage.removeItem('astra.tab'); // onglet retenu d'avant D-156, plus lu
 } catch {}
 // Aide de la carte : une bulle au survol ; au doigt (pas de survol), un toucher l'ouvre ou la ferme.
 $('btn-map-help').onclick = (e) => {

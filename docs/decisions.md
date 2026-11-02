@@ -1857,3 +1857,18 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   pourrait se déclarer IA de mon téléphone et faire jouer sa fiche par lui) ; ne pas reprendre
   les IA (la partie reprise serait sans adversaire).
 - Qui : Claude, par défaut. Source : session `012yisg2`. Statut : en vigueur.
+**D-156 — Une planète s'ouvre toujours sur ses bâtiments**
+- 2026-11-02 10:56. Contexte : « Quand on va sur une planette, la vue par defaut est la liste des
+  batiments ». Jusque-là, l'écran planète rouvrait le dernier onglet choisi (Bâtiments, Pouvoirs,
+  Recherche ou Flottes), retenu en mémoire et dans `localStorage` (`astra.tab`), même d'une
+  planète à l'autre et d'une partie à l'autre.
+- Choix : `showView('planet', …)` appelle `showTab('build')` à chaque ouverture (bouton de la
+  fiche de la carte, alerte, autre planète). On change d'onglet librement pendant la visite ; au
+  retour sur la carte, l'onglet est oublié. `chosenTab`, l'écriture et la lecture de `astra.tab`
+  sont retirées ; la vieille clé est effacée au chargement. Cache `sw.js` v78 (v77 pris par D-151 à D-155).
+- Écarté : garder l'onglet retenu au sein d'une même session (seulement le premier affichage
+  sur Bâtiments) — la demande parle de chaque arrivée sur une planète.
+- Vérifié dans le navigateur (`index.html?view`, partie à un joueur) : ouverture → Bâtiments ;
+  Recherche → carte → planète → Bâtiments. 194/194 tests (198/198 après la reprise sur `main`, D-151 à D-155 de l'IA).
+- Qui : Vincent (demande), Claude (portée : à chaque ouverture). Source : session `012yisg1`.
+  Statut : en vigueur.
