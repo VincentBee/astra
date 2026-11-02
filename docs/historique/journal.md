@@ -392,6 +392,7 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 08:03 | `f2222601` | « supprime ces deux boutons depuis la partie droite de l'écran puisqu'ils sont déjà dans la liste. » | Boutons « Lancer ce test » / « Lancer le fichier » et leur gestionnaire retirés de `tests/ui/index.html` ; vérifié dans le navigateur | (PR #27) | D-150 |
 | 08:05 | `f2222601` | [Bouton] « Oui, pousse » | Commit des changements D-148 à D-150, poussé sur la PR | (PR #27) | — |
 | 10:56 | `012yisg1` | « Quand on va sur une planette, la vue par defaut est la liste des batiments » | `showView('planet')` affiche toujours l'onglet Bâtiments ; onglet plus retenu (`astra.tab` retiré, vieille clé effacée) ; vérifié dans le navigateur ; 194/194 ; cache v77 | (ce commit) | D-151 |
+| 12:36 | `012yisg1` | « As-tu fait un test ou mis à jour un test en rapport avec cette modification ? » | Réponse sans code : non. Aucun test automatique ne couvre les onglets de l'écran planète : les tests (`node --test`) jouent les règles dans Node, sans `js/app.js` ni navigateur, et aucun n'utilise Playwright. Vérification seulement à la main, par un script Playwright jetable (non commité) sur `index.html?view` | — | D-151 |
 
 ### Travaux en cours au 2026-10-29
 
