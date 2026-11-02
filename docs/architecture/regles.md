@@ -933,6 +933,7 @@ Résultat : `tests 34, pass 34, fail 0`, environ 5,6 s (le rejeu d'une partie de
 | `tests/colony.test.mjs` | 1 | Colonie perdue au recollage : vaisseaux et cargaison restent en orbite |
 | `tests/start.test.mjs` | 11 | Départ commun et colonisateur (D-120) : pas de départ tant qu'un présent n'est pas prêt ; tous prêts → même départ partout, une seule flotte d'un colonisateur chacun, plein fait, cases distinctes hors planètes ; planète mère fondée à l'arrivée (bâtiments et stock de départ), installation directe et astéroïde refusés ; absent qui ne bloque pas puis entre en retard ; « plus prêt » ; deux colonisateurs sur la même planète ; colonisateur perdu → éliminé ; pas de fin tant qu'un joueur vole ; fondation hors ligne acceptée ; rejeu fidèle ; toute planète atteignable. Harnais `newLobby` (`tests/harness.mjs`) |
 | `tests/hostile.test.mjs` | 6 | Pair malveillant ou fiche abîmée : personne ne réécrit ma fiche ni un secret, ni ne date sa fiche loin dans le futur ; fiche abîmée sans plantage ; race ou identifiant spécial ; installation antidatée ; heure qui recule ; téléphone en avance reste visible. Une partie de ces tests passe par l'acceptation des fiches (mécanisme décrit dans reseau.md) |
+| `tests/bot.test.mjs` | 4 | Joueurs IA (D-151 à D-155) : ajoutée par l'hôte, prête, départ ; planète fondée, bâtiments, labo, fiche chez l'hôte, sauvegarde `bots` ; réveil à la reprise ; partie entière de 3 IA (trêve, colonies, conquêtes, gagnant, rejeu fidèle) |
 | `tests/replay.test.mjs` | 4 | Une partie de robots (construire, chercher, armer, décoller, attaquer, échanger) rejouée retombe sur les mêmes fiches ; partie coupée en deux puis recollée ; journal tronqué signalé ; copie pas à jour signalée |
 
 | `tests/decisions-planete.test.mjs` | 24 | Une règle par décision (D-002 → D-074) : vitesse, races, départ, gisements, prélèvement, labos, soleil, climat, places, équilibrage, pouvoirs |
@@ -1052,3 +1053,49 @@ Valeurs **non équilibrées** : les robots de simulation n'attaquent pas (non co
 
 `FORMAT = 8` (`js/session.js`) : nouveaux champs de fiche `since`, `out`, `over`, rapports
 `capture` / `cell`, file `queue.demolish`. Le service worker passe à `astra-p2p-v52`.
+
+## 20. Joueurs IA (2026-11-02, D-151 à D-155)
+
+`js/bot.js`. Une IA est une `Session` avec sa fiche ; elle n'a aucune règle à elle : elle donne
+les mêmes ordres qu'un joueur, notés dans son journal (la partie se rejoue, §13).
+
+- **`think(s, budget = 3)`** (appelé toutes les `THINK_MS` = 3 s par l'hôte, après `tick` et
+  `checkStart`) : sans race → `chooseRace` (la moins prise) ; pas prête → `ready` ; sans planète
+  mère → son colonisateur va fonder (`moveFleet(…, 'colonize')`) sur la meilleure planète
+  (`colonyTargets`, vraie planète seulement). Ensuite, pour chaque planète que le froid n'a pas
+  prise : `evacuate`, `planBuilding`, `planResearch`, `planShips`, `usePowers`,
+  `launchColonizer` ; puis chaque flotte arrêtée sans ordre (`steerFleet`) ; puis `attack`.
+  Au plus `budget` ordres par passage ; chacun est vérifié avant d'être donné (un ordre refusé
+  s'inscrirait quand même au journal).
+- **Bâtiments** (`chooseBuilding(race, st, free, home)`, un seul à la fois au fil de construction,
+  D-105) : énergie si `effE < 1` ou solde < 12 % de la consommation + 1 ; nourriture si
+  `effF < 1` ou solde < 8 % + 0,5 ; humains : habitat si la population dépasse 85 % du plafond,
+  pas de mine si les emplois + 10 dépassent 90 % du plafond ; puis les étapes de `PLAYBOOK[race]`
+  ; puis production, défense, énergie (et logement) au plus bas niveau d'abord. Prix au-dessus
+  de 95 % de l'entrepôt → entrepôt. Planète mère : les dernières places libres vont au labo 2 et
+  au chantier naval. Rien sur une planète que le froid prend dans moins de 2 min.
+- **Recherche** (`chooseTech`) : la liste `PLAYBOOK[race].techs` (une clé par niveau voulu),
+  en sautant ce qui demande un labo plus grand ou une technologie manquante, ou qui est déjà
+  cherché sur une autre planète ; essayée sur une copie (`startResearch`).
+- **Vaisseaux** (`planShips`) : un colonisateur si moins de `WANT_PLANETS` = 4 planètes
+  (colonisateurs posés, en chantier ou en vol compris) et une planète libre ; sinon des
+  vaisseaux lourds (1 à 4) ou des chasseurs (2 à 8) avec ce qui dépasse la réserve (250
+  minéraux, 150 énergie, 120 nourriture sauf humains). Pas de colonisateur sur une planète qui
+  gèle dans moins de 3 min.
+- **Colonies** (`colonyTargets`, `launchColonizer`) : planètes libres, pas déjà visées, qui ne
+  gèlent pas avant 4 min ; note = minutes avant le gel (60 au plus) − 0,6 × distance + places / 4.
+  Le colonisateur part avec un tiers des minéraux et un quart de la nourriture (dans sa soute)
+  et le carburant du trajet + 10 %.
+- **Attaque** (`attack`) : pas avant `PEACE_MS` = 10 min après le départ (D-153). Pour chaque
+  planète, les vaisseaux de guerre posés ; cibles : planètes adverses en vie, à portée du
+  carburant, qui ne gèlent pas avant l'arrivée + 1 min ; combat calculé par `battle` contre les
+  vaisseaux posés et `fortOf` ; gagné en gardant la moitié de la flotte → décollage (carburant
+  aller-retour) et `conquer`. Les cibles qui tiendront le plus longtemps d'abord, puis les plus
+  proches. Après le combat, une flotte restée en orbite rentre se poser (`dockNearest`).
+- **Froid** (`evacuate`) : à 40 s du gel, les vaisseaux posés partent se poser sur la planète qui
+  gèlera le plus tard.
+- **Aliens** (`usePowers`) : arrachement si le gain dépasse 40 minéraux, transe si le sol n'est
+  pas vide ; seulement avec 60 d'énergie de reste.
+- Mesures (simulation, `tests/bot.test.mjs` et essais du 2026-11-02) : parties de 2 à 4 IA
+  finies en 19 à 28 min, toujours par un gagnant ; humains de l'IA les plus faibles (planète
+  mère souvent pleine vers 14 min). **Non confirmé** face à un vrai joueur.

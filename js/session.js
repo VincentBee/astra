@@ -271,6 +271,7 @@ export class Session {
     s.status = 'playing';
     s.intel = saved.intel || {}; // brouillard (D-124) : ce que j'ai vu des planètes des autres
     s.journal = saved.journal || null; // avant le rattrapage : les combats de l'absence s'y inscrivent
+    s.botIds = Array.isArray(saved.bots) ? saved.bots.filter((pid) => pidOk(pid) && s.state.players[pid]) : []; // IA jouées par ce téléphone (D-151), réveillées par js/bot.js
     s.refreshOnline();
     s.start();
     s.tick();
@@ -2547,7 +2548,7 @@ export class Session {
   }
 
   save() {
-    if (this.state && this.me && this.status === 'playing') saveGame(this.me, this.state, this.journal, this.intel);
+    if (this.state && this.me && this.status === 'playing') saveGame(this.me, this.state, this.journal, this.intel, this.botIds?.length ? this.botIds : null);
   }
 
   /** Un autre joueur a une version plus récente de l'appli. */
@@ -2569,6 +2570,9 @@ export class Session {
     clearTimeout(this.saveTimer);
     this.saveTimer = null;
     this.save();
+    // Les IA que ce téléphone fait jouer (D-151) s'arrêtent avec lui ; elles reprendront avec la partie.
+    for (const bot of this.bots?.values() || []) bot.end();
+    this.bots?.clear();
     if (this.onVisible) document.removeEventListener('visibilitychange', this.onVisible);
     this.timers.forEach(clearInterval);
     this.timers = [];

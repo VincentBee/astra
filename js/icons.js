@@ -42,6 +42,7 @@ const PATHS = {
   fighter: 'M12 3l3 9 5 4H4l5-4zM9 20h6',
   heavy: 'M12 2l7 5v9l-7 6-7-6V7zM12 8v8M8.5 10l3.5 2 3.5-2',
   colony: 'M6 21V4h11l-2 4 2 4H6',
+  bot: 'M5 7h14v11H5zM12 3v4M9.5 11v2M14.5 11v2M9 15.5h6M2.5 10.5v4M21.5 10.5v4',
 };
 
 /** Icône à insérer en HTML, décorative : le bouton qui la porte se nomme lui-même. */

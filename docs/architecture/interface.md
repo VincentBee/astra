@@ -536,3 +536,19 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
     (anneau vert ou rouge, pastille au numéro `n` en haut à droite, texte en `title`) sur la case,
     ou sur la flotte là où `fleetSpots` la dessine ; sans case, rien sur la carte. Le texte est
     dans la légende du rapport (`tests/scenario.mjs`, liste numérotée à côté du téléphone).
+
+## 19. Jouer contre l'IA (2026-11-02, D-154)
+
+- Accueil (`index.html`) : bouton `#btn-solo` **Contre l'IA** (icône `bot`, `js/icons.js`),
+  sous « Rejoindre ». `app.js` : `Session.create(nom)`, puis `addBot(session)` (`js/bot.js`),
+  puis `startGame()` (choix de la race).
+- Bandeau du départ (`#pick`) : bouton `#btn-pick-bot` **Ajouter une IA**, à côté d'« Inviter »,
+  caché dès que la partie est partie ou à 8 joueurs (`renderLobby`). Un toucher ajoute une IA
+  et le dit (« IA Orion rejoint la partie : elle joue sur ce téléphone. »).
+- Reprise depuis l'historique : `wakeBots(session)` juste après `Session.resume` (`app.js`).
+- Fenêtre Joueurs : pour une IA, la ligne dit « IA sur ce téléphone » (`routeLabel('bot')`) au
+  lieu de la latence.
+- Vérifié dans Chromium (390 × 844) le 2026-11-02 : accueil, salon (« Vincent pas prêt · IA
+  Véga prêt · IA Orion prêt »), départ, planètes des IA fondées en moins d'une minute, reprise
+  avec les IA reliées. Seules erreurs de la console : les relais Nostr, injoignables dans le
+  conteneur de test.
