@@ -1315,7 +1315,7 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   lâchant (attaquer et conquérir ne se confondent pas, on demande) ; appui long pour la fiche
   (lent, et peu découvrable sur un téléphone).
 - Qui : Vincent (la demande), Claude (le système). Source : session `012yisfzoyH`.
-- Statut : en vigueur. 8 tests (`tests/aim.test.mjs`). Vérifié dans Chromium (390 × 844,
+- Statut : en vigueur, **point 5 modifié par D-159** (toucher une autre de mes flottes ouvre un menu de fusion). 8 tests (`tests/aim.test.mjs`). Vérifié dans Chromium (390 × 844,
   toucher simulé) : toucher une planète libre avec le colonisateur → menu « Fonder / orbite /
   fiche » ; toucher à côté → menu fermé, rien d'envoyé ; glisser le colonisateur jusqu'à la
   planète → trait, libellé, menu, colonisation ; planète mère avec 3 flottes en orbite →
@@ -1921,3 +1921,30 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   retrait et rejeu identique, fil abîmé nettoyé) ; 204/204 ; vu dans Chromium à 360 et 320 px.
 - Qui : Vincent (demande), Claude (un seul fil, règle d'ordre, 12 éléments, par défaut). Source :
   session `012yisg1`. Statut : en vigueur. Modifie D-105.
+**D-159 — Toucher une autre de mes flottes : fusionner, ou la rejoindre pour fusionner**
+- 2026-11-02 22:40. Contexte : « Faciliter la fusion de flotte quand on clique sur une flotte
+  allié ». Il n'y a pas d'alliance dans le jeu : compris comme **une autre de mes flottes**
+  (non confirmé). Avant, flotte choisie, toucher une autre de mes flottes la choisissait à la
+  place (D-126, point 5) ; fusionner demandait d'amener les deux sur la même case, à l'arrêt,
+  puis le bouton « Fusionner ici » de la fiche.
+- Choix :
+  - Flotte choisie, toucher une autre de mes flottes ouvre le menu au doigt : en premier
+    « **Fusionner avec Flotte N** » (déjà arrêtées ensemble : fusion tout de suite, l'autre
+    passe dans la flotte choisie, comme « Fusionner ici ») ou « **Rejoindre Flotte N et
+    fusionner** » (sinon), puis « Choisir · Flotte N » pour changer de flotte comme avant.
+  - Nouvel ordre `joinFleet` / `{ kind: 'join', fleet }` : la flotte va là où l'autre attend
+    (ou là où elle va) et s'y fond à l'arrivée ; si l'autre est encore en route vers la même
+    case, elle l'attend ; si l'autre est partie ailleurs, l'ordre tombe et la flotte reste sur
+    place (noté au journal). Si la flotte choisie disparaît ainsi, la fiche suit celle qui l'a
+    absorbée.
+  - Pas de nouveau `FORMAT` (un téléphone d'avant affiche « Ordre » et n'exécute pas les ordres
+    des autres) ; cache `sw.js` v81.
+- Écarté : fusionner en lâchant une flotte traînée sur une autre (D-126 a exclu mes flottes des
+  cibles d'un glissé, pour qu'une flotte en orbite ne cache pas sa planète : gardé) ; poursuivre
+  une flotte en route comme une flotte ennemie (`chase`) : plus lourd, et on rejoint en général
+  une flotte à l'arrêt ; fusionner sans menu au toucher (on ne pourrait plus changer de flotte
+  d'un toucher).
+- Vérifié : 5 scénarios (`tests/fleet.test.mjs` « jonction : … ») ; 209/209 ; menu vu dans
+  Chromium.
+- Qui : Vincent (demande), Claude (menu, ordre, attente, par défaut). Source : session
+  `012yisg1`. Statut : en vigueur. Modifie D-126 (point 5).

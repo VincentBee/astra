@@ -2129,6 +2129,29 @@ export class Session {
     return true;
   }
 
+  /**
+   * Envoie ma flotte `id` rejoindre une autre de mes flottes, `intoId`, pour
+   * s'y fondre à l'arrivée (D-159) : elle vise la case où l'autre attend, ou
+   * celle où elle va. Déjà ensemble, arrêtées sur la même case : la fusion est
+   * immédiate (`intoId` absorbe `id`).
+   */
+  joinFleet(id, intoId) {
+    if (!this.canAct) return false;
+    const p = this.state.players[this.me];
+    const f = this.myFleet(id);
+    const g = this.myFleet(intoId);
+    if (!f || !g || f === g) return this.refuse('Flotte introuvable.');
+    if (this.locked(id) || this.locked(intoId)) return false;
+    const now = this.now();
+    if (together(f, g, now)) return this.mergeFleets(id, intoId);
+    const err = moveTo(f, p.race, techOf(p), { ...g.to }, { kind: 'join', fleet: g.id }, now);
+    if (err) return this.refuse(err);
+    if (f.stranded) this.ontoast?.('Pas assez de carburant : la flotte tombera en panne en route.');
+    this.touch(this.addLog(`Une flotte ${de(p.name)} part rejoindre une autre de ses flottes en [${g.to.x}:${g.to.y}].`));
+    this.changed();
+    return true;
+  }
+
   /** Scinde une de mes flottes arrêtées : `part` forme une nouvelle flotte, au même endroit. */
   splitFleet(id, part) {
     if (!this.canAct) return false;
@@ -2292,6 +2315,24 @@ export class Session {
       drop();
       const loot = lootText(f.cargo || {});
       this.addLog(`La flotte ${de(p.name)} se pose sur ${pl.name}${loot ? ` avec ${loot}` : ''}.`);
+      return true;
+    }
+
+    if (order.kind === 'join') {
+      // La flotte à rejoindre, ou celle qui l'a absorbée entre-temps.
+      const g = (p.fleets || []).find((x) => x !== f && (x.id === order.fleet || x.absorbed?.includes(order.fleet)));
+      if (g && together(f, g, now) && !this.locked(g.id) && !this.locked(f.id)) {
+        merge(f, g, p.race, now);
+        drop();
+        this.addLog(`Une flotte ${de(p.name)} en rejoint une autre en [${g.to.x}:${g.to.y}] : elles fusionnent.`);
+        return true;
+      }
+      // Elle arrive ici, ou un échange la retient : on l'attend.
+      if (g && ((moving(g, now) && sameCell(g.to, f.to)) || (together(f, g, now) && (this.locked(g.id) || this.locked(f.id))))) {
+        f.order = order;
+        return false;
+      }
+      this.addLog(`Une flotte ${de(p.name)} ne trouve plus la flotte à rejoindre : elle reste en [${f.to.x}:${f.to.y}].`);
       return true;
     }
 
@@ -2703,7 +2744,7 @@ function maxTech(a, b) {
   return out;
 }
 
-export const ORDER_KINDS = ['chooseRace', 'ready', 'begin', 'claimPlanet', 'build', 'planBuild', 'planResearch', 'planShips', 'unplan', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'setFleetStance', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'splitFleet', 'returnFleet', 'power'];
+export const ORDER_KINDS = ['chooseRace', 'ready', 'begin', 'claimPlanet', 'build', 'planBuild', 'planResearch', 'planShips', 'unplan', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'setFleetStance', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'joinFleet', 'splitFleet', 'returnFleet', 'power'];
 for (const k of [...ORDER_KINDS, 'tick']) {
   const act = Session.prototype[k];
   Session.prototype[k] = function (...a) {

@@ -482,6 +482,19 @@ Deux de mes flottes **arrêtées sur la même case** (`together`, `js/fleet.js:1
 Une flotte qui attend la réponse à un échange est **bloquée** (`locked`,
 `js/session.js:1193-1197`).
 
+**Jonction** (D-159) : `Session.joinFleet(id, intoId)` envoie ma flotte `id` rejoindre une
+autre de mes flottes pour s'y fondre. Déjà ensemble → `mergeFleets(id, intoId)` tout de suite.
+Sinon `moveTo` vers `intoId.to` (la case où l'autre attend, ou celle où elle va) avec l'ordre
+`{ kind: 'join', fleet: intoId }` (`ORDERS.join`, « Jonction »). À l'arrivée (`arrive`) :
+- l'autre flotte (ou celle qui l'a absorbée entre-temps, par `absorbed`) est arrêtée sur la
+  même case → `merge` (la flotte arrivée passe dans l'autre), au journal « … elles fusionnent » ;
+- elle est encore en route vers cette case, ou un échange retient l'une des deux → l'ordre est
+  gardé : la flotte attend, et `arrive` réessaie à chaque passage ;
+- sinon (partie ailleurs, posée, détruite) → l'ordre tombe, la flotte reste sur place, au
+  journal « … ne trouve plus la flotte à rejoindre ».
+Pas de nouveau `FORMAT` : un téléphone d'avant affiche « Ordre » pour un ordre qu'il ne connaît
+pas (`ORDERS[kind]?.name || 'Ordre'`) et n'exécute jamais les ordres des flottes des autres.
+
 ### 8.6 Détection
 
 - Portée de base : 3 cases autour d'une planète, 2 autour d'une flotte (`SIGHT`,
@@ -951,7 +964,7 @@ Résultat : `tests 34, pass 34, fail 0`, environ 5,6 s (le rejeu d'une partie de
 | `tests/rules.test.mjs` | 11 | Déconstruire (moitié du prix rendue, place libérée à la fin) ; heure qui recule puis revient : pas de double production ; longue absence ≈ passages toutes les heures (population à moins de 2 %) ; arrachement refusé sans payer ; clés héritées (`constructor`, `__proto__`) refusées ; effectifs négatifs ou fractionnaires au combat ; soleil au centre et sans planète ; climat et production ; une place par niveau ; places lues sur la carte ; une colonie humaine sur le plus petit corps garde des places |
 | `tests/combat.test.mjs` | 4 | Attaques contre une planète : pas de butin créé avec un défenseur hors ligne ou plusieurs flottes arrivées ensemble ; 70 attaques avant le retour du défenseur ; les vaisseaux perdus emportent leur cargaison |
 | `tests/effects.test.mjs` | 1 | 5 joueurs, 4 attaquants × 70 combats : chaque perte subie une fois, puis rapports oubliés des deux côtés |
-| `tests/fleet.test.mjs` | 20 | Deux flottes sur la même cible ; poursuite mutuelle ; colonie qui encaisse les pertes ; premier arrivé à la colonisation ; plein en panne tout près ; plusieurs attaquants ne pillent pas plus que le stock ; revanche ; raids sans armes et un pillage par 2 min ; flotte agressive qui combat puis reprend sa route ; flotte passive qui croise sans combattre ; agressive à l'arrêt qui garde sa case ; deux agressives : pertes comptées une fois ; agressive refusée sans armes, vue par les autres, gardée à la fusion (D-100) ; vitesse du vaisseau le plus lent ; rencontres que personne n'a regardées : `firstContact`, agressive et poursuite hors ligne, pas de combat rejoué, pertes comptées une fois (D-109) |
+| `tests/fleet.test.mjs` | 25 | Deux flottes sur la même cible ; poursuite mutuelle ; colonie qui encaisse les pertes ; premier arrivé à la colonisation ; plein en panne tout près ; plusieurs attaquants ne pillent pas plus que le stock ; revanche ; raids sans armes et un pillage par 2 min ; flotte agressive qui combat puis reprend sa route ; flotte passive qui croise sans combattre ; agressive à l'arrêt qui garde sa case ; deux agressives : pertes comptées une fois ; agressive refusée sans armes, vue par les autres, gardée à la fusion (D-100) ; vitesse du vaisseau le plus lent ; rencontres que personne n'a regardées : `firstContact`, agressive et poursuite hors ligne, pas de combat rejoué, pertes comptées une fois (D-109) ; jonction : rejoindre puis fusionner, fusion immédiate, attente, flotte partie, refus (D-159) |
 | `tests/report.test.mjs` | 7 | Rapport de combat détaillé (D-122) : déroulé cohérent avec les pertes (défense comprise) ; explication du vainqueur et du vaincu avec les chiffres ; défense, technologies, cargos sans armes, combat indécis ; vaisseaux sans armes et victoire sans butin ; déroulé trafiqué borné ; même déroulé dans les deux carnets ; seconde attaque trop tôt expliquée |
 | `tests/colony.test.mjs` | 1 | Colonie perdue au recollage : vaisseaux et cargaison restent en orbite |
 | `tests/start.test.mjs` | 11 | Départ commun et colonisateur (D-120) : pas de départ tant qu'un présent n'est pas prêt ; tous prêts → même départ partout, une seule flotte d'un colonisateur chacun, plein fait, cases distinctes hors planètes ; planète mère fondée à l'arrivée (bâtiments et stock de départ), installation directe et astéroïde refusés ; absent qui ne bloque pas puis entre en retard ; « plus prêt » ; deux colonisateurs sur la même planète ; colonisateur perdu → éliminé ; pas de fin tant qu'un joueur vole ; fondation hors ligne acceptée ; rejeu fidèle ; toute planète atteignable. Harnais `newLobby` (`tests/harness.mjs`) |

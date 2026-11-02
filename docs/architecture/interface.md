@@ -193,6 +193,7 @@ Table des appels de l'interface vers la session :
 | Poursuivre une flotte ennemie | menu au doigt « Attaquer la flotte de … » (`actionsFor`) | `chaseFleet` |
 | Arrêter / plein / rentrer / se poser | 1701-1708 | `stopFleet`, `refuelFleet`, `returnFleet`, `moveFleet(…, 'dock')` |
 | Donner / fusionner / scinder | 1869, 1832 | `transferFleet`, `mergeFleets`, `splitFleet` |
+| Fusionner avec une autre de mes flottes, ou la rejoindre pour fusionner (toucher sur la carte, D-159) | `actionsFor`, menu `#map-menu` | `mergeFleets`, `joinFleet` |
 | Proposer / accepter / refuser un échange | 1770, 1806 | `proposeTrade`, `answerTrade` |
 
 Lectures seules utilisées pour le rendu : `now`, `planets`, `planetsOf`, `planetOf`, `planetsAt`, `ownerAt`, `myFleet`, `fleetsBeside`, `eyes`, `sees`, `linkInfo`, `tradePartners`, `tradeHoldings`, `incomingOffers`, et les propriétés `state`, `me`, `status`, `myRace`, `links`, `peerCount`, `alone`, `outdated`, `failure`, `refusal`.
@@ -240,11 +241,15 @@ comptent pas ; la flotte sélectionnée ne compte que seule sous le doigt ; une 
 **Toucher (écouteur `click` de `#map`).** Menu ouvert → le toucher le ferme, rien d'autre. Puis :
 1. `many` sans flotte sélectionnée → menu « Lequel ? » (une ligne par objet : « Flotte 2 ·
    3 vaisseaux », « Lyra · fiche ») ;
-2. une de mes flottes → la sélectionner (`selectFleet`) ; la flotte déjà sélectionnée → la
-   relâcher ;
+2. une de mes flottes sans flotte sélectionnée → la sélectionner (`selectFleet`) ; la flotte
+   déjà sélectionnée → la relâcher ;
 3. flotte sélectionnée → `orderAt` : les actions de chaque objet visé (`actionsFor` :
    `session.ordersAt` sur la planète ou la case vide, « Attaquer la flotte de … » sur une
-   flotte adverse, « Choisir · Flotte N » sur une autre de mes flottes). Un seul ordre sans
+   flotte adverse ; sur une autre de mes flottes (D-159) : « Fusionner avec Flotte N » si les
+   deux sont arrêtées sur la même case (`mergeFleets`, l'autre passe dans la flotte
+   sélectionnée), sinon « Rejoindre Flotte N et fusionner » (`joinFleet`, « · panne en
+   route » si le carburant ne suffit pas), en premier et en couleur, puis « Choisir · Flotte
+   N »). Le titre du menu est alors le nom de la flotte touchée. Un seul ordre sans
    panne vers une planète ou une case → `moveFleet` tout de suite ; sinon menu au doigt
    (ordre principal en premier, en couleur, puis « Fiche de … ») ;
 4. sinon une planète → sa fiche (`selected`, `#sheet-planet`) ; le vide → ferme la fiche.
@@ -252,6 +257,13 @@ comptent pas ; la flotte sélectionnée ne compte que seule sous le doigt ; une 
 Autre façon de sélectionner : toucher la flotte dans la grille `#map-fleets` sous la carte
 (D-107, D-108) ; la même grille commence par une case par planète à moi (D-115). Carte zoomée :
 choisir une flotte dans la grille recentre la vue sur elle si elle est hors champ (`reveal`).
+
+Flotte choisie qui disparaît en se fondant dans une autre (jonction, D-159) : `renderFleetInfo`
+cherche la flotte qui l'a absorbée (`absorbed`) et la choisit à sa place.
+Vérifié dans Chromium (390 × 844, clics de souris sur `index.html?view`) : Flotte 1 choisie,
+toucher Flotte 2 et 3 posées ensemble → « Que viser ? » avec « Rejoindre Flotte 2 et fusionner /
+Choisir · Flotte 2 / Rejoindre Flotte 3 et fusionner / Choisir · Flotte 3 » ; choisir la 1ʳᵉ →
+fiche « Jonction → [13:17] ».
 
 **Menu au doigt (`#map-menu`, dans `.map-wrap`).** `openMenu(at, items, …)` écrit les boutons
 puis le place avec `menuPlace` (à droite du doigt s'il y a la place, sinon à gauche, jamais hors

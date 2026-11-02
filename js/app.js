@@ -16,7 +16,7 @@ import { TRADE_RES, TRADE_NAMES } from './trade.js';
 import { explainBattle, sideTable } from './report.js';
 import { finalBoard } from './finish.js';
 import { addBot, wakeBots } from './bot.js';
-import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fleetSpeed, slowestShip, fuelAt, moving, aggressive, armed } from './fleet.js';
+import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fleetSpeed, slowestShip, fuelAt, moving, aggressive, armed, together } from './fleet.js';
 
 fillIcons(); // les icônes du HTML statique, avant tout le reste
 startGalaxy();
@@ -2331,8 +2331,15 @@ function showPlanet(w) {
  */
 function actionsFor(fid, it, at) {
   if (it?.type === 'mine' && it.id !== fid) {
-    const f = it.spot.f;
-    return [{ icon: 'fleet', label: `${fid ? 'Choisir · ' : ''}${fleetName(f)} · ${countShips(f.ships)} vaisseau${countShips(f.ships) > 1 ? 'x' : ''}`, run: () => selectFleet(it.id) }];
+    const g = it.spot.f;
+    const pick = { icon: 'fleet', label: `${fid ? 'Choisir · ' : ''}${fleetName(g)} · ${countShips(g.ships)} vaisseau${countShips(g.ships) > 1 ? 'x' : ''}`, run: () => selectFleet(it.id) };
+    const f = fid && session.myFleet(fid);
+    if (!f) return [pick];
+    // Une autre de mes flottes, flotte choisie (D-159) : fusionner d'abord, ou la choisir à la place.
+    const now = session.now();
+    if (together(f, g, now)) return [{ icon: 'merge', primary: true, label: `Fusionner avec ${fleetName(g)}`, run: () => session.mergeFleets(g.id, fid) && renderFleetInfo() }, pick];
+    const short = !!session.ordersAt(fid, g.to)[0]?.short;
+    return [{ icon: 'merge', primary: true, short, label: `Rejoindre ${fleetName(g)} et fusionner${short ? ' · panne en route' : ''}`, run: () => session.joinFleet(fid, g.id) && renderFleetInfo() }, pick];
   }
   if (!fid) return it?.type === 'planet' ? [{ icon: 'planet', label: `${it.w.name} · fiche`, run: () => showPlanet(it.w) }] : [];
   if (it?.type === 'mine') return [];
@@ -2372,7 +2379,7 @@ function orderAt(fid, t, at) {
   }
   const planet = list.find((it) => it?.type === 'planet');
   if (planet && t.kind === 'one') items.push({ icon: 'planet', ghost: true, label: `Fiche de ${planet.w.name}`, run: () => showPlanet(planet.w) });
-  const title = t.kind === 'many' ? 'Que viser ?' : planet ? `${planet.w.name} [${planet.w.x}:${planet.w.y}]` : target?.type === 'foe' ? 'Flotte ennemie' : `Case [${cell.x}:${cell.y}]`;
+  const title = t.kind === 'many' ? 'Que viser ?' : planet ? `${planet.w.name} [${planet.w.x}:${planet.w.y}]` : target?.type === 'foe' ? 'Flotte ennemie' : target?.type === 'mine' ? fleetName(target.spot.f) : `Case [${cell.x}:${cell.y}]`;
   openMenu(at, items, { title, cell: t.kind === 'many' ? null : cell, fleet: fid, foe: target?.type === 'foe' ? { pid: target.spot.p.id, id: target.id } : null });
 }
 
@@ -2394,7 +2401,8 @@ function dropFleet(fid, at) {
  * Toucher la carte (D-126). Ce qui est sous le doigt est cherché avec un aimant (`js/aim.js`) ;
  * plusieurs objets presque aussi près : un menu au doigt pour choisir, au lieu de deviner.
  * Sans flotte sélectionnée : une de mes flottes la sélectionne, une planète ouvre sa fiche.
- * Flotte sélectionnée : la retoucher la relâche, une autre de mes flottes la remplace, ailleurs
+ * Flotte sélectionnée : la retoucher la relâche, une autre de mes flottes ouvre le menu « Fusionner » (ou
+ * « Rejoindre et fusionner ») / « Choisir » (D-159), ailleurs
  * c'est sa cible (un seul ordre possible : il part ; plusieurs : menu au doigt).
  */
 $('map').addEventListener('click', (e) => {
@@ -2409,7 +2417,8 @@ $('map').addEventListener('click', (e) => {
     return orderAt(fid, t, at);
   }
   const it = t.kind === 'one' ? t.it : null;
-  if (it?.type === 'mine') return selectFleet(it.id === fid ? null : it.id);
+  // Une autre de mes flottes, flotte choisie : menu « Fusionner / Rejoindre et fusionner / Choisir » (D-159).
+  if (it?.type === 'mine' && (!fid || it.id === fid)) return selectFleet(it.id === fid ? null : it.id);
   if (fid) return orderAt(fid, t, at);
   if (it?.type === 'planet') return showPlanet(it.w);
   selected = null;
@@ -2538,7 +2547,10 @@ function drawRange(ctx, cell, now) {
 /** Fiche de la flotte sélectionnée : son état et ses ordres (les ordres vers une cible : menu au doigt, D-126). */
 function renderFleetInfo(me = session?.state?.players[session.me], now = session?.now()) {
   if (!session?.state) return;
-  const f = selFleet && session.myFleet(selFleet);
+  let f = selFleet && session.myFleet(selFleet);
+  // La flotte choisie s'est fondue dans une autre (jonction, D-159) : on suit celle-ci.
+  if (!f && selFleet) f = (me?.fleets || []).find((g) => g.absorbed?.includes(selFleet)) || null;
+  if (f) selFleet = f.id;
   if (!f) {
     selFleet = null;
     if (menu?.fleet) closeMenu();
