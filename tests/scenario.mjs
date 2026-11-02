@@ -409,11 +409,9 @@ table.pl{border-collapse:collapse;margin-top:6px;font-size:12px;width:100%;max-w
 .film figure+figure{margin-top:12px}
 .js .frames{display:grid}.js .frames figure{grid-area:1/1;margin:0;visibility:hidden}.js .frames figure.on{visibility:visible}
 .ctl{display:none;gap:8px;align-items:center;margin-top:8px}.js .ctl{display:flex}.ctl button{background:#1b2340;color:#e8ebf7;border:0;border-radius:8px;padding:6px 12px;font-size:15px}.ctl input{flex:1}
-.legend{color:#aab2cf;font-size:13px;margin:0 0 16px}
 </style></head><body>
 <h1>${esc(file)}</h1>
 <p class="sum">${list.length} scénario${list.length > 1 ? 's' : ''}, ${ko ? `<b class="ko">${ko} en échec</b>` : 'tous réussis'} · ${esc(new Date().toISOString().slice(0, 16).replace('T', ' '))} UTC · relancer : <code>ASTRA_REPORT=1 node --test tests/${esc(file)}</code></p>
-<p class="legend">À gauche, l'écran du joueur qui regarde, dans le vrai jeu (<code>index.html?view</code>) : exactement ce qu'il verrait à cet instant (planète touchée : sa fiche est ouverte). À droite, ce que le test vérifie (✔ / ✖), l'état réel de chaque joueur et, en dépliant, la carte de contrôle : halo = portée de détection ; losange plein = flotte vue ; losange en pointillés = flotte cachée pour lui (dessinée pour comprendre) ; anneau en pointillés autour d'une planète = son vrai propriétaire, que le joueur ignore ; anneau blanc = planète touchée ; cercle blanc en pointillés = la portée du doigt, autour du point touché. Sur l'écran du joueur, un anneau vert (✔) ou rouge (✖) numéroté marque chaque valeur vérifiée ; son texte est dans la légende, à droite, au même numéro.</p>
 ${list.map(section).join('\n')}
 <script>
 document.documentElement.classList.add('js');

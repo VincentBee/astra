@@ -1741,3 +1741,30 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   D-142 / D-143) reçoivent aussi leurs `show` : 194 scénarios sur 194 montrent ce qu'ils
   vérifient. L'étiquette de `end` sur le joueur seul gelé suit D-142 (personne ne gagne).
 - Qui : Vincent (demande), Claude (méthode). Source : session `f2222601`. Statut : en vigueur.
+
+**D-148 — Plus de texte d'explication en tête des rapports de scénario** (modifie D-140, D-147)
+- 2026-11-02 07:52. Contexte : Vincent demande de retirer le paragraphe « À gauche, l'écran du joueur qui
+  regarde… au même numéro. » en haut de chaque rapport (`tests/scenario.mjs`).
+- Choix : le paragraphe et son style (`.legend`) sont retirés ; le rapport commence par le titre
+  du fichier et le résumé, puis les scénarios. La légende numérotée de chaque image (D-147) reste.
+- Qui : Vincent. Source : session `f2222601`. Statut : en vigueur.
+
+**D-149 — Plus de badge « simulation » dans la liste des tests** (modifie D-130)
+- 2026-11-02 07:55. Contexte : « Vu que tous les tests sont des simulations, est-ce que tu peux retirer le
+  badge simulation dans la liste ? » (tous les tests sont des scénarios depuis D-141).
+- Choix : `tests/ui/index.html` n'affiche plus le badge à côté de chaque test (ni son style
+  `.badge`) ; la phrase d'accueil qui l'expliquait devient « Chaque test montre l'écran du joueur,
+  image par image, et ce qu'il vérifie. ». Le message « Ce test n'a pas de simulation » reste,
+  pour un éventuel `test(…)` simple à venir.
+- Vérifié dans le navigateur : liste sans badge ; un test lancé montre toujours sa simulation.
+- Qui : Vincent. Source : session `f2222601`. Statut : en vigueur.
+
+**D-150 — Plus de boutons « Lancer » dans le panneau de droite de l'interface de test** (modifie D-130)
+- 2026-11-02 08:03. Contexte : « supprime ces deux boutons depuis la partie droite de l'écran puisqu'ils sont
+  déjà dans la liste. » (« Lancer ce test », « Lancer le fichier »).
+- Choix : `tests/ui/index.html` : les deux boutons et leur gestionnaire de clic sont retirés du
+  panneau de droite ; on lance un test ou un fichier par son ▶ dans la liste (ou Entrée, ou
+  « Tout lancer »). Le message d'un test pas encore lancé dit « (▶ dans la liste) ».
+- Vérifié dans le navigateur : le ▶ de la liste lance le test, le panneau montre le résultat et
+  la simulation.
+- Qui : Vincent. Source : session `f2222601`. Statut : en vigueur.

@@ -382,6 +382,16 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 22:43 | `f2222601` | [Bouton] « Oui, commite » | Commit de tout le travail de la session (doigt D-146, `show` et légende D-147, journal) | (ce commit) | — |
 | 22:55 | `f2222601` | [Bouton] « Créer une PR » | `main` avait avancé (D-142 à D-145, cache v75 d'une autre session) : fusion, décisions de cette branche renumérotées D-146 et D-147, cache v76, `show` ajoutés aux 3 scénarios venus de `main` ; 194/194 ; PR ouverte | (cette PR) | D-146, D-147 |
 
+## 2 novembre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 07:52 | `f2222601` | « retire "À gauche, l'écran du joueur qui regarde, dans le vrai jeu (index.html?view) : … au même numéro." » | Paragraphe et style `.legend` retirés de `tests/scenario.mjs` ; rapport vérifié dans le navigateur ; 194/194 | (PR #27) | D-148 |
+| 07:55 | `f2222601` | « Vu que tous les tests sont des simulations, est-ce que tu peux retirer le badge simulation dans la liste ? » | Badge et son style retirés de `tests/ui/index.html`, phrase d'accueil réécrite ; vérifié dans le navigateur | (PR #27) | D-149 |
+| 08:02 | `f2222601` | « Quelle est la différence entre lancer ce test et lancer le fichier? » | Réponse sans code : « Lancer ce test » ne lance que ce test (filtre sur son nom) ; « Lancer le fichier » lance tous les tests du fichier, et met à jour le rapport de tout le fichier | — | D-130 |
+| 08:03 | `f2222601` | « supprime ces deux boutons depuis la partie droite de l'écran puisqu'ils sont déjà dans la liste. » | Boutons « Lancer ce test » / « Lancer le fichier » et leur gestionnaire retirés de `tests/ui/index.html` ; vérifié dans le navigateur | (PR #27) | D-150 |
+| 08:05 | `f2222601` | [Bouton] « Oui, pousse » | Commit des changements D-148 à D-150, poussé sur la PR | (PR #27) | — |
+
 ### Travaux en cours au 2026-10-29
 
 - **Rythme des parties** (`26f178b9`) : commité sur `claude/swarm-it-game-pacing-1d4502`
