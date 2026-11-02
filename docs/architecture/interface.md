@@ -419,7 +419,7 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
 ## 13. Fil de construction (2026-10-30, D-105)
 
 - `index.html` : `<ol id="plan" class="plan">` au-dessus de `#buildings`, caché quand le fil est
-  vide.
+  vide (déplacé sous les onglets par D-158, voir plus bas).
 - Bouton d'un bâtiment (`[data-build]`, `renderPlanet`) : `data-mode="now"` (icône ↑) quand le
   chantier est libre, le fil vide et le stock suffisant → `session.build` ; sinon
   `data-mode="plan"` (icône +) → `session.planBuild`. Le niveau affiché est celui du prochain
@@ -432,6 +432,24 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   n'est réécrite que quand le fil change ; les heures sont mises à jour à part, pour que le ×
   ne soit pas remplacé sous le doigt toutes les secondes (bug vu pendant le test).
 - Style : `.plan`, `.plan-item` (bloqué : `.blocked`, heure en orange), fin de `style.css`.
+- **Fil d'attente mêlé (2026-11-02, D-158)** : `<section id="plan-zone">` (titre « Fil
+  d'attente ») est sorti de l'onglet Bâtiments et posé juste sous les onglets, sans
+  `data-pane` : visible sur tous les onglets, caché quand le fil est vide. `renderPlan`
+  nomme chaque élément selon son chantier : « Mine niv 5 », icône recherche + « Agronomie
+  niv 1 », icône flotte + « 5 × Cargo Hermès » ; le × porte `data-key = planId(item)`.
+  - Recherche (`renderResearch(me, pl, s, now, ahead)`) : labo libre, aucune recherche au fil
+    et stock suffisant → ↑ (`data-mode="now"`, `session.research`) ; sinon + (`data-mode="plan"`,
+    `session.planResearch`), avec le niveau, le prix et les prérequis comptés fil compris
+    (`ahead = planAhead(s)`). Le compte à rebours passe dans l'étiquette de niveau, comme pour
+    les bâtiments.
+  - Chantier naval (`renderYard(…, ahead)`) : ×1 / ×5 lancent le lot si le chantier naval est
+    libre, sans vaisseaux au fil et le stock suffit ; sinon +1 / +5 ajoutent le lot au fil
+    (`session.planShips`). Le verrou d'un vaisseau compte la recherche au fil.
+  - Bâtiments : le bouton ne passe en + que si le chantier est occupé ou qu'un **bâtiment** est
+    au fil (une recherche au fil ne l'empêche plus de lancer tout de suite).
+  - Le chantier de la fiche de la carte (`data-pi-ship`) lance toujours directement, sans fil.
+  - Vérifié dans Chromium (`index.html?view`, partie à un joueur humain, fil : labo, Propulsion,
+    5 cargos, centrale) : trois onglets, 360 et 320 px, pas de défilement horizontal.
 - Mise en page d'une ligne (2026-11-02, D-157) : `.plan-item` est une grille à deux colonnes,
   nom en haut, heure dessous, × à droite sur les deux lignes ; `.plan` a
   `grid-template-columns: minmax(0, 1fr)`. Avant, l'heure tenait sur la même ligne sans pouvoir

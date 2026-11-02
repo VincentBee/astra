@@ -20,8 +20,8 @@
 import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity } from './save.js';
-import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, PLAN_MAX, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, sunFor, fortOf, seeded } from './game.js';
-import { TECHS, SHIPS, sightRange, TEMPO } from './tech.js';
+import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, PLAN_MAX, planItem, planId, planAhead, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, sunFor, fortOf, seeded } from './game.js';
+import { TECHS, SHIPS, sightRange, TEMPO, techMissing, shipUnlocked } from './tech.js';
 import { cleanReport } from './report.js';
 import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, firstContact, salvage, applyLosses, parkedCell, fleetPos, fleetCargo, fleetTank, ORDERS, MAX_FLEETS, STANCES, aggressive, armed } from './fleet.js';
 import { amounts, isEmpty, holdings, lacks, noRoom, take, put, outcome, OFFER_MS, MAX_OFFERS, GRACE_MS } from './trade.js';
@@ -41,10 +41,25 @@ const de = (name) => (/^[aeiouyhàâéèêëîïôöûü]/i.test(name) ? `d’${
  * 8 : tempo ×2,5, score de tout l'empire, froid, prise de planète, élimination (`out`) et fin (`over`).
  * 9 : départ quand tous les joueurs présents sont prêts (`ready`, `go`), flotte de départ
  *     avec un seul colonisateur qui fonde la planète mère.
+ * 10 : recherches et lots de vaisseaux dans le fil d'attente (`plan`, D-158).
  */
-export const FORMAT = 9;
+export const FORMAT = 10;
 
 const shipsText = (n) => `${n} vaisseau${n > 1 ? 'x' : ''}`;
+
+/** Nom d'un élément du fil, pour le journal : « Mine », « la recherche Armes », « 5 × Chasseur ». */
+function planName(race, item) {
+  if (typeof item === 'string') return RACES[race].buildings[item].name;
+  if (item.tech) return `la recherche ${TECHS[race][item.tech].name}`;
+  return `${item.n} × ${SHIPS[race][item.ship].name}`;
+}
+
+/** Journal : ce que le fil vient de lancer tout seul (événement `start` de stateAt). */
+function planStartText(p, d, where) {
+  if (d.lane === 'research') return `${p.name} lance la recherche ${TECHS[p.race][d.key].name} niv. ${d.level} sur ${where} (fil).`;
+  if (d.lane === 'yard') return `${p.name} met en chantier ${d.count} × ${SHIPS[p.race][d.type].name} sur ${where} (fil).`;
+  return `${p.name} lance ${RACES[p.race].buildings[d.key].name} niv. ${d.level} sur ${where} (fil).`;
+}
 /** Technologies d'un joueur : celles de sa planète mère (aucune tant qu'il n'en a pas). */
 const techOf = (p) => p?.planet?.tech || {};
 
@@ -162,8 +177,8 @@ function planetOk(race, pl) {
   if (pl.climate !== undefined && !(isObj(pl.climate) && ['heat', 'energy', 'minerals', 'food'].every((k) => Number.isFinite(pl.climate[k])))) delete pl.climate;
   if (pl.places !== undefined && !(Number.isInteger(pl.places) && pl.places > 0)) delete pl.places;
   if (pl.queue && !(isObj(pl.queue) && race && Object.hasOwn(RACES[race].buildings, pl.queue.key))) pl.queue = null;
-  // Fil de construction : des noms de bâtiments de la race, PLAN_MAX au plus.
-  if (pl.plan !== undefined) pl.plan = Array.isArray(pl.plan) && race ? pl.plan.filter((k) => typeof k === 'string' && Object.hasOwn(RACES[race].buildings, k)).slice(0, PLAN_MAX) : [];
+  // Fil d'attente : bâtiments, recherches et lots de vaisseaux de la race (D-158), PLAN_MAX au plus.
+  if (pl.plan !== undefined) pl.plan = Array.isArray(pl.plan) && race ? pl.plan.map((x) => planItem(race, x)).filter(Boolean).slice(0, PLAN_MAX) : [];
   // Niveaux : seulement les bâtiments de la race, en entiers positifs (un niveau négatif libérerait des places).
   if (race) pl.levels = Object.fromEntries(Object.keys(RACES[race].buildings).map((k) => [k, Math.max(0, Math.floor(Number(pl.levels[k]) || 0))]));
   return true;
@@ -1261,34 +1276,95 @@ export class Session {
     const w = this.planets.find((x) => sameCell(x, pl.cell));
     if (w?.places) pl.planet.places = Number.isFinite(pl.planet.places) ? w.places : Math.max(w.places, usedPlaces(pl.planet.levels));
     // On compte à partir de maintenant : sinon le fil partirait de l'heure du dernier calcul.
-    for (const d of settle(pl.planet, this.now())) if (d.kind === 'start') this.addLog(`${p.name} lance ${R.buildings[d.key].name} niv. ${d.level} sur ${pl.name} (fil).`);
+    this.settlePlan(p, pl);
     const plan = pl.planet.plan || [];
     if (plan.length >= PLAN_MAX) return this.ontoast?.(`Le fil est plein (${PLAN_MAX} au plus).`);
     // Places : celles déjà prises, le chantier en cours et ce qui attend déjà dans le fil.
     const q = pl.planet.queue;
-    const taken = usedPlaces(pl.planet.levels) + (q ? (q.demolish ? -1 : 1) : 0) + plan.length;
+    const taken = usedPlaces(pl.planet.levels) + (q ? (q.demolish ? -1 : 1) : 0) + plan.filter((x) => typeof x === 'string').length;
     if (Number.isFinite(pl.planet.places) && taken >= pl.planet.places) return this.ontoast?.(`Plus de place : les ${pl.planet.places} places de cette planète seront prises.`);
     pl.planet.plan = [...plan, key];
     this.touch(this.addLog(`${p.name} ajoute ${R.buildings[key].name} au fil de ${pl.name}.`));
     this.changed();
   }
 
+  /** Écrit l'état de la planète maintenant, et note au journal ce que le fil a lancé entre-temps. */
+  settlePlan(p, pl) {
+    for (const d of settle(pl.planet, this.now())) if (d.kind === 'start') this.addLog(planStartText(p, d, pl.name));
+  }
+
   /**
-   * Retire l'élément `index` du fil de construction, s'il s'agit bien de `key`
-   * (le fil a pu avancer entre l'affichage et le toucher).
+   * Ajoute une recherche au fil (D-158) : elle se lancera toute seule, labo
+   * libre, dès que le stock couvrira son prix. Le labo, le niveau et les
+   * prérequis comptent ce qui est déjà au fil (« labo 2, puis telle
+   * recherche » se met au fil d'un coup).
    */
-  unplan(key, index, where = 'home') {
+  planResearch(key, where = 'home') {
+    if (!this.canAct) return;
+    const p = this.state.players[this.me];
+    if (!p?.planet) return this.ontoast?.('Choisis d’abord ta race.');
+    const pl = this.myPlanet(where);
+    if (!pl) return;
+    const T = TECHS[p.race];
+    if (!Object.hasOwn(T, key)) return this.ontoast?.('Technologie inconnue.');
+    this.settlePlan(p, pl);
+    // La copie des technologies d'une colonie peut avoir un passage de retard : on part des plus hautes.
+    if (pl.key !== 'home') pl.planet.tech = maxTech(pl.planet.tech, techOf(p));
+    // Pas la même technologie sur deux planètes à la fois : ni en recherche, ni au fil ailleurs.
+    const other = this.planetsOf(p).find((x) => x.key !== pl.key && (x.planet.research?.key === key || (x.planet.plan || []).some((it) => it?.tech === key)));
+    if (other) return this.ontoast?.(`Cette technologie est déjà en recherche ou au fil sur ${other.name}.`);
+    const plan = pl.planet.plan || [];
+    if (plan.length >= PLAN_MAX) return this.ontoast?.(`Le fil est plein (${PLAN_MAX} au plus).`);
+    const ahead = planAhead(stateAt(pl.planet, pl.planet.at));
+    const lab = ahead.levels.lab || 0;
+    if (!lab) return this.ontoast?.('Il faut un labo (ou en mettre un au fil).');
+    const level = ahead.tech[key] || 0;
+    if (level >= T[key].max) return this.ontoast?.('Niveau maximum atteint (fil compris).');
+    const miss = techMissing(p.race, key, ahead.tech, lab);
+    if (miss) return this.ontoast?.(`Il faut d’abord : ${miss}.`);
+    pl.planet.plan = [...plan, { tech: key }];
+    this.touch(this.addLog(`${p.name} ajoute la recherche ${T[key].name} niv. ${level + 1} au fil de ${pl.name}.`));
+    this.changed();
+  }
+
+  /** Ajoute un lot de vaisseaux au fil (D-158) : chantier naval libre et stock suffisant, il part tout seul. */
+  planShips(type, count, where = 'home') {
+    if (!this.canAct) return;
+    const p = this.state.players[this.me];
+    if (!p?.planet) return this.ontoast?.('Choisis d’abord ta race.');
+    const pl = this.myPlanet(where);
+    if (!pl) return;
+    const S = SHIPS[p.race];
+    if (!Object.hasOwn(S, type)) return this.ontoast?.('Vaisseau inconnu.');
+    if (!(Number.isInteger(count) && count >= 1 && count <= 50)) return this.ontoast?.('Entre 1 et 50 vaisseaux par lot.');
+    this.settlePlan(p, pl);
+    if (pl.key !== 'home') pl.planet.tech = maxTech(pl.planet.tech, techOf(p));
+    const plan = pl.planet.plan || [];
+    if (plan.length >= PLAN_MAX) return this.ontoast?.(`Le fil est plein (${PLAN_MAX} au plus).`);
+    const ahead = planAhead(stateAt(pl.planet, pl.planet.at));
+    if (!ahead.levels.yard) return this.ontoast?.('Il faut un chantier naval (ou en mettre un au fil).');
+    if (!shipUnlocked(p.race, type, ahead.tech)) return this.ontoast?.('Ce vaisseau n’est pas encore recherché (fil compris).');
+    pl.planet.plan = [...plan, { ship: type, n: count }];
+    this.touch(this.addLog(`${p.name} ajoute ${count} × ${S[type].name} au fil de ${pl.name}.`));
+    this.changed();
+  }
+
+  /**
+   * Retire l'élément `index` du fil, s'il s'agit bien de `id` (planId : le
+   * nom du bâtiment, « tech:… » ou « ship:…:n ») : le fil a pu avancer entre
+   * l'affichage et le toucher.
+   */
+  unplan(id, index, where = 'home') {
     if (!this.canAct) return;
     const p = this.state.players[this.me];
     const pl = this.myPlanet(where);
     if (!pl) return;
-    const R = RACES[p.race];
-    for (const d of settle(pl.planet, this.now())) if (d.kind === 'start') this.addLog(`${p.name} lance ${R.buildings[d.key].name} niv. ${d.level} sur ${pl.name} (fil).`);
+    this.settlePlan(p, pl);
     const plan = pl.planet.plan || [];
-    if (!Number.isInteger(index) || plan[index] !== key) return this.ontoast?.('Le fil a changé : déjà lancé ou retiré.');
-    plan.splice(index, 1);
+    if (!Number.isInteger(index) || index < 0 || index >= plan.length || planId(plan[index]) !== id) return this.ontoast?.('Le fil a changé : déjà lancé ou retiré.');
+    const [item] = plan.splice(index, 1);
     pl.planet.plan = [...plan];
-    this.touch(this.addLog(`${p.name} retire ${R.buildings[key].name} du fil de ${pl.name}.`));
+    this.touch(this.addLog(`${p.name} retire ${planName(p.race, item)} du fil de ${pl.name}.`));
     this.changed();
   }
 
@@ -2135,7 +2211,7 @@ export class Session {
     const R = RACES[p.race];
     const report = (pl, d) => {
       changed = true;
-      if (d.kind === 'start') this.addLog(`${p.name} lance ${R.buildings[d.key].name} niv. ${d.level} sur ${pl.name} (fil).`);
+      if (d.kind === 'start') this.addLog(planStartText(p, d, pl.name));
       else if (d.kind === 'queue' && d.demolish) this.addLog(`${p.name} a déconstruit ${R.buildings[d.key].name} (niv. ${d.level}) sur ${pl.name}.`);
       else if (d.kind === 'queue') this.addLog(`${p.name} termine ${R.buildings[d.key].name} niv. ${d.level} sur ${pl.name}.`);
       else if (d.kind === 'research') {
@@ -2627,7 +2703,7 @@ function maxTech(a, b) {
   return out;
 }
 
-export const ORDER_KINDS = ['chooseRace', 'ready', 'begin', 'claimPlanet', 'build', 'planBuild', 'unplan', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'setFleetStance', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'splitFleet', 'returnFleet', 'power'];
+export const ORDER_KINDS = ['chooseRace', 'ready', 'begin', 'claimPlanet', 'build', 'planBuild', 'planResearch', 'planShips', 'unplan', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'setFleetStance', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'splitFleet', 'returnFleet', 'power'];
 for (const k of [...ORDER_KINDS, 'tick']) {
   const act = Session.prototype[k];
   Session.prototype[k] = function (...a) {

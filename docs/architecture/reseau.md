@@ -105,7 +105,7 @@ Découpage convenu avec code-regles : **ici** constructeur, création/arrivée, 
 
 | Élément | Ligne | Rôle |
 |---|---|---|
-| `FORMAT = 9` (D-120) | 41 | Version du format des fiches, écrite dans `p.v` par `touch`. `outdated` (l.1812) est vrai si un autre a un `v` plus grand → `app.js:830` prévient de recharger. |
+| `FORMAT = 10` (D-158 ; 9 : D-120) | 45 | Version du format des fiches (10 : recherches et vaisseaux dans le fil `plan`), écrite dans `p.v` par `touch`. `outdated` (l.1812) est vrai si un autre a un `v` plus grand → `app.js:830` prévient de recharger. |
 | constantes | 54-72 | `MAX_PLAYERS = 8`, `HEARTBEAT_MS = 1500`, `SILENCE_MS = 30000`, `MAX_ORDERS = 1500`. |
 | `normalize(p)` | 90 | Remet une fiche reçue au format actuel et la nettoie (nom ≤ 16, couleur `#rrggbb`, race connue, planètes valides via `planetOk` l.141, quantités bornées via `cleanAmounts` l.158, etc.). Exportée (utilisée par `js/replay.js`). |
 | `pidOk(pid)` | 169 | `[A-Za-z0-9-]{1,24}` : pas de `__proto__`. |
@@ -175,6 +175,7 @@ quand un téléphone voit prêts tous les joueurs **en ligne avec lui** (`online
 écrit `go` dans sa fiche (ordre `begin`). Ce champ se propage comme le reste de la fiche ; le
 départ est le plus petit `go` vu. Le minuteur de 250 ms appelle `tick` puis `checkStart`.
 `FORMAT` passe à 9 : un téléphone d'avant, qui ne connaît pas `go`, est prié de recharger.
+(Puis à 10 avec D-158 : un téléphone d'avant tronquerait un fil qui tient des recherches ou des vaisseaux.)
 
 ### 6.2 Inviter : le double scan
 

@@ -116,7 +116,7 @@ function pickRace(s) {
 // ----- planètes ---------------------------------------------------------------
 
 /** Places encore libres une fois le chantier et le fil terminés. */
-const freePlaces = (planet, st) => (Number.isFinite(planet.places) ? planet.places - usedPlaces(st.levels) - (st.queue && !st.queue.demolish ? 1 : 0) - st.plan.length : Infinity);
+const freePlaces = (planet, st) => (Number.isFinite(planet.places) ? planet.places - usedPlaces(st.levels) - (st.queue && !st.queue.demolish ? 1 : 0) - st.plan.filter((x) => typeof x === 'string').length : Infinity);
 
 /**
  * Prochain bâtiment pour cette planète, ou null. D'abord ce qui manque pour vivre (énergie,

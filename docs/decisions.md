@@ -861,7 +861,7 @@ Aucune conversation ne les prouve.
   repousse le fil. Les autres joueurs voient le même calcul pour l'affichage, sans le vérifier.
 - Pas de nouveau `FORMAT` : un téléphone d'avant ignore `plan` (son fil ne se lance pas chez lui,
   mais rien ne casse) ; cache `astra-p2p-v57` (v55 et v56 pris par D-101 et D-099 ; D-101 prise par la vitesse de flotte, d'où D-105).
-- Qui : Vincent (demande), Claude (règle). Statut : en vigueur.
+- Qui : Vincent (demande), Claude (règle). Statut : en vigueur, **modifiée par D-158** (recherches et vaisseaux au fil, 12 éléments, règle d'ordre entre chantiers).
 
 **D-106 — Construire et faire décoller des vaisseaux depuis la carte**
 - 2026-10-30 12:15. Demandes : « Je voudrais pouvoir créer des vaisseaux depuis la carte, en
@@ -1887,3 +1887,37 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   page à la largeur de l'écran.
 - Qui : Vincent (demande), Claude (mise en page sur deux lignes, par défaut). Source : session
   `012yisg1`. Statut : en vigueur.
+**D-158 — Recherches et vaisseaux dans le fil d'attente**
+- 2026-11-02 22:24 (message reçu pendant le travail précédent, heure à la minute près non confirmée). Contexte : « Il faut aussi pouvoir mettre des recherches et des flottes dans
+  la file ». Le fil (D-105) ne tenait que des bâtiments ; la recherche et le chantier naval ne
+  pouvaient être lancés qu'à la main, labo ou chantier libre et stock suffisant.
+- Choix :
+  - **Un seul fil par planète**, où se mêlent bâtiments, recherches et lots de vaisseaux (« flottes »
+    compris comme les lots du chantier naval : un décollage ne se met pas au fil). Chaque élément
+    attend son chantier ; le chantier, le labo et le chantier naval avancent en même temps.
+  - **Ordre** : un élément dont le chantier est occupé, ou à qui il manque un prérequis, ne
+    bloque pas les autres chantiers ; le premier élément prêt a la priorité sur le stock (les
+    suivants ne le doublent pas pour une question de prix). Un prix plus grand que l'entrepôt
+    compte comme un prérequis manquant (sinon il bloquerait tout le fil pour toujours).
+  - **Ajout fil compris** : labo, chantier naval, niveaux et prérequis se comptent avec ce qui
+    est déjà au fil (labo puis recherche, propulsion puis cargos, d'un coup).
+  - Format : un bâtiment reste son nom (les fiches et les rejeux d'avant restent valables), une
+    recherche `{ tech }`, un lot `{ ship, n }`. Fil de **12** éléments au plus (8 avant : trop
+    court pour trois chantiers). Format de fiche **10** (une version d'avant verrait un fil
+    tronqué : elle est prévenue qu'une mise à jour existe). Cache `sw.js` v80.
+  - Interface : le fil sort de l'onglet Bâtiments, visible sous les onglets ; boutons ↑ / + sur
+    les recherches, ×n / +n sur les vaisseaux, comme pour les bâtiments.
+- Écarté : trois fils séparés, un par chantier (plus d'écrans, et l'ordre entre une recherche
+  et un bâtiment qui se disputent le stock ne se dirait pas) ; ordre strict, où la tête du fil
+  bloque tout (une recherche attendrait la fin d'un bâtiment alors que le labo est libre) ;
+  premier payable d'abord, sans priorité (un bâtiment cher serait doublé sans fin par des petites
+  recherches).
+- Limite : « pas la même technologie sur deux planètes à la fois » n'est vérifié qu'à l'ajout au
+  fil (non constaté en partie).
+- Les IA (D-151) n'utilisent toujours le fil que pour les bâtiments ; leur calcul des places ne
+  compte plus que les bâtiments du fil.
+- Vérifié : 6 nouveaux scénarios (`tests/plan.test.mjs` : trois chantiers à la fois, chantier
+  occupé, priorité sur le stock, labo puis recherche et estimation, le joueur avec refus,
+  retrait et rejeu identique, fil abîmé nettoyé) ; 204/204 ; vu dans Chromium à 360 et 320 px.
+- Qui : Vincent (demande), Claude (un seul fil, règle d'ordre, 12 éléments, par défaut). Source :
+  session `012yisg1`. Statut : en vigueur. Modifie D-105.

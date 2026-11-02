@@ -4,7 +4,7 @@ import { inviteLink, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
 import {
   RACES, RACE_KEYS, RES_INFO, resIcon, raceIcon, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
-  powerReadyAt, powerCost, liftGain, fmt, UNIVERSE, SOIL, sameCell, sunFor, climateName, kindLabel, usedPlaces, TEMPO, frostLine, planForecast, PLAN_MAX,
+  powerReadyAt, powerCost, liftGain, fmt, UNIVERSE, SOIL, sameCell, sunFor, climateName, kindLabel, usedPlaces, TEMPO, frostLine, planForecast, PLAN_MAX, planAhead, planId,
   shipsAffordable, planetAlerts, FROST,
 } from './game.js';
 import { drawSun } from './sky.js';
@@ -665,11 +665,17 @@ $('powers').addEventListener('click', (e) => {
 });
 $('techs').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-research]');
-  if (btn && !btn.disabled) session.research(btn.dataset.research, openKey);
+  if (btn && !btn.disabled) {
+    if (btn.dataset.mode === 'plan') session.planResearch(btn.dataset.research, openKey);
+    else session.research(btn.dataset.research, openKey);
+  }
 });
 $('ships').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-ship]');
-  if (btn && !btn.disabled) session.buildShips(btn.dataset.ship, Number(btn.dataset.n), openKey);
+  if (btn && !btn.disabled) {
+    if (btn.dataset.mode === 'plan') session.planShips(btn.dataset.ship, Number(btn.dataset.n), openKey);
+    else session.buildShips(btn.dataset.ship, Number(btn.dataset.n), openKey);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -1308,11 +1314,13 @@ function renderPlanet(me, now) {
   const full = !!planet.places && used >= planet.places;
   $('places').textContent = planet.places ? `${used} / ${planet.places} places` : '';
   $('places').classList.toggle('full', full);
-  // Fil de construction (D-105) : chantier occupé ou stock trop court, le bouton ajoute au fil.
+  // Fil d'attente (D-105, D-158) : chantier occupé, bâtiment déjà au fil ou stock trop court,
+  // le bouton ajoute au fil. Le fil peut aussi tenir des recherches et des vaisseaux.
   const plan = s.plan || [];
-  const busy = !!s.queue || plan.length > 0;
-  // Places une fois tout fini : chantier en cours et fil compris.
-  const taken = used + (s.queue ? (s.queue.demolish ? -1 : 1) : 0) + plan.length;
+  const planBuilds = plan.filter((x) => typeof x === 'string').length;
+  const busy = !!s.queue || planBuilds > 0;
+  // Places une fois tout fini : chantier en cours et bâtiments du fil compris.
+  const taken = used + (s.queue ? (s.queue.demolish ? -1 : 1) : 0) + planBuilds;
   const noRoom = !!planet.places && taken >= planet.places;
   for (const k of Object.keys(R.buildings)) {
     const level = s.levels[k] || 0;
@@ -1364,15 +1372,18 @@ function renderPlanet(me, now) {
     }
   }
 
-  renderResearch(me, pl, s, now);
-  renderYard(me, pl, s, now);
+  const ahead = planAhead(s);
+  renderResearch(me, pl, s, now, ahead);
+  renderYard(me, pl, s, now, ahead);
   renderFleets(me, pl, s, now);
   renderPartners($('planet-partners'), { planet: pl.key });
 }
 
 /**
- * Fil de construction de la planète ouverte, avec l'heure estimée de début
- * et de fin de chaque bâtiment (planForecast, recalculée une fois par seconde).
+ * Fil d'attente de la planète ouverte (bâtiments, recherches, vaisseaux), avec
+ * l'heure estimée de début et de fin de chaque élément (planForecast,
+ * recalculée une fois par seconde). Visible sur les onglets Bâtiments,
+ * Recherche et Flottes.
  */
 let planCache = { key: '', list: [] };
 function renderPlan(me, pl, planet, now) {
@@ -1380,8 +1391,16 @@ function renderPlan(me, pl, planet, now) {
   const key = [pl.key, planet.at, JSON.stringify(planet.plan || []), planet.queue?.end, planet.research?.end, planet.yard?.end, Math.floor(now / 1000)].join('|');
   if (planCache.key !== key) planCache = { key, list: planForecast(planet, now) };
   const list = planCache.list;
-  el.hidden = !list.length;
+  $('plan-zone').hidden = !list.length;
   const R = RACES[me.race];
+  // « Mine niv 5 », « Armes niv 2 » (icône recherche), « 5 × Chasseur » (icône flotte).
+  const label = (f) =>
+    f.lane === 'queue'
+      ? `${esc(R.buildings[f.key].short || R.buildings[f.key].name)} <span class="level mono">niv ${f.level}</span>`
+      : f.lane === 'research'
+        ? `${ic('research')}${esc(TECHS[me.race][f.key].name)} <span class="level mono">niv ${f.level}</span>`
+        : `${ic('fleet')}${f.count} × ${esc(SHIPS[me.race][f.key].name)}`;
+  const longName = (f) => (f.lane === 'queue' ? R.buildings[f.key].name : f.lane === 'research' ? `la recherche ${TECHS[me.race][f.key].name}` : `${f.count} ${SHIPS[me.race][f.key].name}`);
   const when = (f) => {
     if (f.start == null) return f.why || 'plus de 6 h';
     const start = f.start <= now ? 'maintenant' : `dans ${clock(f.start - now)}`;
@@ -1393,9 +1412,9 @@ function renderPlan(me, pl, planet, now) {
     list
       .map(
         (f, i) => `<li class="plan-item">
-      <span class="plan-name">${i + 1}. ${esc(R.buildings[f.key].short || R.buildings[f.key].name)} <span class="level mono">niv ${f.level}</span></span>
+      <span class="plan-name">${i + 1}. ${label(f)}</span>
       <span class="plan-when mono" title="Estimation, si la production reste la même"></span>
-      <button class="ghost small" data-unplan="${i}" data-key="${f.key}" title="Retirer du fil" aria-label="Retirer ${esc(R.buildings[f.key].name)} du fil"${session.canAct ? '' : ' disabled'}>${ic('close')}</button>
+      <button class="ghost small" data-unplan="${i}" data-key="${esc(planId(f.item))}" title="Retirer du fil" aria-label="Retirer ${esc(longName(f))} du fil"${session.canAct ? '' : ' disabled'}>${ic('close')}</button>
     </li>`,
       )
       .join(''),
@@ -1421,38 +1440,68 @@ function cardProgress(card, job, now) {
   bar.firstElementChild.style.width = `${Math.min(100, (1 - left / Math.max(1, job.end - job.start)) * 100)}%`;
 }
 
-/** Arbre des technologies : sur toute planète qui a un labo, avec le niveau de ce labo. */
-function renderResearch(me, pl, s, now) {
+/**
+ * Arbre des technologies : sur toute planète qui a un labo, avec le niveau de ce labo.
+ * Labo libre, rien au fil pour lui et stock suffisant : le bouton lance (↑). Sinon il ajoute
+ * au fil (+), en comptant ce qui y est déjà (`ahead`, D-158).
+ */
+function renderResearch(me, pl, s, now, ahead) {
   const lab = s.levels.lab || 0;
-  // Recherches lancées sur mes autres planètes : la même technologie ne peut pas y être lancée ici.
+  const labAhead = ahead.levels.lab || 0;
+  const plan = s.plan || [];
+  const planned = plan.some((x) => x?.tech);
+  // Recherches lancées (ou au fil) sur mes autres planètes : la même technologie ne peut pas y être lancée ici.
   const elsewhere = {};
-  for (const x of session.planetsOf(me)) if (x.key !== pl.key && x.planet.research) elsewhere[x.planet.research.key] = x.name;
+  for (const x of session.planetsOf(me)) {
+    if (x.key === pl.key) continue;
+    if (x.planet.research) elsewhere[x.planet.research.key] = x.name;
+    for (const it of x.planet.plan || []) if (it?.tech) elsewhere[it.tech] = x.name;
+  }
   const T = TECHS[me.race];
   const labName = RACES[me.race].buildings.lab.name;
-  $('research-hint').textContent = lab ? '' : `🔒 Il faut un ${labName}.`;
+  $('research-hint').textContent = lab ? '' : labAhead ? `🔒 Il faut un ${labName} : il est au fil, les recherches peuvent l’y suivre.` : `🔒 Il faut un ${labName}.`;
   $('research-hint').hidden = !!lab;
   const q = (sel) => document.querySelector(sel);
+  const playing = session.status === 'playing';
   for (const [k, t] of Object.entries(T)) {
     const level = s.tech[k] || 0;
+    const next = ahead.tech[k] || 0; // niveau une fois fini ce qui est lancé et au fil
     const maxed = level >= t.max;
-    const miss = techMissing(me.race, k, s.tech, lab);
-    const cost = techCost(me.race, k, level);
-    const ok = !maxed && !miss && covers(s.stock, cost);
-    q(`[data-tlevel="${k}"]`).textContent = `niv ${level}/${t.max}`;
-    const req = q(`[data-treq="${k}"]`);
-    req.hidden = !miss || maxed;
-    req.textContent = miss ? `🔒 ${miss}` : '';
-    setHtml(q(`[data-tcost="${k}"]`), maxed ? 'Niveau maximum' : `${costText(cost)} · ${clock(researchDuration(cost, Math.max(1, lab)))}`);
-    q(`[data-tcard="${k}"]`).classList.toggle('locked', !!miss && !maxed);
+    const maxedAhead = next >= t.max;
+    const miss = techMissing(me.race, k, ahead.tech, labAhead);
+    const cost = techCost(me.race, k, next);
     const there = elsewhere[k];
-    q(`[data-tcard="${k}"]`).classList.toggle('affordable', ok && !s.research && !there);
-    q(`[data-tcard="${k}"]`).classList.toggle('building-now', s.research?.key === k);
-    const btn = q(`[data-research="${k}"]`);
-    btn.disabled = !ok || !!s.research || !!there || session.status !== 'playing';
     const job = s.research?.key === k ? s.research : null;
+    const direct = !s.research && !planned && !maxed && !miss && !!lab && covers(s.stock, cost) && !there;
+    const canPlan = !maxedAhead && !miss && !!labAhead && !there && plan.length < PLAN_MAX;
+    q(`[data-tlevel="${k}"]`).textContent = job ? `niv ${level} → ${job.level} · ${clock(Math.max(0, job.end - now))}` : `niv ${level}/${t.max}`;
+    const req = q(`[data-treq="${k}"]`);
+    req.hidden = !miss || maxedAhead;
+    req.textContent = miss ? `🔒 ${miss}` : '';
+    setHtml(q(`[data-tcost="${k}"]`), maxedAhead ? (maxed ? 'Niveau maximum' : 'Niveau maximum (fil compris)') : `${costText(cost)} · ${clock(researchDuration(cost, Math.max(1, labAhead)))}`);
+    q(`[data-tcard="${k}"]`).classList.toggle('locked', !!miss && !maxedAhead);
+    q(`[data-tcard="${k}"]`).classList.toggle('affordable', direct);
+    q(`[data-tcard="${k}"]`).classList.toggle('building-now', !!job);
+    const btn = q(`[data-research="${k}"]`);
+    btn.dataset.mode = direct ? 'now' : 'plan';
+    btn.disabled = !(direct || canPlan) || !playing;
     cardProgress(q(`[data-tcard="${k}"]`), job, now);
-    setHtml(btn, job ? `${ic('wait')}${clock(Math.max(0, job.end - now))}` : maxed ? ic('done') : `${ic('up')}${level + 1}`);
-    btn.title = s.research?.key === k ? 'En cours' : maxed ? 'Terminé' : there ? `En recherche sur ${there}` : miss ? `Il faut : ${miss}` : !ok ? 'Ressources insuffisantes' : `Rechercher le niveau ${level + 1}`;
+    setHtml(btn, maxed ? ic('done') : `${ic(direct ? 'up' : 'plus')}${next + 1}`);
+    btn.title = maxed
+      ? 'Terminé'
+      : maxedAhead
+        ? 'Niveau maximum, fil compris'
+        : there
+          ? `En recherche ou au fil sur ${there}`
+          : miss
+            ? `Il faut : ${miss}`
+            : !labAhead
+              ? `Il faut un ${labName}`
+              : direct
+                ? `Rechercher le niveau ${next + 1}`
+                : plan.length >= PLAN_MAX
+                  ? `Fil plein (${PLAN_MAX} au plus)`
+                  : `Ajouter le niveau ${next + 1} au fil : il se lancera dès que possible`;
     btn.setAttribute('aria-label', `${t.name} : ${btn.title.toLowerCase()}`);
   }
 }
@@ -1466,16 +1515,19 @@ function canBuildShips(me, s, k, n) {
   return !!s.levels.yard && n >= 1 && shipUnlocked(me.race, k, s.tech) && !s.yard && n <= shipsAffordable(me.race, k, s.stock) && session.status === 'playing';
 }
 
-/** Chantier naval de la planète ouverte. */
-function renderYard(me, pl, s, now) {
+/**
+ * Chantier naval de la planète ouverte. Chantier libre, pas de vaisseaux au fil et stock
+ * suffisant : ×1 et ×5 lancent le lot ; sinon ils l'ajoutent au fil (+1, +5, D-158).
+ */
+function renderYard(me, pl, s, now, ahead) {
   const yard = s.levels.yard || 0;
   const S = SHIPS[me.race];
   const yardName = RACES[me.race].buildings.yard.name;
-  $('yard-hint').textContent = yard ? '' : `🔒 Il faut un ${yardName}.`;
+  $('yard-hint').textContent = yard ? '' : ahead.levels.yard ? `🔒 Il faut un ${yardName} : il est au fil, les vaisseaux peuvent l’y suivre.` : `🔒 Il faut un ${yardName}.`;
   $('yard-hint').hidden = !!yard;
   const q = (sel) => document.querySelector(sel);
   for (const k of SHIP_KEYS) {
-    const unlocked = shipUnlocked(me.race, k, s.tech);
+    const unlocked = shipUnlocked(me.race, k, ahead.tech); // recherche au fil comprise : le lot peut l'y suivre
     const u = shipUnlock(me.race, k);
     const job = s.yard?.type === k ? s.yard : null;
     cardProgress(q(`[data-scard="${k}"]`), job, now);
@@ -1490,7 +1542,18 @@ function renderYard(me, pl, s, now) {
     req.textContent = unlocked ? '' : `🔒 ${TECHS[me.race][u.key].name} ${u.level}`;
     setHtml(q(`[data-scost="${k}"]`), `${costText(S[k].cost)} · ${clock(shipDuration(me.race, k, 1, Math.max(1, yard)))}/u`);
     q(`[data-scard="${k}"]`).classList.toggle('locked', !unlocked);
-    for (const btn of document.querySelectorAll(`[data-ship="${k}"]`)) btn.disabled = !canBuildShips(me, s, k, Number(btn.dataset.n));
+    const plan = s.plan || [];
+    const planned = plan.some((x) => x?.ship);
+    const canPlan = !!ahead.levels.yard && unlocked && plan.length < PLAN_MAX && session.status === 'playing';
+    for (const btn of document.querySelectorAll(`[data-ship="${k}"]`)) {
+      const n = Number(btn.dataset.n);
+      const direct = !planned && canBuildShips(me, s, k, n);
+      btn.dataset.mode = direct ? 'now' : 'plan';
+      btn.disabled = !(direct || canPlan);
+      setHtml(btn, direct ? `×${n}` : `${ic('plus')}${n}`);
+      btn.title = direct ? `Construire ${n} ${S[k].name}` : plan.length >= PLAN_MAX ? `Fil plein (${PLAN_MAX} au plus)` : `Ajouter ${n} ${S[k].name} au fil : le lot partira dès que possible`;
+      btn.setAttribute('aria-label', btn.title);
+    }
   }
 }
 
