@@ -14,6 +14,8 @@ const scenario = scenarios(import.meta.url);
 
 const MIN = 60_000;
 const keys = (o) => Object.keys(o);
+/** Une étiquette par joueur, sur sa planète mère : sa fiche rejouée est-elle la même ? */
+const same = (state, r) => Object.values(state.players).map((p) => ({ show: `fiche de ${p.name} rejouée à l’identique`, at: p.home, expected: true, got: comparable(r.players[p.id]) === comparable(p) }));
 
 /**
  * Un petit robot par joueur : à chaque tour, il essaie de construire,
@@ -79,6 +81,13 @@ scenario('une partie rejouée depuis les journaux retombe sur les mêmes fiches'
 
   assert.equal(replayable(state).ok, true);
   const r = replay(state);
+  const all = ['chooseRace', 'claimPlanet', 'build', 'research', 'buildShips', 'takeOff', 'moveFleet', 'setFleetStance', 'proposeTrade', 'answerTrade', 'tick'];
+  const words = ['accepte', 'refuse', 'Échange conclu'];
+  film.look(players[0], 'la copie de J0 rejouée : chaque fiche retombe à l’identique', [
+    ...same(state, r),
+    { show: 'genres d’ordres joués', expected: all, got: all.filter((k) => kinds.has(k)) },
+    { show: 'échanges dans le journal rejoué', expected: words, got: words.filter((w) => r.log.some((l) => l.text.includes(w))) },
+  ]);
   for (const p of Object.values(state.players)) {
     assert.equal(comparable(r.players[p.id]), comparable(p), `fiche de ${p.name}`);
     assert.equal(r.faithful[p.id], true);
@@ -104,6 +113,7 @@ scenario('partie coupée en deux puis recollée : chacun est rejoué avec ce qu�
   const state = clone(players[0].snapshot());
   film.look(players[0], 'fin : la copie de J0 va être rejouée');
   const r = replay(state);
+  film.look(players[0], 'rejouée : chacun avec ce qu’il savait, chaque fiche à l’identique', same(state, r));
   for (const p of Object.values(state.players)) assert.equal(comparable(r.players[p.id]), comparable(p), `fiche de ${p.name}`);
 });
 
@@ -112,7 +122,12 @@ scenario('un journal tronqué est signalé', (film) => {
   film.look(players[0], 'au départ : J0 copie la partie et retire la 1re entrée du journal de J1');
   const state = clone(players[0].snapshot());
   state.players.p1.orders.shift();
-  assert.deepEqual(replayable(state), { ok: false, missing: ['J1'], stale: false });
+  const check = replayable(state);
+  film.look(players[0], 'le rejeu refuse la copie : le journal de J1 est incomplet', [
+    { show: 'rejouable', expected: false, got: check.ok },
+    { show: 'journaux incomplets', at: state.players.p1.home, expected: ['J1'], got: check.missing },
+  ]);
+  assert.deepEqual(check, { ok: false, missing: ['J1'], stale: false });
 });
 
 scenario('une copie pas encore à jour est signalée au lieu de faire planter le rejeu', (film) => {
@@ -121,6 +136,10 @@ scenario('une copie pas encore à jour est signalée au lieu de faire planter le
   const state = clone(players[0].snapshot());
   // p0 dit connaître une entrée du journal de p1 que cette copie n'a pas encore reçue.
   state.players.p0.orders.at(-1).s = { p1: state.players.p1.orders.length + 1 };
+  film.look(players[0], 'le rejeu signale une copie pas à jour, sans planter', [
+    { show: 'copie en retard', expected: true, got: replayable(state).stale },
+    { show: 'rejouable', expected: false, got: replayable(state).ok },
+  ]);
   assert.equal(replayable(state).stale, true);
   assert.equal(replayable(state).ok, false);
 });
@@ -131,6 +150,10 @@ scenario('courbe des points : elle suit le score de chaque joueur', (film) => {
   const state = clone(players[0].snapshot());
   film.look(players[0], 'fin : la copie de J0 va être rejouée');
   const series = scoreSeries(replay(state).frames, state.gid);
+  film.look(players[0], 'la courbe des points rejouée finit au score de chacun', [
+    ...players.map((s) => ({ show: `fin de la courbe de ${s.name}`, at: s.state.players[s.me].home, expected: Math.round(s.scoreOf(s.state.players[s.me])), got: Math.round(series[s.me].at(-1).pts), ok: series[s.me].at(-1).pts === s.scoreOf(s.state.players[s.me]) })),
+    { show: 'marches de la courbe de J0', expected: 'plus de 3', got: series.p0.length, ok: series.p0.length > 3 },
+  ]);
   for (const s of players) assert.equal(series[s.me].at(-1).pts, s.scoreOf(s.state.players[s.me]), `points de ${s.name}`);
   assert.ok(series.p0.length > 3, 'la courbe a plusieurs marches');
 });
@@ -149,14 +172,23 @@ scenario('courbe des points : elle retombe à 0 quand le joueur a tout perdu, et
     assert.ok(rich > 0);
     clock.t += 30 * MIN;
     A.tick();
-    film.look(A, 'après 32 min : le froid a tout pris');
     const p = A.state.players[A.me];
+    film.look(A, 'après 32 min : le froid a tout pris ; les points d’avant la chute sont gardés', [
+      { show: 'éliminé', expected: true, got: Number.isFinite(p.out) },
+      { show: 'score', expected: 0, got: A.scoreOf(p) },
+      { show: 'points d’avant la chute', expected: rich, got: p.deathPts },
+    ]);
     assert.ok(Number.isFinite(p.out), 'éliminé');
     assert.equal(A.scoreOf(p), 0, 'plus rien : 0 point');
     assert.equal(p.deathPts, rich, 'les points d’avant la chute sont gardés');
     const state = clone(A.snapshot());
     const r = replay(state);
     const line = scoreSeries(r.frames, state.gid)[A.me];
+    film.look(A, 'rejouée : la courbe monte puis retombe à 0, et la fiche est la même', [
+      { show: 'fin de la courbe', expected: 0, got: line.at(-1).pts },
+      { show: 'haut de la courbe', expected: rich, got: Math.max(...line.map((x) => x.pts)) },
+      { show: 'fiche rejouée à l’identique', expected: true, got: r.faithful[A.me] },
+    ]);
     assert.equal(line.at(-1).pts, 0);
     assert.equal(Math.max(...line.map((x) => x.pts)), rich);
     assert.equal(r.faithful[A.me], true);

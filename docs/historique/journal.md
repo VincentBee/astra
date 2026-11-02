@@ -365,6 +365,32 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 21:27 | `1b635a47` | [Auto-fix] conflit avec `main` | Fusion de `main` (PR #17 : D-133 à D-141, cache v73) : mes numéros D-142 à D-144 et le cache v74 restent libres, gardés ; conflits de doc et de `js/app.js` résolus en gardant les deux côtés ; écran de fin en section 18 de `interface.md` ; 194/194 | (cette PR) | D-142, D-143, D-144 |
 | 21:30 | `1b635a47` | « as tu rajouter des tests ? » | Réponse sans code : oui, 3 scénarios filmés (`end.test.mjs` : seul et éliminé ; `finish.test.mjs` : fin à quatre, fin seul) et un test existant corrigé ; les 3 échouent sans le correctif ; 194/194 | — | D-142, D-143 |
 | 21:37 | `1b635a47` | « retire ca » (ligne « J0 gagne. » de l'écran de fin, montrée dans le rapport du test) | Ligne `#finish-result` retirée (HTML, CSS, `app.js`), `finalBoard` ne donne plus le titre ; tests adaptés ; 194/194 ; vu dans le rapport du test ; cache v75 | (cette PR) | D-145 |
+| 21:44 | `f2222601` | « lance les tests » | `node --test tests/*.test.mjs` sur `3ea6d2a` : 191/191, 0 échec (6,4 s) | — | — |
+| 21:52 | `f2222601` | « dans le test "D-126 : le doigt a une taille fixe à l’écran, jamais moins de MIN_REACH case" qu'est ce qu'il faut voir dans la simulation ? tu pourrais mettre en evidence l'objet du test ? » | Réponse : rien, le doigt n'était vérifié que par les `assert`. Attente `finger` dans `film.look` (vérifiée par `underFinger`) ; en lecture seule, zoom du test et cercle du doigt (`#view-finger`) ; scénario en 3 images (0,8 case : touchée ; 1,2 : rien ; zoom 4, 0,5 : touchée grâce au minimum) ; 191/191 ; vu dans le navigateur ; cache v74 | (ce commit) | D-146 |
+| 21:54 | `f2222601` | « c'est quoi le doigt dans ce test ? » | Réponse sans code : la zone autour du point touché où le jeu cherche ce qu'on vise (`FINGER` = 18 px, `reach`, `MIN_REACH` = 0,6 case, `js/aim.js`) | — | D-126 |
+| 21:57 | `f2222601` | « est ce que chaque test a un highlight ? » | Réponse sans code, comptée sur les 22 rapports (`ASTRA_REPORT=1`) : non. 124 scénarios sur 191 n'ont aucune vérification dessinée ; 67 en ont (fiche de planète 52, flotte vue ou cachée 22, bandeau 3, doigt 1), mais la fiche est souvent juste l'endroit où le joueur rencontre l'effet, pas l'objet du test | — | D-141, D-146 |
+| 22:09 | `f2222601` | [Bouton] « Oui, par fichier » | Attente générique `show` dans `film.look` (anneau ✔ / ✖ et étiquette sur la case ou la flotte, ou en haut de la carte) ; `decisions-flotte` : 30/30 scénarios montrent ce qu'ils vérifient, 107 `assert` gardés ; 191/191 ; 108 images rejouées sans erreur ; cache v75 ; reste 16 fichiers | (ce commit) | D-147 |
+| 22:12 | `f2222601` | [Bouton] « Oui, continue » | `fleet` : 20/20 scénarios montrent ce qu'ils vérifient, 62 `assert` gardés ; flotte absente → étiquette en haut de la carte ; 191/191 ; 135 images rejouées sans erreur ; reste 15 fichiers | (ce commit) | D-147 |
+| 22:18 | `f2222601` | [Bouton] « Oui, continue » | `decisions-reseau` : 19/19 scénarios montrent ce qu'ils vérifient, 78 `assert` gardés | (ce commit) | D-147 |
+| 22:18 | `f2222601` | « probleme d'affichage ? je ne vois pas tous les message, trouve une autre maniere d'afficher ca » (capture : étiquettes empilées, coupées au bord) | Étiquettes de texte retirées de la carte | (ce commit) | D-147 |
+| 22:18 | `f2222601` | « une legende peut etre ? » (envoyé pendant le travail) | Anneau ✔ / ✖ numéroté sur la carte ; texte dans la légende numérotée à côté du téléphone ; vérifié dans le navigateur | (ce commit) | D-147 |
+| 22:21 | `f2222601` | [Bouton] « Oui, continue » | `start` : 11/11 scénarios montrent ce qu'ils vérifient (départ, colonisateur, planète mère, rejeu), 53 `assert` gardés ; reste 13 fichiers | (ce commit) | D-147 |
+| 22:26 | `f2222601` | [Bouton] « Oui, continue » | `end` : 10/10 scénarios montrent ce qu'ils vérifient (score, froid, élimination, conquête, gagnant), 39 `assert` gardés ; reste 12 fichiers | (ce commit) | D-147 |
+| 22:32 | `f2222601` | [Bouton] « Oui, continue » | `decisions-planete` : les 7 scénarios sans vérification montrée en ont maintenant (races, carte, planète mère disputée, recherche, petits corps), 116 `assert` gardés ; reste 11 fichiers | (ce commit) | D-147 |
+| 22:35 | `f2222601` | [Bouton] « Oui, continue » | `hostile` : 6/6 scénarios montrent ce qu'ils vérifient (fiches trafiquées), 15 `assert` gardés ; reste 10 fichiers | (ce commit) | D-147 |
+| 22:40 | `f2222601` | [Bouton] « Oui, tout d'un coup » | Les 10 derniers fichiers (25 scénarios) : plus aucun scénario sans vérification montrée (0 sur 191) ; aucun `assert` perdu ; 191/191 | (ce commit) | D-147 |
+| 22:43 | `f2222601` | [Bouton] « Oui, commite » | Commit de tout le travail de la session (doigt D-146, `show` et légende D-147, journal) | (ce commit) | — |
+| 22:55 | `f2222601` | [Bouton] « Créer une PR » | `main` avait avancé (D-142 à D-145, cache v75 d'une autre session) : fusion, décisions de cette branche renumérotées D-146 et D-147, cache v76, `show` ajoutés aux 3 scénarios venus de `main` ; 194/194 ; PR ouverte | (cette PR) | D-146, D-147 |
+
+## 2 novembre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 07:52 | `f2222601` | « retire "À gauche, l'écran du joueur qui regarde, dans le vrai jeu (index.html?view) : … au même numéro." » | Paragraphe et style `.legend` retirés de `tests/scenario.mjs` ; rapport vérifié dans le navigateur ; 194/194 | (PR #27) | D-148 |
+| 07:55 | `f2222601` | « Vu que tous les tests sont des simulations, est-ce que tu peux retirer le badge simulation dans la liste ? » | Badge et son style retirés de `tests/ui/index.html`, phrase d'accueil réécrite ; vérifié dans le navigateur | (PR #27) | D-149 |
+| 08:02 | `f2222601` | « Quelle est la différence entre lancer ce test et lancer le fichier? » | Réponse sans code : « Lancer ce test » ne lance que ce test (filtre sur son nom) ; « Lancer le fichier » lance tous les tests du fichier, et met à jour le rapport de tout le fichier | — | D-130 |
+| 08:03 | `f2222601` | « supprime ces deux boutons depuis la partie droite de l'écran puisqu'ils sont déjà dans la liste. » | Boutons « Lancer ce test » / « Lancer le fichier » et leur gestionnaire retirés de `tests/ui/index.html` ; vérifié dans le navigateur | (PR #27) | D-150 |
+| 08:05 | `f2222601` | [Bouton] « Oui, pousse » | Commit des changements D-148 à D-150, poussé sur la PR | (PR #27) | — |
 
 ### Travaux en cours au 2026-10-29
 

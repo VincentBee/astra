@@ -25,17 +25,21 @@ scenario('colonie perdue au recollage : les vaisseaux et la cargaison restent en
   clock.t += 31_000;
   A.tick();
   B.tick();
-  film.look(A, 'après 31 s, sans se voir : A a fondé sa colonie');
+  film.look(A, 'après 31 s, sans se voir : A a fondé sa colonie', [{ show: 'colonie de A', at: cell, expected: true, got: !!A.state.players[A.me].colonies[target.id] }]);
   assert.ok(A.state.players[A.me].colonies[target.id], 'A a fondé sa colonie sans voir celle de B');
 
   sync(A, B);
   film.look(A, 'recollage : A reçoit la fiche de B, arrivé le premier');
   clock.t += 250;
   A.tick();
-  film.look(A, 'A perd la colonie : sa flotte attend en orbite');
   const pa = A.state.players[A.me];
-  assert.equal(pa.colonies[target.id], undefined, 'B, arrivé le premier, garde la planète');
   const back = pa.fleets.find((f) => f.to.x === cell.x && f.to.y === cell.y);
+  film.look(A, 'A perd la colonie : sa flotte attend en orbite, avec ses vaisseaux et sa cargaison', [
+    { show: 'colonie de A', at: cell, expected: false, got: !!pa.colonies[target.id] },
+    { show: 'flotte en orbite', at: [A, back?.id], expected: { colony: 1, fighter: 5, cargo: 2 }, got: back?.ships },
+    { show: 'minéraux en soute', at: [A, back?.id], expected: 'entre 800 et 810', got: back?.cargo.minerals, ok: back?.cargo.minerals >= 800 && back?.cargo.minerals < 810 },
+  ]);
+  assert.equal(pa.colonies[target.id], undefined, 'B, arrivé le premier, garde la planète');
   assert.ok(back, 'une flotte de A attend en orbite');
   assert.deepEqual(back.ships, { colony: 1, fighter: 5, cargo: 2 });
   // La cargaison revient, plus ce que la colonie a produit pendant sa courte vie.

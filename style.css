@@ -738,6 +738,31 @@ body {
 .galaxy > div { position: absolute; inset: 0; } /* une seule image immobile (D-137) */
 /* Lecture seule (index.html?view, D-139) : l'écran d'un scénario de test, rien ne se touche. */
 html.view-only .screen { pointer-events: none; }
+/* Le doigt d'un scénario (D-146) : le cercle vérifié par le test, centré sur le point touché.
+   Par-dessus la fiche de planète (z-index 20) : c'est une annotation du test, il doit se voir en entier. */
+.view-finger {
+  position: absolute; z-index: 25; transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
+  border: 2px dashed #fff; background: rgba(255, 255, 255, 0.22); box-shadow: 0 0 0 2px rgba(5, 7, 15, 0.7);
+}
+.view-finger::before { content: ''; position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: #fff; }
+/* Valeurs vérifiées par un scénario (D-147) : un anneau sur la case ou la flotte, et le numéro de la
+   vérification (son texte est dans la légende du rapport). */
+.view-mark {
+  position: absolute; z-index: 25; transform: translate(-50%, -50%); width: 26px; height: 26px; border-radius: 50%;
+  pointer-events: none; border: 3px solid var(--mark); box-shadow: 0 0 0 2px rgba(5, 7, 15, 0.7);
+}
+.view-mark span {
+  position: absolute; top: -10px; right: -12px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px;
+  display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #05070f; background: var(--mark);
+  box-shadow: 0 0 0 2px rgba(5, 7, 15, 0.8);
+}
+.view-mark.ok { --mark: #4ade80; }
+.view-mark.ko { --mark: #ff8a8a; }
+.view-finger i { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.7); }
+.view-finger span {
+  position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%); white-space: nowrap;
+  padding: 2px 6px; font-size: 12px; font-weight: 600; color: #05070f; background: #fff; border-radius: 4px;
+}
 .topbar { background: transparent; }
 
 /* ----- Choix de la race : trois icônes, une seule fiche ----- */

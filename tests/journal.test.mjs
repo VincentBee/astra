@@ -32,15 +32,25 @@ function raid(kind = 'attack', film) {
 
 scenario('attaque de planète : les deux carnets ont les pertes des deux côtés et le butin', (film) => {
   const { A, B, sync } = raid('attack', film);
-  film.look(A, 'combat : A a abattu les drones et pillé');
   const a = A.journal.list.find((e) => e.kind === 'combat');
+  film.look(A, 'combat : A a abattu les drones et pillé ; son carnet le note', [
+    { show: 'carnet de A', expected: 'good', got: a?.tone },
+    { show: 'drones de B abattus', expected: 4, got: a?.theirs },
+    { show: 'butin', expected: 'des minéraux', got: a?.loot, ok: !!a?.loot.includes('minéraux') },
+  ]);
   assert.equal(a.tone, 'good');
   assert.equal(a.theirs, 4, 'les 4 drones de B');
   assert.ok(a.loot.includes('minéraux'), a.loot);
   sync(B, A); // B revient et lit le rapport de A
   B.tick();
-  film.look(B, 'B revient et lit le rapport de A');
   const b = B.journal.list.find((e) => e.kind === 'combat');
+  film.look(B, 'B revient et lit le rapport de A : son carnet a le même combat, de son côté', [
+    { show: 'carnet de B', expected: 'bad', got: b?.tone },
+    { show: 'drones perdus par B', expected: 4, got: b?.mine },
+    { show: 'pertes de A, connues de B', expected: a.mine, got: b?.theirs },
+    { show: 'pillé chez B', expected: a.loot, got: b?.pillaged },
+    { show: 'daté du combat', expected: true, got: b?.at === a.at },
+  ]);
   assert.equal(b.tone, 'bad');
   assert.equal(b.mine, 4);
   assert.equal(b.theirs, a.mine, 'B connaît les pertes de A');
@@ -53,19 +63,25 @@ scenario('attaque de planète : les deux carnets ont les pertes des deux côtés
 
 scenario('planète prise : le carnet du perdant dit qui l’a prise et qu’il est éliminé', (film) => {
   const { B, sync, A } = raid('conquer', film);
-  film.look(A, 'combat : A a pris la planète de B');
+  film.look(A, 'combat : A a pris la planète de B', [{ show: 'prise, dans le carnet de A', expected: true, got: A.journal.list.some((e) => e.capture && e.tone === 'good') }]);
   assert.ok(A.journal.list.some((e) => e.capture && e.tone === 'good'));
   sync(B, A);
   B.tick();
-  film.look(B, 'B lit le rapport : planète perdue');
   const texts = B.journal.list.map((e) => e.text);
+  film.look(B, 'B lit le rapport : planète perdue, il est éliminé', [
+    { show: 'perte, dans le carnet de B', expected: true, got: B.journal.list.some((e) => e.capture && e.tone === 'bad') },
+    { show: 'le carnet dit « tu es éliminé »', expected: true, got: texts.some((t) => t.includes('tu es éliminé')) },
+  ]);
   assert.ok(B.journal.list.some((e) => e.capture && e.tone === 'bad'), texts.join(' | '));
   assert.ok(texts.some((t) => t.includes('tu es éliminé')), texts.join(' | '));
 });
 
 scenario('le carnet reste sur le téléphone : il ne part pas avec la fiche', (film) => {
   const { A } = raid('attack', film);
-  film.look(A, 'après le combat');
+  film.look(A, 'après le combat : le carnet est rempli, mais pas dans la fiche envoyée aux autres', [
+    { show: 'entrées du carnet', expected: 'au moins 1', got: A.journal.list.length, ok: A.journal.list.length > 0 },
+    { show: 'carnet dans la fiche envoyée', expected: false, got: JSON.stringify(A.snapshot()).includes('"journal"') },
+  ]);
   assert.ok(A.journal.list.length > 0);
   assert.ok(!JSON.stringify(A.snapshot()).includes('"journal"'));
 });

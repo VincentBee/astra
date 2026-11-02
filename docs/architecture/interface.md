@@ -526,3 +526,13 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   bleus à gauche). Données : `finalBoard` (`js/finish.js`), testé dans `tests/finish.test.mjs`.
 - Couleurs : `--gold` `#f5c542`, `--silver` `#c9d1e3`, `--bronze` `#d08a52` (`style.css`,
   `:root`).
+- Ce que le test vérifie, posé sur la carte par `showMarks` dans `#view-marks` (dans
+  `.map-wrap`, z-index 25 : par-dessus la fiche ; vidé à chaque image ; jamais en jeu) :
+  - doigt (D-146) : chaque image remet le zoom à 1, sauf si elle porte `finger: { x, y, zoom, r,
+    raw, text }` : alors zoom du test, centré sur le toucher, et `.view-finger` : cercle blanc en
+    pointillés de rayon `r` cases, point au centre, texte au-dessus, petit cercle de rayon `raw`
+    quand le minimum `MIN_REACH` joue ;
+  - valeurs vérifiées (D-147) : `marks: [{ n, text, ok, x, y, pid, id }]` → `.view-mark`
+    (anneau vert ou rouge, pastille au numéro `n` en haut à droite, texte en `title`) sur la case,
+    ou sur la flotte là où `fleetSpots` la dessine ; sans case, rien sur la carte. Le texte est
+    dans la légende du rapport (`tests/scenario.mjs`, liste numérotée à côté du téléphone).

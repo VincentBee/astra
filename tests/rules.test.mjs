@@ -199,9 +199,13 @@ scenario('les places viennent de la carte : les effacer ou un niveau négatif ne
   delete pl.places; // fiche trafiquée
   film.look(A, 'planète pleine de mines, stock plein, places effacées de la fiche');
   A.build('farm');
-  film.look(A, 'A tente une ferme : refusée, la planète reste pleine');
+  film.look(A, 'A tente une ferme : refusée, la planète reste pleine', [{ show: 'chantier', at: A.state.players[A.me].home, expected: 'aucun', got: pl.queue ? pl.queue.key : 'aucun' }]);
   assert.equal(pl.queue, null, 'toujours pleine');
   const p = normalize({ race: 'human', planet: { ...pl, levels: { ...pl.levels, mine: -20, x: 1e9 } } });
+  film.look(A, 'fiche reçue avec une mine au niveau −20 et un bâtiment « x » : nettoyée', [
+    { show: 'niveau de mine reçu (−20)', expected: 0, got: p.planet.levels.mine },
+    { show: 'bâtiment « x » gardé', expected: false, got: 'x' in p.planet.levels && p.planet.levels.x !== undefined },
+  ]);
   assert.equal(p.planet.levels.mine, 0);
   assert.equal(p.planet.levels.x, undefined);
 });
