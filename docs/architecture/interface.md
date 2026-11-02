@@ -432,6 +432,11 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   n'est réécrite que quand le fil change ; les heures sont mises à jour à part, pour que le ×
   ne soit pas remplacé sous le doigt toutes les secondes (bug vu pendant le test).
 - Style : `.plan`, `.plan-item` (bloqué : `.blocked`, heure en orange), fin de `style.css`.
+- Mise en page d'une ligne (2026-11-02, D-157) : `.plan-item` est une grille à deux colonnes,
+  nom en haut, heure dessous, × à droite sur les deux lignes ; `.plan` a
+  `grid-template-columns: minmax(0, 1fr)`. Avant, l'heure tenait sur la même ligne sans pouvoir
+  passer à la ligne et la page débordait (484 px de large sur un écran de 360). Vérifié dans
+  Chromium à 360 et 320 px : plus de défilement horizontal.
 - Vérifié dans le navigateur (vue mobile 375 × 812, 2026-10-30) : ajout de 3 bâtiments, lancement
   automatique de la mine à l'heure annoncée, retrait par ×, rattrapage après rechargement.
 

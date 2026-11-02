@@ -1872,3 +1872,18 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   Recherche → carte → planète → Bâtiments. 194/194 tests (198/198 après la reprise sur `main`, D-151 à D-155 de l'IA).
 - Qui : Vincent (demande), Claude (portée : à chaque ouverture). Source : session `012yisg1`.
   Statut : en vigueur.
+**D-157 — Fil de construction sur deux lignes**
+- 2026-11-02 22:22. Contexte : « La file de batiment provoque un scroll horizontal ». Chaque
+  ligne du fil (`#plan`) mettait le nom, l'heure estimée et le × sur une seule ligne ; l'heure
+  (« ≈ dans 1:23:45 → fini dans 1:30:12 ») ne pouvait pas passer à la ligne, et la grille `.plan`
+  s'élargissait pour la contenir : 484 px de page sur un écran de 360.
+- Choix : `.plan-item` devient une grille : nom (coupé par « … » s'il est trop long) en haut,
+  heure dessous (peut passer à la ligne), × à droite sur les deux lignes. `.plan` a
+  `grid-template-columns: minmax(0, 1fr)` pour ne jamais déborder. Seulement du CSS
+  (`style.css`) ; cache `sw.js` v79.
+- Écarté : couper l'heure par « … » (on perdrait l'heure de fin) ; raccourcir le texte de
+  l'heure (le débordement reviendrait avec un nom long ou un écran plus étroit).
+- Vérifié dans Chromium (montage de l'écran planète avec 3 lignes au plus long) : 360 et 320 px,
+  page à la largeur de l'écran.
+- Qui : Vincent (demande), Claude (mise en page sur deux lignes, par défaut). Source : session
+  `012yisg1`. Statut : en vigueur.
