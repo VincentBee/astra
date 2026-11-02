@@ -89,7 +89,7 @@ Clés `localStorage` (l.13-16) :
 
 | Clé | Contenu |
 |---|---|
-| `astra.save` | partie en cours `{ v: 1, me, savedAt, state, journal? }` (`journal` : mon carnet de combats, D-110, propre au téléphone) |
+| `astra.save` | partie en cours `{ v: 1, me, savedAt, state, journal?, intel?, bots? }` (`journal` : mon carnet de combats, D-110, propre au téléphone ; `bots` : les IA que ce téléphone fait jouer, D-155) |
 | `astra.saves` | historique `{ gid: sauvegarde }`, 10 plus récentes (`KEEP`, l.17) |
 | `astra.identity` | mon identité dans la partie en cours `{ gid, pid, secret }` |
 | `astra.identities` | historique `{ gid: identité }` |
@@ -220,6 +220,21 @@ Un pair qui arrive par le rendez-vous et par un lien direct garde le lien rendez
 
 ### 6.6 Départ d'un joueur
 Il n'y a **pas de message « je pars »**. Un départ = un lien qui se ferme : silence de 30 s (`heartbeat`), état WebRTC `failed/closed`, ou `disconnected` pendant 5 s. Le joueur passe hors ligne (`refreshOnline`) ; **sa fiche reste dans la partie**. Quitter l'écran (`data-go`, `app.js:137`) appelle `end()`. Resté seul (`alone`), l'écran montre un bouton pour rejoindre les autres (`app.js:289`, `762`).
+
+### 6.7 IA sur le téléphone de l'hôte (D-151, D-155)
+- `addBot(host)` (`js/bot.js`) : l'hôte fait comme pour un invité (`addPlayer` avec une empreinte
+  de secret au hasard, entrée au journal, `spread` de la fiche), puis crée la `Session` de l'IA
+  sur une copie de sa partie (`snapshot`), reliée par `localPair()` : deux `LocalLink` qui
+  passent les messages en texte JSON par `queueMicrotask`, `route()` = `'bot'` (« IA sur ce
+  téléphone » dans la fenêtre Joueurs), `viaRoom` faux. `host.attach(lien, pid de l'IA)` :
+  l'IA est **en ligne** chez l'hôte, donc comptée par `notReady` (elle est prête aussitôt).
+- La `Session` de l'IA : `save`, `scheduleSave`, `meet`, `dial`, `start` neutralisés ; un
+  minuteur d'1 s fait `tick`, `checkStart` et, toutes les 3 s, `think`. Elle répond aux `hb` de
+  l'hôte comme un pair. Ses fiches passent par `rec` ; l'hôte les relaie aux autres téléphones.
+- Sauvegarde : `host.botIds` → champ `bots` de la sauvegarde (`saveGame(me, state, journal,
+  intel, bots)`) ; `Session.resume` le relit (`botIds`, identifiants valides et présents dans
+  la partie) ; `app.js` appelle `wakeBots(session)` juste après la reprise. `host.bots` (Map pid
+  → Session) ; `Session.end` appelle `end()` de chaque IA (minuteur arrêté, lien fermé).
 
 ## 7. Ordres et synchronisation
 

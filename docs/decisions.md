@@ -1768,3 +1768,92 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Vérifié dans le navigateur : le ▶ de la liste lance le test, le panneau montre le résultat et
   la simulation.
 - Qui : Vincent. Source : session `f2222601`. Statut : en vigueur.
+
+## 2 novembre 2026 (soir) — jouer contre une IA
+
+**D-151 — L'IA est un joueur comme un autre, qui joue sur le téléphone de l'hôte**
+- 2026-11-02 20:35. Contexte : « Je voudrais pouvoir jouer contre une ia ». Le jeu n'a pas de
+  serveur et chaque joueur est le seul à écrire sa fiche (D-001, `reseau.md` §1).
+- Choix : une IA est une `Session` de plus (`js/bot.js`), avec sa propre fiche et son propre
+  identifiant, qui tourne dans la page de celui qui l'a ajoutée (l'hôte). Elle est reliée à la
+  `Session` de l'hôte par un **lien en mémoire** (`localPair`) qui a l'interface d'un lien WebRTC
+  (`send`, `onmessage`, `onclose`, `close`, `route`) : messages en JSON, livrés juste après
+  (microtâche). L'hôte l'accueille comme un invité (`addPlayer`, entrée au journal, fiche
+  diffusée) ; elle joue avec les ordres de l'interface (`chooseRace`, `ready`, `planBuild`,
+  `research`, `buildShips`, `takeOff`, `moveFleet`, `power`) : ses ordres vont dans son journal
+  et **la partie se rejoue** (vérifié). Elle ne sauve rien et n'appelle personne (`save`,
+  `meet`, `dial` neutralisés) : l'hôte sauve toute la partie. `Session.end` arrête ses IA.
+- Alternatives écartées : l'hôte qui écrit lui-même la fiche de l'IA (deux auteurs pour une
+  fiche, contraire à D-001) ; une IA sur un serveur (pas de serveur) ; une IA sans fiche, hors
+  des règles (pas de rejeu, règles en double).
+- Limites : l'IA ne joue que tant que la page de l'hôte est ouverte (comme un joueur, sa planète
+  continue de produire, mais elle ne donne plus d'ordres) ; dans une partie à plusieurs
+  téléphones, les autres reçoivent sa fiche par l'hôte et la voient « hors ligne » : **non
+  confirmé**, pas testé entre téléphones. Elle ne répond pas aux offres d'échange (elles
+  expirent).
+- Qui : Vincent (demande), Claude (conception, par défaut). Source : session `012yisg2`. Statut :
+  en vigueur.
+
+**D-152 — Le cerveau de l'IA : des règles par race, des ordres vérifiés d'avance**
+- 2026-11-02 20:35. Choix : `think(session)` toutes les 3 s (`THINK_MS`), **3 ordres au plus**
+  par passage, et seulement des ordres qui passeront (un ordre refusé s'inscrit quand même au
+  journal de la fiche, D-045) : recherche et vaisseaux essayés sur une copie de la planète
+  (`startResearch`, `startShips`), bâtiments mis au **fil de construction** (D-105), qui se
+  lance seul quand le stock suffit. Par planète : d'abord ce qui manque pour vivre (énergie avec
+  12 % de marge, nourriture, logement des humains ; pas de mine humaine sans bras), puis une liste
+  d'étapes par race (`PLAYBOOK`), puis production et défense à tour de rôle ; les dernières
+  places de la planète mère vont au labo 2 et au chantier naval ; un bâtiment trop cher pour
+  l'entrepôt fait monter l'entrepôt. Recherche : une liste par race (colonisation tôt, puis
+  armes). Chantier naval : un colonisateur tant qu'elle a moins de 4 planètes (`WANT_PLANETS`),
+  sinon des vaisseaux de guerre avec ce qui dépasse une réserve. Colonies : la planète libre que
+  le froid prendra le plus tard, pas trop loin. Attaque : `conquer` quand le combat calculé
+  (`battle`, défense comprise, comme le menu « Conquérir … · défense ⚔ ◇ ») est gagné en gardant
+  au moins la moitié de la flotte. Le froid presque là : les vaisseaux posés partent sur la
+  planète qui tiendra le plus longtemps. Aliens : arrachement et transe dès qu'ils sont prêts.
+  Race : la moins prise (au hasard entre ex æquo) ; noms « IA Véga », « IA Orion »…
+- Mesuré (simulation, 3 IA, une par race) : chacune fonde sa planète en moins de 3 min,
+  colonise, se bat ; la partie finit en 19 à 28 min par un gagnant ; ≈ 150 à 550 ordres par IA.
+  Les machines de l'IA gagnent le plus souvent ; les humains de l'IA sont les plus faibles.
+  **Non confirmé** : la force de l'IA face à un vrai joueur.
+- Alternatives écartées : recherche par simulation (comme le guide des races) ou arbre de
+  décision appris (trop lourd pour un téléphone, toutes les 3 s) ; plusieurs niveaux de
+  difficulté (pas demandé : un seul niveau pour commencer).
+- L'IA lit les planètes adverses dans sa copie de la partie (pas de brouillard pour elle, D-124) ;
+  elle ne suit pas les flottes ennemies. Choix par défaut, à revoir si elle paraît tricher.
+- Qui : Claude, par défaut. Source : session `012yisg2`. Statut : en vigueur.
+
+**D-153 — Trêve : l'IA ne conquiert pas avant 10 min**
+- 2026-11-02 20:35. Contexte : sans trêve, en simulation, l'IA machine conquiert dès 14 min et
+  la partie finit à 19 min, avant que le froid compte.
+- Choix : `PEACE_MS = 10 min` après le départ : avant, l'IA construit, colonise et arme, mais
+  n'attaque pas. Les joueurs, eux, n'ont pas de trêve.
+- Alternatives écartées : pas de trêve ; une trêve plus longue (le froid commence à 12 min :
+  l'IA doit pouvoir prendre des planètes quand il se resserre).
+- Qui : Claude, par défaut. Source : session `012yisg2`. Statut : en vigueur. Testé :
+  `tests/bot.test.mjs` (aucune conquête avant 10 min dans une partie de 3 IA).
+
+**D-154 — Où l'on ajoute une IA : « Contre l'IA » à l'accueil, « Ajouter une IA » au départ**
+- 2026-11-02 20:35. Choix : sur l'accueil, sous « Créer » et « Rejoindre », le bouton
+  **Contre l'IA** (icône `bot`, tête de robot) crée une partie et y ajoute une IA ; dans le
+  bandeau du départ, tant que la partie n'est pas partie, **Ajouter une IA** (à côté
+  d'« Inviter ») en ajoute une de plus, jusqu'à 8 joueurs. L'IA choisit sa race et se dit prête
+  aussitôt : la partie part quand le joueur est prêt. Dans la fenêtre Joueurs, une IA est
+  « IA sur ce téléphone » (au lieu de la latence et du chemin réseau).
+- Alternatives écartées : un écran de réglage (nombre d'IA, races) avant la partie (plus de
+  clics) ; un mode « solo » à part (même partie que les autres : on peut aussi inviter des
+  joueurs).
+- Vérifié dans Chromium (390 × 844) : accueil, salon avec deux IA prêtes, départ, planètes des
+  IA fondées en 1 min, reprise depuis l'historique avec les IA reliées. Cache `astra-p2p-v77`
+  (`js/bot.js` pré-caché).
+- Qui : Claude, par défaut. Source : session `012yisg2`. Statut : en vigueur.
+
+**D-155 — Les IA d'un téléphone sont notées dans sa sauvegarde, et se réveillent à la reprise**
+- 2026-11-02 20:35. Choix : la sauvegarde locale (`astra.save`, historique `astra.saves`) garde
+  `bots` : les identifiants des IA que ce téléphone fait jouer (`saveGame(…, bots)`,
+  `Session.botIds`). À la reprise, `wakeBots` recrée leurs `Session` sur la partie reprise ;
+  leur premier passage rattrape le temps écoulé, comme pour un joueur. Le format des fiches ne
+  change pas (`FORMAT` reste 9).
+- Alternatives écartées : un champ « IA de tel joueur » dans la fiche (un joueur malveillant
+  pourrait se déclarer IA de mon téléphone et faire jouer sa fiche par lui) ; ne pas reprendre
+  les IA (la partie reprise serait sans adversaire).
+- Qui : Claude, par défaut. Source : session `012yisg2`. Statut : en vigueur.

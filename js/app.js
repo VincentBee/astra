@@ -15,6 +15,7 @@ import { TECHS, SHIPS, SHIP_KEYS, techCost, techMissing, researchDuration, shipU
 import { TRADE_RES, TRADE_NAMES } from './trade.js';
 import { explainBattle, sideTable } from './report.js';
 import { finalBoard } from './finish.js';
+import { addBot, wakeBots } from './bot.js';
 import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fleetSpeed, slowestShip, fuelAt, moving, aggressive, armed } from './fleet.js';
 
 fillIcons(); // les icônes du HTML statique, avant tout le reste
@@ -213,6 +214,7 @@ $('games').addEventListener('click', (e) => {
   session = Session.resume(saved);
   session.ontoast = toast;
   session.onchange = onSessionChange;
+  wakeBots(session); // les IA que ce téléphone faisait jouer reprennent (D-151)
   startGame();
   toast('Partie reprise.');
   // Les combats rattrapés à la reprise ont été notés avant que l'écran existe, ceux d'avant la
@@ -229,6 +231,18 @@ $('btn-create').onclick = async () => {
   session = await Session.create(name);
   session.ontoast = toast;
   session.onchange = onSessionChange;
+  startGame();
+};
+
+// Partie contre l'IA (D-151) : une partie neuve, avec une IA qui joue sur ce téléphone ; d'autres
+// IA (ou des joueurs) s'ajoutent depuis le bandeau du départ.
+$('btn-solo').onclick = async () => {
+  const name = playerName();
+  if (!name) return;
+  session = await Session.create(name);
+  session.ontoast = toast;
+  session.onchange = onSessionChange;
+  addBot(session);
   startGame();
 };
 
@@ -963,7 +977,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 function routeLabel(route) {
-  return { host: 'réseau local', srflx: 'direct', prflx: 'direct', relay: 'relais' }[route] || '';
+  return { host: 'réseau local', srflx: 'direct', prflx: 'direct', relay: 'relais', bot: 'IA sur ce téléphone' }[route] || '';
 }
 
 /** Rendu des valeurs qui bougent en continu (5 fois par seconde). */
@@ -1011,7 +1025,7 @@ function renderLive() {
     const sub = document.querySelector(`[data-psub="${p.id}"]`);
     if (!sub) continue;
     const info = session.linkInfo(p.id);
-    const net = p.id === session.me ? '' : !info ? 'déconnecté' : info.rtt != null ? `${info.rtt} ms${info.route ? ' ' + routeLabel(info.route) : ''}` : '';
+    const net = p.id === session.me ? '' : !info ? 'déconnecté' : info.route === 'bot' ? routeLabel('bot') : info.rtt != null ? `${info.rtt} ms${info.route ? ' ' + routeLabel(info.route) : ''}` : '';
     const scoreEl = document.querySelector(`[data-pscore="${p.id}"]`);
     if (!p.race || !p.planet) {
       const started = session.startedAt != null;
@@ -2841,6 +2855,7 @@ function renderLobby(me) {
   $('btn-pick-fleet').hidden = !colonizer;
   $('btn-pick-fleet').dataset.fleet = colonizer?.id || '';
   $('btn-pick-invite').hidden = start != null;
+  $('btn-pick-bot').hidden = start != null || Object.keys(session.state.players).length >= 8;
 }
 $('btn-ready').onclick = (e) => {
   if (!session?.state) return;
@@ -2861,6 +2876,12 @@ $('btn-pick-fleet').onclick = (e) => {
   renderMapFleets();
 };
 $('btn-pick-invite').onclick = () => openInviteSheet();
+$('btn-pick-bot').onclick = () => {
+  if (!session?.state) return;
+  const bot = addBot(session);
+  toast(bot ? `${bot.name} rejoint la partie : elle joue sur ce téléphone.` : 'La partie est complète (8 joueurs).');
+  renderPick();
+};
 
 /** Bandeau du départ et fiche de la planète touchée. */
 function renderPick(me = session?.state?.players[session.me], now = session?.now()) {
