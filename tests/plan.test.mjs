@@ -144,7 +144,11 @@ scenario('le joueur : fil par ordre, lancement au passage, retrait, et la partie
   film.look(a, 'départ : A et B sur leur planète mère');
   // Le stock de départ paie la première mine (lancée tout de suite) ; les suivantes attendent.
   for (let i = 0; i < 4; i++) a.planBuild('mine');
-  film.look(a, 'A met 4 mines au fil : la 1ʳᵉ est lancée, 3 attendent');
+  const home = a.state.players[a.me].home;
+  film.look(a, 'A met 4 mines au fil : la 1ʳᵉ est lancée, 3 attendent', [
+    { show: 'chantier', at: home, expected: 'mine', got: pa().queue?.key },
+    { show: 'fil', at: home, expected: ['mine', 'mine', 'mine'], got: pa().plan },
+  ]);
   assert.equal(pa().queue.key, 'mine');
   assert.deepEqual(pa().plan, ['mine', 'mine', 'mine']);
   a.unplan('farm', 2); // ce n'est pas ce qui est à cette place : refusé
@@ -153,7 +157,7 @@ scenario('le joueur : fil par ordre, lancement au passage, retrait, et la partie
   assert.deepEqual(pa().plan, ['mine', 'mine']);
   a.unplan('mine', 5); // refusé, sans dégâts
   assert.equal(pa().plan.length, 2);
-  film.look(a, 'A retire une mine du fil : il en reste 2');
+  film.look(a, 'A retire une mine du fil : il en reste 2 (les retraits mal visés sont refusés)', [{ show: 'fil', at: home, expected: ['mine', 'mine'], got: pa().plan }]);
   for (let i = 0; i < 40; i++) {
     clock.t += 30 * SEC;
     a.tick();
@@ -168,6 +172,12 @@ scenario('le joueur : fil par ordre, lancement au passage, retrait, et la partie
   assert.equal(pa().plan.length, 0, 'tout le fil est lancé');
   assert.equal(pa().levels.mine, 4);
   const r = replay(clone(a.snapshot()));
+  film.look(a, 'tout le fil est lancé ; la partie rejouée retombe sur les mêmes fiches', [
+    { show: 'fil', at: home, expected: [], got: pa().plan },
+    { show: 'mines', at: home, expected: 4, got: pa().levels.mine },
+    { show: 'lancement « (fil) » au journal', expected: true, got: log.some((t) => t.includes('(fil)')) },
+    ...Object.values(a.state.players).map((p) => ({ show: `fiche de ${p.name} rejouée à l’identique`, at: p.home, expected: true, got: comparable(r.players[p.id]) === comparable(p) })),
+  ]);
   for (const p of Object.values(a.state.players)) assert.equal(comparable(r.players[p.id]), comparable(p), `fiche de ${p.name}`);
 });
 
@@ -177,8 +187,14 @@ scenario('un fil abîmé reçu d’un autre est nettoyé', (film) => {
   const p = clone(players[0].state.players[players[0].me]);
   p.planet.plan = ['mine', '__proto__', 42, 'nope', ...Array(20).fill('mine')];
   const n = normalize(p);
+  const cleaned = [...n.planet.plan]; // normalize réécrit la fiche : on garde ce premier résultat pour l'image
   assert.ok(n.planet.plan.every((k) => k === 'mine'));
   assert.equal(n.planet.plan.length, game.PLAN_MAX);
   p.planet.plan = 'mine';
-  assert.deepEqual(normalize(p).planet.plan, []);
+  const notList = normalize(p).planet.plan;
+  film.look(players[0], 'fils abîmés nettoyés à la réception (vérifiés sur une copie de la fiche de A)', [
+    { show: 'fil reçu (« __proto__ », 42, « nope », 21 mines)', expected: Array(game.PLAN_MAX).fill('mine'), got: cleaned },
+    { show: 'fil reçu en texte au lieu d’une liste', expected: [], got: notList },
+  ]);
+  assert.deepEqual(notList, []);
 });

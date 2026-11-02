@@ -31,9 +31,15 @@ scenario('fin à quatre : le classement dans l’ordre, or, argent, bronze, et m
   for (const a of players) for (const b of players) if (a !== b) sync(a, b);
   A.tick();
   for (const s of players) sync(s, A);
-  film.look(B, 'B, C et D ont gelé : A gagne, B voit l’écran de fin');
-  assert.equal(B.over?.winner, A.me);
   const board = finalBoard(B);
+  const L = { [A.me]: 'A', [B.me]: 'B', [C.me]: 'C', [D.me]: 'D' };
+  film.look(B, 'B, C et D ont gelé : A gagne, B voit l’écran de fin', [
+    { show: 'classement', expected: ['A', 'B', 'C', 'D'], got: board?.rows.map((r) => L[r.id]) },
+    { show: 'médailles', expected: ['gold', 'silver', 'bronze', null], got: board?.rows.map((r) => r.medal) },
+    { show: 'moi (B) repéré', expected: [false, true, false, false], got: board?.rows.map((r) => r.me) },
+    ...players.map((s) => ({ show: `points de ${L[s.me]}`, at: me(s).home, expected: 'plus de 0', got: Math.round(board?.rows.find((r) => r.id === s.me)?.pts || 0), ok: board?.rows.find((r) => r.id === s.me)?.pts > 0 })),
+  ]);
+  assert.equal(B.over?.winner, A.me);
   assert.deepEqual(board.rows.map((r) => r.id), [A.me, B.me, C.me, D.me], 'le dernier en vie, puis les derniers tombés');
   assert.deepEqual(board.rows.map((r) => r.medal), ['gold', 'silver', 'bronze', null], 'or, argent, bronze, puis rien');
   assert.deepEqual(board.rows.map((r) => r.place), [1, 2, 3, 4]);
@@ -48,8 +54,12 @@ scenario('fin seul : pas de médaille, je ne suis pas le gagnant', (film) => {
   const { players: [A], clock } = newGame(1, ['human']);
   clock.t = A.frostOf(me(A).home) + 1;
   A.tick();
-  film.look(A, 'A, seul, a tout perdu : la partie est finie');
   const board = finalBoard(A);
+  film.look(A, 'A, seul, a tout perdu : la partie est finie, sans médaille', [
+    { show: 'gagnant', expected: null, got: A.over?.winner },
+    { show: 'médaille de A', expected: null, got: board.rows[0]?.medal },
+    { show: 'A repéré, tombé', expected: { me: true, dead: true }, got: { me: board.rows[0]?.me, dead: board.rows[0]?.dead } },
+  ]);
   assert.equal(A.over.winner, null, 'personne ne gagne');
   assert.equal(board.rows.length, 1);
   assert.equal(board.rows[0].medal, null, 'pas de médaille d’or pour une défaite');

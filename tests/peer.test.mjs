@@ -33,5 +33,9 @@ scenario('un message de 600 000 caractères arrive entier, en morceaux de moins 
   assert.deepEqual(got, [{ type: 'ping' }, big]);
   assert.ok(sent.length > 10 && sent.every((n) => n < 64_000), `envois : ${sent}`);
   B.mergeIn(got[1].state, { pid: A.me });
-  film.look(B, 'la copie de A est arrivée entière : B voit A et sa planète');
+  film.look(B, 'la copie de A est arrivée entière : B voit A et sa planète', [
+    { show: 'envois', expected: 'plus de 10, chacun sous 64 000', got: `${sent.length} morceaux, le plus gros : ${Math.max(...sent)}`, ok: sent.length > 10 && sent.every((n) => n < 64_000) },
+    { show: 'message reçu entier', expected: true, got: JSON.stringify(got[1]) === JSON.stringify(big) },
+    { show: 'A connu de B', at: B.state.players[A.me]?.home, expected: true, got: !!B.state.players[A.me] },
+  ]);
 });

@@ -55,9 +55,16 @@ scenario('D-011 : trois races, trois ressources, race choisie une fois pour tout
   assert.deepEqual(game.RACE_KEYS, ['human', 'machine', 'alien']);
   assert.deepEqual(game.RES, ['minerals', 'food', 'energy']);
   const { players: [A] } = newGame(1, ['human']);
-  film.look(A, 'A a choisi les humains et s’est installé');
-  assert.equal(A.chooseRace('alien'), false, 'second choix refusé');
-  film.look(A, 'A tente de passer alien : refusé, il reste humain');
+  film.look(A, 'A a choisi les humains et s’est installé', [
+    { show: 'races', expected: ['human', 'machine', 'alien'], got: game.RACE_KEYS },
+    { show: 'ressources', expected: ['minerals', 'food', 'energy'], got: game.RES },
+  ]);
+  const again = A.chooseRace('alien');
+  assert.equal(again, false, 'second choix refusé');
+  film.look(A, 'A tente de passer alien : refusé, il reste humain', [
+    { show: 'passer alien', expected: false, got: again },
+    { show: 'race', at: A.state.players[A.me].home, expected: 'human', got: A.myRace },
+  ]);
   assert.equal(A.myRace, 'human');
 });
 
@@ -138,8 +145,11 @@ scenario('D-018 : 14 planètes tirées de l’identifiant de la partie, les mêm
   // L'image montre la carte de la partie `gtest` et ses planètes ; l'identique d'un téléphone à
   // l'autre et la différence avec une autre partie sont vérifiés par les asserts.
   const { players: [A, B] } = newGame(2);
-  film.look(A, 'la carte de la partie gtest, vue par A');
-  film.look(B, 'la même carte, vue par B');
+  film.look(A, 'la carte de la partie gtest, vue par A : 14 planètes, une autre partie en a d’autres', [
+    { show: 'planètes', expected: 14, got: game.planetsFor('gtest').filter((w) => w.kind === 'planet').length },
+    { show: 'même carte que la partie gautre', expected: false, got: JSON.stringify(game.planetsFor('gtest')) === JSON.stringify(game.planetsFor('gautre')) },
+  ]);
+  film.look(B, 'la même carte, vue par B', [{ show: 'même carte que chez A', expected: true, got: JSON.stringify(B.planets) === JSON.stringify(A.planets) }]);
   assert.equal(game.PLANET_COUNT, 14);
   assert.deepEqual(game.planetsFor('gtest'), game.planetsFor('gtest'));
   assert.notDeepEqual(game.planetsFor('gtest'), game.planetsFor('gautre'));
@@ -172,7 +182,11 @@ scenario('D-018 : deux joueurs sur la même planète mère, le premier l’empor
   clock.t += 2000;
   A.tick();
   B.tick();
-  film.look(A, '2 s plus tard, après un passage : A, premier, garde p3 (B la lui laisse, chez lui)');
+  const p3 = A.planets.find((w) => w.id === 'p3');
+  film.look(A, '2 s plus tard, après un passage : A, premier, garde p3 (B la lui laisse, chez lui)', [
+    { show: 'planète mère de A', at: p3, expected: 'p3', got: A.state.players[A.me].home ? 'p3' : 'aucune' },
+    { show: 'planète mère de B, chez B', expected: 'aucune', got: B.state.players[B.me].home ? 'une' : 'aucune' },
+  ]);
   assert.ok(A.state.players[A.me].home, 'A, premier, garde sa planète');
   assert.equal(B.state.players[B.me].home, null, 'B la lui laisse');
 });
@@ -247,11 +261,14 @@ scenario('D-021 / D-031 : labo et chantier par race, 7 technologies et 4 vaissea
 
 scenario('D-021 : une recherche à la fois, et elle vaut pour toutes les planètes', (film) => {
   const p = game.newPlanet('human', T0);
-  assert.match(game.startResearch(p, 'forage', T0), /labo/);
+  const noLab = game.startResearch(p, 'forage', T0);
+  assert.match(noLab, /labo/);
   p.levels.lab = 1;
   p.stock.minerals = 900;
-  assert.equal(game.startResearch(p, 'forage', T0), null);
-  assert.match(game.startResearch(p, 'agro', T0), /déjà en cours/);
+  const first = game.startResearch(p, 'forage', T0);
+  assert.equal(first, null);
+  const second = game.startResearch(p, 'agro', T0);
+  assert.match(second, /déjà en cours/);
 
   // La colonie reçoit les technologies de la planète mère.
   const { players: [A] } = newGame(1, ['human']);
@@ -259,9 +276,13 @@ scenario('D-021 : une recherche à la fois, et elle vaut pour toutes les planèt
   const w = A.planets.find((x) => x.id === 'a0');
   me.colonies = { a0: { ...game.newPlanet('human', T0, w), claimAt: T0 } };
   me.planet.tech = { forage: 2 };
-  film.look(A, 'A a une colonie sur a0 ; sa planète mère connaît Forage 2');
+  film.look(A, 'A a une colonie sur a0 ; sa planète mère connaît Forage 2 ; en légende, une recherche à la fois', [
+    { show: 'recherche sans labo', expected: 'refusée (labo)', got: noLab, ok: /labo/.test(noLab) },
+    { show: 'avec un labo', expected: 'lancée', got: first === null ? 'lancée' : first },
+    { show: 'une deuxième en même temps', expected: 'refusée (déjà en cours)', got: second, ok: /déjà en cours/.test(second) },
+  ]);
   A.tick();
-  film.look(A, 'après un passage : la colonie a reçu Forage 2');
+  film.look(A, 'après un passage : la colonie a reçu Forage 2', [{ show: 'technologies de la colonie', at: w, expected: { forage: 2 }, got: me.colonies.a0.tech }]);
   assert.deepEqual(me.colonies.a0.tech, { forage: 2 });
 });
 
@@ -290,7 +311,12 @@ scenario('D-098 : recherche sur toute planète qui a un labo, selon le niveau de
   // Propulsion niv. 2 : lancée dans la colonie, payée par la colonie.
   const before = col.stock.minerals;
   A.research('propulsion', 'a0');
-  film.look(A, 'la colonie lance Propulsion 2 et la paie');
+  const took = col.research ? col.research.end - col.research.start : null;
+  film.look(A, 'la colonie lance Propulsion 2 et la paie ; sa durée vient de son labo (niv. 1)', [
+    { show: 'recherche de la colonie', at: w, expected: 'propulsion 2', got: col.research ? `${col.research.key} ${col.research.level}` : 'aucune' },
+    { show: 'payée par la colonie', at: w, expected: true, got: col.stock.minerals < before },
+    { show: 'durée, en min', expected: researchDuration(techCost('human', 'propulsion', 1), 1) / MIN, got: took / MIN },
+  ]);
   assert.equal(col.research?.key, 'propulsion');
   assert.equal(col.research.level, 2, 'le niveau part des technologies de l’empire');
   assert.ok(col.stock.minerals < before);
@@ -302,14 +328,21 @@ scenario('D-098 : recherche sur toute planète qui a un labo, selon le niveau de
   me.planet.stock.minerals = 5000;
   A.research('propulsion', 'home');
   assert.ok(!me.planet.research);
-  assert.match(toasts.at(-1), /déjà en recherche/);
+  const busy = toasts.at(-1);
+  assert.match(busy, /déjà en recherche/);
   A.research('agro', 'home');
-  film.look(A, 'la planète mère lance Agronomie (Propulsion refusée : déjà en recherche)');
+  film.look(A, 'la planète mère lance Agronomie (Propulsion refusée : déjà en recherche)', [
+    { show: 'Propulsion sur la planète mère', expected: 'refusée (déjà en recherche)', got: busy, ok: /déjà en recherche/.test(busy) },
+    { show: 'recherche de la planète mère', at: me.home, expected: 'agro', got: me.planet.research?.key },
+  ]);
   assert.equal(me.planet.research?.key, 'agro');
   // À la fin, la technologie trouvée dans la colonie vaut pour toutes mes planètes.
   clock.t = Math.max(col.research.end, me.planet.research.end) + 1000;
   A.tick();
-  film.look(A, 'les deux recherches finies : elles valent pour toutes les planètes de A');
+  film.look(A, 'les deux recherches finies : elles valent pour toutes les planètes de A', [
+    { show: 'planète mère', at: me.home, expected: { propulsion: 2, agro: 1 }, got: { propulsion: me.planet.tech.propulsion, agro: me.planet.tech.agro } },
+    { show: 'colonie', at: w, expected: { propulsion: 2, agro: 1 }, got: { propulsion: col.tech.propulsion, agro: col.tech.agro } },
+  ]);
   assert.equal(me.planet.tech.propulsion, 2);
   assert.equal(col.tech.propulsion, 2);
   assert.equal(col.tech.agro, 1);
@@ -411,9 +444,16 @@ scenario('D-056 : les petits corps ne servent pas de départ', (film) => {
   me.home = null;
   me.planet = null;
   film.look(A, 'A n’a plus de planète mère');
-  assert.equal(A.claimPlanet('a0'), false);
-  assert.equal(A.claimPlanet('c0'), false);
-  film.look(A, 'A tente l’astéroïde a0 puis la comète c0 : refusé, toujours sans planète');
+  const rock = A.claimPlanet('a0');
+  const comet = A.claimPlanet('c0');
+  assert.equal(rock, false);
+  assert.equal(comet, false);
+  const at = (id) => A.planets.find((w) => w.id === id);
+  film.look(A, 'A tente l’astéroïde a0 puis la comète c0 : refusé, toujours sans planète', [
+    { show: 'départ sur l’astéroïde', at: at('a0'), expected: false, got: rock },
+    { show: 'départ sur la comète', at: at('c0'), expected: false, got: comet },
+    { show: 'planète mère', expected: 'aucune', got: me.home ? 'une' : 'aucune' },
+  ]);
   assert.equal(me.home, null);
 });
 
@@ -430,7 +470,7 @@ scenario('D-056 : un astéroïde se colonise', (film) => {
   film.look(A, 'A donne l’ordre de coloniser');
   clock.t += 1000;
   A.tick();
-  film.look(A, '1 s plus tard : colonie fondée sur l’astéroïde');
+  film.look(A, '1 s plus tard : colonie fondée sur l’astéroïde', [{ show: 'colonie', at: cell, expected: true, got: !!A.state.players[A.me].colonies?.[target.id] }]);
   assert.ok(A.state.players[A.me].colonies?.[target.id], 'colonie fondée sur l’astéroïde');
 });
 

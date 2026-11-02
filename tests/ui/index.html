@@ -31,7 +31,6 @@ main{flex:1;display:grid;grid-template-columns:minmax(300px,420px) 1fr;min-heigh
 .row.sel{background:#141b33;border-left-color:var(--accent)}
 .row .name{flex:1;border:0;background:none;text-align:left;padding:0;color:var(--text);min-width:0}
 .row .ms{color:var(--dim);font-size:12px;font-variant-numeric:tabular-nums}
-.badge{font-size:11px;border:1px solid #3b4a7a;color:#9fb6ff;border-radius:6px;padding:0 5px;white-space:nowrap}
 .play{border:0;background:none;color:var(--dim);padding:2px 6px;border-radius:6px;visibility:hidden}
 .row:hover .play,.file:hover .play,.row.sel .play,.play:focus{visibility:visible}
 .play:hover{background:#1b2340;color:var(--text)}
@@ -45,7 +44,6 @@ main{flex:1;display:grid;grid-template-columns:minmax(300px,420px) 1fr;min-heigh
 .status{display:inline-flex;gap:6px;align-items:center;font-weight:700;margin:0 0 12px}
 .status.ok{color:var(--ok)}.status.ko{color:var(--ko)}.status.idle{color:var(--dim)}.status.run{color:var(--run)}
 .err{overflow-wrap:anywhere;background:#1d0b10;border:1px solid #5c1d27;border-radius:10px;padding:10px 12px;white-space:pre-wrap;font:12.5px/1.5 ui-monospace,monospace;color:#ffc7c7;margin:0 0 14px}
-.actions{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}
 .hint{color:var(--dim)}
 iframe{width:100%;border:0;border-radius:12px;background:var(--bg);min-height:200px}
 .empty{color:var(--dim);margin-top:15vh;text-align:center}
@@ -123,7 +121,7 @@ function render() {
       const r = res.get(key(f.file, t.name));
       const s = r?.st || 'idle';
       const isSel = sel && sel.file === f.file && sel.name === t.name;
-      html.push(`<div class="row${isSel ? ' sel' : ''}" data-file="${esc(f.file)}" data-name="${esc(t.name)}"><span class="st ${s}" title="${LABEL[s]}">${ICON[s]}</span><button class="name">${esc(t.name)}</button>${t.scenario ? '<span class="badge" title="Scénario : la simulation est visible">simulation</span>' : ''}${r?.ms != null && s !== 'run' ? `<span class="ms">${r.ms} ms</span>` : ''}<button class="play" data-run title="Lancer ce test" aria-label="Lancer « ${esc(t.name)} »">▶</button></div>`);
+      html.push(`<div class="row${isSel ? ' sel' : ''}" data-file="${esc(f.file)}" data-name="${esc(t.name)}"><span class="st ${s}" title="${LABEL[s]}">${ICON[s]}</span><button class="name">${esc(t.name)}</button>${r?.ms != null && s !== 'run' ? `<span class="ms">${r.ms} ms</span>` : ''}<button class="play" data-run title="Lancer ce test" aria-label="Lancer « ${esc(t.name)} »">▶</button></div>`);
     }
   }
   $('list').innerHTML = html.join('') || '<p class="hint" style="padding:12px">Aucun test ne correspond.</p>';
@@ -134,7 +132,7 @@ function detail() {
   const d = $('detail');
   if (!sel) {
     d.dataset.k = '';
-    d.innerHTML = `<div class="empty"><p><b>Choisis un test à gauche</b>, ou lance tout avec <b>▶ Tout lancer</b>.</p><p>Les tests marqués <span class="badge">simulation</span> montrent la carte vue par le joueur, image par image.</p><p class="hint"><kbd>/</kbd> chercher · <kbd>Entrée</kbd> lancer le test choisi</p>${lastRun?.stderr ? `<pre class="err" style="text-align:left">${esc(lastRun.stderr)}</pre>` : ''}</div>`;
+    d.innerHTML = `<div class="empty"><p><b>Choisis un test à gauche</b>, ou lance tout avec <b>▶ Tout lancer</b>.</p><p>Chaque test montre l’écran du joueur, image par image, et ce qu’il vérifie.</p><p class="hint"><kbd>/</kbd> chercher · <kbd>Entrée</kbd> lancer le test choisi</p>${lastRun?.stderr ? `<pre class="err" style="text-align:left">${esc(lastRun.stderr)}</pre>` : ''}</div>`;
     return;
   }
   const f = files.find((x) => x.file === sel.file);
@@ -150,7 +148,7 @@ function detail() {
     d.innerHTML = '<div id="d-head"></div><div id="d-sim"></div>';
   }
   const err = r?.error ? `<pre class="err">${esc(r.error.message)}${r.error.at ? `\n\n→ ${esc(r.error.at)}` : ''}</pre>` : '';
-  $('d-head').innerHTML = `<h2>${esc(t.name)}</h2><p class="where"><code>${esc(f.file)}:${t.line}</code></p>${statusHtml(s, r)}${err}<div class="actions"><button class="primary" data-run-sel ${running ? 'disabled' : ''}>▶ Lancer ce test</button><button class="secondary" data-run-file="${esc(f.file)}" ${running ? 'disabled' : ''}>▶ Lancer le fichier</button></div>`;
+  $('d-head').innerHTML = `<h2>${esc(t.name)}</h2><p class="where"><code>${esc(f.file)}:${t.line}</code></p>${statusHtml(s, r)}${err}`;
   const box = $('d-sim');
   if (!t.scenario) {
     box.innerHTML = '<p class="hint">Ce test n’a pas de simulation. Pour en avoir une, écris-le avec <code>scenario()</code> (<code>tests/scenario.mjs</code>) : l’intitulé dit ce qui est attendu, et <code>film.look(…)</code> photographie chaque vérification.</p>';
@@ -159,7 +157,7 @@ function detail() {
   const frame = $('sim');
   if (s === 'run') return; // la simulation d'avant reste affichée jusqu'au nouveau rapport
   if (s !== 'ok' && s !== 'ko') {
-    if (!frame) box.innerHTML = '<p class="hint">Lance ce test pour voir sa simulation.</p>';
+    if (!frame) box.innerHTML = '<p class="hint">Lance ce test (▶ dans la liste) pour voir sa simulation.</p>';
     return;
   }
   const src = `/reports/${f.file.replace(/^tests\//, '').replace(/\.mjs$/, '.html')}?v=${stamps.get(f.file) || 0}#scn=${encodeURIComponent(t.name)}`;
@@ -249,11 +247,6 @@ $('list').addEventListener('click', (e) => {
   sel = { file: row.dataset.file, name: row.dataset.name };
   if (e.target.closest('[data-run]')) return run(sel);
   render();
-});
-$('detail').addEventListener('click', (e) => {
-  if (e.target.closest('[data-run-sel]') && sel) return run(sel);
-  const rf = e.target.closest('[data-run-file]');
-  if (rf) run({ file: rf.dataset.runFile });
 });
 $('all').onclick = () => run({});
 $('stop').onclick = stop;

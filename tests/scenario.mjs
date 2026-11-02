@@ -5,6 +5,7 @@
 // le joueur, image par image. Un agent lit le HTML tel quel (textes, <title>
 // des SVG) ; un humain l'ouvre dans un navigateur.
 import { test, after } from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -14,6 +15,7 @@ import { game, fleet } from './harness.mjs';
 const { threatText } = await import('../js/session.js');
 
 const { SHIPS } = await import('../js/tech.js');
+const { reach, underFinger, FINGER } = await import('../js/aim.js');
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const cell = (p) => `[${+p.x.toFixed(1)}:${+p.y.toFixed(1)}]`;
@@ -102,6 +104,18 @@ function known(viewer, cell, owner, now, eyes) {
   return viewer.intel?.[`${cell.x},${cell.y}`]?.pid || null;
 }
 
+/** Une valeur vérifiée, en clair : nombres arrondis, oui / non, « rien ». */
+function val(v) {
+  if (v === null || v === undefined) return 'rien';
+  if (typeof v === 'boolean') return v ? 'oui' : 'non';
+  if (typeof v === 'number') return String(+v.toFixed(2)).replace('.', ',');
+  if (typeof v === 'string') return v;
+  if (Array.isArray(v)) return v.length ? v.map(val).join(', ') : 'rien';
+  // { minerals: 150, energy: 50 } → « ⛏ 150 ⚡ 50 » ; les autres clés en clair.
+  const icon = { ...Object.fromEntries(RES), fuel: '⛽' };
+  return Object.entries(v).map(([k, x]) => `${icon[k] || `${k} :`} ${val(x)}`).join(' ') || 'rien';
+}
+
 /** Ce qu'un test attend du bandeau d'alerte, en clair. */
 const alertWant = (re) => (re === null ? 'aucun bandeau' : `un bandeau qui contient ${re}`);
 
@@ -114,6 +128,13 @@ function film(s, out) {
      * `alert` : le bandeau d'alerte de flotte ennemie (D-133), null = pas de bandeau.
      * { sheet: case, button } : le joueur touche la planète de cette case ; sa fiche montre-t-elle
      * « Voir la planète » (D-139) ?
+     * { finger: { at, px, zoom }, hits: case ou null } : le joueur touche la carte en `at` (en cases,
+     * décimales permises), avec des cases de `px` pixels (zoom `zoom`) : la planète la plus proche
+     * sous le doigt est-elle celle de `hits` (null : aucune) ? Le doigt se dessine sur l'image (D-146).
+     * { show: 'carburant', at, expected, got, ok } : une valeur vérifiée, montrée sur l'image (D-147) :
+     * une étiquette ✔ / ✖ posée en `at` (une case { x, y }, ou une flotte [session du propriétaire, id]),
+     * ou, sans `at` (ou flotte que le joueur n'a pas), dans un cadre en haut de la carte. `ok` : par défaut, `expected` et `got` égaux
+     * (isDeepStrictEqual) ; le test le donne quand il compare avec une marge.
      * `eyes` remplace sa vue.
      */
     look(viewer, label, expect = [], { eyes } = {}) {
@@ -133,7 +154,21 @@ function film(s, out) {
       const threat = viewer.over ? null : threatText(viewer.threats(now));
       const alert = threat ? (threat.more ? `${threat.main} · ${threat.more}` : threat.main) : null;
       let sheet = null; // la fiche de planète ouverte par le joueur, s'il en touche une
-      const checks = expect.map((x) => {
+      let finger = null; // le doigt posé sur la carte, avec sa portée en cases
+      const marks = []; // les valeurs vérifiées, posées sur la carte (D-147)
+      const checks = expect.map((x, i) => {
+        if ('finger' in x) {
+          const { at, px, zoom = 1 } = x.finger;
+          const r = reach(px);
+          const raw = FINGER / px;
+          const num = (v) => String(+v.toFixed(2)).replace('.', ',');
+          const text = r > raw ? `doigt : ${num(r)} case (sans minimum : ${num(raw)})` : `doigt : ${FINGER} px = ${num(r)} case`;
+          finger = { x: at.x, y: at.y, zoom, px, r, raw, text };
+          const hit = underFinger(viewer.planets, at, px)[0]?.it || null;
+          const name = (w) => (w ? viewer.planets.find((p) => game.sameCell(p, w))?.name || cell(w) : 'rien');
+          const ok = x.hits === null ? !hit : !!hit && game.sameCell(hit, x.hits);
+          return { kind: 'finger', what: `sous le doigt (${num(r)} case) en ${cell(at)}`, expected: name(x.hits), got: name(hit), ok };
+        }
         if ('sheet' in x) {
           const w = viewer.planets.find((p) => game.sameCell(p, x.sheet));
           const got = !!viewer.myPlanetAt(x.sheet);
@@ -143,6 +178,18 @@ function film(s, out) {
         if ('alert' in x) {
           const ok = x.alert === null ? alert === null : alert !== null && x.alert.test(alert);
           return { kind: 'alert', what: 'le bandeau d’alerte', expected: x.alert, got: alert, ok };
+        }
+        if ('show' in x) {
+          const ok = 'ok' in x ? !!x.ok : isDeepStrictEqual(x.expected, x.got);
+          const mark = { n: i + 1, text: `${x.show} : ${val(x.got)}`, ok }; // n : son numéro dans la légende
+          if (Array.isArray(x.at)) {
+            const [owner, id] = x.at;
+            const f = fleets.find((y) => y.pid === owner.me && y.id === id);
+            // Flotte disparue (posée, fusionnée, détruite) ou inconnue du joueur : l'étiquette va en haut de la carte.
+            if (f) Object.assign(mark, { pid: owner.me, id, x: f.x, y: f.y, moving: f.moving });
+          } else if (x.at) Object.assign(mark, { x: x.at.x, y: x.at.y });
+          marks.push(mark);
+          return { kind: 'show', what: x.show, expected: val(x.expected), got: val(x.got), ok };
         }
         const { fleet: [owner, id], visible } = x;
         const f = fleets.find((x) => x.pid === owner.me && x.id === id);
@@ -164,10 +211,12 @@ function film(s, out) {
         fleets,
         alert,
         sheet,
+        finger,
+        marks,
         checks,
         // Ce qu'il faut au vrai jeu (index.html?view, D-139) pour redessiner l'écran du joueur à cet instant.
         // `frost` : les réglages du froid du test (souvent coupé, delayMs Infinity, que JSON écrit null).
-        snap: JSON.parse(JSON.stringify({ state: st, me: viewer.me, t: now, intel: viewer.intel || {}, selected: sheet ? { x: sheet.x, y: sheet.y } : null, frost: { ...game.FROST, delayMs: Number.isFinite(game.FROST.delayMs) ? game.FROST.delayMs : null } })),
+        snap: JSON.parse(JSON.stringify({ state: st, me: viewer.me, t: now, intel: viewer.intel || {}, selected: sheet ? { x: sheet.x, y: sheet.y } : null, finger, marks, frost: { ...game.FROST, delayMs: Number.isFinite(game.FROST.delayMs) ? game.FROST.delayMs : null } })),
         // L'état réel de chaque joueur (pas seulement ce que voit `viewer`) : pour comprendre.
         players: Object.values(st.players)
           .sort(byRank)
@@ -184,7 +233,7 @@ function film(s, out) {
       if (bad.length) {
         frame.ko = true;
         s.ok = false;
-        s.error = bad.map((c) => (c.kind === 'sheet' ? `${L[viewer.me]} ${c.got ? 'voit' : 'ne voit pas'} ${c.what} (attendu : ${c.expected ? 'visible' : 'caché'})` : c.kind === 'alert' ? `${L[viewer.me]} a ${c.got ? `le bandeau « ${c.got} »` : 'aucun bandeau'} (attendu : ${alertWant(c.expected)})` : `${L[viewer.me]} ${c.got ? 'voit' : 'ne voit pas'} ${c.what} (attendu : ${c.expected ? 'vue' : 'cachée'})`)).join(' ; ');
+        s.error = bad.map((c) => (c.kind === 'show' ? `${c.what} : ${c.got} (attendu : ${c.expected})` : c.kind === 'finger' ? `${c.what} de ${L[viewer.me]} : ${c.got} (attendu : ${c.expected})` : c.kind === 'sheet' ? `${L[viewer.me]} ${c.got ? 'voit' : 'ne voit pas'} ${c.what} (attendu : ${c.expected ? 'visible' : 'caché'})` : c.kind === 'alert' ? `${L[viewer.me]} a ${c.got ? `le bandeau « ${c.got} »` : 'aucun bandeau'} (attendu : ${alertWant(c.expected)})` : `${L[viewer.me]} ${c.got ? 'voit' : 'ne voit pas'} ${c.what} (attendu : ${c.expected ? 'vue' : 'cachée'})`)).join(' ; ');
         assert.fail(`${s.error}\n  Image : « ${label} »\n  Rapport : ${pathToFileURL(out)}`);
       }
     },
@@ -260,6 +309,19 @@ function svg(f) {
   // Planète touchée (fiche ouverte) : un doigt, en anneau blanc.
   if (f.sheet) parts.push(`<circle cx="${c(f.sheet.x)}" cy="${c(f.sheet.y)}" r="0.6" fill="none" stroke="#ffffff" stroke-width="0.08"><title>${esc(f.L[me])} touche ${esc(f.sheet.name)}</title></circle>`);
 
+  // Valeurs vérifiées (D-147) : un anneau et son numéro (celui de la légende) sur la case ou la flotte.
+  for (const m of f.marks || []) {
+    if (m.x === undefined) continue; // sans place sur la carte : seulement dans la légende
+    const color = m.ok ? '#4ade80' : '#ff5a5a';
+    const cx = c(m.x) + (m.id && !m.moving ? 0.3 : 0);
+    const cy = c(m.y) - (m.id && !m.moving ? 0.3 : 0);
+    parts.push(`<circle cx="${cx}" cy="${cy}" r="0.55" fill="none" stroke="${color}" stroke-width="0.08"/><circle cx="${cx + 0.5}" cy="${cy - 0.5}" r="0.3" fill="${color}"/><text x="${cx + 0.5}" y="${cy - 0.36}" font-size="0.4" font-weight="700" text-anchor="middle" fill="#05070f">${m.n}<title>${esc(`${m.ok ? '✔' : '✖'} ${m.text}`)}</title></text>`);
+  }
+
+  // Le doigt (D-146) : sa portée en cases, autour du point touché.
+  if (f.finger) parts.push(`<circle cx="${c(f.finger.x)}" cy="${c(f.finger.y)}" r="${f.finger.r}" fill="rgba(255,255,255,0.12)" stroke="#ffffff" stroke-width="0.06" stroke-dasharray="0.15 0.1"><title>${esc(f.L[me])} touche ${cell(f.finger)} : ${esc(f.finger.text)}</title></circle><circle cx="${c(f.finger.x)}" cy="${c(f.finger.y)}" r="0.08" fill="#ffffff"/>`);
+  if (f.finger?.raw < f.finger?.r) parts.push(`<circle cx="${c(f.finger.x)}" cy="${c(f.finger.y)}" r="${f.finger.raw}" fill="none" stroke="#ffffff" stroke-width="0.04" opacity="0.6"><title>${FINGER} px seuls : ${+f.finger.raw.toFixed(2)} case</title></circle>`);
+
   for (const x of f.fleets) {
     // À l'arrêt, souvent sur une planète : décalée en haut à droite pour ne pas être cachée (comme le replay).
     const cx = c(x.x) + (x.moving ? 0 : 0.3);
@@ -294,12 +356,16 @@ function section(s, i) {
   const frames = s.frames
     .map((f, k) => {
       const checks = f.checks
-        .map((c) =>
-          c.kind === 'sheet'
-            ? `<li class="${c.ok ? 'ok' : 'ko'}">${c.ok ? '✔' : '✖'} ${esc(c.what)} : attendu ${c.expected ? 'visible' : 'caché'}, obtenu ${c.got ? 'visible' : 'caché'}</li>`
+        .map((c, i) =>
+          c.kind === 'show'
+            ? `<li class="${c.ok ? 'ok' : 'ko'}"><b class="num">${i + 1}</b>${c.ok ? '✔' : '✖'} ${esc(c.what)} : attendu ${esc(c.expected)}, obtenu ${esc(c.got)}</li>`
+            : c.kind === 'finger'
+            ? `<li class="${c.ok ? 'ok' : 'ko'}"><b class="num">${i + 1}</b>${c.ok ? '✔' : '✖'} ${esc(c.what)} : attendu ${esc(c.expected)}, obtenu ${esc(c.got)}</li>`
+            : c.kind === 'sheet'
+            ? `<li class="${c.ok ? 'ok' : 'ko'}"><b class="num">${i + 1}</b>${c.ok ? '✔' : '✖'} ${esc(c.what)} : attendu ${c.expected ? 'visible' : 'caché'}, obtenu ${c.got ? 'visible' : 'caché'}</li>`
             : c.kind === 'alert'
-              ? `<li class="${c.ok ? 'ok' : 'ko'}">${c.ok ? '✔' : '✖'} ${esc(c.what)} : attendu ${esc(alertWant(c.expected))}, obtenu ${c.got === null ? 'aucun bandeau' : `« ${esc(c.got)} »`}</li>`
-              : `<li class="${c.ok ? 'ok' : 'ko'}">${c.ok ? '✔' : '✖'} ${esc(c.what)} : attendu ${c.expected ? 'vue' : 'cachée'}, obtenu ${c.got === null ? 'absente' : c.got ? 'vue' : 'cachée'}</li>`,
+              ? `<li class="${c.ok ? 'ok' : 'ko'}"><b class="num">${i + 1}</b>${c.ok ? '✔' : '✖'} ${esc(c.what)} : attendu ${esc(alertWant(c.expected))}, obtenu ${c.got === null ? 'aucun bandeau' : `« ${esc(c.got)} »`}</li>`
+              : `<li class="${c.ok ? 'ok' : 'ko'}"><b class="num">${i + 1}</b>${c.ok ? '✔' : '✖'} ${esc(c.what)} : attendu ${c.expected ? 'vue' : 'cachée'}, obtenu ${c.got === null ? 'absente' : c.got ? 'vue' : 'cachée'}</li>`,
         )
         .join('');
       const rows = (f.players || [])
@@ -308,7 +374,7 @@ function section(s, i) {
       const table = rows ? `<table class="pl"><tr><th>Joueur</th><th>Planètes : stock · à quai</th><th>Flottes</th></tr>${rows}</table>` : '';
       const head = s.frames.length < 2 ? '' : `<b>${k + 1}/${s.frames.length} · t = ${Math.round((f.t - t0) / 1000)} s</b> · `;
       // La carte de contrôle : la vérité du test (flottes cachées, vrais propriétaires), pas ce que voit le joueur.
-      return `<figure data-frame="${k}"${f.ko ? ' class="ko"' : ''}><figcaption>${head}${f.ko && !f.checks.length ? '<span class="ko">✖ </span>' : ''}${esc(f.label)} (vu par ${f.L[f.viewer]})${checks ? `<ul>${checks}</ul>` : ''}${table}</figcaption><details class="truth"><summary>Carte de contrôle (vérité du test)</summary>${svg(f)}</details></figure>`;
+      return `<figure data-frame="${k}"${f.ko ? ' class="ko"' : ''}><figcaption>${head}${f.ko && !f.checks.length ? '<span class="ko">✖ </span>' : ''}${esc(f.label)} (vu par ${f.L[f.viewer]})${checks ? `<p class="leg">Légende : chaque numéro est posé sur la carte, à l’endroit vérifié${f.marks?.some((m) => m.x === undefined) ? ' (ceux qui n’ont pas de place sur la carte ne sont qu’ici)' : ''}</p><ol class="checks">${checks}</ol>` : ''}${table}</figcaption><details class="truth"><summary>Carte de contrôle (vérité du test)</summary>${svg(f)}</details></figure>`;
     })
     .join('');
   // Chaque image : l'état de la partie pour le vrai jeu (index.html?view). « < » échappé : le JSON reste dans son <script>.
@@ -337,17 +403,15 @@ h2{font-size:16px;margin:0 0 8px}.scn.ok h2{color:#4ade80}.scn.ko h2{color:#ff5a
 .phone-off{display:none;color:#aab2cf;font-size:13px;margin:0}.phone.off iframe{display:none}.phone.off .phone-off{display:block}
 figure{margin:0}svg{display:block;width:100%;max-width:420px;aspect-ratio:1;border-radius:8px}figcaption{color:#aab2cf;font-size:13px;margin:0 0 6px}
 details.truth summary{color:#7d86a8;font-size:12px;cursor:pointer;margin:4px 0}
-figcaption ul{margin:4px 0 0;padding-left:18px}
+figcaption ol.checks{margin:2px 0 0;padding:0;list-style:none;display:grid;gap:3px}.leg{margin:6px 0 0;color:#7d86a8;font-size:12px}b.num{display:inline-grid;place-items:center;min-width:18px;height:18px;margin-right:6px;border-radius:9px;font-size:11px;color:#05070f;background:currentColor}li.ok b.num{background:#4ade80}li.ko b.num{background:#ff8a8a}
 table.pl{border-collapse:collapse;margin-top:6px;font-size:12px;width:100%;max-width:420px}table.pl th,table.pl td{text-align:left;padding:2px 6px 2px 0;vertical-align:top;border-top:1px solid #1f2742}table.pl th{color:#7d86a8;font-weight:600}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}li.ok{color:#4ade80}li.ko{color:#ff8a8a}
 .film figure+figure{margin-top:12px}
 .js .frames{display:grid}.js .frames figure{grid-area:1/1;margin:0;visibility:hidden}.js .frames figure.on{visibility:visible}
 .ctl{display:none;gap:8px;align-items:center;margin-top:8px}.js .ctl{display:flex}.ctl button{background:#1b2340;color:#e8ebf7;border:0;border-radius:8px;padding:6px 12px;font-size:15px}.ctl input{flex:1}
-.legend{color:#aab2cf;font-size:13px;margin:0 0 16px}
 </style></head><body>
 <h1>${esc(file)}</h1>
 <p class="sum">${list.length} scénario${list.length > 1 ? 's' : ''}, ${ko ? `<b class="ko">${ko} en échec</b>` : 'tous réussis'} · ${esc(new Date().toISOString().slice(0, 16).replace('T', ' '))} UTC · relancer : <code>ASTRA_REPORT=1 node --test tests/${esc(file)}</code></p>
-<p class="legend">À gauche, l'écran du joueur qui regarde, dans le vrai jeu (<code>index.html?view</code>) : exactement ce qu'il verrait à cet instant (planète touchée : sa fiche est ouverte). À droite, ce que le test vérifie (✔ / ✖), l'état réel de chaque joueur et, en dépliant, la carte de contrôle : halo = portée de détection ; losange plein = flotte vue ; losange en pointillés = flotte cachée pour lui (dessinée pour comprendre) ; anneau en pointillés autour d'une planète = son vrai propriétaire, que le joueur ignore ; anneau blanc = planète touchée.</p>
 ${list.map(section).join('\n')}
 <script>
 document.documentElement.classList.add('js');

@@ -30,7 +30,7 @@ scenario('5 joueurs, 4 attaquants × 70 combats : chaque perte subie une seule f
   for (let i = 0; i < 20; i++) {
     clock.t += 250;
     D.tick();
-    if (i % 5 === 4) film.look(D, `D applique les rapports (${(i + 1) / 4} s)`);
+    if (i % 5 === 4) film.look(D, `D applique les rapports (${(i + 1) / 4} s)`, i === 19 ? [{ show: 'drones de D', at: D.state.players[D.me].home, expected: 1000 - 4 * 70, got: fighters(D) }] : []);
   }
   assert.equal(fighters(D), 1000 - 4 * 70, 'chaque rapport appliqué exactement une fois');
 
@@ -40,14 +40,17 @@ scenario('5 joueurs, 4 attaquants × 70 combats : chaque perte subie une seule f
     a.tick();
     assert.equal(a.state.players[a.me].effects.length, 0);
   }
-  film.look(D, 'les attaquants ont vu que D a tout appliqué : ils oublient leurs rapports');
+  film.look(D, 'les attaquants ont vu que D a tout appliqué : ils oublient leurs rapports', [{ show: 'rapports gardés par les attaquants', expected: 0, got: attackers.reduce((t, a) => t + a.state.players[a.me].effects.length, 0) }]);
   // D le voit à son tour : il oublie la liste des rapports appliqués, sans rien réappliquer.
   for (const a of attackers) sync(D, a);
   for (let i = 0; i < 20; i++) {
     clock.t += 250;
     D.tick();
   }
-  film.look(D, 'D oublie la liste des rapports appliqués, sans rien réappliquer');
+  film.look(D, 'D oublie la liste des rapports appliqués, sans rien réappliquer', [
+    { show: 'rapports appliqués retenus', expected: 0, got: D.state.players[D.me].applied.length },
+    { show: 'drones de D', at: D.state.players[D.me].home, expected: 1000 - 4 * 70, got: fighters(D) },
+  ]);
   assert.equal(D.state.players[D.me].applied.length, 0);
   assert.equal(fighters(D), 1000 - 4 * 70);
 });
