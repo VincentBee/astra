@@ -91,7 +91,7 @@ Détail de `#screen-game` :
 | `#map-fleets` (sous `canvas#map`) | Mes planètes puis mes flottes en grille (2 colonnes sur téléphone). **Une case par planète** (D-115, bord vert) : nom, compte à rebours du chantier, une icône par type de vaisseau à quai avec son nombre, statut (« Chantier : +5 Frégate », « 7 à quai », « Aucun vaisseau à quai » ou « 🔒 » sans chantier naval) et deux boutons-icônes : **+** (Construire, si la planète a un chantier naval) ouvre `#sheet-planet` sur sa partie Chantier ; **Décoller** (icône `fleet`, s'il y a des vaisseaux à quai) ouvre directement le formulaire de décollage de cette planète. Toucher ailleurs sur la case ouvre la fiche de la planète. Une case par flotte : nom, compte à rebours, une icône par type de vaisseau avec son nombre, statut ; bord rouge si attaque/conquête/poursuite, grisée si à sec. Toucher = sélectionner la flotte (ouvre `#fleet-info`), retoucher = la relâcher (D-107, D-108). | `renderMapFleets`, appelé par `renderLive` ; le HTML n'est réécrit que si le contenu ou le statut change, les comptes à rebours (flotte, chantier) et `aria-pressed` sont mis à jour en place. Un seul écouteur de clic : `[data-mp-build]`, `[data-mp-go]`, `[data-planet]`, puis `[data-fleet]`. |
 | `#fleet-info` (129-145) | Fiche de la flotte sélectionnée : vaisseaux, statut (avec la vitesse et, si la flotte mêle plusieurs types, le nom du plus lent : `speedText`), carburant, choix d'ordres (`#fi-choice`), mes flottes à côté (`#fi-beside`), joueurs à côté (`#fi-partners`), boutons Arrêter / Rentrer / Se poser / Plein / Passive-Agressive (`#btn-fi-stance`, icône d'attaque, pleine quand la flotte est agressive, cachée pour une flotte sans armes ; D-100) / Scinder / Fermer. Le statut finit par « · agressive » (`fleetStatus`). | `renderFleetInfo` 1643-1687, handlers 1689-1714. |
 | `#view-planet` (150-199) | Vue planète : en-tête (retour, nom, climat), gisements `#soil-zone`, stocks `#resources`, onglets, puis les panneaux `data-pane`. | `renderPlanet` 869-988. |
-| `.tabs` (163-168) | Onglets Bâtiments / Pouvoirs (aliens seulement) / Recherche (toute planète ; « 🔒 Il faut un labo » sans labo, technologie grisée si elle est en recherche sur une autre planète) / Flottes. | `showTab` 1241-1252, flèches clavier 1255-1262. |
+| `.tabs` (163-168) | Onglets Bâtiments / Pouvoirs (aliens seulement) / Recherche (toute planète ; « 🔒 Il faut un labo » sans labo, technologie grisée si elle est en recherche sur une autre planète) / Flottes. | `showTab`, flèches clavier. Ouvrir une planète (`showView('planet')`) affiche toujours **Bâtiments** ; l'onglet n'est plus retenu entre deux visites ni dans `localStorage` (D-156). |
 | `[data-pane=power]` `#powers-zone` (170-173) | Pouvoirs aliens. | `buildStatic` 526-540, `renderPlanet` 966-982. |
 | `[data-pane=build]` (175-178) | Bâtiments + compteur de places `#places`. | `buildStatic` 488-498, `renderPlanet` 942-964. |
 | `[data-pane=research]` `#research-zone` (180-184) | Technologies. | `buildStatic` 500-510, `renderResearch` 1000-1036. |
@@ -125,7 +125,7 @@ Toutes se ferment par leur croix (`.close-btn`), un toucher sur le fond sombre o
 
 ### 4.1 Démarrage (fin du fichier)
 
-1. Au chargement du module : `fillIcons()` puis `startGalaxy()` (`js/app.js:16-17`), mise en place du collage des en-têtes (`stackSticky`, 22-36), restauration du nom (`astra.name`, 132-134) et de l'onglet (`astra.tab`, 1263-1266).
+1. Au chargement du module : `fillIcons()` puis `startGalaxy()` (`js/app.js:16-17`), mise en place du collage des en-têtes (`stackSticky`, 22-36), restauration du nom (`astra.name`, 132-134) ; l'ancienne clé `astra.tab` (onglet retenu) est effacée, plus lue depuis D-156.
 2. `showSaved()` puis `boot()` (1959-1960). `boot` lit `location.hash`, l'efface de l'adresse, et le décode avec `decode` (`js/invite.js`) :
    - invitation (`kind === 'o'`) : si un nom est déjà connu → `startJoin(hash)` ; sinon note sur l'accueil et **Rejoindre** est rebranché sur ce lien (1941-1947) ;
    - réponse : note qui dit de la coller sur le téléphone qui invite (1948-1950).
@@ -404,7 +404,7 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   affichés sont `session.scoreOf(p)` (tout l'empire).
 - **Flottes** : sur une planète adverse, deux boutons « Attaquer X (joueur) » et « Conquérir X »,
   suivis tous deux de « · défense ⚔ a ◇ c + N vaisseaux posés · victoire probable » (`ordersAt`,
-  `assaultView`, D-151) : « + ? vaisseaux » hors de ma détection ; issue « victoire probable »,
+  `assaultView`, D-157) : « + ? vaisseaux » hors de ma détection ; issue « victoire probable »,
   « victoire incertaine » ou « bataille perdue ». Une flotte en conquête est dessinée en rouge comme une attaque.
 - **Bâtiments** : les bâtiments de défense de la race apparaissent dans la liste comme les autres.
   Carte dépliée (toucher le nom) : bouton « Déconstruire un niveau » (`data-demolish`), caché au
@@ -538,3 +538,19 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
     (anneau vert ou rouge, pastille au numéro `n` en haut à droite, texte en `title`) sur la case,
     ou sur la flotte là où `fleetSpots` la dessine ; sans case, rien sur la carte. Le texte est
     dans la légende du rapport (`tests/scenario.mjs`, liste numérotée à côté du téléphone).
+
+## 19. Jouer contre l'IA (2026-11-02, D-154)
+
+- Accueil (`index.html`) : bouton `#btn-solo` **Contre l'IA** (icône `bot`, `js/icons.js`),
+  sous « Rejoindre ». `app.js` : `Session.create(nom)`, puis `addBot(session)` (`js/bot.js`),
+  puis `startGame()` (choix de la race).
+- Bandeau du départ (`#pick`) : bouton `#btn-pick-bot` **Ajouter une IA**, à côté d'« Inviter »,
+  caché dès que la partie est partie ou à 8 joueurs (`renderLobby`). Un toucher ajoute une IA
+  et le dit (« IA Orion rejoint la partie : elle joue sur ce téléphone. »).
+- Reprise depuis l'historique : `wakeBots(session)` juste après `Session.resume` (`app.js`).
+- Fenêtre Joueurs : pour une IA, la ligne dit « IA sur ce téléphone » (`routeLabel('bot')`) au
+  lieu de la latence.
+- Vérifié dans Chromium (390 × 844) le 2026-11-02 : accueil, salon (« Vincent pas prêt · IA
+  Véga prêt · IA Orion prêt »), départ, planètes des IA fondées en moins d'une minute, reprise
+  avec les IA reliées. Seules erreurs de la console : les relais Nostr, injoignables dans le
+  conteneur de test.

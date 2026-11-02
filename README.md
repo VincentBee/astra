@@ -38,6 +38,7 @@ Ensuite : quelqu'un crée la partie. Pour inviter, n'importe quel joueur appuie 
 | `js/fleet.js` | Flottes : décollage, déplacements libres sur la carte, carburant, poursuite, combat sans hasard, pillage |
 | `js/trade.js` | Échanges entre joueurs : séquestre, réception, issue d'une offre |
 | `js/save.js` | Sauvegarde de la partie sur le téléphone et fusion de deux copies |
+| `js/bot.js` | Joueurs IA : une IA joue sur le téléphone de celui qui l'ajoute (« Contre l'IA » à l'accueil, « Ajouter une IA » au départ), avec les mêmes ordres qu'un joueur |
 | `js/session.js` | Une partie vue d'un téléphone : copie de l'état, fiches des joueurs, connexions entre joueurs, invitations, journal des ordres |
 | `js/replay.js` | Rejeu d'une partie à partir des journaux d'ordres des fiches |
 | `replay.html`, `js/replay-view.js` | Écran du replay : la carte, les joueurs et le journal, au fil du temps |
