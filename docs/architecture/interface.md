@@ -193,6 +193,7 @@ Table des appels de l'interface vers la session :
 | Poursuivre une flotte ennemie | menu au doigt « Attaquer la flotte de … » (`actionsFor`) | `chaseFleet` |
 | Arrêter / plein / rentrer / se poser | 1701-1708 | `stopFleet`, `refuelFleet`, `returnFleet`, `moveFleet(…, 'dock')` |
 | Donner / fusionner / scinder | 1869, 1832 | `transferFleet`, `mergeFleets`, `splitFleet` |
+| Fusionner avec une autre de mes flottes, ou la rejoindre pour fusionner (toucher sur la carte, D-159) | `actionsFor`, menu `#map-menu` | `mergeFleets`, `joinFleet` |
 | Proposer / accepter / refuser un échange | 1770, 1806 | `proposeTrade`, `answerTrade` |
 
 Lectures seules utilisées pour le rendu : `now`, `planets`, `planetsOf`, `planetOf`, `planetsAt`, `ownerAt`, `myFleet`, `fleetsBeside`, `eyes`, `sees`, `linkInfo`, `tradePartners`, `tradeHoldings`, `incomingOffers`, et les propriétés `state`, `me`, `status`, `myRace`, `links`, `peerCount`, `alone`, `outdated`, `failure`, `refusal`.
@@ -240,11 +241,15 @@ comptent pas ; la flotte sélectionnée ne compte que seule sous le doigt ; une 
 **Toucher (écouteur `click` de `#map`).** Menu ouvert → le toucher le ferme, rien d'autre. Puis :
 1. `many` sans flotte sélectionnée → menu « Lequel ? » (une ligne par objet : « Flotte 2 ·
    3 vaisseaux », « Lyra · fiche ») ;
-2. une de mes flottes → la sélectionner (`selectFleet`) ; la flotte déjà sélectionnée → la
-   relâcher ;
+2. une de mes flottes sans flotte sélectionnée → la sélectionner (`selectFleet`) ; la flotte
+   déjà sélectionnée → la relâcher ;
 3. flotte sélectionnée → `orderAt` : les actions de chaque objet visé (`actionsFor` :
    `session.ordersAt` sur la planète ou la case vide, « Attaquer la flotte de … » sur une
-   flotte adverse, « Choisir · Flotte N » sur une autre de mes flottes). Un seul ordre sans
+   flotte adverse ; sur une autre de mes flottes (D-159) : « Fusionner avec Flotte N » si les
+   deux sont arrêtées sur la même case (`mergeFleets`, l'autre passe dans la flotte
+   sélectionnée), sinon « Rejoindre Flotte N et fusionner » (`joinFleet`, « · panne en
+   route » si le carburant ne suffit pas), en premier et en couleur, puis « Choisir · Flotte
+   N »). Le titre du menu est alors le nom de la flotte touchée. Un seul ordre sans
    panne vers une planète ou une case → `moveFleet` tout de suite ; sinon menu au doigt
    (ordre principal en premier, en couleur, puis « Fiche de … ») ;
 4. sinon une planète → sa fiche (`selected`, `#sheet-planet`) ; le vide → ferme la fiche.
@@ -252,6 +257,13 @@ comptent pas ; la flotte sélectionnée ne compte que seule sous le doigt ; une 
 Autre façon de sélectionner : toucher la flotte dans la grille `#map-fleets` sous la carte
 (D-107, D-108) ; la même grille commence par une case par planète à moi (D-115). Carte zoomée :
 choisir une flotte dans la grille recentre la vue sur elle si elle est hors champ (`reveal`).
+
+Flotte choisie qui disparaît en se fondant dans une autre (jonction, D-159) : `renderFleetInfo`
+cherche la flotte qui l'a absorbée (`absorbed`) et la choisit à sa place.
+Vérifié dans Chromium (390 × 844, clics de souris sur `index.html?view`) : Flotte 1 choisie,
+toucher Flotte 2 et 3 posées ensemble → « Que viser ? » avec « Rejoindre Flotte 2 et fusionner /
+Choisir · Flotte 2 / Rejoindre Flotte 3 et fusionner / Choisir · Flotte 3 » ; choisir la 1ʳᵉ →
+fiche « Jonction → [13:17] ».
 
 **Menu au doigt (`#map-menu`, dans `.map-wrap`).** `openMenu(at, items, …)` écrit les boutons
 puis le place avec `menuPlace` (à droite du doigt s'il y a la place, sinon à gauche, jamais hors
@@ -419,7 +431,7 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
 ## 13. Fil de construction (2026-10-30, D-105)
 
 - `index.html` : `<ol id="plan" class="plan">` au-dessus de `#buildings`, caché quand le fil est
-  vide.
+  vide (déplacé sous les onglets par D-158, voir plus bas).
 - Bouton d'un bâtiment (`[data-build]`, `renderPlanet`) : `data-mode="now"` (icône ↑) quand le
   chantier est libre, le fil vide et le stock suffisant → `session.build` ; sinon
   `data-mode="plan"` (icône +) → `session.planBuild`. Le niveau affiché est celui du prochain
@@ -432,6 +444,29 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   n'est réécrite que quand le fil change ; les heures sont mises à jour à part, pour que le ×
   ne soit pas remplacé sous le doigt toutes les secondes (bug vu pendant le test).
 - Style : `.plan`, `.plan-item` (bloqué : `.blocked`, heure en orange), fin de `style.css`.
+- **Fil d'attente mêlé (2026-11-02, D-158)** : `<section id="plan-zone">` (titre « Fil
+  d'attente ») est sorti de l'onglet Bâtiments et posé juste sous les onglets, sans
+  `data-pane` : visible sur tous les onglets, caché quand le fil est vide. `renderPlan`
+  nomme chaque élément selon son chantier : « Mine niv 5 », icône recherche + « Agronomie
+  niv 1 », icône flotte + « 5 × Cargo Hermès » ; le × porte `data-key = planId(item)`.
+  - Recherche (`renderResearch(me, pl, s, now, ahead)`) : labo libre, aucune recherche au fil
+    et stock suffisant → ↑ (`data-mode="now"`, `session.research`) ; sinon + (`data-mode="plan"`,
+    `session.planResearch`), avec le niveau, le prix et les prérequis comptés fil compris
+    (`ahead = planAhead(s)`). Le compte à rebours passe dans l'étiquette de niveau, comme pour
+    les bâtiments.
+  - Chantier naval (`renderYard(…, ahead)`) : ×1 / ×5 lancent le lot si le chantier naval est
+    libre, sans vaisseaux au fil et le stock suffit ; sinon +1 / +5 ajoutent le lot au fil
+    (`session.planShips`). Le verrou d'un vaisseau compte la recherche au fil.
+  - Bâtiments : le bouton ne passe en + que si le chantier est occupé ou qu'un **bâtiment** est
+    au fil (une recherche au fil ne l'empêche plus de lancer tout de suite).
+  - Le chantier de la fiche de la carte (`data-pi-ship`) lance toujours directement, sans fil.
+  - Vérifié dans Chromium (`index.html?view`, partie à un joueur humain, fil : labo, Propulsion,
+    5 cargos, centrale) : trois onglets, 360 et 320 px, pas de défilement horizontal.
+- Mise en page d'une ligne (2026-11-02, D-157) : `.plan-item` est une grille à deux colonnes,
+  nom en haut, heure dessous, × à droite sur les deux lignes ; `.plan` a
+  `grid-template-columns: minmax(0, 1fr)`. Avant, l'heure tenait sur la même ligne sans pouvoir
+  passer à la ligne et la page débordait (484 px de large sur un écran de 360). Vérifié dans
+  Chromium à 360 et 320 px : plus de défilement horizontal.
 - Vérifié dans le navigateur (vue mobile 375 × 812, 2026-10-30) : ajout de 3 bâtiments, lancement
   automatique de la mine à l'heure annoncée, retrait par ×, rattrapage après rechargement.
 

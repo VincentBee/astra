@@ -172,3 +172,6 @@ que fait le code.
 | D-153 | Trêve de 10 min avant la première conquête de l'IA | nouveau test | `bot.test.mjs` « trois IA… » : première conquête ≥ `PEACE_MS` après le départ |  |
 | D-154 | Boutons « Contre l'IA » et « Ajouter une IA » | non testable |  | DOM : vérifié dans Chromium ; le bouton apparaît dans les images des rapports de test |
 | D-155 | Les IA sont dans la sauvegarde et se réveillent à la reprise | nouveau test | `bot.test.mjs` « fonde sa planète… » : `bots` dans la sauvegarde ; « à la reprise… » : réveillée, en ligne, rejoue, pas de doublon, arrêtée avec l'hôte |  |
+| D-157 | Fil de construction sur deux lignes (plus de défilement horizontal) | non testable |  | CSS : vérifié dans Chromium à 360 et 320 px |
+| D-158 | Recherches et vaisseaux dans le fil d'attente | nouveau test | `plan.test.mjs` « fil mixte : … » (trois chantiers à la fois, chantier occupé, priorité sur le stock, labo puis recherche), « le joueur : recherches et vaisseaux au fil… » (refus, retrait, rejeu identique), « un fil mixte abîmé… » | boutons et affichage du fil : vérifiés dans Chromium |
+| D-159 | Toucher une autre de mes flottes : fusionner ou la rejoindre | nouveau test | `fleet.test.mjs` « jonction : … » (rejoindre puis fusionner, fusion immédiate, attente d'une flotte en route, flotte partie ailleurs, refus) | menu au doigt : vérifié dans Chromium |

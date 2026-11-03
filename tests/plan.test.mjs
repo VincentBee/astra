@@ -198,3 +198,162 @@ scenario('un fil abîmé reçu d’un autre est nettoyé', (film) => {
   ]);
   assert.deepEqual(notList, []);
 });
+
+// ---------------------------------------------------------------------------
+// Recherches et vaisseaux au fil (D-158) : un seul fil, trois chantiers qui avancent ensemble.
+// ---------------------------------------------------------------------------
+
+/** Planète humaine riche, avec labo et chantier naval, et la propulsion (qui ouvre le cargo). */
+function rich() {
+  const p = poor();
+  p.levels = { ...p.levels, lab: 1, yard: 1, store: 6 };
+  p.places = 40;
+  p.tech = { propulsion: 1 };
+  p.stock = { minerals: 5000, food: 2000, energy: 5000 };
+  return p;
+}
+
+scenario('fil mixte : bâtiment, recherche et vaisseaux partent chacun à son chantier, en même temps', (film) => {
+  const { show } = stage(film);
+  const p = rich();
+  p.plan = ['mine', { tech: 'forage' }, { ship: 'cargo', n: 2 }];
+  show(p, 'A met au fil une mine, la recherche Forage et 2 cargos', T0);
+  const s = game.stateAt(p, T0 + SEC);
+  show(p, 'une seconde plus tard : les trois sont lancés, chacun à son chantier', T0 + SEC);
+  assert.deepEqual(s.plan, []);
+  assert.equal(s.queue.key, 'mine');
+  assert.equal(s.research.key, 'forage');
+  assert.equal(s.research.level, 1);
+  assert.deepEqual([s.yard.type, s.yard.count], ['cargo', 2]);
+  const starts = s.done.filter((d) => d.kind === 'start');
+  assert.deepEqual(starts.map((d) => d.lane), ['queue', 'research', 'yard']);
+  assert.ok(starts.every((d) => d.start === T0));
+  // Payés tous les trois.
+  const paid = game.upgradeCost('human', 'mine', 4).minerals + 150 + 2 * 110;
+  assert.ok(Math.abs(5000 - paid - game.stateAt(p, T0).stock.minerals) < 50);
+});
+
+scenario('fil mixte : un chantier occupé ne bloque pas les autres, et chacun garde son ordre', (film) => {
+  const { show } = stage(film);
+  const p = rich();
+  p.research = { key: 'agro', level: 1, start: T0, end: T0 + 30 * SEC };
+  p.plan = [{ tech: 'forage' }, { tech: 'radar' }, 'solar'];
+  show(p, 'labo occupé ; au fil : Forage, Radar, puis une centrale', T0);
+  const s = game.stateAt(p, T0 + SEC);
+  // La centrale ne passe pas après les recherches : son chantier est libre.
+  assert.equal(s.queue?.key, 'solar');
+  assert.deepEqual(s.plan, [{ tech: 'forage' }, { tech: 'radar' }]);
+  // Labo libre : Forage d'abord, Radar ensuite.
+  const later = game.stateAt(p, T0 + 10 * MIN);
+  show(p, '10 min plus tard : Agronomie, Forage puis Radar, dans l’ordre', T0 + 10 * MIN);
+  const techs = later.done.filter((d) => d.lane === 'research').map((d) => d.key);
+  assert.deepEqual(techs, ['forage', 'radar']);
+  assert.equal(later.tech.forage, 1);
+  assert.equal(later.tech.radar, 1);
+});
+
+scenario('fil mixte : le premier élément prêt passe avant les autres sur le stock', (film) => {
+  const { show } = stage(film);
+  const p = rich();
+  const cost = game.upgradeCost('human', 'mine', 4);
+  p.stock = { minerals: cost.minerals - 100, food: 2000, energy: 5000 };
+  p.plan = ['mine', { tech: 'radar' }];
+  show(p, 'au fil : une mine (pas tout à fait payable), puis Radar (payable)', T0);
+  const s = game.stateAt(p, T0 + 30 * MIN);
+  const starts = s.done.filter((d) => d.kind === 'start');
+  show(p, 'la mine part d’abord, Radar attend son tour', T0 + 30 * MIN);
+  assert.deepEqual(starts.map((d) => d.lane), ['queue', 'research']);
+  assert.ok(starts[0].start > T0, 'la mine attend ses minéraux');
+  assert.ok(starts[1].start >= starts[0].start, 'Radar ne la double pas');
+});
+
+scenario('fil mixte : labo au fil, puis une recherche qui l’attend ; l’estimation le dit', (film) => {
+  const { show } = stage(film);
+  const p = rich();
+  p.levels.lab = 0;
+  p.plan = ['lab', { tech: 'forage' }];
+  show(p, 'pas de labo : A met un labo au fil, puis Forage', T0);
+  const s = game.stateAt(p, T0 + SEC);
+  assert.equal(s.queue.key, 'lab');
+  assert.deepEqual(s.plan, [{ tech: 'forage' }]);
+  const f = game.planForecast(p, T0 + SEC);
+  assert.equal(f.length, 1);
+  assert.equal(f[0].lane, 'research');
+  assert.equal(f[0].level, 1);
+  assert.equal(f[0].start, s.queue.end, 'Forage part quand le labo est fini');
+  const later = game.stateAt(p, s.queue.end + SEC);
+  show(p, 'le labo fini, Forage est lancé', s.queue.end + SEC);
+  assert.equal(later.research?.key, 'forage');
+});
+
+scenario('le joueur : recherches et vaisseaux au fil, refus, retrait, et la partie se rejoue à l’identique', (film) => {
+  const { players, clock, sync } = newGame(2, ['human', 'machine']);
+  const [a, b] = players;
+  const toasts = [];
+  a.ontoast = (m) => toasts.push(m);
+  const pa = () => a.state.players[a.me].planet;
+  const home = a.state.players[a.me].home;
+  // Pas de labo ni de chantier naval : refusé, tant qu'ils ne sont pas au fil.
+  a.planResearch('forage');
+  a.planShips('cargo', 2);
+  assert.equal(toasts.length, 2);
+  assert.deepEqual(pa().plan || [], []);
+  // Deux centrales et une mine d'abord : sans elles, le labo mange l'énergie et tout cale.
+  a.planBuild('solar');
+  a.planBuild('solar');
+  a.planBuild('mine');
+  a.planBuild('lab');
+  a.planResearch('propulsion');
+  a.planBuild('yard');
+  a.planShips('cargo', 2); // la propulsion au fil ouvre le cargo
+  a.planShips('fighter', 1); // la frégate demande le blindage : refusé
+  a.planResearch('colonies'); // il faut la propulsion 2 et un labo 2 : refusé
+  assert.equal(toasts.length, 4);
+  const wanted = ['solar', 'mine', 'lab', { tech: 'propulsion' }, 'yard', { ship: 'cargo', n: 2 }];
+  film.look(a, 'A met au fil 2 centrales, mine, labo, Propulsion, chantier naval, 2 cargos (une frégate et les Arches refusées)', [
+    { show: 'fil (la 1ʳᵉ centrale, payable, déjà lancée)', at: home, expected: wanted, got: pa().plan },
+  ]);
+  assert.equal(pa().queue.key, 'solar', 'le stock de départ paie la 1ʳᵉ centrale : lancée tout de suite');
+  assert.deepEqual(pa().plan, wanted);
+  a.unplan('ship:cargo:5', 5); // ce n'est pas ce lot-là : refusé
+  assert.equal(pa().plan.length, 6);
+  a.planResearch('forage');
+  a.unplan('tech:forage', 6);
+  assert.deepEqual(pa().plan, wanted);
+  // Le stock de départ ne paie rien de tout ça : le fil attend la production, sans que A repasse.
+  let min = 0;
+  while (min < 180 && !(pa().ships?.cargo >= 2)) {
+    min += 1;
+    clock.t += MIN;
+    a.tick();
+    b.tick();
+    sync(b, a);
+    sync(a, b);
+  }
+  const log = a.state.log.map((l) => l.text);
+  assert.ok(log.some((t) => t.includes('lance la recherche Propulsion chimique niv. 1') && t.includes('(fil)')));
+  assert.ok(log.some((t) => t.includes('met en chantier 2 ×') && t.includes('(fil)')));
+  assert.equal(pa().plan.length, 0, 'tout le fil est lancé');
+  assert.equal(pa().tech.propulsion, 1);
+  assert.equal(pa().ships.cargo, 2);
+  // L'autre téléphone voit le même fil, et la partie se rejoue à l'identique.
+  const r = replay(clone(a.snapshot()));
+  film.look(a, `${min} min plus tard : tout est lancé et fini ; la partie rejouée retombe sur les mêmes fiches`, [
+    { show: 'cargos à quai', at: home, expected: 2, got: pa().ships.cargo },
+    { show: 'Propulsion', at: home, expected: 1, got: pa().tech.propulsion },
+    ...Object.values(a.state.players).map((p) => ({ show: `fiche de ${p.name} rejouée à l’identique`, at: p.home, expected: true, got: comparable(r.players[p.id]) === comparable(p) })),
+  ]);
+  for (const p of Object.values(a.state.players)) assert.equal(comparable(r.players[p.id]), comparable(p), `fiche de ${p.name}`);
+});
+
+scenario('un fil mixte abîmé reçu d’un autre est nettoyé', (film) => {
+  const { players } = newGame(1, ['human']);
+  film.look(players[0], 'la fiche de A, avant qu’on abîme son fil');
+  const p = clone(players[0].state.players[players[0].me]);
+  p.planet.plan = ['mine', { tech: 'forage', x: 1 }, { tech: 'nope' }, { tech: '__proto__' }, { ship: 'cargo', n: 3 }, { ship: 'cargo', n: 0 }, { ship: 'cargo', n: 2.5 }, { ship: 'cargo', n: 99 }, { ship: 'nope', n: 1 }, null, [1]];
+  const cleaned = normalize(p).planet.plan;
+  film.look(players[0], 'fil reçu nettoyé (vérifié sur une copie de la fiche de A)', [
+    { show: 'fil gardé', expected: ['mine', { tech: 'forage' }, { ship: 'cargo', n: 3 }], got: cleaned },
+  ]);
+  assert.deepEqual(cleaned, ['mine', { tech: 'forage' }, { ship: 'cargo', n: 3 }]);
+});

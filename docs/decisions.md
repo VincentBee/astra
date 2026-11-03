@@ -861,7 +861,7 @@ Aucune conversation ne les prouve.
   repousse le fil. Les autres joueurs voient le même calcul pour l'affichage, sans le vérifier.
 - Pas de nouveau `FORMAT` : un téléphone d'avant ignore `plan` (son fil ne se lance pas chez lui,
   mais rien ne casse) ; cache `astra-p2p-v57` (v55 et v56 pris par D-101 et D-099 ; D-101 prise par la vitesse de flotte, d'où D-105).
-- Qui : Vincent (demande), Claude (règle). Statut : en vigueur.
+- Qui : Vincent (demande), Claude (règle). Statut : en vigueur, **modifiée par D-158** (recherches et vaisseaux au fil, 12 éléments, règle d'ordre entre chantiers).
 
 **D-106 — Construire et faire décoller des vaisseaux depuis la carte**
 - 2026-10-30 12:15. Demandes : « Je voudrais pouvoir créer des vaisseaux depuis la carte, en
@@ -1315,7 +1315,7 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   lâchant (attaquer et conquérir ne se confondent pas, on demande) ; appui long pour la fiche
   (lent, et peu découvrable sur un téléphone).
 - Qui : Vincent (la demande), Claude (le système). Source : session `012yisfzoyH`.
-- Statut : en vigueur. 8 tests (`tests/aim.test.mjs`). Vérifié dans Chromium (390 × 844,
+- Statut : en vigueur, **point 5 modifié par D-159** (toucher une autre de mes flottes ouvre un menu de fusion). 8 tests (`tests/aim.test.mjs`). Vérifié dans Chromium (390 × 844,
   toucher simulé) : toucher une planète libre avec le colonisateur → menu « Fonder / orbite /
   fiche » ; toucher à côté → menu fermé, rien d'envoyé ; glisser le colonisateur jusqu'à la
   planète → trait, libellé, menu, colonisation ; planète mère avec 3 flottes en orbite →
@@ -1872,3 +1872,79 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   Recherche → carte → planète → Bâtiments. 194/194 tests (198/198 après la reprise sur `main`, D-151 à D-155 de l'IA).
 - Qui : Vincent (demande), Claude (portée : à chaque ouverture). Source : session `012yisg1`.
   Statut : en vigueur.
+**D-157 — Fil de construction sur deux lignes**
+- 2026-11-02 22:22. Contexte : « La file de batiment provoque un scroll horizontal ». Chaque
+  ligne du fil (`#plan`) mettait le nom, l'heure estimée et le × sur une seule ligne ; l'heure
+  (« ≈ dans 1:23:45 → fini dans 1:30:12 ») ne pouvait pas passer à la ligne, et la grille `.plan`
+  s'élargissait pour la contenir : 484 px de page sur un écran de 360.
+- Choix : `.plan-item` devient une grille : nom (coupé par « … » s'il est trop long) en haut,
+  heure dessous (peut passer à la ligne), × à droite sur les deux lignes. `.plan` a
+  `grid-template-columns: minmax(0, 1fr)` pour ne jamais déborder. Seulement du CSS
+  (`style.css`) ; cache `sw.js` v79.
+- Écarté : couper l'heure par « … » (on perdrait l'heure de fin) ; raccourcir le texte de
+  l'heure (le débordement reviendrait avec un nom long ou un écran plus étroit).
+- Vérifié dans Chromium (montage de l'écran planète avec 3 lignes au plus long) : 360 et 320 px,
+  page à la largeur de l'écran.
+- Qui : Vincent (demande), Claude (mise en page sur deux lignes, par défaut). Source : session
+  `012yisg1`. Statut : en vigueur.
+**D-158 — Recherches et vaisseaux dans le fil d'attente**
+- 2026-11-02 22:24 (message reçu pendant le travail précédent, heure à la minute près non confirmée). Contexte : « Il faut aussi pouvoir mettre des recherches et des flottes dans
+  la file ». Le fil (D-105) ne tenait que des bâtiments ; la recherche et le chantier naval ne
+  pouvaient être lancés qu'à la main, labo ou chantier libre et stock suffisant.
+- Choix :
+  - **Un seul fil par planète**, où se mêlent bâtiments, recherches et lots de vaisseaux (« flottes »
+    compris comme les lots du chantier naval : un décollage ne se met pas au fil). Chaque élément
+    attend son chantier ; le chantier, le labo et le chantier naval avancent en même temps.
+  - **Ordre** : un élément dont le chantier est occupé, ou à qui il manque un prérequis, ne
+    bloque pas les autres chantiers ; le premier élément prêt a la priorité sur le stock (les
+    suivants ne le doublent pas pour une question de prix). Un prix plus grand que l'entrepôt
+    compte comme un prérequis manquant (sinon il bloquerait tout le fil pour toujours).
+  - **Ajout fil compris** : labo, chantier naval, niveaux et prérequis se comptent avec ce qui
+    est déjà au fil (labo puis recherche, propulsion puis cargos, d'un coup).
+  - Format : un bâtiment reste son nom (les fiches et les rejeux d'avant restent valables), une
+    recherche `{ tech }`, un lot `{ ship, n }`. Fil de **12** éléments au plus (8 avant : trop
+    court pour trois chantiers). Format de fiche **10** (une version d'avant verrait un fil
+    tronqué : elle est prévenue qu'une mise à jour existe). Cache `sw.js` v80.
+  - Interface : le fil sort de l'onglet Bâtiments, visible sous les onglets ; boutons ↑ / + sur
+    les recherches, ×n / +n sur les vaisseaux, comme pour les bâtiments.
+- Écarté : trois fils séparés, un par chantier (plus d'écrans, et l'ordre entre une recherche
+  et un bâtiment qui se disputent le stock ne se dirait pas) ; ordre strict, où la tête du fil
+  bloque tout (une recherche attendrait la fin d'un bâtiment alors que le labo est libre) ;
+  premier payable d'abord, sans priorité (un bâtiment cher serait doublé sans fin par des petites
+  recherches).
+- Limite : « pas la même technologie sur deux planètes à la fois » n'est vérifié qu'à l'ajout au
+  fil (non constaté en partie).
+- Les IA (D-151) n'utilisent toujours le fil que pour les bâtiments ; leur calcul des places ne
+  compte plus que les bâtiments du fil.
+- Vérifié : 6 nouveaux scénarios (`tests/plan.test.mjs` : trois chantiers à la fois, chantier
+  occupé, priorité sur le stock, labo puis recherche et estimation, le joueur avec refus,
+  retrait et rejeu identique, fil abîmé nettoyé) ; 204/204 ; vu dans Chromium à 360 et 320 px.
+- Qui : Vincent (demande), Claude (un seul fil, règle d'ordre, 12 éléments, par défaut). Source :
+  session `012yisg1`. Statut : en vigueur. Modifie D-105.
+**D-159 — Toucher une autre de mes flottes : fusionner, ou la rejoindre pour fusionner**
+- 2026-11-02 22:40. Contexte : « Faciliter la fusion de flotte quand on clique sur une flotte
+  allié ». Il n'y a pas d'alliance dans le jeu : compris comme **une autre de mes flottes**
+  (non confirmé). Avant, flotte choisie, toucher une autre de mes flottes la choisissait à la
+  place (D-126, point 5) ; fusionner demandait d'amener les deux sur la même case, à l'arrêt,
+  puis le bouton « Fusionner ici » de la fiche.
+- Choix :
+  - Flotte choisie, toucher une autre de mes flottes ouvre le menu au doigt : en premier
+    « **Fusionner avec Flotte N** » (déjà arrêtées ensemble : fusion tout de suite, l'autre
+    passe dans la flotte choisie, comme « Fusionner ici ») ou « **Rejoindre Flotte N et
+    fusionner** » (sinon), puis « Choisir · Flotte N » pour changer de flotte comme avant.
+  - Nouvel ordre `joinFleet` / `{ kind: 'join', fleet }` : la flotte va là où l'autre attend
+    (ou là où elle va) et s'y fond à l'arrivée ; si l'autre est encore en route vers la même
+    case, elle l'attend ; si l'autre est partie ailleurs, l'ordre tombe et la flotte reste sur
+    place (noté au journal). Si la flotte choisie disparaît ainsi, la fiche suit celle qui l'a
+    absorbée.
+  - Pas de nouveau `FORMAT` (un téléphone d'avant affiche « Ordre » et n'exécute pas les ordres
+    des autres) ; cache `sw.js` v81.
+- Écarté : fusionner en lâchant une flotte traînée sur une autre (D-126 a exclu mes flottes des
+  cibles d'un glissé, pour qu'une flotte en orbite ne cache pas sa planète : gardé) ; poursuivre
+  une flotte en route comme une flotte ennemie (`chase`) : plus lourd, et on rejoint en général
+  une flotte à l'arrêt ; fusionner sans menu au toucher (on ne pourrait plus changer de flotte
+  d'un toucher).
+- Vérifié : 5 scénarios (`tests/fleet.test.mjs` « jonction : … ») ; 209/209 ; menu vu dans
+  Chromium.
+- Qui : Vincent (demande), Claude (menu, ordre, attente, par défaut). Source : session
+  `012yisg1`. Statut : en vigueur. Modifie D-126 (point 5).

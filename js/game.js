@@ -613,8 +613,120 @@ function simulate(race, s, from, to, trance = 0) {
   return steps(race, s, from, to, 1);
 }
 
-/** Taille maximale du fil de construction d'une planète. */
-export const PLAN_MAX = 8;
+/** Taille maximale du fil d'attente d'une planète (bâtiments, recherches et vaisseaux ensemble). */
+export const PLAN_MAX = 12;
+
+// ---------------------------------------------------------------------------
+// Fil d'attente (D-105, puis D-158) : un seul fil par planète, où l'on met
+// des bâtiments, des recherches et des lots de vaisseaux. Un élément est :
+//   - un bâtiment : son nom, en texte, comme avant ("mine") ;
+//   - une recherche : { tech: "weapons" } ;
+//   - un lot de vaisseaux : { ship: "fighter", n: 5 }.
+// Chacun attend son chantier : le chantier (bâtiments), le labo (recherches),
+// le chantier naval (vaisseaux) ; les trois avancent en même temps.
+// ---------------------------------------------------------------------------
+
+/** File (`queue`, `research` ou `yard`) qu'un élément du fil occupera. */
+export function planLane(item) {
+  if (typeof item === 'string') return 'queue';
+  return item?.tech ? 'research' : 'yard';
+}
+
+/** Identifiant d'un élément du fil, pour le retirer sans se tromper (le nom du bâtiment pour un bâtiment). */
+export function planId(item) {
+  if (typeof item === 'string') return item;
+  return item?.tech ? `tech:${item.tech}` : `ship:${item?.ship}:${item?.n}`;
+}
+
+/** Élément du fil bien formé pour cette race, recopié proprement, ou null. */
+export function planItem(race, item) {
+  if (!RACES[race]) return null;
+  if (typeof item === 'string') return own(RACES[race].buildings, item) ? item : null;
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+  if (typeof item.tech === 'string') return own(TECHS[race], item.tech) ? { tech: item.tech } : null;
+  if (typeof item.ship === 'string' && own(SHIPS[race], item.ship) && Number.isInteger(item.n) && item.n >= 1 && item.n <= 50) return { ship: item.ship, n: item.n };
+  return null;
+}
+
+/**
+ * Niveaux et technologies une fois fini tout ce qui est lancé ou au fil
+ * (état `s` de stateAt) : c'est sur eux qu'on ajoute au fil (« labo, puis
+ * telle recherche » se met au fil d'un coup).
+ */
+export function planAhead(s) {
+  const levels = { ...s.levels };
+  const tech = { ...(s.tech || {}) };
+  if (s.queue) levels[s.queue.key] = s.queue.level;
+  if (s.research) tech[s.research.key] = s.research.level;
+  for (const it of s.plan || []) {
+    if (typeof it === 'string') levels[it] = (levels[it] || 0) + 1;
+    else if (it.tech) tech[it.tech] = (tech[it.tech] || 0) + 1;
+  }
+  return { levels, tech };
+}
+
+/** Prix d'un lot de `n` vaisseaux. */
+const shipsCost = (race, type, n) => Object.fromEntries(Object.entries(SHIPS[race][type].cost).map(([r, v]) => [r, v * n]));
+
+/**
+ * Ce qu'un élément du fil coûterait et lancerait sur l'état `s`, ou { why }
+ * s'il ne peut pas encore partir (prérequis, place, entrepôt trop petit).
+ * `job(at)` : l'ordre en cours qu'il devient, lancé à l'heure `at`.
+ */
+function planNeed(race, places, s, item) {
+  const caps = capsFor(s.levels);
+  const fits = (cost) => Object.entries(cost).every(([r, v]) => v <= (caps[r] ?? Infinity));
+  let out;
+  if (typeof item === 'string') {
+    if (freePlaces(places, s.levels) <= 0) return { why: 'Plus de place' };
+    const level = lv(s.levels, item);
+    const cost = upgradeCost(race, item, level);
+    out = { cost, job: (at) => ({ key: item, level: level + 1, start: at, end: at + buildDuration(race, s.levels, cost) }) };
+  } else if (item.tech) {
+    const lab = lv(s.levels, 'lab');
+    const T = TECHS[race][item.tech];
+    const level = s.tech?.[item.tech] || 0;
+    if (!lab) return { why: 'Il faut un labo' };
+    if (level >= T.max) return { why: 'Niveau maximum' };
+    const miss = techMissing(race, item.tech, s.tech, lab);
+    if (miss) return { why: `Il faut : ${miss}` };
+    const cost = techCost(race, item.tech, level);
+    out = { cost, job: (at) => ({ key: item.tech, level: level + 1, start: at, end: at + researchDuration(cost, lab) }) };
+  } else {
+    const yard = lv(s.levels, 'yard');
+    if (!yard) return { why: 'Il faut un chantier naval' };
+    if (!shipUnlocked(race, item.ship, s.tech)) return { why: 'Pas encore recherché' };
+    const cost = shipsCost(race, item.ship, item.n);
+    out = { cost, job: (at) => ({ type: item.ship, count: item.n, start: at, end: at + shipDuration(race, item.ship, item.n, yard) }) };
+  }
+  return fits(out.cost) ? out : { why: 'Entrepôt trop petit' };
+}
+
+/**
+ * Prochain élément du fil à lancer, dans l'ordre du fil : le premier dont le
+ * chantier est libre et qui peut partir. Un élément dont le chantier est
+ * occupé, ou à qui il manque un prérequis, garde sa place sans bloquer les
+ * autres chantiers (mais bloque ceux de son chantier qui le suivent). Le
+ * premier élément prêt a la priorité sur le stock : ceux d'après attendent
+ * qu'il soit lancé (on ne double pas dans le fil pour une question de prix).
+ */
+function planNext(race, places, s, q, plan) {
+  const waiting = new Set();
+  for (let pos = 0; pos < plan.length; pos++) {
+    const lane = planLane(plan[pos].item);
+    if (q[lane] || waiting.has(lane)) {
+      waiting.add(lane);
+      continue;
+    }
+    const need = planNeed(race, places, s, plan[pos].item);
+    if (need.why) {
+      waiting.add(lane);
+      continue;
+    }
+    return { pos, lane, ...need };
+  }
+  return null;
+}
 
 /** Places libres pour ces niveaux (les planètes d'avant la place n'ont pas de limite). */
 const freePlaces = (places, levels) => (Number.isFinite(places) ? places - usedPlaces(levels) : Infinity);
@@ -664,28 +776,27 @@ export function stateAt(planet, now) {
   };
   let at = planet.at;
   const q = { queue: planet.queue || null, research: planet.research || null, yard: planet.yard || null };
-  const plan = Array.isArray(planet.plan) ? [...planet.plan] : [];
+  // Le fil, avec la place de chaque élément dans le fil de départ (pour planForecast).
+  const plan = (Array.isArray(planet.plan) ? planet.plan : []).map((item, i) => ({ item: planItem(race, item), i })).filter((x) => x.item);
   const done = [];
   for (;;) {
     const next = Object.entries(q)
       .filter(([, v]) => v && v.end <= now)
       .sort((x, y) => x[1].end - y[1].end || (x[0] < y[0] ? -1 : 1))[0];
-    // Chantier libre : le fil attend que le stock couvre le prix, au plus jusqu'au prochain événement.
-    const key = plan[0];
-    if (!q.queue && key && own(RACES[race].buildings, key) && freePlaces(planet.places, s.levels) > 0) {
-      const level = s.levels[key] || 0;
-      const cost = upgradeCost(race, key, level);
+    // Un chantier libre : le fil attend que le stock couvre le prix, au plus jusqu'au prochain événement.
+    const pick = planNext(race, planet.places, s, q, plan);
+    if (pick) {
       const limit = next ? Math.max(at, next[1].end) : now;
-      const r = until(race, s, at, limit, cost, planet.trance || 0);
+      const r = until(race, s, at, limit, pick.cost, planet.trance || 0);
       s = r.s;
       at = Math.max(at, r.at);
       if (r.ok) {
         const stock = { ...s.stock };
-        for (const [k, v] of Object.entries(cost)) stock[k] -= v;
+        for (const [k, v] of Object.entries(pick.cost)) stock[k] -= v;
         s = { ...s, stock };
-        q.queue = { key, level: level + 1, start: at, end: at + buildDuration(race, s.levels, cost) };
-        plan.shift();
-        done.push({ kind: 'start', ...q.queue });
+        q[pick.lane] = pick.job(at);
+        const [{ i }] = plan.splice(pick.pos, 1);
+        done.push({ kind: 'start', lane: pick.lane, i, ...q[pick.lane] });
         continue;
       }
     }
@@ -702,41 +813,43 @@ export function stateAt(planet, now) {
   s = simulate(race, s, at, now, planet.trance);
   // Rythme actuel, pour l'affichage (sur une seconde de jeu).
   const prod = flows(race, s.levels, s.pop, s.stock, 1 / 3600, (planet.trance || 0) > now ? 2 : 1, s.nature, s.reserve, s.tech, s.climate);
-  return { stock: s.stock, pop: s.pop, levels: s.levels, reserve: s.reserve, tech: s.tech, ships: s.ships, ...q, plan, done, prod };
+  return { stock: s.stock, pop: s.pop, levels: s.levels, reserve: s.reserve, tech: s.tech, ships: s.ships, ...q, plan: plan.map((x) => x.item), done, prod };
 }
 
 /**
- * Estimation du fil de construction, pour l'affichage seulement : quand
- * chaque bâtiment du fil devrait commencer et finir, si la production
- * reste celle d'aujourd'hui (bâtiments, recherches et vaisseaux déjà lancés
- * compris). Deux passes : 10 min à la seconde près, puis 6 h, plus grossière.
- * Renvoie [{ key, level, cost, start, end }] dans l'ordre du fil ; `start`
- * vaut null si rien n'arrive dans les 6 h, et `why` dit ce qui bloque quand
- * on le sait (plus de place, entrepôt trop petit).
+ * Estimation du fil, pour l'affichage seulement : quand chaque élément du fil
+ * devrait commencer et finir, si la production reste celle d'aujourd'hui
+ * (ce qui est déjà lancé compris). Deux passes : 10 min à la seconde près,
+ * puis 6 h, plus grossière. Renvoie, dans l'ordre du fil,
+ * [{ item, lane, key, level, count, cost, start, end, why }] : `key` est le
+ * bâtiment, la technologie ou le vaisseau ; `level` le niveau visé (bâtiment,
+ * recherche) ; `count` le nombre de vaisseaux. `start` vaut null si rien
+ * n'arrive dans les 6 h, et `why` dit ce qui bloque quand on le sait.
  */
 export function planForecast(planet, now) {
-  const s = stateAt(planet, now);
-  if (!s.plan.length) return [];
   // Ce qui s'est déjà lancé avant `now` (pas encore écrit dans la fiche) ne compte plus.
-  const gone = (planet.plan || []).length - s.plan.length;
-  const passes = [10 * 60_000, 6 * 3_600_000].map((h) => stateAt(planet, now + h).done.filter((d) => d.kind === 'start').slice(gone));
-  // Niveau, prix et places tels qu'au lancement de chaque élément, si tout passe dans l'ordre.
-  const levels = { ...s.levels };
-  if (s.queue) levels[s.queue.key] = s.queue.level;
-  const caps = s.prod.caps || {};
-  let free = freePlaces(planet.places, levels);
-  return s.plan.map((key, i) => {
-    const level = levels[key] || 0;
-    const cost = upgradeCost(planet.race, key, level);
-    levels[key] = level + 1;
-    const hit = passes.map((p) => p[i]).find((d) => d && d.key === key) || null;
-    let why = null;
-    if (!hit) {
-      if (free <= 0) why = 'Plus de place';
-      else if (Object.entries(cost).some(([r, v]) => v > (caps[r] ?? Infinity))) why = 'Entrepôt trop petit';
-    }
-    free -= 1;
-    return { key, level: level + 1, cost, start: hit?.start ?? null, end: hit?.end ?? null, why };
+  const here = JSON.parse(JSON.stringify(planet));
+  settle(here, now);
+  const s = stateAt(here, now);
+  if (!s.plan.length) return [];
+  const passes = [10 * 60_000, 6 * 3_600_000].map((h) => stateAt(here, now + h).done.filter((d) => d.kind === 'start'));
+  // Niveaux, prix et places tels qu'au lancement de chaque élément, si tout passe dans l'ordre.
+  const ahead = planAhead({ ...s, plan: [] });
+  const race = planet.race;
+  return s.plan.map((item, i) => {
+    const lane = planLane(item);
+    const hit = passes.map((p) => p.find((d) => d.i === i)).find(Boolean) || null;
+    const st = { levels: ahead.levels, tech: ahead.tech };
+    const need = planNeed(race, planet.places, st, item);
+    let out;
+    if (typeof item === 'string') {
+      out = { key: item, level: (ahead.levels[item] || 0) + 1, cost: upgradeCost(race, item, ahead.levels[item] || 0) };
+      ahead.levels[item] = out.level;
+    } else if (item.tech) {
+      out = { key: item.tech, level: (ahead.tech[item.tech] || 0) + 1, cost: techCost(race, item.tech, ahead.tech[item.tech] || 0) };
+      ahead.tech[item.tech] = out.level;
+    } else out = { key: item.ship, count: item.n, cost: shipsCost(race, item.ship, item.n) };
+    return { item, lane, ...out, start: hit?.start ?? null, end: hit?.end ?? null, why: hit ? null : need.why || null };
   });
 }
 

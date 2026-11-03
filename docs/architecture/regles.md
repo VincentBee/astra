@@ -98,7 +98,7 @@ Créée par `newPlanet(race, now, world)` (`js/game.js:404-420`) :
 | `at` | heure (ms) à laquelle `stock`, `pop`, `reserve` sont vrais |
 | `levels` | `{ bâtiment: niveau }`, départ : `buildings[k].start` |
 | `queue` | chantier en cours `{ key, level, start, end }` ou `null` (`js/game.js:645`) |
-| `plan` | fil de construction : noms de bâtiments qui attendent le chantier, 8 au plus (D-105) ; absent sur une planète d'avant |
+| `plan` | fil d'attente, 12 au plus (D-105, D-158) : un bâtiment est son nom (`"mine"`), une recherche `{ tech }`, un lot de vaisseaux `{ ship, n }` (1 à 50) ; absent sur une planète d'avant. Format de fiche 10 |
 | `research` | recherche en cours `{ key, level, start, end }` (`js/game.js:669`) |
 | `yard` | lot de vaisseaux en cours `{ type, count, start, end }` (`js/game.js:688`) |
 | `tech` | `{ technologie: niveau }` |
@@ -180,13 +180,25 @@ l'intègre par pas (`js/game.js:13-15`).
   niveau, nouvelle techno, nouveaux vaisseaux), puis on continue (`js/game.js:566-579`). À
   égalité d'heure, l'ordre est celui du nom de la file (`js/game.js:569`). Le résultat contient
   aussi `prod`, le rythme actuel pour l'affichage (`js/game.js:582`).
-- **Fil de construction** (`plan`, D-105) : à chaque tour de cette boucle, si le chantier est
-  libre, qu'il reste une place et qu'un bâtiment attend en tête du fil, `stateAt` avance
-  l'économie pas à pas (fonction `until`, les pas de `steps`) jusqu'à ce que le stock couvre son
-  prix, au plus jusqu'au prochain événement. Trouvé : il paye, remplit `queue`, retire la tête
-  du fil, et note `{ kind: 'start', … }` dans `done`. Le fil avance donc aussi pendant une
-  absence. `planForecast(planet, now)` refait ce calcul 10 min puis 6 h plus loin pour estimer
-  le début et la fin de chaque élément (affichage seulement).
+- **Fil d'attente** (`plan`, D-105, étendu par D-158) : un seul fil par planète, où se mêlent
+  bâtiments, recherches et lots de vaisseaux. Chaque élément attend **son** chantier
+  (`planLane` : `queue` pour un bâtiment, `research` pour une recherche, `yard` pour des
+  vaisseaux) ; les trois chantiers avancent en même temps. À chaque tour de la boucle,
+  `planNext` (`js/game.js`) parcourt le fil dans l'ordre et prend le premier élément dont le
+  chantier est libre et qui peut partir (`planNeed`) :
+  - un élément dont le chantier est occupé, ou à qui il manque quelque chose (place, labo,
+    prérequis, chantier naval, vaisseau pas recherché, prix plus grand que l'entrepôt), **garde
+    sa place sans bloquer les autres chantiers**, mais bloque les éléments de son chantier qui
+    le suivent (chaque chantier garde l'ordre du fil) ;
+  - le premier élément prêt **a la priorité sur le stock** : `stateAt` avance l'économie pas à
+    pas (`until`) jusqu'à ce que le stock couvre son prix, au plus jusqu'au prochain événement ;
+    ceux d'après attendent (on ne double pas dans le fil pour une question de prix).
+  Trouvé : il paye, remplit sa file, sort du fil, et note `{ kind: 'start', lane, i, … }`
+  dans `done` (`i` : sa place dans le fil de départ). Le fil avance aussi pendant une absence.
+  `planForecast(planet, now)` part d'une copie soldée à `now`, refait ce calcul 10 min puis
+  6 h plus loin, et rend pour chaque élément `{ item, lane, key, level, count, cost, start,
+  end, why }` (affichage seulement). `planAhead(s)` donne les niveaux et technologies une fois
+  fini tout ce qui est lancé ou au fil : c'est sur eux qu'on ajoute au fil.
 - `settle(planet, now)` (`js/game.js:591-607`) écrit cet état dans la planète. Seul le
   propriétaire l'appelle. **Une heure qui recule est ignorée** : `now = max(now, planet.at)`,
   et une heure invalide (`NaN`) ne fait rien (`js/game.js:592-594`).
@@ -271,11 +283,22 @@ Tests : `tests/alerts.test.mjs`. L'affichage est dans [interface.md](interface.m
   construction de ce niveau ; rend **tout de suite la moitié** de son coût ; le niveau (et sa
   place) ne disparaît qu'à la fin du chantier. La file `queue` porte alors `demolish: true` ;
   `stateAt` applique `levels[key] = job.level` comme pour une construction (le niveau baisse).
-- **Fil de construction** (D-105) : ordre `Session.planBuild(key, where)` (ajoute en fin de fil,
-  8 au plus, refusé si les places bâties + le chantier + le fil atteignent `places`) et
-  `Session.unplan(key, index, where)` (retire un élément, seulement si c'est bien `key` à cette place : le fil a pu avancer entre l'affichage et le toucher). Les deux font d'abord `settle`, pour que le
-  fil parte de maintenant. Le lancement automatique est décrit en §4.3. Un élément sans place
-  bloque le fil jusqu'à ce que le joueur le retire ou déconstruise.
+- **Fil d'attente** (D-105, D-158) : ordres `Session.planBuild(key, where)` (bâtiment ; refusé
+  si les places bâties + le chantier + les bâtiments du fil atteignent `places`),
+  `Session.planResearch(key, where)` (recherche ; labo, niveau maximum et prérequis comptés
+  **fil compris** avec `planAhead` : « labo, puis telle recherche » se met au fil d'un coup ;
+  refusé si la même technologie est en recherche ou au fil sur une autre de mes planètes) et
+  `Session.planShips(type, count, where)` (lot de 1 à 50 ; chantier naval et vaisseau débloqué
+  comptés fil compris). Tous ajoutent en fin de fil, 12 éléments au plus. `Session.unplan(id,
+  index, where)` retire un élément, seulement si c'est bien `id` à cette place (`planId` : le nom
+  du bâtiment, `tech:<clé>` ou `ship:<type>:<n>`) : le fil a pu avancer entre l'affichage et le
+  toucher. Tous font d'abord `settle` (`settlePlan`, qui note au journal ce que le fil a lancé),
+  pour que le fil parte de maintenant. Le lancement automatique est décrit en §4.3. Un bâtiment
+  sans place bloque les bâtiments du fil jusqu'à ce que le joueur le retire ou déconstruise.
+- Limite connue (D-158) : la règle « pas la même technologie sur deux planètes à la fois » n'est
+  vérifiée qu'à l'ajout au fil ; `stateAt` ne voit qu'une planète et ne peut pas la revérifier
+  au lancement. Non constaté en partie ; sans gravité (les technologies se fusionnent au plus
+  haut niveau).
 - `covers` tolère 1e-9 d'écart d'arrondi (`js/game.js:624-626`).
 
 ### 5.6 Classement
@@ -458,6 +481,19 @@ Deux de mes flottes **arrêtées sur la même case** (`together`, `js/fleet.js:1
 
 Une flotte qui attend la réponse à un échange est **bloquée** (`locked`,
 `js/session.js:1193-1197`).
+
+**Jonction** (D-159) : `Session.joinFleet(id, intoId)` envoie ma flotte `id` rejoindre une
+autre de mes flottes pour s'y fondre. Déjà ensemble → `mergeFleets(id, intoId)` tout de suite.
+Sinon `moveTo` vers `intoId.to` (la case où l'autre attend, ou celle où elle va) avec l'ordre
+`{ kind: 'join', fleet: intoId }` (`ORDERS.join`, « Jonction »). À l'arrivée (`arrive`) :
+- l'autre flotte (ou celle qui l'a absorbée entre-temps, par `absorbed`) est arrêtée sur la
+  même case → `merge` (la flotte arrivée passe dans l'autre), au journal « … elles fusionnent » ;
+- elle est encore en route vers cette case, ou un échange retient l'une des deux → l'ordre est
+  gardé : la flotte attend, et `arrive` réessaie à chaque passage ;
+- sinon (partie ailleurs, posée, détruite) → l'ordre tombe, la flotte reste sur place, au
+  journal « … ne trouve plus la flotte à rejoindre ».
+Pas de nouveau `FORMAT` : un téléphone d'avant affiche « Ordre » pour un ordre qu'il ne connaît
+pas (`ORDERS[kind]?.name || 'Ordre'`) et n'exécute jamais les ordres des flottes des autres.
 
 ### 8.6 Détection
 
@@ -928,7 +964,7 @@ Résultat : `tests 34, pass 34, fail 0`, environ 5,6 s (le rejeu d'une partie de
 | `tests/rules.test.mjs` | 11 | Déconstruire (moitié du prix rendue, place libérée à la fin) ; heure qui recule puis revient : pas de double production ; longue absence ≈ passages toutes les heures (population à moins de 2 %) ; arrachement refusé sans payer ; clés héritées (`constructor`, `__proto__`) refusées ; effectifs négatifs ou fractionnaires au combat ; soleil au centre et sans planète ; climat et production ; une place par niveau ; places lues sur la carte ; une colonie humaine sur le plus petit corps garde des places |
 | `tests/combat.test.mjs` | 4 | Attaques contre une planète : pas de butin créé avec un défenseur hors ligne ou plusieurs flottes arrivées ensemble ; 70 attaques avant le retour du défenseur ; les vaisseaux perdus emportent leur cargaison |
 | `tests/effects.test.mjs` | 1 | 5 joueurs, 4 attaquants × 70 combats : chaque perte subie une fois, puis rapports oubliés des deux côtés |
-| `tests/fleet.test.mjs` | 20 | Deux flottes sur la même cible ; poursuite mutuelle ; colonie qui encaisse les pertes ; premier arrivé à la colonisation ; plein en panne tout près ; plusieurs attaquants ne pillent pas plus que le stock ; revanche ; raids sans armes et un pillage par 2 min ; flotte agressive qui combat puis reprend sa route ; flotte passive qui croise sans combattre ; agressive à l'arrêt qui garde sa case ; deux agressives : pertes comptées une fois ; agressive refusée sans armes, vue par les autres, gardée à la fusion (D-100) ; vitesse du vaisseau le plus lent ; rencontres que personne n'a regardées : `firstContact`, agressive et poursuite hors ligne, pas de combat rejoué, pertes comptées une fois (D-109) |
+| `tests/fleet.test.mjs` | 25 | Deux flottes sur la même cible ; poursuite mutuelle ; colonie qui encaisse les pertes ; premier arrivé à la colonisation ; plein en panne tout près ; plusieurs attaquants ne pillent pas plus que le stock ; revanche ; raids sans armes et un pillage par 2 min ; flotte agressive qui combat puis reprend sa route ; flotte passive qui croise sans combattre ; agressive à l'arrêt qui garde sa case ; deux agressives : pertes comptées une fois ; agressive refusée sans armes, vue par les autres, gardée à la fusion (D-100) ; vitesse du vaisseau le plus lent ; rencontres que personne n'a regardées : `firstContact`, agressive et poursuite hors ligne, pas de combat rejoué, pertes comptées une fois (D-109) ; jonction : rejoindre puis fusionner, fusion immédiate, attente, flotte partie, refus (D-159) |
 | `tests/report.test.mjs` | 7 | Rapport de combat détaillé (D-122) : déroulé cohérent avec les pertes (défense comprise) ; explication du vainqueur et du vaincu avec les chiffres ; défense, technologies, cargos sans armes, combat indécis ; vaisseaux sans armes et victoire sans butin ; déroulé trafiqué borné ; même déroulé dans les deux carnets ; seconde attaque trop tôt expliquée |
 | `tests/colony.test.mjs` | 1 | Colonie perdue au recollage : vaisseaux et cargaison restent en orbite |
 | `tests/start.test.mjs` | 11 | Départ commun et colonisateur (D-120) : pas de départ tant qu'un présent n'est pas prêt ; tous prêts → même départ partout, une seule flotte d'un colonisateur chacun, plein fait, cases distinctes hors planètes ; planète mère fondée à l'arrivée (bâtiments et stock de départ), installation directe et astéroïde refusés ; absent qui ne bloque pas puis entre en retard ; « plus prêt » ; deux colonisateurs sur la même planète ; colonisateur perdu → éliminé ; pas de fin tant qu'un joueur vole ; fondation hors ligne acceptée ; rejeu fidèle ; toute planète atteignable. Harnais `newLobby` (`tests/harness.mjs`) |
