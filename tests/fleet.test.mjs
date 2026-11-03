@@ -532,3 +532,83 @@ scenario('hors ligne tous les deux : deux flottes agressives qui se sont croisé
   run([A, B], clock, sync, 10, (i) => i % 5 === 4 && film.look(A, `fiches échangées (${i + 1} s)`, i === 9 ? once(A, B, fa) : []));
   for (const s of [A, B]) assert.deepEqual(P(s).fleets.map((f) => f.ships), [{ fighter: 2 }], 'comme un seul combat 10 contre 10');
 });
+
+// ----- Jonction : toucher une autre de mes flottes pour la rejoindre et fusionner (D-159) -----
+
+/** Fait passer le temps par pas d'une seconde jusqu'à ce que `done()` soit vrai (2 min de jeu au plus). */
+function until(s, clock, done, film, label) {
+  for (let i = 0; i < 120 && !done(); i++) {
+    clock.t += 1000;
+    s.tick();
+  }
+  if (film) film.look(s, label);
+}
+
+scenario('jonction : une flotte en rejoint une autre, arrêtée ailleurs, et elles fusionnent à l’arrivée', (film) => {
+  const { players: [A], clock } = newGame(1, ['human']);
+  const a = park(A, { fighter: 2 }, {}, { x: 3, y: 5 }, 60);
+  const b = park(A, { cargo: 1 }, { minerals: 50 }, { x: 6, y: 5 }, 30);
+  film.look(A, 'A a deux flottes : 2 frégates en (3:5), un cargo chargé en (6:5)');
+  assert.ok(A.joinFleet(a, b));
+  assert.equal(A.myFleet(a).order.kind, 'join');
+  assert.ok(fleet.moving(A.myFleet(a), clock.t + 1));
+  film.look(A, 'A touche le cargo, flotte des frégates choisie : « Rejoindre et fusionner », elles partent', [{ show: 'ordre', at: [A, a], expected: 'join', got: A.myFleet(a).order?.kind }]);
+  until(A, clock, () => !A.myFleet(a), film, 'arrivées : les deux flottes n’en font plus qu’une');
+  assert.equal(A.myFleet(a), null);
+  const g = A.myFleet(b);
+  assert.deepEqual(g.ships, { fighter: 2, cargo: 1 });
+  assert.equal(g.cargo.minerals, 50);
+  assert.ok(g.absorbed.includes(a));
+  assert.ok(A.state.log.some((l) => l.text.includes('elles fusionnent')));
+});
+
+scenario('jonction : déjà arrêtées sur la même case, la fusion est immédiate', (film) => {
+  const { players: [A] } = newGame(1, ['human']);
+  const a = park(A, { fighter: 2 }, {}, { x: 3, y: 5 }, 60);
+  const b = park(A, { fighter: 1 }, {}, { x: 3, y: 5 }, 30);
+  assert.ok(A.joinFleet(a, b));
+  film.look(A, 'deux flottes sur la même case : une seule, tout de suite', [{ show: 'flottes de A', expected: 1, got: P(A).fleets.length }]);
+  assert.equal(P(A).fleets.length, 1);
+  assert.deepEqual(A.myFleet(b).ships, { fighter: 3 });
+});
+
+scenario('jonction : la flotte à rejoindre est en route vers la même case, on l’attend', (film) => {
+  const { players: [A], clock } = newGame(1, ['human']);
+  const b = park(A, { cargo: 1 }, {}, { x: 0, y: 5 }, 60);
+  const a = park(A, { fighter: 1 }, {}, { x: 8, y: 5 }, 60);
+  assert.ok(A.moveFleet(b, { x: 7, y: 5 }));
+  assert.ok(A.joinFleet(a, b));
+  assert.deepEqual(A.myFleet(a).to, { x: 7, y: 5 }, 'elle vise là où l’autre va');
+  film.look(A, 'le cargo part vers (7:5) ; la frégate, tout près, part l’y attendre');
+  until(A, clock, () => !fleet.moving(A.myFleet(a), clock.t), film, 'la frégate est arrivée la première : elle attend, l’ordre gardé');
+  assert.equal(A.myFleet(a).order?.kind, 'join');
+  until(A, clock, () => !A.myFleet(a), film, 'le cargo arrive : elles fusionnent');
+  assert.deepEqual(A.myFleet(b).ships, { cargo: 1, fighter: 1 });
+});
+
+scenario('jonction : la flotte à rejoindre est partie ailleurs, on reste sur place', (film) => {
+  const { players: [A], clock } = newGame(1, ['human']);
+  const a = park(A, { fighter: 1 }, {}, { x: 3, y: 5 }, 60);
+  const b = park(A, { cargo: 1 }, {}, { x: 6, y: 5 }, 60);
+  assert.ok(A.joinFleet(a, b));
+  assert.ok(A.moveFleet(b, { x: 6, y: 12 }));
+  film.look(A, 'la frégate part rejoindre le cargo, mais le cargo s’en va vers (6:12)');
+  until(A, clock, () => !fleet.moving(A.myFleet(a), clock.t) && !A.myFleet(a).order, film, 'la frégate arrive en (6:5) : plus personne, elle y reste');
+  assert.equal(P(A).fleets.length, 2);
+  assert.deepEqual(A.myFleet(a).to, { x: 6, y: 5 });
+  assert.equal(A.myFleet(a).order, null);
+  assert.ok(A.state.log.some((l) => l.text.includes('ne trouve plus la flotte à rejoindre')));
+});
+
+scenario('jonction : refusée vers une flotte qui n’est pas à moi, ou vers elle-même', (film) => {
+  const { players: [A, B] } = newGame(2, ['human', 'human']);
+  const toasts = [];
+  A.ontoast = (m) => toasts.push(m);
+  const a = park(A, { fighter: 1 }, {}, { x: 3, y: 5 }, 60);
+  const foe = park(B, { fighter: 1 }, {}, { x: 6, y: 5 }, 60);
+  assert.equal(A.joinFleet(a, foe), false);
+  assert.equal(A.joinFleet(a, a), false);
+  film.look(A, 'rejoindre une flotte de B, ou elle-même : refusé, rien ne bouge', [{ show: 'refus', expected: 2, got: toasts.length }]);
+  assert.equal(toasts.length, 2);
+  assert.equal(A.myFleet(a).order, null);
+});
