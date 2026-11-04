@@ -1948,3 +1948,25 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   Chromium.
 - Qui : Vincent (demande), Claude (menu, ordre, attente, par défaut). Source : session
   `012yisg1`. Statut : en vigueur. Modifie D-126 (point 5).
+
+
+**D-160 — Les ordres d'assaut montrent les vaisseaux posés et une estimation du combat**
+- 2026-10-30 14:05. Contexte : recette (point 1.2) : « Conquérir X · défense ⚔ ◇ » ne comptait que
+  les bâtiments (`fortOf`) ; un joueur a vu « ⚔54 ◇1380 » sur une planète qui avait 7 + 9
+  vaisseaux posés, et a perdu des assauts d'avance.
+- Choix : « Attaquer » et « Conquérir » affichent la même fin : « défense ⚔ a ◇ c + N vaisseaux
+  posés · estimation ». Hors de ma détection, « + ? vaisseaux ». L'estimation joue `battle`
+  maintenant avec ce que je vois (`assaultView`, `js/session.js`).
+- Choix de Claude, par défaut : trois issues. « bataille perdue » si le combat est perdu (même sans
+  voir les vaisseaux : ils ne feraient qu'ajouter) ; « victoire incertaine » si gagné sans voir les
+  vaisseaux, ou en perdant plus de la moitié de la flotte ; sinon « victoire probable ». Calcul à
+  l'heure présente, pas à l'arrivée : la planète peut bâtir ou recevoir des renforts d'ici là.
+- Alternatives écartées : additionner vaisseaux et bâtiments en un seul ⚔ ◇ (on ne voit plus ce
+  qui vient d'où) ; simuler à l'heure d'arrivée (on ne connaît pas ce que l'autre fera d'ici là).
+- Qui : Vincent (demande), Claude (forme et seuils). Source : session `fb0c1844`. Statut : en vigueur.
+- Tests : `tests/end.test.mjs`, trois tests « Attaquer » et « Conquérir »… / sans vaisseaux posés / hors de ma détection.
+
+**D-161 — Cache `astra-p2p-v82`**
+- 2026-11-03. Contexte : fusion de `main` (D-157 à D-159 et cache v81 déjà pris) dans la PR des ordres d'assaut (D-160).
+- Choix : `VERSION` passe à `astra-p2p-v82` pour que les téléphones prennent le nouveau `session.js`.
+- Qui : Claude, par défaut. Source : session `fb0c1844`. Statut : en vigueur.

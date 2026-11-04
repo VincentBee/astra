@@ -206,6 +206,66 @@ scenario('un colonisateur ne prend pas une planète habitée, une attaque pille 
   assert.equal(raid.A.ownerAt(raid.cell)?.id, raid.B.me, 'l’ordre « attaquer » ne prend pas la planète');
 });
 
+/** A a une flotte en orbite sur la planète mère de B, qui a `docked` posés et `defense` en bâtiments. */
+function facing(ships, docked = {}, defense = {}) {
+  const g = newGame(2, ['human', 'machine']);
+  const { players: [A, B], sync } = g;
+  const cell = { ...me(B).home };
+  Object.assign(me(B).planet.levels, defense);
+  me(B).planet.ships = { ...docked };
+  B.touch();
+  sync(A, B);
+  me(A).planet.ships = { ...ships };
+  const id = A.takeOff('home', { ...ships }, {}, 0);
+  Object.assign(A.myFleet(id), { from: { ...cell }, to: { ...cell }, fuel: 1000 });
+  return { A, B, cell, id };
+}
+
+scenario('« Attaquer » et « Conquérir » comptent les vaisseaux posés et estiment le combat', (film) => {
+  const { A, cell, id } = facing({ fighter: 3 }, { fighter: 7, heavy: 9 });
+  film.look(A, '3 frégates de A face à la planète mère de B, 16 vaisseaux posés');
+  const orders = A.ordersAt(id, cell);
+  const conquer = orders.find((x) => x.kind === 'conquer');
+  film.look(A, 'l’ordre « Conquérir » compte les 16 vaisseaux posés', [
+    { show: 'vaisseaux posés comptés', at: cell, expected: '+ 16 vaisseaux posés', got: conquer.label.match(/\+ [^·]+/)?.[0].trim(), ok: /\+ 16 vaisseaux posés/.test(conquer.label) },
+    { show: 'estimation', at: [A, id], expected: 'lose', got: conquer.odds },
+  ]);
+  for (const kind of ['attack', 'conquer']) {
+    const o = orders.find((x) => x.kind === kind);
+    assert.match(o.label, /défense ⚔ \d+ ◇ \d+ \+ 16 vaisseaux posés/, kind);
+    assert.equal(o.odds, 'lose', `${kind} : 3 vaisseaux contre 16, perdu d’avance`);
+    assert.match(o.label, /bataille perdue/);
+  }
+});
+
+scenario('la même planète sans vaisseaux posés : victoire probable', (film) => {
+  const { A, cell, id } = facing({ fighter: 30 });
+  film.look(A, '30 frégates de A face à une planète sans vaisseaux');
+  const o = A.ordersAt(id, cell).find((x) => x.kind === 'conquer');
+  film.look(A, 'l’ordre « Conquérir » : rien de posé, victoire probable', [
+    { show: 'estimation', at: [A, id], expected: 'win', got: o.odds },
+  ]);
+  assert.equal(o.odds, 'win');
+  assert.match(o.label, /\+ 0 vaisseau posé · victoire probable/);
+});
+
+scenario('hors de ma détection : vaisseaux posés inconnus, victoire au mieux incertaine', (film) => {
+  const { A, cell, id } = facing({ fighter: 30 }, { fighter: 7 });
+  film.look(A, '30 frégates de A face à 7 vaisseaux posés, avant de perdre la vue');
+  A.eyes = () => [];
+  const o = A.ordersAt(id, cell).find((x) => x.kind === 'conquer');
+  film.look(A, 'plus de vue : les vaisseaux posés deviennent « ? »', [
+    { show: 'vaisseaux posés', at: cell, expected: '+ ? vaisseaux', got: o.label.match(/\+ [^·]+/)?.[0].trim(), ok: /\+ \? vaisseaux/.test(o.label) },
+    { show: 'estimation', at: [A, id], expected: 'unsure', got: o.odds },
+  ]);
+  assert.match(o.label, /\+ \? vaisseaux · victoire incertaine/);
+  assert.equal(o.odds, 'unsure');
+  // Même sans voir les vaisseaux, la défense seule suffit à dire « perdu ».
+  const weak = facing({ fighter: 1 }, {}, { turret: 3 });
+  weak.A.eyes = () => [];
+  assert.equal(weak.A.ordersAt(weak.id, weak.cell).find((x) => x.kind === 'attack').odds, 'lose');
+});
+
 scenario('une partie d’avant la course n’a ni froid ni fin', (film) => {
   frost();
   const { players: [A], clock } = newGame(1, ['human']);
