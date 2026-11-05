@@ -11,7 +11,7 @@ réelles depuis le départ.*
 
 | Forces | Faiblesses |
 |---|---|
-| Les pouvoirs : **+45 % à +90 % de minéraux** à 10 min (deux mesures) | Économie la plus lente au départ (650 minéraux/min à 12 min au mieux, sans pouvoirs) |
+| Les pouvoirs : **+45 % à +90 % de minéraux** à 10 min, +24 % sur toute la partie | Économie la plus lente au départ (650 minéraux/min à 12 min au mieux, sans pouvoirs) |
 | La défense la plus dure du jeu (le dôme) | Défense chère : chaque niveau coûte 1,6 fois le précédent |
 | Vaisseaux à longue portée (50 cases) et dards solides | Vaisseaux lents (léviathan 10 cases/min) et chers |
 
@@ -110,6 +110,10 @@ meilleur investissement des aliens.**
   minéraux.
 - Par point d'énergie, la transe rapporte plus ; par minute, l'arrachement rapporte plus
   (voir [questions](questions.md), q-21).
+- **Sur toute une partie, le gain baisse** : +24 % avec les deux pouvoirs sur 32 min (mesure
+  `eq-eco`, `eq-eco/q-pouvoirs-absence.mjs`), car l'entrepôt se remplit et la planète est
+  pleine vers 13 à 14 min. Le gros du gain est au début.
+- **Ne lance jamais la transe entrepôt plein** : le surplus est perdu (l'IA le fait, `eq-eco`).
 - L'arrachement ne marche pas si l'entrepôt de minéraux est plein : dépense avant.
 - Après 14 min, la planète de 18 places est pleine et l'entrepôt plafonne : les pouvoirs ne
   servent que si tu dépenses (vaisseaux, colonies).
@@ -211,6 +215,9 @@ dard psionique 1, soit **1 726**. Le léviathan : carapace chitineuse 2 en plus,
   bassin 1 et 2, sanctuaire, lévitation 1, ruche, dard 1, couveuse ; 1re graine-ruche à
   11,9 min ; 1er léviathan à 18,1 min. L'IA alien commande son premier dard vers 22,4 min
   et ne fait jamais de léviathan.
+- **Colonise tôt** (`eq-eco`, `eq-eco/q-colonies.mjs`) : une colonie fondée à 8 min extrait
+  22 571 minéraux jusqu'à son gel, à 16 min 13 264 ; son colonisateur se rembourse en 1 à
+  2,5 min. Toute colonie fondée plus de 3 min avant son gel vaut le coup.
 - **Après 18 min, il ne reste que 2 planètes libres** sur la carte (médiane, `eq-combat`) :
   pour grandir, il faut conquérir. Avec des léviathans, prendre une colonie d'IA ne coûte
   aucune perte (`eq-combat`).

@@ -186,6 +186,9 @@ nanométrique 2 en plus, soit **3 024**.
   depuis la fondation) : **1er drone à 7,75 min** avec réacteur, matrice 1, foreuse, matrice 2,
   réacteur, ions 1, essaim 1, usine ; 1re sonde à 9,7 min (l'IA fait mieux : 8,7 min) ;
   1er destroyer à 12,6 min. L'IA machine commande ses premiers drones vers 12,75 min.
+- **Colonise tôt** (`eq-eco`, `eq-eco/q-colonies.mjs`) : une colonie fondée à 8 min extrait
+  47 595 minéraux jusqu'à son gel, à 16 min 29 249 ; son colonisateur se rembourse en 1 à
+  2,5 min. Toute colonie fondée plus de 3 min avant son gel vaut le coup.
 - **Après 18 min, il ne reste que 2 planètes libres** sur la carte (médiane, `eq-combat`) :
   pour grandir, il faut conquérir.
 - **Façon la plus rapide de gagner contre l'IA** : *non confirmé, en attente de la mesure de

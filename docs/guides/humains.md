@@ -177,6 +177,9 @@ L'arche coloniale (colonies) : **1 870**.
   depuis la fondation) : **1re frégate à 7,8 min** avec solaire, mine, labo 1, labo 2,
   propulsion 1, blindage 1, chantier ; 1re arche à 9,5 min ; 1er croiseur à 11,5 min. L'IA
   humaine commande sa première frégate vers 14,2 min et ne fait jamais de croiseur.
+- **Colonise tôt** (`eq-eco`, `eq-eco/q-colonies.mjs`) : une colonie fondée à 8 min extrait
+  26 671 minéraux jusqu'à son gel, à 16 min 14 459 ; son colonisateur se rembourse en 1 à
+  2,5 min. Toute colonie fondée plus de 3 min avant son gel vaut le coup.
 - **Après 18 min, il ne reste que 2 planètes libres** sur la carte (médiane, `eq-combat`) :
   pour grandir, il faut conquérir. Prendre une colonie d'IA coûte moins cher qu'une arche
   (390 à 1 020 de flotte, 0 perte avec des croiseurs).

@@ -42,9 +42,22 @@ en recherches ou en bâtiments, jamais en entrepôts. *Non confirmé en partie (
 
 ## Planètes et colonies
 
-**Combien de colonies valent la peine, et jusqu'à quand ? (q-02)** *Non confirmé (en attente de
-`eq-eco`).* Prix pour débloquer le colonisateur (mesuré, `guides/deblocage.out`) : 1 870
-(humains), 2 123 (machines), 2 263 (aliens), plus le colonisateur lui-même (360, 360, 510).
+**Combien de colonies valent la peine, et jusqu'à quand ? (q-02)**
+Prix pour débloquer le colonisateur (mesuré, `guides/deblocage.out`) : 1 870 (humains), 2 123
+(machines), 2 263 (aliens), plus le colonisateur lui-même (360, 360, 510). Mesuré par `eq-eco`
+(`eq-eco/q-colonies.mjs`, sans combat, planète de chaleur 0,7) : **une colonie rembourse son
+colonisateur 1 à 2,5 min après sa fondation**, et la première « tout compris » (labo 2,
+chantier, technologie) en 4 à 8 min. **Toute colonie fondée plus de 3 min avant son gel vaut le
+coup** (6 à 8 min pour la première). Ce qui limite le nombre de colonies, ce sont les planètes
+libres et le froid, pas l'argent. Minéraux qu'une colonie extrait jusqu'à son gel :
+
+| Fondée à | Humains | Machines | Aliens |
+|---|---|---|---|
+| 8 min | 26 671 | 47 595 | 22 571 |
+| 16 min | 14 459 | 29 249 | 13 264 |
+| 24 min | 3 085 | 8 540 | 3 981 |
+
+*Non confirmé en vraie partie (trajet réel, planètes déjà prises).*
 
 **Conquérir rapporte-t-il plus que coloniser ? (q-10)**
 Lu dans le code : une planète prise devient une **colonie neuve de ta race**, avec les
@@ -60,28 +73,45 @@ et la flotte reste. Prendre une **planète mère** d'IA demande 1 800 à 3 060 d
 **Coloniser un astéroïde ou une comète vaut-il le coup ? (q-17)**
 Lu dans le code : un astéroïde a 7 à 10 places, 35 % des minéraux et 10 % de la nourriture
 d'une planète ; une comète 6 à 8 places, 20 % des minéraux et 35 % de la nourriture
-(`SMALL_BODIES`, `js/game.js:1171-1174`). On ne peut pas y fonder sa planète mère. *Non
-confirmé : la rentabilité (en attente de `eq-eco`).*
+(`SMALL_BODIES`, `js/game.js:1171-1174`). On ne peut pas y fonder sa planète mère. Mesuré par `eq-eco`
+(`eq-eco/q-colonies.mjs`) : **oui, ça vaut le coup**, le colonisateur se rembourse aussi vite
+(1 à 2,5 min), mais un petit corps rapporte 2 à 4 fois moins qu'une planète (fondé à 8 min :
+astéroïde 7 607 minéraux, comète 4 431, planète 26 671 chez les humains). À prendre quand aucune
+planète n'est libre. L'astéroïde est un peu meilleur que la comète.
 
 **Combien vaut le climat ? (q-19)**
 Lu dans le code (`climateAt`, `js/game.js:1226-1236`) : énergie ×0,8 à ×1,2, minéraux ×0,9 à
 ×1,1 (meilleurs près du soleil), nourriture ×0,6 à ×1,3 (meilleure en zone tempérée). Mesuré :
-×0,82 / ×0,91 dans un coin, ×1,18 / ×1,09 au bord du soleil (`guides/limites.out`). Le climat
-compte surtout parce qu'**une planète chaude gèle plus tard**. *Non confirmé : l'écart de
-production en partie (en attente de `eq-eco`).*
+×0,82 / ×0,91 dans un coin, ×1,18 / ×1,09 au bord du soleil (`guides/limites.out`). Mesuré par `eq-eco` (`eq-eco/q-gisement-climat.mjs`) : **le climat compte beaucoup, et pas
+pareil selon la race**. Machines : plus c'est chaud, mieux c'est (à 15 min, 1 547 minéraux/min à
+chaleur 0,16 contre 2 801 à 0,96, et la planète gèle 14 min plus tard). Humains et aliens : la
+meilleure zone est **tempérée à chaude (0,5 à 0,7)** ; trop près du soleil, la nourriture baisse
+et c'est la famine. Une planète glacée gèle tôt (21,6 min à 0,16) : à éviter pour tous.
 
 **Le gisement peut-il s'épuiser avant le froid ? (q-09)**
 Lu dans le code : un gisement de minéraux a 60 000 à 200 000 unités et se régénère de 150 à
 450 par heure de jeu ; la nourriture 15 000 à 60 000 et 80 à 250 (`NATURE`,
-`js/game.js:1200`). Une partie de 36 min dure 90 heures de jeu. *Non confirmé : à partir de quel
-niveau il s'épuise (en attente de `eq-eco`).*
+`js/game.js:1200`). Une partie de 36 min dure 90 heures de jeu. Mesuré par `eq-eco`
+(`eq-eco/q-gisement-climat.mjs`) : **non, le gisement ne se vide jamais avant le gel**, même le
+plus pauvre. Il ne baisse que si l'extraction dépasse la repousse (375 à 1 125 minéraux par
+minute réelle), à partir d'environ mine ou foreuse 6-7. Ce qui ne rentre pas dans l'entrepôt
+reste dans le sol. **La richesse du sol ne compte presque pas pour choisir sa planète.**
 
 **À combien de minutes du gel faut-il arrêter de construire ? (q-03)**
 Lu dans le code : l'IA arrête 2 min avant (`planBuilding`, `js/bot.js`). Mesuré
 (`guides/roi.mjs`) : une mine ou une foreuse se rembourse en 2,5 à 5 min, un amplificateur en
-5 à 14 min. Donc : **plus de mine ni de foreuse à moins de 5 min du gel**, plus
-d'amplificateur à moins de 6 à 14 min. *Non confirmé pour les autres bâtiments (en attente de
-`eq-eco`).*
+5 à 14 min. Mesuré par `eq-eco` (`eq-eco/roi-table.mjs`, énergie consommée comprise) — **n'ajoute plus ce
+niveau à moins de ces minutes du gel de la planète** :
+
+| Race | Bâtiment et minutes avant le gel |
+|---|---|
+| ◆ Humains | mine 1-4 : 1-2 min ; mine 5 : 2,3 ; mine 7 : 3,7 ; mine 9 : 6,2 ; mine 12 : 13,6 · ferme 5 : 3,5 · solaire 5 : 3 |
+| ⬢ Machines | foreuse 3 : 2,4 ; foreuse 5 : 3,9 ; foreuse 7 : 6,6 ; foreuse 9 : 11,3 · réacteur 5 : 3,2 ; réacteur 7 : 5,7 |
+| ✦ Aliens | prisme 5 : 2,5 · ruche 5 : 3,2 · amplificateur 1 : 2,9 ; 2 : 4,9 ; 3 : 8,3 ; 4 : 14 (environ moitié moins avec les pouvoirs) |
+
+Le seuil de l'IA (2 min) est trop tard dès la mine 5, la foreuse 3 ou la ruche 4. **Mais pour le
+départage**, juste avant le gel, un bâtiment compte dans le score même s'il ne se rembourse pas,
+et le stock ne compte pas : dépense tout (voir q-23).
 
 **Comment vider une planète qui va geler ? (q-11)**
 Mesuré (`guides/q11-deconstruction.mjs`) : déconstruire rend **tout de suite** la moitié du prix
@@ -103,8 +133,12 @@ ressource. Premiers niveaux impossibles :
 
 **Le fil d'attente pendant une absence (q-13)**
 Lu dans le code : 12 éléments au plus (`PLAN_MAX`), et un bâtiment sans place bloque les
-bâtiments qui le suivent (`js/game.js`). *Non confirmé : le meilleur fil et ce qu'on perd (en
-attente de `eq-eco`).*
+bâtiments qui le suivent (`js/game.js`). Mesuré par `eq-eco` (`eq-eco/q-pouvoirs-absence.mjs`) : **partir 10 min avec un fil bien
+rempli coûte peu** : à 3 et 8 min, 12 éléments couvrent environ 10 min (6 à 7 bâtiments et 5 à 6
+recherches). Bon fil : les bâtiments de production en alternance avec les recherches de
+production, **et un entrepôt au milieu** (sinon le stock déborde). Ce qui se perd : les pouvoirs
+aliens (−14 % d'extraction à 3 min, −6 à −7 % ensuite). Après la planète pleine (vers 13 min),
+être là ou non ne change rien à l'économie. *Non confirmé en chiffres pour humains et machines.*
 
 ## Défense et combat
 
@@ -210,9 +244,11 @@ Lu dans le code (`POWERS`, `liftGain`, `js/game.js`) : par psionique, l'arrachem
 40 minéraux (×amplificateur) pour 30 d'énergie, toutes les 72 s ; la transe double
 l'extraction pendant 48 s, soit 50 minéraux en plus (×amplificateur) pour 25 d'énergie,
 toutes les 144 s. **Par point d'énergie, la transe rapporte plus (2 contre 1,33) ; par
-minute, l'arrachement rapporte plus** (33 contre 21 minéraux par psionique). Mesuré
-(`guides/pouvoirs.out`) : arrachement seul +43 %, transe seule +37 % à 10 min. Voir
-[aliens](aliens.md).
+minute, l'arrachement rapporte plus** (33 contre 21 minéraux par psionique). Mesuré à 10 min (`guides/pouvoirs.out`) : arrachement seul +43 %, transe seule +37 %. Mesuré
+par `eq-eco` sur toute une partie de 32 min : arrachement +11 %, transe +21 %, les deux +24 %.
+**La transe ne vaut que si l'entrepôt a de la place pendant ses 48 s** : ne la lance jamais
+entrepôt plein. Le nombre de psioniques ne change pas ce rapport : les deux pouvoirs valent le
+coup dès 1 psionique. Voir [aliens](aliens.md).
 
 **Un pouvoir alien peut-il ruiner un voisin ? (q-24)**
 Lu dans le code : non. Les pouvoirs n'agissent que sur la planète alien qui les lance
