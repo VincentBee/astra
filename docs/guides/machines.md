@@ -3,7 +3,7 @@
 Pas de population, pas de nourriture : tout tourne à l'énergie. Les foreuses produisent
 beaucoup mais mangent du courant, et les bâtiments coûtent aussi de l'énergie.
 
-*Chiffres mesurés sur le commit `15ca511`, le 2026-11-04 vers 23:50 UTC. Scripts dans
+*Chiffres mesurés sur le commit `15ca511`, du 2026-11-04 vers 23:40 au 2026-11-05 UTC. Scripts dans
 `~/.claude/swarm-runs/astra-audit-2026-11-05/guides/` (voir [README](README.md)). Minutes
 réelles depuis le départ.*
 
@@ -11,7 +11,7 @@ réelles depuis le départ.*
 
 | Forces | Faiblesses |
 |---|---|
-| La meilleure économie du départ : 1 138 minéraux/min dès 10 min avec un bon ordre | La planète est pleine très tôt (vers 7,6 min en suivant l'ordre de l'IA) |
+| La meilleure économie du départ : 2 022 minéraux/min à 10 min avec l'ordre optimisé (`eq-eco`) | La planète est pleine très tôt (vers 7,6 min en suivant l'ordre de l'IA) |
 | Drones rapides (22,5 cases/min) et vite construits (10 en 17 s) | Portée courte : 36 cases pour un drone, 30 pour la sonde |
 | Défense la moins chère (tourelles et blindage) | Défense la plus faible en coque : elle tombe vite face aux gros lots |
 
@@ -23,8 +23,10 @@ Taux de victoire en parties d'IA contre IA :
 | IA humaine | 39 | **38 (97,4 %)** | 22,9 min | — |
 | 3 joueurs (humain, machine, alien) | 117 | **101 (86,3 %)** | 27,8 min | 33,4 min, surtout par le froid |
 
-*Session `eq-races` (`eq-races/sim.mjs`, 297 parties d'IA contre IA, 20 cartes, froid réel ; champ `guide` de `eq-races.json`).* Dans 5 parties sur 6, c'est elle qui lance la première
-conquête de la partie, entre 12,1 et 13,6 min.
+*Session `eq-races` (`eq-races/sim.mjs`, 297 parties d'IA contre IA, 20 cartes, froid réel ; champ `guide` de `eq-races.json`).*
+
+Dans mes 6 duels d'IA (`ia-parties.mjs`), c'est l'IA machine qui lance la première conquête de
+la partie 5 fois sur 6, entre 12,1 et 13,6 min.
 
 À trois IA (une par race, 4 parties, `ia-parties.mjs`, sortie `ia-3.out`) : **l'IA machine gagne
 4 fois sur 4** ; la partie finit entre 21,6 et 30,3 min. L'IA humaine est éliminée entre 21,6 et
@@ -118,7 +120,8 @@ Mesuré sur la planète de l'IA à 5, 10 et 18 min, un seul niveau ajouté (`roi
   Une foreuse 7 consomme environ 64 d'énergie par minute de plus (mesuré). Garde le solde
   d'énergie positif, sinon les foreuses ralentissent.
 - **Le nœud de calcul** (−12 % de consommation des foreuses par niveau) ne s'est pas remboursé
-  en 15 min dans ces mesures (niveaux 2 à 6) : il ne sert que si l'énergie manque.
+  en 15 min dans ces mesures (niveaux 2 à 6) : il ne sert que si l'énergie manque. Le niveau 1,
+  avec un réacteur, se rembourse en 3,5 min (`eq-eco`, plus bas).
 - La recherche ne dure que 3 à 22 secondes avec une matrice 2 (`roi-tech.mjs`).
 
 **Sur toute une partie** (session `eq-tech`, 16 parties d'IA, ressources gagnées de 10 à 29 min
@@ -163,6 +166,11 @@ blindage (`defense.mjs`, tableau complet dans [limites](limites.md) §4) :
   mère à 12-13 min ; avec 14 drones posés, il faut 25 drones ou 16 frégates pour la prendre
   (`ia-cibles.mjs`).
 - Tes technologies renforcent tes drones, **pas** tes tourelles ni ton blindage.
+- **Pour que l'IA ne t'attaque pas** (mesure `eq-ia`, planète à 10 niveaux ordinaires) : rien à
+  10 min ; 1 niveau de tourelles à 15 min ; à 20 min, 3 tourelles contre une IA humaine, 5
+  contre une IA machine ; à 25 min, 8 et 9. Détails : [questions](questions.md), q-04.
+- **Jouer la tortue** (défenses et évacuation, sans attaquer) perd : 0 victoire sur 5 contre
+  1 IA (`eq-ia`).
 
 ## Attaquer et gagner
 
@@ -186,8 +194,8 @@ nanométrique 2 en plus, soit **3 024**.
   coque d'un de ses vaisseaux ; les lourds sont ainsi intouchables par les défenses d'IA
   vues en partie (⚔ 45 à 70) (`eq-combat`).
 - **Ce que fait l'IA machine, et qui gagne contre les IA** : elle lance des conquêtes de
-  drones dès 12 min, avant que les autres aient des vaisseaux posés, et finit ses duels entre
-  15,9 et 20,0 min (`ia-parties.mjs`).
+  drones dès 12 min, avant que les autres aient des vaisseaux posés ; ses duels durent 18,9 min
+  (contre l'IA alien) et 22,9 min (contre l'IA humaine) en médiane (`eq-races`).
 - **Le plus vite possible** (`eq-tech/rush.mjs`, meilleur ordre trouvé, vaisseau fini, minutes
   depuis la fondation) : **1er drone à 7,75 min** avec réacteur, matrice 1, foreuse, matrice 2,
   réacteur, ions 1, essaim 1, usine ; 1re sonde à 9,7 min (l'IA fait mieux : 8,7 min) ;
@@ -199,8 +207,20 @@ nanométrique 2 en plus, soit **3 024**.
   pour grandir, il faut conquérir.
 - **Façon la plus rapide de gagner** (mesure `eq-races`) : **prendre les machines, coloniser tôt
   (2e planète vers 9 min), puis conquérir après 10 min**. Victoire en 19,9 min en médiane contre
-  1 IA (12,6 min au plus vite), 26,7 min contre 3 IA. C'est la façon la plus rapide de gagner
-  du jeu. La stratégie « guerre d'abord » (vaisseaux avant les colonies) perd presque toujours.
+  1 IA (12,6 min au plus vite), 26,7 min contre 3 IA. C'est la race qui gagne le plus vite
+  (`eq-races`). La stratégie « guerre d'abord » (vaisseaux avant les colonies) perd presque toujours.
+- **Encore plus vite, contre 1 IA** (mesure `eq-ia`, `eq-ia/sim.mjs`, 5 parties, joueur limité
+  à 3 ordres toutes les 3 s comme l'IA) : **attaque rapide de drones sur la planète mère de
+  l'IA**. Exemple : 1er drone à 8,2 min, 10 drones (900 minéraux + 400 énergie) décollent à
+  10,2 min, planète mère prise, victoire à 12,0 min. Résultat contre 1 IA machine : **4 victoires
+  sur 5, en 11,9 min en médiane** (10,8 au mieux). Contre 3 IA, le jeu économique gagne mieux
+  (4 sur 5 en 27,4 min) que l'attaque rapide (3 sur 5 en 31,4 min).
+- **Les deux mesures ne disent pas tout à fait la même chose** : chez `eq-ia`, l'attaque rapide
+  vise directement la planète mère et ne part que si le combat est gagné en gardant la moitié
+  de la flotte ; chez `eq-races`, la « guerre d'abord » perd. Ce qui marche dans les deux :
+  **frapper la planète mère de l'IA avant qu'elle ait des vaisseaux de guerre** (vers 11,4 min
+  pour l'IA machine, `eq-ia`). *Non confirmé : laquelle est la meilleure face à un vrai joueur
+  (peu de parties).*
 
 ## Pièges
 
@@ -214,8 +234,8 @@ nanométrique 2 en plus, soit **3 024**.
 
 ## Non confirmé
 
-- Le « meilleur ordre » vient d'une recherche locale (400 essais) sur une planète type ; ce
-  n'est pas forcément le meilleur possible.
+- Les ordres de départ sont les meilleurs **trouvés** (recherche locale d'`eq-eco` et la mienne)
+  sur une planète type ; ce n'est pas forcément le meilleur possible.
 - Les taux de victoire sont ceux de l'IA contre l'IA : un vrai joueur joue autrement.
-- La façon la plus rapide de gagner a été mesurée avec des joueurs scriptés (`eq-races`), pas
-  avec un vrai joueur.
+- La façon la plus rapide de gagner a été mesurée avec des joueurs scriptés (`eq-races`,
+  `eq-ia`, 5 parties par ligne chez `eq-ia`), pas avec un vrai joueur.

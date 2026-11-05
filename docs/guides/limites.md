@@ -4,10 +4,12 @@ Ce que le jeu ne permet pas, et à partir de quand. Tous les chiffres viennent d
 script qui lit le code ou qui joue avec les règles de `js/game.js`, `js/fleet.js` et `js/bot.js`.
 
 - **Code mesuré** : commit `15ca511` (2026-11-04).
-- **Mesures** : 2026-11-04 vers 23:40 UTC, par la session `guides` de l'audit du 2026-11-05.
-  Les scripts sont hors du dépôt, dans `~/.claude/swarm-runs/astra-audit-2026-11-05/guides/`
-  (nom du script et de sa sortie sous chaque tableau). D'autres chiffres viennent des sessions
-  `eq-combat` et `eq-rythme` de la même équipe (dossiers `eq-combat/` et `eq-rythme/` à côté).
+- **Mesures** : du 2026-11-04 vers 23:40 au 2026-11-05 UTC, par la session `guides` de l'audit
+  du 2026-11-05. Les scripts sont hors du dépôt, dans
+  `~/.claude/swarm-runs/astra-audit-2026-11-05/guides/` (nom du script et de sa sortie sous
+  chaque tableau). D'autres chiffres viennent des sessions `eq-combat`, `eq-rythme`, `eq-eco`,
+  `eq-tech`, `eq-races` et `eq-ia` de la même équipe (dossiers du même nom à côté, et champ
+  `guide` de leurs fichiers `.json`).
 - Une minute, ici, c'est une **minute réelle** comptée depuis le départ commun de la partie.
 
 ## 1. La partie dure au plus 36 minutes
@@ -164,8 +166,8 @@ toujours plus cher (aussi mesuré par `eq-combat`, `eq-combat/02_defense.mjs`).*
 - **Les niveaux hauts ne le sont plus** : le prix d'un niveau de défense est multiplié par 1,5
   (1,45 machines, 1,6 aliens) à chaque niveau, mais l'attaquant n'a besoin que de quelques
   vaisseaux de plus. À *k* = 8, la défense humaine coûte 13 295 et se fait prendre par
-  8 800 de frégates. Au-delà de *k* = 6 environ, **la défense coûte plus cher que la flotte
-  qui la prend**.
+  8 800 de frégates. Au-delà de *k* = 4 (aliens) à *k* = 6 (humains, machines), **la défense
+  coûte plus cher que la flotte qui la prend**.
 - **Le plafond absolu** : même une planète de 22 places couverte uniquement de défenses
   (11 + 11 niveaux, rien d'autre) tombe devant :
 
@@ -206,6 +208,20 @@ planètes (script `ia-cibles.mjs`, sortie `ia-cibles.out`) :
 | IA machine, 12 min (⚔ 24 / ◇ 240 + 8 drones posés) | 12 | 4 | 18 | 4 | 9 | 2 |
 | IA machine, 13 min (⚔ 24 / ◇ 240 + 14 drones posés) | 16 | 5 | 25 | 5 | 11 | 3 |
 
+### 4.4 Les failles de l'IA (mesures `eq-ia`, 50 IA)
+
+- **Aucun vaisseau de guerre avant 11,4 min** (IA machine), **14,2 min** (humaine), **18,3 min**
+  (alienne), en médiane ; à 10 min, la plus grosse flotte posée d'une IA est de 2 drones.
+- **Quand elle attaque, elle emmène tous ses vaisseaux de guerre** : sa planète reste vide
+  pendant 24 à 51 s en médiane (1 914 départs sur 1 914).
+- **Elle ne poursuit jamais une flotte**, ne la voit pas comme une menace et ne rappelle jamais
+  une flotte en route.
+- **Elle envoie souvent deux flottes sur la même planète à 3 s d'écart** ; une planète qu'elle
+  vient de prendre se reprend avec 1 chasseur (ce n'est qu'une colonie neuve).
+- Elle voit à travers le brouillard : tes vaisseaux posés comptent pour elle, même hors de sa
+  détection.
+- Elle évacue bien ses vaisseaux avant le froid : ce n'est pas une faille.
+
 ## 5. Technologies, chantiers, sol
 
 Mesures de la session `eq-tech` (champ `guide` de `eq-tech.json`) et `eq-eco`
@@ -235,6 +251,7 @@ Mesures de la session `eq-tech` (champ `guide` de `eq-tech.json`) et `eq-eco`
 | Dès que le prix dépasse l'entrepôt | Payer ce bâtiment, cette recherche ou ce lot (agrandir l'entrepôt) |
 | Planète pleine (7 à 14 min selon la race, sur 18 places) | Construire sans déconstruire |
 | Vers 18 min | Trouver une planète libre : il n'en reste que 2 en médiane (13 à 12 min, `eq-combat`) ; ensuite, on grandit en conquérant |
+| Après 23 min | Envoyer un colonisateur vers une planète qui tiendra : les derniers sont partis entre 14 et 23 min dans les mesures de `eq-rythme` (q-01) |
 | Planète gelée | Y vivre, la coloniser, la conquérir, s'y poser |
 | Plus de planète, plus de colonisateur | Jouer : le joueur est éliminé |
 | Vers 29 min à 8 joueurs | Trouver une planète chaude pour chacun |

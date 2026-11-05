@@ -1977,13 +1977,18 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   départ) pendant l'audit `astra-audit-2026-11-05`. Les ordres de `GUIDE.md` datent d'avant le
   tempo 2,5, la recherche, la place et les vaisseaux (le fichier dit « à refaire »).
 - Choix (Claude, par défaut) : un dossier `docs/guides/` avec un fichier par race
-  (`humains.md`, `machines.md`, `aliens.md`), `limites.md` et un index `README.md` ; `GUIDE.md`
+  (`humains.md`, `machines.md`, `aliens.md`), `limites.md`, `questions.md` (24 questions de
+  joueurs préparées par la session `questions`, ajoutées le 2026-11-05) et un index `README.md` ; `GUIDE.md`
   garde son texte mais renvoie en tête vers ces guides, qui remplacent ses ordres de
   construction. Chaque chiffre vient d'une mesure (script Node sur les règles de `js/game.js`,
   `js/fleet.js`, `js/bot.js`, ou constante lue dans le code) ; chaque tableau donne le commit
   mesuré (`15ca511`), la date et le script. Les scripts restent **hors du dépôt**
   (`~/.claude/swarm-runs/astra-audit-2026-11-05/guides/`), comme demandé pour l'audit. Ce qui
   n'est pas mesuré est écrit « non confirmé ». Minutes réelles depuis le départ commun.
+  Les mesures des autres sessions de l'audit (`eq-eco`, `eq-tech`, `eq-combat`, `eq-rythme`,
+  `eq-races`, `eq-ia`) sont reprises avec leur source ; quand deux mesures ne s'accordent pas
+  (attaque rapide : gagne chez `eq-ia`, perd chez `eq-races` ; pouvoirs aliens : +45 à +90 %),
+  les deux sont écrites, sans trancher.
 - Alternatives écartées : réécrire `GUIDE.md` en entier (un seul long fichier, et on perdrait la
   partie « Flottes et voyage » encore juste) ; mettre les scripts de mesure dans `tests/`
   (l'audit interdit d'écrire autre chose que les guides ; à reconsidérer pour pouvoir refaire

@@ -3,7 +3,7 @@
 Une population qui travaille dans les mines et les fermes. Plus d'habitants, plus de bras,
 plus de minéraux.
 
-*Chiffres mesurés sur le commit `15ca511`, le 2026-11-04 vers 23:50 UTC. Scripts dans
+*Chiffres mesurés sur le commit `15ca511`, du 2026-11-04 vers 23:40 au 2026-11-05 UTC. Scripts dans
 `~/.claude/swarm-runs/astra-audit-2026-11-05/guides/` (voir [README](README.md)). Minutes
 réelles depuis le départ.*
 
@@ -37,7 +37,7 @@ Taux de victoire en parties d'IA contre IA :
 2. **Préfère une planète plus près du soleil et plus grande** : elle gèle plus tard (voir
    [limites](limites.md) §1) et a plus de places. **Mais pas brûlante** : à chaleur 0,9, la nourriture ne vaut plus
    que ×0,74 et la population meurt de faim. Minéraux extraits sur une partie (`eq-eco`) :
-   30 225 à chaleur 0,4, **40 386 à 0,7**, 26 298 à 0,9. Vise une chaleur de 0,6 à 0,75.
+   30 225 à chaleur 0,4, **40 386 à 0,7**, 26 298 à 0,9. Vise une chaleur de 0,5 à 0,75 (tempérée à chaude).
 3. **Le plus fort : loge, creuse, et cherche le forage tout de suite.** Ordre optimisé par la
    session `eq-eco` (objectif : minéraux extraits en 32 min ; planète de 18 places, chaleur
    0,7 ; R = recherche) :
@@ -86,7 +86,9 @@ chiffres de l'IA diffèrent un peu entre les deux.*
    pénurie et 17 habitants morts avant 20 min, et l'avance sur l'IA disparaît. La planète est
    pleine : **déconstruis un niveau** (un habitat, par exemple) pour mettre une ferme et une
    centrale, ou **colonise**.
-6. **Le labo tôt** : il ouvre le forage (voir plus bas), le meilleur placement du jeu.
+6. **Le labo après 3 ou 4 mines, pas avant** : il ouvre le forage (voir plus bas), le meilleur
+   placement du jeu. Mais le construire en premier retarde la première colonie de 1,5 à 4 min et
+   coûte 25 à 50 % du score à 20 min (mesure `eq-rythme`, `eq-rythme/departs.mjs`).
 
 ## Investissements rentables
 
@@ -153,6 +155,9 @@ bouclier (`defense.mjs`, tableau complet dans [limites](limites.md) §4) :
   une planète *k* = 2 font passer le seuil de 17 à 27 frégates ennemies.
 - Tes technologies (blindage, canons à masse) renforcent tes vaisseaux, **pas** tes canons ni
   ton bouclier.
+- **Pour que l'IA ne t'attaque pas** (mesure `eq-ia`, planète à 10 niveaux ordinaires) : rien à
+  10 min ; 1 niveau de canon à 15 min ; à 20 min, 2 boucliers contre une IA humaine, 5 contre
+  une IA machine ; à 25 min, 5 et 8. Détails : [questions](questions.md), q-04.
 - L'IA n'attaque pas avant 10 min. Vers 11 à 13 min, sa planète mère humaine a ⚔ 48 / ◇ 400 :
   11 frégates ou 3 croiseurs la prennent (`ia-cibles.mjs`).
 
@@ -193,25 +198,36 @@ L'arche coloniale (colonies) : **1 870**.
   ensuite**. En humains, victoire en 25,2 min en médiane contre 1 IA (17,4 min au plus vite),
   33,2 min contre 3 IA. La stratégie « guerre d'abord » (labo 2 et chantier tout de suite,
   vaisseaux avant les colonies) **perd presque toujours** : chute vers 15,7 min contre 1 IA,
-  0 victoire sur 18 contre 3 IA. Tu peux avoir des frégates 6 min avant l'IA, mais ne fonce pas.
+  0 victoire sur 18 contre 3 IA. Tu peux pourtant avoir des frégates 6 min avant l'IA (`eq-tech`).
   L'IA humaine ne défend sa planète mère qu'avec ses bâtiments jusqu'à 13 min au moins :
   11 frégates ou 3 croiseurs la prennent à 12 min (`ia-cibles.mjs`).
+- **Contre 1 IA humaine** (mesure `eq-ia`, `eq-ia/sim.mjs`, 5 parties par ligne, joueur limité à
+  3 ordres toutes les 3 s comme l'IA) : jeu économique puis conquêtes dès 10 min, 4 victoires
+  sur 5 en 24,5 min en médiane (20,1 au mieux) ; attaque rapide de frégates, 4 sur 5 en 25 min
+  (15,3 au mieux : 1re frégate à 12,3 min, 3 frégates décollent à 12,75 min vers la planète mère
+  de l'IA). Contre 3 IA : 1 victoire sur 5, en 33,4 min. **Ce qui marche : frapper la planète
+  mère de l'IA avant ses premiers vaisseaux de guerre** (vers 14,2 min pour l'IA humaine). *Non
+  confirmé face à un vrai joueur (peu de parties ; l'attaque rapide perd dans la mesure
+  `eq-races`, mais gagne dans celle d'`eq-ia`, qui ne part que si le combat est gagné).*
 
 ## Pièges
 
 - **« Le moins cher d'abord »** : 6 min de pénurie dans les 15 premières minutes, et 37 % de
-  minéraux en moins à 10 min que le meilleur ordre.
+  minéraux en moins à 10 min que mon ordre sans recherche.
 - **Mine sans bras** : une mine de plus que d'habitants (10 par niveau) ne rapporte rien.
 - **Oublier la nourriture après 14 min** : la population meurt, la production suit.
 - **Monter la défense très haut** : chaque niveau coûte 1,5 fois le précédent ; l'ennemi
   n'a besoin que de 4 à 5 frégates de plus par niveau.
 - **Rester sur une seule planète pleine** : sans colonie, plus rien à construire après 9 min.
+- **Jouer la tortue** (défenses et évacuation, sans attaquer) : 0 victoire sur 5 contre 1 IA,
+  chute vers 18 à 25 min (`eq-ia`).
 
 ## Non confirmé
 
-- Le « meilleur ordre » est le meilleur trouvé par une recherche locale (400 essais) sur une
-  planète type, pour les minéraux à 12 min ; ce n'est pas forcément le meilleur possible, ni
-  sur une autre planète.
+- Les ordres de départ sont les meilleurs **trouvés** (recherche locale d'`eq-eco` et la mienne,
+  400 essais) sur une planète type ; ce n'est pas forcément le meilleur possible, ni sur une
+  autre planète.
 - Les taux de victoire sont ceux de l'IA contre l'IA : un vrai joueur joue autrement.
-- La façon la plus rapide de gagner a été mesurée avec des joueurs scriptés (`eq-races`), pas
-  avec un vrai joueur.
+- La façon la plus rapide de gagner a été mesurée avec des joueurs scriptés (`eq-races`,
+  `eq-ia`), pas avec un vrai joueur, et les deux mesures ne s'accordent pas sur l'attaque
+  rapide.

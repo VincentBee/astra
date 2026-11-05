@@ -5,11 +5,13 @@ réponse. Trois sortes de réponses :
 
 - **Mesuré** : un script a joué ou calculé avec les règles du jeu.
 - **Lu dans le code** : la règle est écrite ainsi dans le code (fichier et ligne donnés).
-- **Non confirmé** : pas encore mesuré. La session de mesure qui doit répondre est indiquée.
+- **Non confirmé** : pas mesuré, ou pas assez (peu de parties, pas en vraie partie). La raison est
+  donnée.
 
 *Code du commit `15ca511`. Scripts dans `~/.claude/swarm-runs/astra-audit-2026-11-05/` :
-`guides/` (cette session), `questions/` (calculs de la session `questions`), `eq-tech/`,
-`eq-combat/`, `eq-rythme/`.*
+`guides/` (cette session), `questions/` (calculs de la session `questions`), `eq-eco/`,
+`eq-tech/`, `eq-combat/`, `eq-rythme/`, `eq-races/`, `eq-ia/` (et le champ `guide` de leurs
+fichiers `.json`).*
 
 ## Gagner
 
@@ -19,8 +21,14 @@ tombent à la même minute, le meilleur score juste avant la chute gagne (`check
 `js/session.js`). Seul, personne ne gagne (D-142). La dernière case gèle vers 35,3 min
 (médiane, [limites](limites.md) §1). Mesuré par `eq-races` (q-08 ci-dessous) : un joueur qui ne combat jamais perd surtout **de
 froid** (14 défaites sur 18), car il n'a pas de planète près du soleil ; les IA, elles, le visent
-peu (7 % des prises). *Non confirmé : la stratégie « une colonie sur la planète qui gèle en
-dernier » exactement (en attente de `eq-rythme`).*
+peu (7 % des prises). Mesuré par `eq-rythme` (`eq-rythme/q01.mjs`, 30 parties : un joueur qui construit, colonise vers
+le soleil et se défend, mais n'attaque jamais) : **gagner sans combattre est rare : 3 parties
+sur 30, et seulement avec les machines.** Contre 1 IA machine : 2 victoires sur 18 ; l'IA prend
+sa première planète entre 11,5 et 16,3 min. Contre 3 IA : 1 victoire sur 12 ; on survit plus
+longtemps (les IA se battent entre elles) mais on gèle avec les autres vers 32-33 min. Le
+dernier colonisateur a été envoyé entre 14 et 23 min ; après 23 min, plus aucun n'a pu partir.
+Une défense « tortue » (défenses et évacuation) perd aussi : 0 victoire sur 5 pour chaque race,
+chute vers 18 à 25 min (`eq-ia`).
 
 **Contre 3 IA, les IA s'attaquent-elles entre elles ? Vaut-il mieux attendre ? (q-08)**
 Lu dans le code : l'IA vise toutes les planètes adverses, IA comprises, d'abord celles qui
@@ -36,15 +44,23 @@ stratégie** : machines 3 à 4 victoires sur 8, les autres 0 à 1.
 **Combien de planètes faut-il prendre pour éliminer une IA ? (q-20)**
 Lu dans le code : l'IA cherche à tenir 4 planètes, la mère comprise (`WANT_PLANETS`,
 `js/bot.js:52`). Si sa planète mère tombe, sa plus vieille colonie la remplace ; sans colonie,
-elle est éliminée. *Non confirmé : le temps entre la première prise et l'élimination (en
-attente de `eq-ia`).*
+elle est éliminée. Mesuré par `eq-ia` (`eq-ia/probe.jsonl`, 50 IA) : une IA humaine ou alien n'a qu'**une planète
+jusqu'à 12 min**, puis 3 vers 18 et 24 min ; une IA machine en a 4 à 12 min, 7 à 18 min, 10 à
+24 min (elle conquiert beaucoup). Contre 1 IA, de la première prise à l'élimination : 1,2 à
+2,5 min avec une attaque rapide de drones (3 à 5 conquêtes), 3,9 à 16,9 min avec un jeu
+économique. **Attaquer avant 12 min, c'est souvent prendre sa seule planète, donc l'éliminer.**
 
 **Si tout le monde gèle à la même minute, comment gagner le départage ? (q-23)**
 Lu dans le code : le score d'empire compte les bâtiments (sauf les entrepôts), les recherches
 et le prix des vaisseaux posés ou en vol, divisés par 100 (`empireScore`,
 `js/game.js:1071-1090`). **Le stock ne compte pas** : avant le gel, dépense tout en vaisseaux,
-en recherches ou en bâtiments, jamais en entrepôts. *Non confirmé en partie (en attente de
-`eq-rythme`).*
+en recherches ou en bâtiments, jamais en entrepôts. Calcul de `eq-rythme` : 2 000 de stock
+dépensés en chasseurs donnent +20 points (humains, 10 frégates), +19 (machines, 15 drones), +17
+(aliens, 5 dards). **Ne déconstruis jamais juste avant le gel final** : tu perds tout le prix du
+niveau et ne récupères que la moitié, en stock qui ne compte pas. Et ce départage ne sert que si
+les dernières planètes gèlent à la même minute : sinon, **le dernier gelé gagne, quel que soit
+son score** (`ranking` trie d'abord par heure de chute). *Non confirmé en scénario à deux
+joueurs.*
 
 ## Planètes et colonies
 
@@ -123,9 +139,16 @@ et le stock ne compte pas : dépense tout (voir q-23).
 Mesuré (`guides/q11-deconstruction.mjs`) : déconstruire rend **tout de suite** la moitié du prix
 du niveau, et ce remboursement **dépasse le plafond de l'entrepôt** (3 588 minéraux dans un
 entrepôt de 1 000) ; on peut ensuite payer un prix plus grand que l'entrepôt. C'est
-probablement un bug (`js/game.js:936`, demande de vérification déposée pour `verif-bug1`) : ne
-compte pas dessus. L'IA évacue ses vaisseaux 40 s avant le gel (`evacuate`, `js/bot.js`).
-*Non confirmé : combien emporter en cargos, et quand partir (en attente de `eq-rythme`).*
+probablement un bug (`js/game.js:936`, demande de vérification déposée pour `verif-bug1`) ; un
+constat voisin est confirmé (`code-eco-02` : un stock au-dessus du plafond, par une cargaison
+déchargée, bloque le fil mais pas le bouton Construire). Ne compte pas dessus. L'IA évacue ses vaisseaux 40 s avant le gel (`evacuate`, `js/bot.js`). Mesuré par
+`eq-rythme` (`eq-rythme/q11.mjs`, planète d'IA à 22 min) : **tout déconstruire prend 20 à 30 s**
+et rend 1 173 minéraux (humains, 16 niveaux), 1 452 minéraux et 346 énergie (machines), 1 352
+minéraux et 218 énergie (aliens). **2 à 4 cargos emportent le tout** (soute 400 à 500 ; un cargo
+se construit en 2,4 à 3,2 s ; 12 cases en 36 à 58 s). Donc : **commence à vider au moins
+« trajet + 30 s » avant le gel.** Avec les 40 s de l'IA, on n'arrive qu'à une planète à moins
+de 8 à 10 cases. Déconstruire fait perdre les points des bâtiments : seulement si la ressource
+sert ailleurs.
 
 **Quand l'entrepôt devient-il le mur ? (q-14)**
 Mesuré (`guides/q14-q15.mjs`, sortie `q14-q15.out`) : sans entrepôt, plafond de 1 000 par
@@ -151,23 +174,36 @@ aliens (−14 % d'extraction à 3 min, −6 à −7 % ensuite). Après la planè
 **Quelle défense l'IA n'attaque-t-elle jamais ? (q-04)**
 Lu dans le code : l'IA n'attaque que si le calcul du combat lui donne la victoire **en gardant
 au moins la moitié** de sa flotte (`js/bot.js:371`). Elle voit tous les vaisseaux posés, même
-hors de sa détection (elle lit la fiche sans brouillard). Mesuré : la planète mère d'une IA
-humaine à 12 min a ⚔ 48 / ◇ 400 ([limites](limites.md) §4.3). *Non confirmé : le seuil minute
-par minute (en attente de `eq-ia`).*
+hors de sa détection (elle lit la fiche sans brouillard). Mesuré par `eq-ia` (`eq-ia/q04.mjs`, plus grosse flotte posée par IA sur 20 parties, planète à
+10 niveaux ordinaires, sans vaisseau posé) — **défense minimale pour que l'IA ne t'attaque pas** :
+
+| Minute | Contre l'IA machine | Contre l'IA humaine | Contre l'IA alien |
+|---|---|---|---|
+| 10 min | rien (2 drones au plus) | rien | rien |
+| 15 min | 1 niveau d'arme (0 avec 15 niveaux ordinaires) | 1 niveau d'arme | 1 niveau d'arme |
+| 20 min | 5 boucliers / 5 tourelles / 3 dômes | 2 boucliers / 3 tourelles / 1 dôme | 1 bouclier / 2 tourelles / 1 dôme |
+| 25 min | 8 boucliers / 9 tourelles / 5 dômes | 5 boucliers / 8 tourelles / 3 dômes | 7 boucliers / 9 tourelles / 4 dômes |
+
+(« boucliers » pour une planète humaine, « tourelles » pour une machine, « dômes » pour une
+alienne.) Chaque niveau prend une place : 5 niveaux, ce sont 5 mines de moins.
 
 **Quand l'IA part attaquer, sa planète reste-t-elle vide ? (q-05)**
 Lu dans le code : l'IA envoie **tous** les vaisseaux de guerre posés de la planète d'où elle
 attaque (`attack`, `js/bot.js`) : pendant l'aller-retour, cette planète n'a plus que ses
-bâtiments pour se défendre. *Non confirmé : si une contre-attaque à ce moment réussit mieux (en
-attente de `eq-ia`).*
+bâtiments pour se défendre. Mesuré par `eq-ia` : **100 % des départs** de conquête de l'IA (1 914 sur 1 914) laissent sa
+planète sans vaisseau de guerre, pendant 24 s en médiane (humains, machines) à 51 s (aliens),
+jusqu'à 12 min. Son trajet aller dure 17 à 20 s en médiane. *Non confirmé : si une contre-attaque
+lancée exactement à ce moment réussit mieux.*
 
 **Une flotte en orbite ou en vol est-elle à l'abri de l'IA ? (q-06)**
 Lu dans le code : la défense d'une planète, ce sont ses vaisseaux **posés** et ses bâtiments ;
 une flotte en orbite ne défend pas (`defenseAt`, `js/session.js:2518-2530`). L'IA ne poursuit
 jamais une flotte, ne passe jamais en mode agressif et n'échange jamais (`js/bot.js` n'utilise
 ni poursuite, ni comportement, ni échange) : **contre l'IA, une flotte hors d'une planète n'est
-jamais attaquée.** *Non confirmé : ce que devient la flotte si la planète sous elle est prise
-(en attente de `eq-ia`).*
+jamais attaquée.** Lu par `eq-ia` : si la planète sous elle est prise, **la flotte reste en orbite, intacte** (la
+prise ne touche que les vaisseaux posés) ; il lui faut du carburant pour aller se poser ailleurs
+(sans carburant, elle reste coincée). L'IA ne rappelle jamais une flotte en route et ne voit pas
+une flotte comme une menace.
 
 **Les cargos protègent-ils une flotte de guerre ? (q-12)**
 Lu dans le code : à chaque passe, les dégâts se répartissent selon la coque de chaque type de

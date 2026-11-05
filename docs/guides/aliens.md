@@ -3,7 +3,7 @@
 Une poignée de psioniques, chacun très fort. Pas de mines : ils arrachent les minéraux par la
 pensée. Chaque psionique mange et consomme de l'énergie, et il en naît peu.
 
-*Chiffres mesurés sur le commit `15ca511`, le 2026-11-04 vers 23:55 UTC. Scripts dans
+*Chiffres mesurés sur le commit `15ca511`, du 2026-11-04 vers 23:40 au 2026-11-05 UTC. Scripts dans
 `~/.claude/swarm-runs/astra-audit-2026-11-05/guides/` (voir [README](README.md)). Minutes
 réelles depuis le départ.*
 
@@ -11,7 +11,7 @@ réelles depuis le départ.*
 
 | Forces | Faiblesses |
 |---|---|
-| Les pouvoirs : **+45 % à +90 % de minéraux** à 10 min, +24 % sur toute la partie | Économie la plus lente au départ (650 minéraux/min à 12 min au mieux, sans pouvoirs) |
+| Les pouvoirs : **+45 % à +90 % de minéraux** à 10 min, +24 % sur toute la partie | Économie la plus lente au départ : 854 minéraux/min à 10 min au mieux, contre 1 304 (humains) et 2 022 (machines) (`eq-eco`) |
 | La défense la plus dure du jeu (le dôme) | Défense chère : chaque niveau coûte 1,6 fois le précédent |
 | Vaisseaux à longue portée (50 cases) et dards solides | Vaisseaux lents (léviathan 10 cases/min) et chers |
 
@@ -23,8 +23,10 @@ Taux de victoire en parties d'IA contre IA :
 | IA machine | 39 | 0 | 18,9 min | 18,9 min, par conquête |
 | 3 joueurs (humain, machine, alien) | 117 | 5 (4,3 %) | 27,8 min | 24,2 min |
 
-*Session `eq-races` (`eq-races/sim.mjs`, 297 parties d'IA contre IA, 20 cartes, froid réel ; champ `guide` de `eq-races.json`).* L'ordre de construction de l'IA alien est aussi le plus éloigné du
-meilleur ordre trouvé (ci-dessous) : un joueur fait beaucoup mieux qu'elle.
+*Session `eq-races` (`eq-races/sim.mjs`, 297 parties d'IA contre IA, 20 cartes, froid réel ; champ `guide` de `eq-races.json`).*
+
+L'ordre de construction de l'IA alien est aussi le plus éloigné du meilleur ordre trouvé
+(ci-dessous) : un joueur fait beaucoup mieux qu'elle.
 
 À trois IA (une par race, 4 parties, `ia-parties.mjs`, sortie `ia-3.out`) : **l'IA machine gagne
 4 fois sur 4** ; la partie finit entre 21,6 et 30,3 min. L'IA humaine est éliminée entre 21,6 et
@@ -85,7 +87,7 @@ de famine ni de panne jusqu'à 20 min avec cet ordre.*
 chiffres de l'IA diffèrent un peu entre les deux.*
 
 4. **Pourquoi l'IA fait moins bien** : elle monte d'abord ruche et prismes (nourriture et
-   énergie), et son premier amplificateur n'arrive qu'à 6,5 min. Or l'amplificateur multiplie
+   énergie), et son premier amplificateur n'arrive qu'à 6,5 min dans ma mesure. Or l'amplificateur multiplie
    ce que rapportent **tous** les psioniques.
 5. **Il te reste 2 places sur 18** à 15 min : de quoi mettre épines 1 et dôme 1 sans rien
    perdre en production (`depart-variantes.out`).
@@ -192,6 +194,11 @@ dans [limites](limites.md) §4) :
 - **Des dards posés comptent** : 6 dards posés sur la planète *k* = 2 font passer le seuil de
   22 à 36 frégates ennemies (`defense.mjs`).
 - Tes technologies renforcent tes vaisseaux, **pas** tes épines ni ton dôme.
+- **Pour que l'IA ne t'attaque pas** (mesure `eq-ia`, planète à 10 niveaux ordinaires) : rien à
+  10 min ; 1 niveau d'épines à 15 min ; à 20 min, 1 dôme contre une IA humaine, 3 contre une IA
+  machine ; à 25 min, 3 et 5. Détails : [questions](questions.md), q-04.
+- **Jouer la tortue** (défenses et évacuation, sans attaquer) perd : 0 victoire sur 5 contre
+  1 IA (`eq-ia`).
 
 ## Attaquer et gagner
 
@@ -232,24 +239,29 @@ dard psionique 1, soit **1 726**. Le léviathan : carapace chitineuse 2 en plus,
   les autres races, **coloniser d'abord bat la guerre d'abord**. Le meilleur départ (plus haut)
   donne presque 2 fois la production de l'IA alien : un joueur fait bien mieux qu'elle
   (*non confirmé face à un vrai joueur*).
+- **Contre l'IA** (mesure `eq-ia`) : avec un jeu économique, 1 victoire sur 5 contre 1 IA
+  alien, en 32,7 min ; l'attaque rapide n'a rien gagné, mais ses scripts aliens sont jugés
+  mauvais par `eq-ia` lui-même : **ça ne conclut rien sur la race**. L'IA alien n'a pas de
+  vaisseau de guerre avant 18,3 min (médiane, `eq-ia`) : une attaque de dards avant, sur sa
+  planète mère, est la piste la plus prometteuse (*non confirmé*).
 
 ## Pièges
 
-- **Ruches et prismes d'abord** (ce que fait l'IA) : 40 % de minéraux en moins à 10 min que
-  le meilleur ordre.
-- **« Le moins cher d'abord »** : moins de la moitié des minéraux du meilleur ordre à 10 min
+- **Ruches et prismes d'abord** (ce que fait l'IA) : 40 à 50 % de minéraux en moins à 10 min
+  que les meilleurs ordres (331 contre 553 dans ma mesure, 435 contre 854 chez `eq-eco`).
+- **« Le moins cher d'abord »** : moins de la moitié des minéraux de mon ordre à 10 min
   (241 contre 553 par minute).
 - **Laisser naître sans nourriture ni énergie** : les psioniques dépérissent et l'extraction
   s'arrête avec eux.
-- **Oublier les pouvoirs** : environ un tiers de tes minéraux perdus.
+- **Oublier les pouvoirs** : environ un tiers de tes minéraux perdus dans les 14 premières
+  minutes.
 - **Défense très haute** : épines 8 et dôme 8 coûtent 37 744 ; 92 drones (11 960) les
   prennent quand même.
 
 ## Non confirmé
 
-- Le meilleur ordre a été cherché **sans pouvoirs** ; avec les pouvoirs, l'ordre idéal peut
-  être un peu différent.
-- Le « meilleur ordre » vient d'une recherche locale (400 essais) sur une planète type.
+- Mon ordre a été cherché **sans pouvoirs** ; celui d'`eq-eco` les utilise. Les deux sont les
+  meilleurs **trouvés** sur une planète type, pas forcément les meilleurs possibles.
 - Les taux de victoire sont ceux de l'IA contre l'IA : un vrai joueur joue autrement.
-- La façon la plus rapide de gagner a été mesurée avec des joueurs scriptés (`eq-races`), pas
-  avec un vrai joueur.
+- La façon la plus rapide de gagner a été mesurée avec des joueurs scriptés (`eq-races`,
+  `eq-ia`), pas avec un vrai joueur ; les scripts aliens d'`eq-ia` sont jugés mauvais.
