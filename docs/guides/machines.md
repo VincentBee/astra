@@ -15,9 +15,15 @@ réelles depuis le départ.*
 | Drones rapides (22,5 cases/min) et vite construits (10 en 17 s) | Portée courte : 36 cases pour un drone, 30 pour la sonde |
 | Défense la moins chère (tourelles et blindage) | Défense la plus faible en coque : elle tombe vite face aux gros lots |
 
-En parties d'IA contre IA (script `ia-parties.mjs`, 3 parties par duel) : **l'IA machine a
-gagné ses 6 parties** : 3 sur 3 contre l'IA humaine (fin entre 15,9 et 20,0 min) et 3 sur 3
-contre l'IA alien (fin entre 17,0 et 19,8 min). Dans 5 parties sur 6, c'est elle qui lance la première
+Taux de victoire en parties d'IA contre IA :
+
+| Contre | Parties | Victoires | Durée médiane | Si elle perd : éliminée vers |
+|---|---|---|---|---|
+| IA alien | 39 | **39 (100 %)** | 18,9 min | — |
+| IA humaine | 39 | **38 (97,4 %)** | 22,9 min | — |
+| 3 joueurs (humain, machine, alien) | 117 | **101 (86,3 %)** | 27,8 min | 33,4 min, surtout par le froid |
+
+*Session `eq-races` (`eq-races/sim.mjs`, 297 parties d'IA contre IA, 20 cartes, froid réel ; champ `guide` de `eq-races.json`).* Dans 5 parties sur 6, c'est elle qui lance la première
 conquête de la partie, entre 12,1 et 13,6 min.
 
 À trois IA (une par race, 4 parties, `ia-parties.mjs`, sortie `ia-3.out`) : **l'IA machine gagne
@@ -191,8 +197,10 @@ nanométrique 2 en plus, soit **3 024**.
   2,5 min. Toute colonie fondée plus de 3 min avant son gel vaut le coup.
 - **Après 18 min, il ne reste que 2 planètes libres** sur la carte (médiane, `eq-combat`) :
   pour grandir, il faut conquérir.
-- **Façon la plus rapide de gagner contre l'IA** : *non confirmé, en attente de la mesure de
-  la session `eq-ia` (joueur scripté)*.
+- **Façon la plus rapide de gagner** (mesure `eq-races`) : **prendre les machines, coloniser tôt
+  (2e planète vers 9 min), puis conquérir après 10 min**. Victoire en 19,9 min en médiane contre
+  1 IA (12,6 min au plus vite), 26,7 min contre 3 IA. C'est la façon la plus rapide de gagner
+  du jeu. La stratégie « guerre d'abord » (vaisseaux avant les colonies) perd presque toujours.
 
 ## Pièges
 
@@ -208,5 +216,6 @@ nanométrique 2 en plus, soit **3 024**.
 
 - Le « meilleur ordre » vient d'une recherche locale (400 essais) sur une planète type ; ce
   n'est pas forcément le meilleur possible.
-- 3 parties par duel d'IA : peu. Les taux de victoire de `eq-races` sont attendus.
-- La façon la plus rapide de gagner contre l'IA attend la mesure de `eq-ia`.
+- Les taux de victoire sont ceux de l'IA contre l'IA : un vrai joueur joue autrement.
+- La façon la plus rapide de gagner a été mesurée avec des joueurs scriptés (`eq-races`), pas
+  avec un vrai joueur.

@@ -15,9 +15,15 @@ réelles depuis le départ.*
 | Défense polyvalente (canons qui tirent, bouclier qui encaisse) | La planète est pleine vers 9 min (18 places) |
 | La recherche de minéraux (forage) se rembourse en 2 à 4 min | Famine si on oublie la nourriture : la population meurt et la production avec |
 
-En parties d'IA contre IA (script `ia-parties.mjs`, 3 parties par duel) : l'IA humaine **perd
-3 fois sur 3 contre l'IA machine** (éliminée entre 15,9 et 20,0 min) et **gagne 3 fois sur 3
-contre l'IA alien** (partie finie entre 20,6 et 27,8 min).
+Taux de victoire en parties d'IA contre IA :
+
+| Contre | Parties | Victoires | Durée médiane | Si elle perd : éliminée vers |
+|---|---|---|---|---|
+| IA alien | 40 | **39 (97,5 %)** | 25,1 min | — |
+| IA machine | 39 | 1 (2,6 %) | 22,9 min | 22,7 min, par conquête |
+| 3 joueurs (humain, machine, alien) | 117 | 11 (9,4 %) | 27,8 min | 25,9 min |
+
+*Session `eq-races` (`eq-races/sim.mjs`, 297 parties d'IA contre IA, 20 cartes, froid réel ; champ `guide` de `eq-races.json`).*
 
 À trois IA (une par race, 4 parties, `ia-parties.mjs`, sortie `ia-3.out`) : **l'IA machine gagne
 4 fois sur 4** ; la partie finit entre 21,6 et 30,3 min. L'IA humaine est éliminée entre 21,6 et
@@ -183,11 +189,13 @@ L'arche coloniale (colonies) : **1 870**.
 - **Après 18 min, il ne reste que 2 planètes libres** sur la carte (médiane, `eq-combat`) :
   pour grandir, il faut conquérir. Prendre une colonie d'IA coûte moins cher qu'une arche
   (390 à 1 020 de flotte, 0 perte avec des croiseurs).
-- **Façon la plus rapide de gagner** : *non confirmé, en attente de la mesure de la session
-  `eq-ia` (joueur scripté contre l'IA)*. Ce qu'on sait déjà : tu peux avoir des frégates
-  6 min avant l'IA, et l'IA humaine ne défend sa planète mère qu'avec ses bâtiments jusqu'à
-  13 min au moins (aucun vaisseau posé, `ia-parties.mjs`) : 11 frégates ou 3 croiseurs la
-  prennent à 12 min.
+- **Façon la plus rapide de gagner** (mesure `eq-races`) : **coloniser d'abord, conquérir
+  ensuite**. En humains, victoire en 25,2 min en médiane contre 1 IA (17,4 min au plus vite),
+  33,2 min contre 3 IA. La stratégie « guerre d'abord » (labo 2 et chantier tout de suite,
+  vaisseaux avant les colonies) **perd presque toujours** : chute vers 15,7 min contre 1 IA,
+  0 victoire sur 18 contre 3 IA. Tu peux avoir des frégates 6 min avant l'IA, mais ne fonce pas.
+  L'IA humaine ne défend sa planète mère qu'avec ses bâtiments jusqu'à 13 min au moins :
+  11 frégates ou 3 croiseurs la prennent à 12 min (`ia-cibles.mjs`).
 
 ## Pièges
 
@@ -204,6 +212,6 @@ L'arche coloniale (colonies) : **1 870**.
 - Le « meilleur ordre » est le meilleur trouvé par une recherche locale (400 essais) sur une
   planète type, pour les minéraux à 12 min ; ce n'est pas forcément le meilleur possible, ni
   sur une autre planète.
-- Les parties d'IA (3 par duel) sont peu nombreuses ; les taux de victoire de la session
-  `eq-races` (plus de parties) sont attendus.
-- La façon la plus rapide de gagner contre l'IA attend la mesure de `eq-ia`.
+- Les taux de victoire sont ceux de l'IA contre l'IA : un vrai joueur joue autrement.
+- La façon la plus rapide de gagner a été mesurée avec des joueurs scriptés (`eq-races`), pas
+  avec un vrai joueur.

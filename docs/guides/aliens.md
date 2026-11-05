@@ -15,9 +15,15 @@ réelles depuis le départ.*
 | La défense la plus dure du jeu (le dôme) | Défense chère : chaque niveau coûte 1,6 fois le précédent |
 | Vaisseaux à longue portée (50 cases) et dards solides | Vaisseaux lents (léviathan 10 cases/min) et chers |
 
-En parties d'IA contre IA (script `ia-parties.mjs`, 3 parties par duel) : **l'IA alien a perdu
-ses 6 parties**, contre l'IA humaine (fin entre 20,6 et 27,8 min) et contre l'IA machine (fin
-entre 17,0 et 19,8 min). L'ordre de construction de l'IA alien est aussi le plus éloigné du
+Taux de victoire en parties d'IA contre IA :
+
+| Contre | Parties | Victoires | Durée médiane | Si elle perd : éliminée vers |
+|---|---|---|---|---|
+| IA humaine | 40 | 1 (2,5 %) | 25,1 min | 24,9 min, par conquête |
+| IA machine | 39 | 0 | 18,9 min | 18,9 min, par conquête |
+| 3 joueurs (humain, machine, alien) | 117 | 5 (4,3 %) | 27,8 min | 24,2 min |
+
+*Session `eq-races` (`eq-races/sim.mjs`, 297 parties d'IA contre IA, 20 cartes, froid réel ; champ `guide` de `eq-races.json`).* L'ordre de construction de l'IA alien est aussi le plus éloigné du
 meilleur ordre trouvé (ci-dessous) : un joueur fait beaucoup mieux qu'elle.
 
 À trois IA (une par race, 4 parties, `ia-parties.mjs`, sortie `ia-3.out`) : **l'IA machine gagne
@@ -221,8 +227,11 @@ dard psionique 1, soit **1 726**. Le léviathan : carapace chitineuse 2 en plus,
 - **Après 18 min, il ne reste que 2 planètes libres** sur la carte (médiane, `eq-combat`) :
   pour grandir, il faut conquérir. Avec des léviathans, prendre une colonie d'IA ne coûte
   aucune perte (`eq-combat`).
-- **Façon la plus rapide de gagner contre l'IA** : *non confirmé, en attente de la mesure de
-  la session `eq-ia` (joueur scripté)*.
+- **Façon la plus rapide de gagner** (mesure `eq-races`) : les aliens gagnent rarement entre IA
+  (1 victoire en 30,5 min contre 1 IA, médiane 33,6 min pour 5 victoires contre 3 IA). Comme pour
+  les autres races, **coloniser d'abord bat la guerre d'abord**. Le meilleur départ (plus haut)
+  donne presque 2 fois la production de l'IA alien : un joueur fait bien mieux qu'elle
+  (*non confirmé face à un vrai joueur*).
 
 ## Pièges
 
@@ -241,5 +250,6 @@ dard psionique 1, soit **1 726**. Le léviathan : carapace chitineuse 2 en plus,
 - Le meilleur ordre a été cherché **sans pouvoirs** ; avec les pouvoirs, l'ordre idéal peut
   être un peu différent.
 - Le « meilleur ordre » vient d'une recherche locale (400 essais) sur une planète type.
-- 3 parties par duel d'IA : peu. Les taux de victoire de `eq-races` sont attendus.
-- La façon la plus rapide de gagner contre l'IA attend la mesure de `eq-ia`.
+- Les taux de victoire sont ceux de l'IA contre l'IA : un vrai joueur joue autrement.
+- La façon la plus rapide de gagner a été mesurée avec des joueurs scriptés (`eq-races`), pas
+  avec un vrai joueur.

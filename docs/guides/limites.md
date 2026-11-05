@@ -41,6 +41,11 @@ Ce que ça veut dire :
 - **Après 36 minutes, plus personne ne peut vivre.** Seul contre le froid, on ne gagne
   jamais : la partie finit sans gagnant.
 - Le cercle où les joueurs apparaissent (7 cases du centre) gèle vers 29 à 31 minutes.
+- **Durée réelle des parties d'IA** (`eq-races`, 297 parties) : duels 21,1 min en médiane
+  (34 au plus), entre deux IA de même race 30,8 min, à 3 joueurs 27,8 min (35,3 au plus), à 4
+  joueurs 31 min. Aucune ne dépasse 36 min.
+- **Bug connu** : 2 parties sur 299 ont fini à 0,9 min (constat `code-fin-03` de l'audit) ; ne
+  compte pas sur cette fin.
 
 ## 2. La place sur une planète
 
@@ -81,7 +86,7 @@ son prix). Pour grandir, il faut **coloniser** d'autres planètes.
 | Détection | 3 cases autour d'une planète, 2 autour d'une flotte, +1 par niveau de radar | `SIGHT` |
 | Pillage | une fois par planète toutes les 48 s, la moitié des minéraux et de la nourriture au plus, dans la place des soutes | `RAID_COOLDOWN_MS`, `plunder` |
 | Échange | expire au bout de 5 min ; abandonné après 30 min sans nouvelles ; 10 offres au plus | `js/trade.js` |
-| Trêve des IA | une IA n'attaque pas avant 10 min | `PEACE_MS`, `js/bot.js` |
+| Trêve des IA | une IA n'attaque pas avant 10 min ; sans effet mesurable, car aucune IA n'a de vaisseau de guerre avant 10 min (`eq-races`) | `PEACE_MS`, `js/bot.js` |
 | Pouvoirs aliens | arrachement toutes les 72 s ; transe toutes les 144 s, pendant 48 s | `POWERS` |
 
 *Script `limites.mjs`, sortie `limites.out`.*

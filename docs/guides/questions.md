@@ -17,15 +17,21 @@ réponse. Trois sortes de réponses :
 Lu dans le code : à plusieurs, la partie finit quand il ne reste qu'un joueur en vie ; si tous
 tombent à la même minute, le meilleur score juste avant la chute gagne (`checkOver`,
 `js/session.js`). Seul, personne ne gagne (D-142). La dernière case gèle vers 35,3 min
-(médiane, [limites](limites.md) §1). *Non confirmé : si l'IA laisse vivre ce joueur (en attente
-de `eq-rythme`).*
+(médiane, [limites](limites.md) §1). Mesuré par `eq-races` (q-08 ci-dessous) : un joueur qui ne combat jamais perd surtout **de
+froid** (14 défaites sur 18), car il n'a pas de planète près du soleil ; les IA, elles, le visent
+peu (7 % des prises). *Non confirmé : la stratégie « une colonie sur la planète qui gèle en
+dernier » exactement (en attente de `eq-rythme`).*
 
 **Contre 3 IA, les IA s'attaquent-elles entre elles ? Vaut-il mieux attendre ? (q-08)**
 Lu dans le code : l'IA vise toutes les planètes adverses, IA comprises, d'abord celles qui
 gèleront le plus tard, puis les plus proches (`attack`, `js/bot.js`). Rien ne la fait préférer
-un joueur humain. Mesuré (`guides/ia-parties.mjs`, `ia-3.out`) : dans 4 parties à trois IA, l'IA
-machine a gagné les 4 ; les IA humaine et alien ont été éliminées entre 21 et 30 min. *Non
-confirmé : si attendre bat attaquer tôt (en attente de `eq-races`).*
+un joueur humain. Mesuré par `eq-races` (`eq-races/sim.mjs`, 72 parties à 4 : un joueur + 3 IA) : **oui, les IA
+s'attaquent entre elles** : 53 % des prises de planètes sont IA contre IA ; si le joueur ne
+combat pas, 93 %. **Attendre ne gagne pas mieux** : joueur passif 6 victoires sur 24, joueur
+normal 4 sur 24 (pas de différence nette), et le passif meurt surtout de froid (14 défaites sur
+18) : sans conquête, il n'a pas de planète près du soleil. Attaquer sans trêve ne change rien
+non plus : avant 10 min, aucune IA n'a de vaisseau de guerre. **La race compte bien plus que la
+stratégie** : machines 3 à 4 victoires sur 8, les autres 0 à 1.
 
 **Combien de planètes faut-il prendre pour éliminer une IA ? (q-20)**
 Lu dans le code : l'IA cherche à tenir 4 planètes, la mère comprise (`WANT_PLANETS`,
