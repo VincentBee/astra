@@ -229,6 +229,7 @@ Mesures de la session `eq-tech` (champ `guide` de `eq-tech.json`) et `eq-eco`
 |---|---|
 | Dès que le prix dépasse l'entrepôt | Payer ce bâtiment, cette recherche ou ce lot (agrandir l'entrepôt) |
 | Planète pleine (7 à 14 min selon la race, sur 18 places) | Construire sans déconstruire |
+| Vers 18 min | Trouver une planète libre : il n'en reste que 2 en médiane (13 à 12 min, `eq-combat`) ; ensuite, on grandit en conquérant |
 | Planète gelée | Y vivre, la coloniser, la conquérir, s'y poser |
 | Plus de planète, plus de colonisateur | Jouer : le joueur est éliminé |
 | Vers 29 min à 8 joueurs | Trouver une planète chaude pour chacun |

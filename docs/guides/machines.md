@@ -182,6 +182,12 @@ nanométrique 2 en plus, soit **3 024**.
 - **Ce que fait l'IA machine, et qui gagne contre les IA** : elle lance des conquêtes de
   drones dès 12 min, avant que les autres aient des vaisseaux posés, et finit ses duels entre
   15,9 et 20,0 min (`ia-parties.mjs`).
+- **Le plus vite possible** (`eq-tech/rush.mjs`, meilleur ordre trouvé, vaisseau fini, minutes
+  depuis la fondation) : **1er drone à 7,75 min** avec réacteur, matrice 1, foreuse, matrice 2,
+  réacteur, ions 1, essaim 1, usine ; 1re sonde à 9,7 min (l'IA fait mieux : 8,7 min) ;
+  1er destroyer à 12,6 min. L'IA machine commande ses premiers drones vers 12,75 min.
+- **Après 18 min, il ne reste que 2 planètes libres** sur la carte (médiane, `eq-combat`) :
+  pour grandir, il faut conquérir.
 - **Façon la plus rapide de gagner contre l'IA** : *non confirmé, en attente de la mesure de
   la session `eq-ia` (joueur scripté)*.
 

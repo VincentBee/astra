@@ -173,9 +173,18 @@ L'arche coloniale (colonies) : **1 870**.
   vues en partie (⚔ 45 à 70) (`eq-combat`).
 - **Conquérir**, pas seulement « Attaquer » : la conquête prend la planète (et ses places). Il
   faut abattre la défense **et** les vaisseaux posés en un seul combat.
+- **Le plus vite possible** (`eq-tech/rush.mjs`, meilleur ordre trouvé, vaisseau fini, minutes
+  depuis la fondation) : **1re frégate à 7,8 min** avec solaire, mine, labo 1, labo 2,
+  propulsion 1, blindage 1, chantier ; 1re arche à 9,5 min ; 1er croiseur à 11,5 min. L'IA
+  humaine commande sa première frégate vers 14,2 min et ne fait jamais de croiseur.
+- **Après 18 min, il ne reste que 2 planètes libres** sur la carte (médiane, `eq-combat`) :
+  pour grandir, il faut conquérir. Prendre une colonie d'IA coûte moins cher qu'une arche
+  (390 à 1 020 de flotte, 0 perte avec des croiseurs).
 - **Façon la plus rapide de gagner** : *non confirmé, en attente de la mesure de la session
-  `eq-ia` (joueur scripté contre l'IA)*. Ce qu'on sait déjà : l'IA humaine ne défend sa planète
-  mère qu'avec ses bâtiments jusqu'à 13 min au moins (aucun vaisseau posé, `ia-parties.mjs`).
+  `eq-ia` (joueur scripté contre l'IA)*. Ce qu'on sait déjà : tu peux avoir des frégates
+  6 min avant l'IA, et l'IA humaine ne défend sa planète mère qu'avec ses bâtiments jusqu'à
+  13 min au moins (aucun vaisseau posé, `ia-parties.mjs`) : 11 frégates ou 3 croiseurs la
+  prennent à 12 min.
 
 ## Pièges
 

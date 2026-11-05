@@ -426,6 +426,7 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
 |---|---|---|---|---|---|
 | 00:09 | `fd4119a6` | [Message de la coordination de l'audit] 24 questions de joueurs préparées par la session `questions` (demande de Vincent), et mesures des sessions `eq-tech`, `eq-eco`, `eq-combat` | Nouvelle page `docs/guides/questions.md` (24 questions : réponse mesurée, lue dans le code ligne à l'appui, ou « non confirmé » avec la session qui doit mesurer) ; guides complétés : départs optimisés avec recherche (`eq-eco`), rentabilité des technologies sur toute une partie (`eq-tech`), pouvoirs aliens (deux mesures, +45 à +90 %), choix de la chaleur de la planète, combat à prix égal, rendement de la défense, limites des technologies et des chantiers. Mesuré au passage : le remboursement de déconstruction dépasse le plafond de l'entrepôt (`js/game.js:936`), demande de vérification déposée pour `verif-bug1` ; 212/212 | (ce commit) | D-162 |
+| 00:12 | `fd4119a6` | [Messages des sessions `eq-tech` et `eq-combat`] réponses aux questions q-07, q-10, q-12, q-16, q-18, q-22 | Intégrées dans `docs/guides/questions.md` ; guides des races : premier vaisseau au plus tôt (ordre et minute) comparé à l'IA, plus que 2 planètes libres après 18 min ; ligne ajoutée aux limites ; 212/212 | (ce commit) | D-162 |
 
 ### Travaux en cours au 2026-10-29
 

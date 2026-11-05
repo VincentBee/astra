@@ -206,6 +206,14 @@ dard psionique 1, soit **1 726**. Le léviathan : carapace chitineuse 2 en plus,
   coque d'un de ses vaisseaux ; les lourds sont ainsi intouchables par les défenses d'IA
   vues en partie (⚔ 45 à 70) (`eq-combat`).
 - Tes vaisseaux coûtent de la **nourriture** : prévois des ruches avant de lancer un lot.
+- **Le plus vite possible** (`eq-tech/rush.mjs`, meilleur ordre trouvé, sans pouvoirs, vaisseau
+  fini, minutes depuis la fondation) : **1er dard à 10,1 min** avec prisme, amplificateur,
+  bassin 1 et 2, sanctuaire, lévitation 1, ruche, dard 1, couveuse ; 1re graine-ruche à
+  11,9 min ; 1er léviathan à 18,1 min. L'IA alien commande son premier dard vers 22,4 min
+  et ne fait jamais de léviathan.
+- **Après 18 min, il ne reste que 2 planètes libres** sur la carte (médiane, `eq-combat`) :
+  pour grandir, il faut conquérir. Avec des léviathans, prendre une colonie d'IA ne coûte
+  aucune perte (`eq-combat`).
 - **Façon la plus rapide de gagner contre l'IA** : *non confirmé, en attente de la mesure de
   la session `eq-ia` (joueur scripté)*.
 

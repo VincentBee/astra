@@ -50,7 +50,12 @@ en recherches ou en bâtiments, jamais en entrepôts. *Non confirmé en partie (
 Lu dans le code : une planète prise devient une **colonie neuve de ta race**, avec les
 bâtiments de départ ; les bâtiments de l'ennemi sont perdus. Tu gardes les vaisseaux
 survivants, la cargaison, le butin et le carburant (`capture`, `js/session.js:2490-2510`).
-*Non confirmé : le bilan chiffré (en attente de `eq-combat`).*
+Mesuré par `eq-combat` (`eq-combat/16_conquest.mjs`, 6 parties d'IA) : **après 18 min, il ne
+reste que 2 planètes libres sur la carte** (médiane ; 13 à 12 min) : conquérir devient presque la
+seule façon de s'agrandir. Prendre une **colonie** d'IA demande une flotte de 390 à 1 020, pour
+0 à 520 de pertes (0 avec des croiseurs ou des léviathans) : moins cher qu'une arche (360 à 510),
+et la flotte reste. Prendre une **planète mère** d'IA demande 1 800 à 3 060 de flotte, pour 650 à
+1 690 de pertes ; butin 80 à 300.
 
 **Coloniser un astéroïde ou une comète vaut-il le coup ? (q-17)**
 Lu dans le code : un astéroïde a 7 à 10 places, 35 % des minéraux et 10 % de la nourriture
@@ -129,16 +134,21 @@ Lu dans le code : à chaque passe, les dégâts se répartissent selon la coque 
 vaisseau (`battle`, `js/fleet.js:457-467`) : un cargo prend sa part. Coque pour 100 de prix
 (calcul `questions/code-answers.out`, vérifié) : humains cargo 13,3, frégate 15,0, croiseur
 18,5 ; machines cargo 8,6, drone 11,5, destroyer 12,0 ; aliens méduse 14,6, dard 11,8,
-léviathan 17,1. Le cargo alien encaisse mieux que le dard à prix égal. *Non confirmé : le gain
-en combat (en attente de `eq-combat`).*
+léviathan 17,1. Mais mesuré par `eq-combat` (`eq-combat/14_cargo_shield.mjs`, budget de 6 000, 0 à 30 % de
+cargos) : **non, les cargos ne font pas un bon bouclier**. Pour les 6 vaisseaux de guerre, chaque
+cargo ajouté fait baisser le résultat : ils prennent des tirs mais ne tirent pas.
 
 **Qui peut fuir qui ? (q-16)**
 Lu dans le code : vitesse d'une flotte = celle de son vaisseau le plus lent, +10 % par niveau
 de propulsion (`SHIPS`, `shipStats`, `js/tech.js`). Vitesses (cases par minute réelle) : drone
 d'assaut 22,5, drone-cargo 20, frégate et dard 17,5, cargo humain, destroyer et sonde 15,
 croiseur et méduse 12,5, léviathan, arche et graine-ruche 10. **Sans technologie, rien ne
-rattrape un drone d'assaut.** La poursuite s'arrête si la cible sort de la vue (2 cases autour
-d'une flotte). *Non confirmé en simulation (en attente de `eq-combat`).*
+rattrape un drone d'assaut.** Mesuré par `eq-combat` en vraie partie (`eq-combat/15_chase.mjs`) :
+plus rapide que la cible, on la rattrape en route ; aussi rapide ou à peine plus lent, on la
+rattrape à son arrivée ; nettement plus lent, elle sort de la vue (2 cases autour d'une flotte)
+et la poursuite s'arrête. **Pour fuir, il faut être nettement plus rapide** : 4 % de plus ne
+suffit pas, 14 % suffit (sur 17 cases). Exemples : une frégate perd de vue un drone d'assaut ;
+avec propulsion 3, elle le rattrape à son arrivée. Un croiseur ne rattrape que le léviathan.
 
 **Combien de secondes d'alerte avant une attaque ? (q-15)**
 Mesuré (`guides/q14-q15.mjs`) : une planète voit à 3 cases. Une flotte vue au bord de cette
@@ -162,20 +172,36 @@ jamais le radar (`eq-tech`).
 Lu dans le code (`SHIPS`, `js/tech.js`) : un plein mène à 40 cases (humains), 36 (drones et
 destroyers machines, 30 pour la sonde), 50 (aliens) ; aller-retour : 20, 18 et 25 cases. La
 carte fait 38 cases d'un coin à l'autre. Faire le plein sur une colonie allonge la portée.
-*Non confirmé : la part des planètes à portée (en attente de `eq-combat`).*
+Mesuré par `eq-combat` (`eq-combat/17_range.mjs`, 300 cartes) : depuis sa planète mère, un
+aller-retour atteint **89 % des autres planètes (humains), 83 % (machines), 98 % (aliens)**.
+Deux mondes sont à 12 cases l'un de l'autre en médiane, 34 au plus.
 
 ## Technologies
 
 **Au plus tôt, quand lancer son premier colonisateur, chasseur, vaisseau lourd ? (q-07)**
 Mesuré par `eq-tech` (`eq-tech/`) : l'IA débloque le cargo vers 3,5 à 6,5 min, le
 colonisateur vers 8 à 11 min, le chasseur vers 9 à 11,5 min, le lourd vers 16,5 à 18,5 min.
-*Non confirmé : le plus tôt possible avec un ordre optimal (en attente de `eq-tech`).*
+Mesuré par `eq-tech` (`eq-tech/rush.mjs`, meilleur ordre trouvé en 1 900 essais, minutes
+depuis la fondation, vaisseau **fini**) :
+
+| Race | 1er chasseur | 1er colonisateur | 1er lourd | IA : 1er chasseur commandé |
+|---|---|---|---|---|
+| ◆ Humains | 7,8 min | 9,5 min | 11,5 min | 14,2 min |
+| ⬢ Machines | 7,75 min | 9,7 min | 12,6 min | 12,75 min |
+| ✦ Aliens | 10,1 min | 11,9 min | 18,1 min | 22,4 min |
+
+**Un joueur pressé a son premier chasseur 5 à 12 min avant l'IA**, donc pendant sa trêve. L'IA
+ne construit jamais de vaisseau lourd. Ordres : dans les guides de chaque race.
 
 **Plusieurs labos ou un gros labo ? (q-18)**
 Lu dans le code : durée d'une recherche divisée par `1 + 0,5 × (labo − 1)` (`researchDuration`,
 `js/tech.js`) ; une recherche à la fois par planète, jamais la même sur deux planètes. Mesuré
 par `eq-tech` : le labo 2 ouvre tout l'arbre ; un labo 3 ne fait gagner que 82 à 109 s sur
-l'arbre entier (351 à 453 s au labo 2). **Un labo 2 suffit.**
+l'arbre entier (351 à 453 s au labo 2). **Un labo 2 suffit.** Mesuré par `eq-tech` (`eq-tech/labs.mjs`) : deux labos niveau 2 (sur
+deux planètes) finissent la liste de l'IA plus vite qu'un labo 4, pour moitié prix (humains :
+70 s contre 80 s, 1 120 contre 2 374). Mais toute cette liste ne prend que 47 à 122 s : **c'est le
+prix des recherches qui freine, pas le labo.** Un labo sur une colonie a surtout un intérêt : la
+colonie paie la recherche avec son propre stock.
 
 ## Aliens
 
