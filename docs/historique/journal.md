@@ -415,6 +415,12 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 |---|---|---|---|---|---|
 | 08:58 | `fb0c1844` | [Auto-fix] conflit avec `main` | Huitième fusion de `main` (D-157 à D-159, cache v81 déjà pris) : ma décision devient D-160, cache v82 (D-161) ; 212/212 | (cette PR) | D-160, D-161 |
 
+## 4 novembre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 23:35 | `fd4119a6` | « ecrit des guide pour le jeux, pour chaque races, documente aussi les limites du jeux, par ex a partir de quel flotte il devient impossible pour une planete de defendre? quel est la facon la plus rapide de gagner ? quel sont les investissement les plus rentables ? comment faire le meilleur départ ? » (transmise par la session de coordination de l'audit `astra-audit-2026-11-05`, date de Paris) | Guides `docs/guides/` : un par race (`humains.md`, `machines.md`, `aliens.md`), `limites.md` et un index ; liens depuis `GUIDE.md` et `docs/README.md`. Chaque chiffre vient d'un script Node sur les vraies règles (hors dépôt, `~/.claude/swarm-runs/astra-audit-2026-11-05/guides/`) : seuils de défense (`battle` + `fortOf`), plafonds et calendrier du froid, meilleur départ par recherche locale, rentabilité des bâtiments et technologies, pouvoirs aliens, 17 parties d'IA complètes ; plus des mesures des sessions `eq-combat` et `eq-rythme`. Non confirmé : la façon la plus rapide de gagner contre l'IA (attend la session `eq-ia`) ; 212/212 | (ce commit) | D-162 |
+
 ### Travaux en cours au 2026-10-29
 
 - **Rythme des parties** (`26f178b9`) : commité sur `claude/swarm-it-game-pacing-1d4502`
