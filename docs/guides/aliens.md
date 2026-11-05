@@ -11,7 +11,7 @@ réelles depuis le départ.*
 
 | Forces | Faiblesses |
 |---|---|
-| Les pouvoirs : environ **+45 % de minéraux** à 10 et 14 min | Économie la plus lente au départ (650 minéraux/min à 12 min au mieux, sans pouvoirs) |
+| Les pouvoirs : **+45 % à +90 % de minéraux** à 10 min (deux mesures) | Économie la plus lente au départ (650 minéraux/min à 12 min au mieux, sans pouvoirs) |
 | La défense la plus dure du jeu (le dôme) | Défense chère : chaque niveau coûte 1,6 fois le précédent |
 | Vaisseaux à longue portée (50 cases) et dards solides | Vaisseaux lents (léviathan 10 cases/min) et chers |
 
@@ -27,8 +27,24 @@ meilleur ordre trouvé (ci-dessous) : un joueur fait beaucoup mieux qu'elle.
 ## Départ : tes 5 à 10 premières minutes
 
 1. **Choisis une planète proche** (2 cases en médiane depuis ton point d'apparition), plutôt
-   **près du soleil** (elle gèle plus tard) et **grande** (plus de places).
-2. **Sanctuaire en premier, puis prismes et amplificateur.** Le meilleur ordre trouvé
+   **chaude mais pas brûlante** (elle gèle plus tard, mais trop près du soleil la nourriture
+   baisse) et **grande** (plus de places). Minéraux extraits sur une partie (`eq-eco`) :
+   24 456 à chaleur 0,4, **34 066 à 0,7**, 28 294 à 0,9.
+2. **Le plus fort : prismes, pouvoirs, amplificateurs, et la recherche.** Ordre optimisé par
+   la session `eq-eco` (objectif : minéraux extraits en 32 min ; planète de 18 places,
+   chaleur 0,7 ; R = recherche ; pouvoirs dès qu'ils sont prêts, sauf la transe quand
+   l'entrepôt est presque plein) :
+
+   prisme 2 · ruche 2 · transe · prisme 3 · arrachement · sanctuaire 1 (1,1 min) ·
+   amplificateur 1 (1,8) · prisme 4 · amplificateur 2 (3,2) · sanctuaire 2 (3,6) ·
+   amplificateur 3 (4,9) · bassin 1 (5,1) · R écho 1 à 3 · prisme 5 · R symbiose 1 et 2 ·
+   sanctuaire 3 (7,7) · amplificateur 4 (8,8) · réserve 1 · R écho 4
+
+   **854 minéraux/min à 10 min, contre 435 pour l'IA** (champ `guide.depart` de
+   `eq-eco.json`, scripts dans `eq-eco/`). Cet ordre ne prépare ni bassin 2 ni couveuse : ni
+   colonie ni vaisseau avant 10 min.
+3. **Sans pouvoirs ni recherche, avec bassin 2 et couveuse avant 11,5 min**, le meilleur ordre
+   que j'ai trouvé
    (`depart.mjs`, planète type de 18 places, **sans pouvoirs**) :
 
 | # | Chantier | Vers |
@@ -52,19 +68,22 @@ meilleur ordre trouvé (ci-dessous) : un joueur fait beaucoup mieux qu'elle.
 
 | Ordre (sans pouvoirs) | Minéraux/min à 10 min | à 12 min | à 20 min | Psioniques à 15 min |
 |---|---|---|---|---|
-| Meilleur trouvé (ci-dessus) | **553** | 650 | 650 | 5 |
+| Mon ordre (ci-dessus, sans pouvoirs ni recherche) | **553** | 650 | 650 | 5 |
 | Ordre de l'IA | 331 | 331 | 411 | 4,5 |
 | Le moins cher d'abord | 241 | 252 | — | 3 |
 
 *Scripts `depart.mjs` (`depart-alien.out`) et `depart-check.mjs` (`depart-check.out`) : pas
 de famine ni de panne jusqu'à 20 min avec cet ordre.*
 
-3. **Pourquoi l'IA fait moins bien** : elle monte d'abord ruche et prismes (nourriture et
+*Les deux mesures n'utilisent pas la même planète (chaleur 0,7 chez `eq-eco`, 0,59 ici) : les
+chiffres de l'IA diffèrent un peu entre les deux.*
+
+4. **Pourquoi l'IA fait moins bien** : elle monte d'abord ruche et prismes (nourriture et
    énergie), et son premier amplificateur n'arrive qu'à 6,5 min. Or l'amplificateur multiplie
    ce que rapportent **tous** les psioniques.
-4. **Il te reste 2 places sur 18** à 15 min : de quoi mettre épines 1 et dôme 1 sans rien
+5. **Il te reste 2 places sur 18** à 15 min : de quoi mettre épines 1 et dôme 1 sans rien
    perdre en production (`depart-variantes.out`).
-5. **Déclenche tes pouvoirs à chaque recharge** (voir plus bas).
+6. **Déclenche tes pouvoirs à chaque recharge** (voir plus bas).
 
 ## Les pouvoirs
 
@@ -79,8 +98,18 @@ sortie `pouvoirs.out`) :
 | Transe seule | 3 303 (+37 %) | 5 338 (+43 %) |
 | Les deux | **3 555 (+48 %)** | **5 557 (+48 %)** |
 
-- **Les deux pouvoirs ensemble rapportent à peine plus qu'un seul** : ils se disputent
-  l'énergie. Si l'énergie est juste, garde l'arrachement.
+Une autre mesure, sur une planète type où les minéraux sont retirés au fur et à mesure (pas de
+plafond d'entrepôt ; session `eq-tech`, `eq-tech/powers.out`) : **arrachement +55 %, transe
++35 %, les deux +90 %** à 10 min, pour environ 158 d'énergie par minute. À titre de
+comparaison, écho tellurique 5 (3 957 de recherches) ne donne que +48 %. **Les pouvoirs sont le
+meilleur investissement des aliens.**
+
+- **Quand l'énergie est juste** (ma mesure, ordre de l'IA), les deux ensemble rapportent à
+  peine plus qu'un seul : ils se disputent l'énergie. Garde alors l'arrachement.
+- **Quand l'énergie suffit** (mesure `eq-tech`), les deux ensemble presque doublent tes
+  minéraux.
+- Par point d'énergie, la transe rapporte plus ; par minute, l'arrachement rapporte plus
+  (voir [questions](questions.md), q-21).
 - L'arrachement ne marche pas si l'entrepôt de minéraux est plein : dépense avant.
 - Après 14 min, la planète de 18 places est pleine et l'entrepôt plafonne : les pouvoirs ne
   servent que si tu dépenses (vaisseaux, colonies).
@@ -109,7 +138,26 @@ l'IA à 5, 10 et 18 min, un seul niveau ajouté, **sans pouvoirs** (`roi.mjs`, `
 - **L'écho tellurique paie moins** que le forage des autres races : il ne renforce pas
   l'arrachement (seulement l'extraction continue).
 - Avant chaque naissance, vérifie que les soldes de nourriture et d'énergie dépassent
-  +17,5 par minute.
+  +17,5 par minute. Un psionique met environ 3,3 min à naître (`eq-eco`).
+
+**Sur toute une partie** (session `eq-tech`, 16 parties d'IA, ressources gagnées de 10 à 29 min
+pour un niveau acheté à 10 min, divisées par son prix ; champ `guide` de `eq-tech.json`) :
+
+| Écho 1 | Symbiose 1 | Écho 2 | Symbiose 2 | Écho 3 | Symbiose 3 | Écho 4 | Symbiose 4 | Écho et symbiose 5 |
+|---|---|---|---|---|---|---|---|---|
+| ×5,0 | ×5,0 | ×3,0 | ×2,9 | ×1,7 | ×1,7 | ×1,0 | ×1,0 | jamais remboursé |
+
+Écho 4 et symbiose 4 ne se remboursent que s'ils sont achetés avant 10,5 min.
+
+**Bâtiments, d'après `eq-eco`** : prisme et ruche 2 à 5 remboursés en 1,2 à 2,8 min (en énergie
+et nourriture), amplificateur 1 à 3 en 1,3 à 6 min **avec pouvoirs** (2,7 à 7,8 sans),
+sanctuaire 2 et 3 en 4,1 à 7,4 min s'il va avec un prisme, amplificateur 4 et 5 en 7 et 12 min
+avec pouvoirs ; amplificateur 6 et plus, sanctuaire 4 et plus seul : jamais avant le gel.
+
+**Technologies militaires** (`eq-tech`, `eq-combat`) : un niveau d'attaque ou de coque ne vaut
+qu'environ +5 % de flotte. Le niveau 3 n'est rentable qu'au-delà de 15 600 à 31 800 de vaisseaux
+de guerre construits dans la partie ; les niveaux 4 et 5 ne le sont pour aucune race. Les IA
+construisent en médiane 4 400 (humains), 28 500 (machines), 4 100 (aliens) de vaisseaux.
 
 ## Défendre
 
@@ -151,6 +199,12 @@ dard psionique 1, soit **1 726**. Le léviathan : carapace chitineuse 2 en plus,
   défense ; il a la plus longue portée des chasseurs.
 - **Le léviathan est trop lent pour poursuivre**, mais contre une planète il vaut à peu près
   le dard à prix égal (`defense.out`).
+- **Flotte contre flotte, à prix égal** (`eq-tech`, `eq-combat`) : le croiseur bat la frégate,
+  le léviathan bat le dard ; le destroyer perd contre le drone d'assaut.
+- **Les lourds ne perdent rien contre une défense faible** : une flotte qui abat la défense en
+  1 ou 2 passes ne perd aucun vaisseau si l'attaque de la défense × les passes reste sous la
+  coque d'un de ses vaisseaux ; les lourds sont ainsi intouchables par les défenses d'IA
+  vues en partie (⚔ 45 à 70) (`eq-combat`).
 - Tes vaisseaux coûtent de la **nourriture** : prévois des ruches avant de lancer un lot.
 - **Façon la plus rapide de gagner contre l'IA** : *non confirmé, en attente de la mesure de
   la session `eq-ia` (joueur scripté)*.

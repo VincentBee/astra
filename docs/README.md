@@ -50,7 +50,7 @@ Ordre conseillé pour arriver sur le projet : README racine → `reseau.md` §1-
 | `RAPPORT-RYTHME.md` | Analyse du rythme des parties par 4 agents et des robots (D-077), puis changements faits | — |
 | `CLAUDE.md` | Règles pour Claude : tenir le journal et les décisions | — |
 | `docs/` | Cette documentation | — |
-| `docs/guides/` | Guides de jeu par race et limites du jeu, chiffres mesurés au commit `15ca511` (D-162) : `README.md` (index), `humains.md`, `machines.md`, `aliens.md`, `limites.md` | ici |
+| `docs/guides/` | Guides de jeu par race et limites du jeu, chiffres mesurés au commit `15ca511` (D-162) : `README.md` (index), `humains.md`, `machines.md`, `aliens.md`, `limites.md`, `questions.md` (24 questions de joueurs) | ici |
 | `icons/` | Icônes de l'application (`icon.svg`, 192 et 512 px) | interface |
 | `vendor/` | Bibliothèques incluses : `qrcode.mjs` (QR), `jsQR.js` (lecture QR), `trystero-nostr.mjs` (rendez-vous Nostr) ; licences dans `vendor/README.txt` | reseau |
 | `js/config.js` | Réglages réseau (serveurs ICE, relais, identifiant d'application) | reseau |

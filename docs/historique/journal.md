@@ -421,6 +421,12 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 |---|---|---|---|---|---|
 | 23:35 | `fd4119a6` | « ecrit des guide pour le jeux, pour chaque races, documente aussi les limites du jeux, par ex a partir de quel flotte il devient impossible pour une planete de defendre? quel est la facon la plus rapide de gagner ? quel sont les investissement les plus rentables ? comment faire le meilleur départ ? » (transmise par la session de coordination de l'audit `astra-audit-2026-11-05`, date de Paris) | Guides `docs/guides/` : un par race (`humains.md`, `machines.md`, `aliens.md`), `limites.md` et un index ; liens depuis `GUIDE.md` et `docs/README.md`. Chaque chiffre vient d'un script Node sur les vraies règles (hors dépôt, `~/.claude/swarm-runs/astra-audit-2026-11-05/guides/`) : seuils de défense (`battle` + `fortOf`), plafonds et calendrier du froid, meilleur départ par recherche locale, rentabilité des bâtiments et technologies, pouvoirs aliens, 17 parties d'IA complètes ; plus des mesures des sessions `eq-combat` et `eq-rythme`. Non confirmé : la façon la plus rapide de gagner contre l'IA (attend la session `eq-ia`) ; 212/212 | (ce commit) | D-162 |
 
+## 5 novembre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 00:09 | `fd4119a6` | [Message de la coordination de l'audit] 24 questions de joueurs préparées par la session `questions` (demande de Vincent), et mesures des sessions `eq-tech`, `eq-eco`, `eq-combat` | Nouvelle page `docs/guides/questions.md` (24 questions : réponse mesurée, lue dans le code ligne à l'appui, ou « non confirmé » avec la session qui doit mesurer) ; guides complétés : départs optimisés avec recherche (`eq-eco`), rentabilité des technologies sur toute une partie (`eq-tech`), pouvoirs aliens (deux mesures, +45 à +90 %), choix de la chaleur de la planète, combat à prix égal, rendement de la défense, limites des technologies et des chantiers. Mesuré au passage : le remboursement de déconstruction dépasse le plafond de l'entrepôt (`js/game.js:936`), demande de vérification déposée pour `verif-bug1` ; 212/212 | (ce commit) | D-162 |
+
 ### Travaux en cours au 2026-10-29
 
 - **Rythme des parties** (`26f178b9`) : commité sur `claude/swarm-it-game-pacing-1d4502`

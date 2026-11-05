@@ -175,6 +175,10 @@ toujours plus cher (aussi mesuré par `eq-combat`, `eq-combat/02_defense.mjs`).*
 - **Les technologies ne renforcent pas la défense des bâtiments**, seulement les vaisseaux
   (attaquant ou posés). Un attaquant avec 3 niveaux d'attaque et de coque a besoin d'environ
   un quart de vaisseaux en moins (défense humaine *k* = 3 : 17 frégates au lieu de 22).
+- **Rendement de la défense** (`eq-combat`, `eq-combat/07_defroi.mjs`) : chaque minerai mis en
+  défense oblige l'attaquant à dépenser ×3,47 (humains, 270 investis) à ×0,58 (8 682 investis) ;
+  machines ×2,17 à ×0,46 ; aliens ×1,73 à ×0,69. Les bâtiments de défense battent les
+  vaisseaux posés jusqu'à environ 3 000 investis, puis c'est l'inverse.
 - **Des vaisseaux posés aident à peu près autant qu'ils coûtent** : 6 frégates posées
   (1 200) sur la planète humaine *k* = 2 font passer le seuil de 17 à 27 frégates
   (+2 000) ; c'est mieux que les hauts niveaux de défense, et ces vaisseaux peuvent aussi
@@ -197,7 +201,29 @@ planètes (script `ia-cibles.mjs`, sortie `ia-cibles.out`) :
 | IA machine, 12 min (⚔ 24 / ◇ 240 + 8 drones posés) | 12 | 4 | 18 | 4 | 9 | 2 |
 | IA machine, 13 min (⚔ 24 / ◇ 240 + 14 drones posés) | 16 | 5 | 25 | 5 | 11 | 3 |
 
-## 5. Ce qui devient impossible, et quand
+## 5. Technologies, chantiers, sol
+
+Mesures de la session `eq-tech` (champ `guide` de `eq-tech.json`) et `eq-eco`
+(`eq-eco.json`), et calculs de `guides/q14-q15.mjs` :
+
+- **7 technologies par race**, niveau 5 au plus (colonies : 1). **Le labo 2 ouvre tout l'arbre** ;
+  un labo 3 ne fait gagner que 82 à 109 s sur l'arbre entier.
+- **Une recherche dure 3 à 92 s**. Arbre complet au labo 2 : 351 s (humains), 438 s (machines),
+  453 s (aliens). Prix de l'arbre complet : 25 961, 32 698 et 33 838.
+- **Les niveaux 5 demandent un entrepôt** : niveau 1 pour l'économie, 2 ou 3 pour l'attaque et
+  la coque (canons à masse 5 : 3 340 minéraux, donc entrepôt 3). Sans entrepôt, voir
+  [questions](questions.md), q-14.
+- **Les constructions sont presque instantanées** : prix / 25 secondes de jeu ÷ 2,5, au moins
+  1,6 s (`buildDuration`). C'est le stock qui fait attendre, pas le chantier (`eq-eco`).
+- **Avec 400 à 2 000 minéraux par minute à 10 min, un entrepôt de 1 000 est plein en moins d'une
+  minute** (`eq-eco`) : dépense, ou monte l'entrepôt.
+- **Le sol ne s'épuise pas** dans une partie avec un gisement médian : il repousse d'environ
+  750 minéraux par minute réelle (`eq-eco`).
+- **Quand l'IA débloque ses vaisseaux** (médiane, `eq-tech`) : cargo 3,5 à 6,5 min,
+  colonisateur 8 à 11 min, chasseur 9 à 11,5 min, lourd 16,5 à 18,5 min. Elle ne cherche jamais
+  le radar.
+
+## 6. Ce qui devient impossible, et quand
 
 | Quand | Ce qui devient impossible |
 |---|---|

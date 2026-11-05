@@ -29,9 +29,22 @@ contre l'IA alien** (partie finie entre 20,6 et 27,8 min).
    est à 2 cases en médiane, 4 au plus dans 9 cas sur 10 (`limites.mjs`). Ton arche va à
    10 cases par minute : quelques secondes de trajet.
 2. **Préfère une planète plus près du soleil et plus grande** : elle gèle plus tard (voir
-   [limites](limites.md) §1) et a plus de places. Le climat change peu la production : de
-   ×0,9 à ×1,1 pour les minéraux.
-3. **Loge d'abord, creuse ensuite.** Le meilleur ordre trouvé (recherche par simulation,
+   [limites](limites.md) §1) et a plus de places. **Mais pas brûlante** : à chaleur 0,9, la nourriture ne vaut plus
+   que ×0,74 et la population meurt de faim. Minéraux extraits sur une partie (`eq-eco`) :
+   30 225 à chaleur 0,4, **40 386 à 0,7**, 26 298 à 0,9. Vise une chaleur de 0,6 à 0,75.
+3. **Le plus fort : loge, creuse, et cherche le forage tout de suite.** Ordre optimisé par la
+   session `eq-eco` (objectif : minéraux extraits en 32 min ; planète de 18 places, chaleur
+   0,7 ; R = recherche) :
+
+   habitat 2 (0 min) · habitat 3 (0,95) · solaire 2 · mine 2 (2,5) · mine 3 · solaire 3 ·
+   mine 4 (4,6) · labo 1 (5,1) · R forage 1 et 2 · mine 5 · R forage 3 · mine 6 (7,7) ·
+   solaire 4 · entrepôt 1 (8,1) · solaire 5 · ferme 2 · R forage 4
+
+   **1 304 minéraux/min à 10 min, contre 686 pour l'IA** (champ `guide.depart` de
+   `eq-eco.json`, scripts dans `eq-eco/`). Cet ordre ne prépare ni labo 2 ni chantier : ni
+   colonie ni vaisseau avant 10 min.
+4. **Si tu veux aussi des vaisseaux tôt** (labo 2 et chantier avant 11,5 min), le meilleur
+   ordre que j'ai trouvé **sans recherche** (recherche par simulation,
    `depart.mjs`, planète type de 18 places) :
 
 | # | Chantier | Vers |
@@ -53,18 +66,21 @@ contre l'IA alien** (partie finie entre 20,6 et 27,8 min).
 
 | Ordre | Minéraux/min à 10 min | à 12 min | à 20 min | Habitants à 15 min |
 |---|---|---|---|---|
-| Meilleur trouvé (ci-dessus) | **835** | 854 | 857 | 111 |
+| Mon ordre (ci-dessus, sans recherche) | **835** | 854 | 857 | 111 |
 | Ordre de l'IA | 720 | 830 | 855 | 80 |
 | Le moins cher d'abord | 522 | 611 | — | 81 (6 min de pénurie) |
 
 *Scripts `depart.mjs` (sortie `depart-human.out`) et `depart-check.mjs` (`depart-check.out`).*
 
-4. **Attention vers 14 min** : avec cet ordre, la nourriture et l'énergie passent dans le
+*Les deux mesures n'utilisent pas la même planète (chaleur 0,7 chez `eq-eco`, 0,59 ici) : les
+chiffres de l'IA diffèrent un peu entre les deux.*
+
+5. **Attention vers 14 min** : avec mon ordre sans recherche, la nourriture et l'énergie passent dans le
    rouge après 15 min (−39 nourriture/min, −21 énergie/min) ; sans rien faire, 92 s de
    pénurie et 17 habitants morts avant 20 min, et l'avance sur l'IA disparaît. La planète est
    pleine : **déconstruis un niveau** (un habitat, par exemple) pour mettre une ferme et une
    centrale, ou **colonise**.
-5. **Le labo tôt** : il ouvre le forage (voir plus bas), le meilleur placement du jeu.
+6. **Le labo tôt** : il ouvre le forage (voir plus bas), le meilleur placement du jeu.
 
 ## Investissements rentables
 
@@ -89,7 +105,27 @@ l'IA à 5, 10 et 18 min, en ajoutant un seul niveau (scripts `roi.mjs`, `roi-tec
 - **Puis des mines**, tant qu'il y a des bras : chaque mine emploie 10 habitants.
 - **Ferme et centrale** ne rapportent rien quand le stock suffit ; elles évitent la panne. Une
   mine de plus consomme jusqu'à 64 d'énergie par minute (mesuré) : surveille le solde.
-- **Forage 5** ne se rembourse pas avant le froid.
+- **Forage 5** ne se rembourse pas en 15 min.
+
+**Sur toute une partie** (session `eq-tech`, 16 parties d'IA, ressources gagnées de 10 à 29 min
+pour un niveau acheté à 10 min, divisées par son prix ; champ `guide` de `eq-tech.json`) :
+
+| Forage 1 | Forage 2 | Forage 3 | Agronomie 1 | Forage 4 | Agronomie 2 | Forage 5 | Agronomie 3 | Agronomie 4 et 5 |
+|---|---|---|---|---|---|---|---|---|
+| ×12,8 | ×7,5 | ×4,4 | ×3,5 | ×2,6 | ×2,0 | ×1,5 | ×1,2 | jamais remboursé |
+
+L'agronomie vaut moins que son chiffre : chez les IA, la nourriture humaine est en surplus 95 %
+du temps (`eq-tech`). Forage 5 doit être acheté avant 18,5 min pour se rembourser.
+
+**Bâtiments, d'après `eq-eco`** (prix / gain de production, toutes ressources) : mine 1 à 5
+remboursée en 0,6 à 1,5 min (0,9 à 2,3 en comptant son énergie), solaire 2 à 5 en 1,5 à 3 min,
+ferme 2 à 5 en 1,2 à 2,5 min de nourriture, mine 6 à 9 en 1,9 à 4 min ; l'habitat ne produit
+rien : seulement quand la population touche le plafond.
+
+**Technologies militaires** (`eq-tech`, `eq-combat`) : un niveau d'attaque ou de coque ne vaut
+qu'environ +5 % de flotte. Le niveau 3 n'est rentable qu'au-delà de 15 600 à 31 800 de vaisseaux
+de guerre construits dans la partie ; les niveaux 4 et 5 ne le sont pour aucune race. Les IA
+construisent en médiane 4 400 (humains), 28 500 (machines), 4 100 (aliens) de vaisseaux.
 
 ## Défendre
 
@@ -129,6 +165,12 @@ L'arche coloniale (colonies) : **1 870**.
 - **Contre une planète peu défendue, le croiseur est le moins cher** : 2 croiseurs (1 300)
   prennent une planète sans défense, 3 croiseurs prennent la planète mère d'une IA humaine à
   12 min (`ia-cibles.mjs`).
+- **Flotte contre flotte, à prix égal** (`eq-tech`, `eq-combat`) : le croiseur bat la frégate,
+  le léviathan bat le dard ; le destroyer perd contre le drone d'assaut.
+- **Les lourds ne perdent rien contre une défense faible** : une flotte qui abat la défense en
+  1 ou 2 passes ne perd aucun vaisseau si l'attaque de la défense × les passes reste sous la
+  coque d'un de ses vaisseaux ; les lourds sont ainsi intouchables par les défenses d'IA
+  vues en partie (⚔ 45 à 70) (`eq-combat`).
 - **Conquérir**, pas seulement « Attaquer » : la conquête prend la planète (et ses places). Il
   faut abattre la défense **et** les vaisseaux posés en un seul combat.
 - **Façon la plus rapide de gagner** : *non confirmé, en attente de la mesure de la session

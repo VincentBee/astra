@@ -27,9 +27,23 @@ conquête de la partie, entre 12,1 et 13,6 min.
 ## Départ : tes 5 à 10 premières minutes
 
 1. **Choisis une planète proche** (2 cases en médiane depuis ton point d'apparition) et, si
-   possible, **plus près du soleil** : elle gèle plus tard et le climat y donne un peu plus
-   d'énergie (×0,82 dans un coin, ×1,18 au bord du soleil, `limites.mjs`).
-2. **Beaucoup de réacteurs.** Le meilleur ordre trouvé (`depart.mjs`, puis
+   possible, **la plus chaude possible** : elle gèle plus tard et le climat y donne plus
+   d'énergie ; minéraux extraits sur une partie (`eq-eco`) : 45 520 à chaleur 0,4, 65 781 à
+   0,7, **77 525 à 0,9** (×0,82 dans un coin, ×1,18 au bord du soleil, `limites.mjs`).
+2. **Le plus fort : foreuses et réacteurs en alternance, puis la recherche.** Ordre optimisé
+   par la session `eq-eco` (objectif : minéraux extraits en 32 min ; planète de 18 places,
+   chaleur 0,7 ; R = recherche) :
+
+   foreuse 2 · réacteur 2 · foreuse 3 · réacteur 3 · foreuse 4 · réacteur 4 · foreuse 5 ·
+   réacteur 5 · nœud 1 (4,1 min) · foreuse 6 · réacteur 6 · matrice 1 (5,8) · R supra 1 ·
+   quantique 1 · supra 2 · quantique 2 · supra 3 · quantique 3 · foreuse 7 · stockage 1 ·
+   quantique 4 · foreuse 8 (9,3)
+
+   **2 022 minéraux/min à 10 min, contre 610 pour l'IA** (champ `guide.depart` de
+   `eq-eco.json`, scripts dans `eq-eco/`). Cet ordre ne prépare ni matrice 2 ni usine : ni
+   colonie ni vaisseau avant 10 min.
+3. **Si tu veux aussi des vaisseaux tôt** (matrice 2 et usine avant 11,5 min), le meilleur
+   ordre que j'ai trouvé **sans recherche** (`depart.mjs`, puis
    `depart-variantes.mjs`, planète type de 18 places) :
 
 | # | Chantier | Vers |
@@ -55,7 +69,7 @@ conquête de la partie, entre 12,1 et 13,6 min.
 
 | Ordre | Minéraux/min à 10 min | à 12 min | à 20 min |
 |---|---|---|---|
-| Ci-dessus (usine après la matrice 2) | **1 138** | 1 138 | 1 138 |
+| Mon ordre (ci-dessus, sans recherche, usine après la matrice 2) | **1 138** | 1 138 | 1 138 |
 | Même ordre, usine à 1,3 min | 892 | 1 138 | 1 138 |
 | Même ordre + tourelles 1 et blindage 1 à la place de 2 niveaux de production | 892 | 892 | 892 |
 | Ordre de l'IA | 682 | 682 | 682 |
@@ -65,11 +79,14 @@ conquête de la partie, entre 12,1 et 13,6 min.
 (`depart-variantes.out`), `depart-check.mjs` (`depart-check.out`) : aucune panne d'énergie
 jusqu'à 20 min avec cet ordre.*
 
-3. **Pourquoi l'IA fait moins bien** : elle met tôt des tourelles, du blindage, un entrepôt et
+*Les deux mesures n'utilisent pas la même planète (chaleur 0,7 chez `eq-eco`, 0,59 ici) : les
+chiffres de l'IA diffèrent un peu entre les deux.*
+
+4. **Pourquoi l'IA fait moins bien** : elle met tôt des tourelles, du blindage, un entrepôt et
    une deuxième usine. Sur 18 places, chaque niveau de défense est un niveau de foreuse en
    moins. **Ta planète est pleine vers 9 min** : la production ne monte plus ensuite, d'où le
    même chiffre à 12 et 20 min.
-4. **La suite, c'est coloniser** : la sonde réplicatrice coûte **2 123** à débloquer (labo 1
+5. **La suite, c'est coloniser** : la sonde réplicatrice coûte **2 123** à débloquer (labo 1
    et 2, usine 1, propulseurs ioniques 1 et 2, réplication) (`deblocage.mjs`).
 
 ## Investissements rentables
@@ -97,6 +114,26 @@ Mesuré sur la planète de l'IA à 5, 10 et 18 min, un seul niveau ajouté (`roi
 - **Le nœud de calcul** (−12 % de consommation des foreuses par niveau) ne s'est pas remboursé
   en 15 min dans ces mesures (niveaux 2 à 6) : il ne sert que si l'énergie manque.
 - La recherche ne dure que 3 à 22 secondes avec une matrice 2 (`roi-tech.mjs`).
+
+**Sur toute une partie** (session `eq-tech`, 16 parties d'IA, ressources gagnées de 10 à 29 min
+pour un niveau acheté à 10 min, divisées par son prix ; champ `guide` de `eq-tech.json`) :
+
+| Quantique 1 | Supra 1 | Quantique 2 | Supra 2 | Quantique 3 | Supra 3 | Quantique 4 | Supra 4 | Quantique 5 | Supra 5 |
+|---|---|---|---|---|---|---|---|---|---|
+| ×30,5 | ×26,3 | ×17,9 | ×15,4 | ×10,6 | ×9,1 | ×6,2 | ×5,4 | ×3,7 | ×3,2 |
+
+**Tout se rembourse** chez les machines, car leur empire grandit vite (12 planètes en moyenne
+à 20 min chez les IA). Les supraconducteurs comptent ici l'énergie gagnée (ma mesure sur une
+seule planète, qui ne compte que les minéraux, leur donne 0 tant que l'énergie ne manque pas).
+
+**Bâtiments, d'après `eq-eco`** : foreuse 1 à 5 remboursée en 0,9 à 2,4 min (1,5 à 3,9 en
+comptant son énergie), réacteur 2 à 5 en 1,5 à 3,2 min d'énergie, nœud de calcul 1 en 3,5 min
+s'il va avec un réacteur (7 à 18 min seul), foreuse 6 à 9 en 3 à 6,4 min.
+
+**Technologies militaires** (`eq-tech`, `eq-combat`) : un niveau d'attaque ou de coque ne vaut
+qu'environ +5 % de flotte. Le niveau 3 n'est rentable qu'au-delà de 15 600 à 31 800 de vaisseaux
+de guerre construits dans la partie ; les niveaux 4 et 5 ne le sont pour aucune race. Les IA
+construisent en médiane 4 400 (humains), 28 500 (machines), 4 100 (aliens) de vaisseaux.
 
 ## Défendre
 
@@ -136,6 +173,12 @@ nanométrique 2 en plus, soit **3 024**.
 - **Attaque en essaim de drones** : 12 drones (1 560) prennent une planète sans défense.
 - **Évite le destroyer pour attaquer** : contre toutes les défenses mesurées, c'est le lot le
   plus cher pour prendre une planète (aussi mesuré par `eq-combat`).
+- **Flotte contre flotte, à prix égal** (`eq-tech`, `eq-combat`) : le croiseur bat la frégate,
+  le léviathan bat le dard ; le destroyer perd contre le drone d'assaut.
+- **Les lourds ne perdent rien contre une défense faible** : une flotte qui abat la défense en
+  1 ou 2 passes ne perd aucun vaisseau si l'attaque de la défense × les passes reste sous la
+  coque d'un de ses vaisseaux ; les lourds sont ainsi intouchables par les défenses d'IA
+  vues en partie (⚔ 45 à 70) (`eq-combat`).
 - **Ce que fait l'IA machine, et qui gagne contre les IA** : elle lance des conquêtes de
   drones dès 12 min, avant que les autres aient des vaisseaux posés, et finit ses duels entre
   15,9 et 20,0 min (`ia-parties.mjs`).
