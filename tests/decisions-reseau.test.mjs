@@ -505,6 +505,38 @@ scenario('D-240 : 6 parties de 1 M jouées l’une après l’autre : la partie 
   })));
 });
 
+scenario('D-240 : reprendre une grosse partie à mémoire presque pleine ne fait perdre aucune autre partie', async (film) => {
+  let A = null;
+  let rows = [];
+  await withStore(async (m) => {
+    const now = Date.now;
+    let t = 1_000;
+    Date.now = () => (t += 1_000);
+    try {
+      // 4 parties de 1,2 M, puis une petite partie en cours : ≈ 4,8 M sur 5,24 M.
+      for (let g = 1; g <= 4; g++) save.saveGame('me', heavy(`big${g}`, 1_200_000));
+      save.saveGame('me', heavy('petite', 10_000));
+      // Reprendre la plus vieille : pendant un instant, elle serait là deux fois (6 M).
+      const back = save.selectGame('big1');
+      assert.equal(back?.state.gid, 'big1', 'reprise');
+      assert.equal(save.loadGame().state.gid, 'big1');
+      const listed = save.listGames().map((x) => x.state.gid).sort();
+      assert.deepEqual(listed, ['big1', 'big2', 'big3', 'big4', 'petite'], 'aucune partie perdue');
+      const c = copies(m);
+      assert.equal(c.length, new Set(c).size, `une seule copie de chaque (${c})`);
+      // La partie reprise grossit encore : les plus vieilles laissent la place, jamais elle.
+      assert.equal(save.saveGame('me', heavy('big1', 1_700_000)), true, 'big1 grossit : sauvée');
+      assert.deepEqual(save.listGames().map((x) => x.state.gid), ['big1', 'petite', 'big4', 'big3'], 'big2, la plus vieille, est sortie');
+      Date.now = now;
+      rows = [{ show: 'parties après la reprise de big1', expected: 'big1 · big2 · big3 · big4 · petite', got: listed.join(' · ') }];
+      A = soloNow('gvraie');
+    } finally {
+      Date.now = now;
+    }
+  }, { quota: QUOTA });
+  film.look(A, 'une partie lancée après avoir repris une grosse partie : rien n’a été retiré', rows);
+});
+
 scenario('D-240 : une sauvegarde impossible prévient le joueur, sans planter ni rien perdre', async (film) => {
   let A = null;
   const rows = [];

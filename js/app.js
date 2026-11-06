@@ -76,7 +76,10 @@ function toast(text, ms = 3200) {
   if (!toastTimer) nextToast();
 }
 // Mémoire du téléphone pleine malgré le ménage de l'historique (D-240) : le joueur est prévenu.
-onSaveFailed(() => toast('Sauvegarde impossible : la mémoire du téléphone est pleine. La partie continue, mais elle ne sera pas gardée si tu fermes l’appli.', 8000));
+onSaveFailed(() => {
+  toast('Sauvegarde impossible : la mémoire du téléphone est pleine. La partie continue, mais elle ne sera pas gardée si tu fermes l’appli.', 8000);
+  return document.visibilityState !== 'hidden'; // appli cachée : pas de toast, on redira au prochain échec
+});
 function nextToast() {
   const t = $('toast');
   const next = toasts.shift();

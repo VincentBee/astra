@@ -2136,7 +2136,9 @@ Numéro pris haut (D-240) : D-163 à D-239 sont pris ou réservés par les autre
      est écrite d'abord, puis l'ancienne est rangée dans sa clé.
   3. **Mémoire pleine** : sur `QuotaExceededError` (ou ses variantes Safari, ancien Firefox), on
      retire la plus ancienne partie de l'historique, jamais la partie en cours, et on réessaie,
-     jusqu'à ce que ça passe. Si même l'historique vide ne suffit pas, les parties retirées sont
+     jusqu'à ce que ça passe. En reprenant une partie de l'historique, sa propre copie là-bas part
+     la première (sinon, pendant un instant, la partie serait comptée deux fois et une autre
+     partie serait retirée pour rien). Si même l'historique vide ne suffit pas, les parties retirées sont
      remises (elles tenaient avant) : on ne perd rien pour rien. Une autre erreur (stockage bloqué)
      ne retire rien.
   4. **Message** : si la partie en cours n'a pas pu être sauvée, toast « Sauvegarde impossible : la
@@ -2144,7 +2146,8 @@ Numéro pris haut (D-240) : D-163 à D-239 sont pris ou réservés par les autre
      fermes l'appli. » (8 s), au plus une fois par minute tant que ça dure. `save.js` ne connaît
      pas l'écran : `app.js` s'abonne par `onSaveFailed` (rien à changer dans `session.js`). Une
      partie retirée de l'historique pour faire de la place ne donne pas de message (c'est le
-     comportement demandé).
+     comportement demandé). Appli cachée (sauvegarde à `pagehide`) : pas de toast possible, la
+     minute n'est pas comptée, le prochain échec préviendra.
   5. **Reprise de l'ancien format** (`migrate`, au premier accès) : `astra.saves` est lu en
      mémoire, effacé d'abord, puis chaque partie valide reçoit sa clé, la plus récente d'abord ;
      la copie de la partie en cours n'est pas recopiée (gardée si elle est plus récente que
@@ -2161,9 +2164,10 @@ Numéro pris haut (D-240) : D-163 à D-239 sont pris ou réservés par les autre
   de caractères chacune) ; une partie en cours plus grosse que toute la mémoire n'est pas sauvée
   (message).
 - Cache : `sw.js` passe à `astra-p2p-v87` (v86 est dans `main`).
-- Vérifié : 3 scénarios D-240 (`tests/decisions-reseau.test.mjs`, quota simulé de 5 242 880
+- Vérifié : 4 scénarios D-240 (`tests/decisions-reseau.test.mjs`, quota simulé de 5 242 880
   car. qui lève `QuotaExceededError`) : 6 parties de 1 M jouées l'une après l'autre ; échec forcé
-  (mémoire et stockage bloqué) ; reprise de l'ancien format (petites parties, et 3 parties de 1,25 M
+  (mémoire et stockage bloqué) ; reprise d'une partie de 1,2 M à mémoire presque pleine (aucune
+  autre partie perdue ; échoue sans la correction) ; reprise de l'ancien format (petites parties, et 3 parties de 1,25 M
   qui remplissent la mémoire). Scénario D-170 adapté. Vrai jeu dans Chromium : reprise de
   l'ancien format (4 parties de 1,2 M), retrait de la plus vieille en reprenant une partie
   (quota simulé dans la page : ce navigateur accepte ≈ 26 M), toast quand l'écriture est refusée.

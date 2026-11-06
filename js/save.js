@@ -50,16 +50,19 @@ const isMap = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 let failed = null;
 let told = -Infinity;
 const RETELL = 60_000; // échecs à la suite : on prévient de nouveau au plus une fois par minute
-/** `fn()` est appelé quand une sauvegarde de la partie en cours échoue (au plus une fois par minute). */
+/**
+ * `fn()` est appelé quand une sauvegarde de la partie en cours échoue (au plus une fois par
+ * minute). Il renvoie `false` si le message n'a pas pu être montré (appli cachée) : on
+ * préviendra au prochain échec.
+ */
 export function onSaveFailed(fn) {
   failed = fn;
 }
 function report(ok) {
   if (ok) told = -Infinity;
   else if (Date.now() - told >= RETELL) {
-    told = Date.now();
     try {
-      failed?.();
+      if (failed?.() !== false) told = Date.now();
     } catch {}
   }
   return ok;
@@ -182,14 +185,14 @@ export function saveGame(me, state, journal, intel, bots) {
   const idx = index();
   const prev = loadGame();
   const text = JSON.stringify(save);
-  let ok = fit(SAVE_KEY, text, idx, [gid]);
-  if (!ok && gid in idx) {
-    // Une ancienne copie de cette partie dans l'historique : elle fait de la place, et ne sert plus.
-    const [copy, at] = [localStorage.getItem(GAME_KEY + gid), idx[gid]];
-    drop(gid, idx);
+  let ok = put(SAVE_KEY, text) === true;
+  if (!ok) {
+    // Une ancienne copie de cette partie dans l'historique fait de la place la première : elle
+    // ne sert plus. Ensuite seulement, les plus vieilles parties.
+    const copy = gid in idx ? [localStorage.getItem(GAME_KEY + gid), idx[gid]] : null;
+    if (copy) drop(gid, idx);
     ok = fit(SAVE_KEY, text, idx, [gid]);
-    if (!ok && copy != null) write(GAME_KEY + gid, copy); // rien n'est perdu (l'index l'a gardée)
-    if (!ok) idx[gid] = at;
+    if (!ok && copy?.[0] != null && write(GAME_KEY + gid, copy[0])) idx[gid] = copy[1]; // rien n'est perdu
   }
   if (!ok) return report(false);
   const twice = gid in idx;
@@ -231,8 +234,9 @@ export function selectGame(gid) {
   if (save !== cur) {
     const idx = index();
     const text = JSON.stringify(save);
-    // D'abord la mettre en cours (sa copie dans l'historique ne s'efface qu'ensuite).
-    if (!fit(SAVE_KEY, text, idx, [gid])) {
+    // D'abord la mettre en cours. Si la place manque, sa propre copie dans l'historique (qui ne
+    // servira plus) part la première, avant toute autre partie.
+    if (put(SAVE_KEY, text) !== true) {
       drop(gid, idx);
       if (!fit(SAVE_KEY, text, idx, [gid])) {
         write(GAME_KEY + gid, text); // remise à sa place : rien n'est perdu
