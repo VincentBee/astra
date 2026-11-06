@@ -404,7 +404,9 @@ class LocalLink {
     this.peer = null;
     this.closed = false;
     this.viaRoom = false;
-    this.local = true; // même téléphone, même horloge (D-165)
+    // Même téléphone : même horloge (D-165), et le silence ne veut rien dire, la page était
+    // seulement en pause (D-220).
+    this.local = true;
     this.queue = [];
     this.handler = null;
     this.closer = null;

@@ -2308,3 +2308,76 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
 - Source : capture et messages de Vincent, transmis par la session « Affichage aide ».
 - Statut : en vigueur (cette PR). Change le bandeau de course de la session `26f178b9` (`interface.md` §12) ; D-104 (lien vers la courbe) et D-143 (bouton Classement) restent vrais.
 
+**D-210 — Le Journal ne trahit plus l'ordre d'une flotte que je ne vois pas (issue #37)**
+- 2026-11-06 22:18. Contexte : issue #37. `moveFleet` (attaque, conquête) et `chaseFleet`
+  (poursuite) écrivaient au journal partagé « La flotte de A attaque Rigel (B) » ou « … prend en
+  chasse une flotte de B ». La fenêtre Journal (« Ce qui me concerne », D-110) montrait à B toutes
+  les lignes qui contiennent son nom : B apprenait l'attaque dès l'ordre, flotte hors de sa
+  détection, alors que la carte (D-128) et l'alerte (D-133) ne montraient rien.
+- Choix de Claude : **marquer et filtrer**. Une ligne d'ordre de flotte porte `{ pid, fleet }`
+  (le joueur et sa flotte) dans le journal partagé ; `showsLog(l)` (`js/session.js`) la montre à
+  son auteur toujours, aux autres seulement tant qu'ils voient cette flotte (`sees`, la règle de
+  la carte et de l'alerte). Flotte disparue (posée, détruite) : la ligne reste cachée ; le
+  combat a ses propres lignes (« est attaquée par », « prend … à », carnet D-110), jamais
+  marquées, toujours montrées. `openJournal` (`js/app.js`) passe par `showsLog`. Une marque mal
+  formée reçue du réseau est ignorée (`pushLog` : `pid` et `fleet` doivent être du texte) ; la
+  ligne redevient ordinaire. Tous les ordres de `moveFleet` sont marqués (coloniser et se poser
+  ne nomment que l'auteur : aucun changement pour eux).
+- Alternative écartée : garder ces lignes hors du journal partagé (journal local de l'auteur
+  seulement). Il aurait fallu un second journal, sauvegardé à part, et B n'aurait jamais lu
+  l'ordre, même flotte en vue. La marque garde un seul journal et suit la même règle que la
+  carte. Comme D-128, c'est un **filtre d'affichage, pas un secret** : la ligne voyage toujours
+  avec la fiche (la fiche contient d'ailleurs déjà l'ordre de la flotte), et la console
+  (`printLog`) la montre toujours, pour le débogage.
+- Avec D-190 (fusionné avant) : la ligne ne nomme la cible que si l'auteur voit sa planète
+  (`live`). Hors de sa vue, la ligne ne contient pas le nom de B et n'est déjà pas dans son
+  Journal. La marque reste utile quand l'auteur voit la planète (un éclaireur, du radar) mais que
+  la cible ne voit pas la flotte d'attaque : les scénarios d'attaque et de conquête placent un
+  éclaireur de A à 1 case de la planète de B pour couvrir ce cas.
+- Rejeu (`js/replay.js`) : inchangé. Son journal rejoué ne garde que `{ at, pid, text }`, et la
+  marque ne change pas l'état de la partie ; `tests/replay.test.mjs` passe sans changement.
+- Vérifié : 4 scénarios (`tests/journal.test.mjs`) : attaque et conquête depuis 19 cases (B ne lit
+  pas l'ordre tant qu'il ne voit pas la flotte, A toujours ; flotte à 2 cases : B la voit,
+  l'alerte sonne, l'ordre se lit ; après le combat, B lit le résultat) ; poursuite (A, radar 3,
+  voit le cargo de B à 4 cases, B ne voit pas A) ; marque gardée par `onRecord`, marque mal formée
+  ignorée. Contrôlés par mutation (`showsLog` qui renvoie toujours vrai : les 4 échouent).
+  222/222. Vu dans le vrai jeu (interface de test, contre l'IA) : Journal de B avant, flotte en
+  vue, après le combat.
+- Qui : Claude (choix de méthode, demandé par la session de coordination). Source : session
+  `89918100`.
+  Statut : en vigueur. Applique D-128 et D-133 au Journal (D-110).
+
+**D-211 — Cache `astra-p2p-v91`**
+- 2026-11-06. Choix de Claude : `js/app.js` et `js/session.js` changent (D-210) ; nouvelle
+  version de cache pour que les téléphones les récupèrent. Prévu en v84 ; `main` est passé à v86
+  (D-176), puis à v90 (#161, #162, #165, #166) avant les fusions, d'où v91.
+- Statut : en vigueur.
+
+## 6 novembre 2026 — IA coupée après une pause de la page (#38)
+
+Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autres PR en cours.
+
+**D-220 — Le lien en mémoire d'une IA ne se coupe jamais pour silence**
+- 2026-11-06 22:15. Contexte : issue #38. Une IA (D-151) est reliée à l'hôte par un lien en
+  mémoire (`LocalLink`, `js/bot.js`). `heartbeat()` (`js/session.js`) ferme tout lien muet depuis
+  30 s (`SILENCE_MS`). Si la page de l'hôte se fige plus de 30 s (téléphone verrouillé, appli en
+  arrière-plan), au réveil le battement passe avant le moindre message : le lien de l'IA était
+  fermé, et rien ne le recréait. L'IA jouait dans sa copie, mais l'hôte ne recevait plus ses
+  fiches (« déconnecté », « Seul en ligne · Rejoindre ») ; au rechargement, ses ordres joués
+  pendant la coupure étaient perdus.
+- Choix de Claude : `LocalLink` porte `local = true`, et `heartbeat` ne ferme pas pour silence un
+  lien `local` (il lui envoie toujours `hb`, pour la latence et « IA sur ce téléphone »). Les
+  deux bouts sont sur le même téléphone : un silence veut seulement dire que la page était en
+  pause, pendant laquelle l'IA non plus n'a pas joué. Le lien ne se ferme plus qu'à la fin
+  (`end()`). Le bandeau « Seul en ligne » suit tout seul : le lien de l'IA compte dans
+  `links`, donc `alone` reste faux ; `js/app.js` n'a pas changé.
+- Alternatives écartées : recréer l'IA quand son lien se ferme (`wakeBots` après avoir retiré
+  l'entrée morte de `host.bots`) : plus de code, et la nouvelle Session repartirait de la fiche
+  figée chez l'hôte, donc perdrait les ordres joués entre-temps ; faire de `lastSeen` un getter
+  de `LocalLink` (toujours « à l'instant ») : magie cachée, `attach` l'écrit.
+- Vérifié : scénario « D-220 : la page de l'hôte se fige 31 s… » (`tests/bot.test.mjs`), qui
+  échoue sans la correction (liens 1 → 0, IA hors ligne, `alone` vrai) ; vrai jeu (page bloquée
+  31 s, IA toujours en ligne, fiche qui avance, rien de perdu au rechargement). Cache `sw.js` :
+  `astra-p2p-v92` (v86 au départ ; v92 au merge, au-dessus de v91 de `main`).
+- Qui : Vincent (demande : corriger #38), Claude (méthode). Source : session `2f996c1d`.
+  Statut : en vigueur. Complète D-151.
