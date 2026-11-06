@@ -1194,7 +1194,8 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   ajouter le carburant restant au stock (avantage aux départs proches d'une planète) ; donner
   aussi des cargos ou des chasseurs au départ (la demande dit « uniquement »).
 - Qui : Vincent (la demande), Claude (la forme). Source : session `012yisg3`.
-- Statut : en vigueur. 11 tests (`tests/start.test.mjs`), contrôlés par mutation. Vérifié dans
+- Statut : en vigueur, modifiée par D-163 (le froid détruit les flottes : un joueur sans planète
+  meurt quand il perd son dernier colonisateur au froid). 11 tests (`tests/start.test.mjs`), contrôlés par mutation. Vérifié dans
   Chromium (390 × 844), seul et à deux avec une vraie invitation WebRTC. Équilibre des cases de
   départ (une planète peut être plus proche de l'un que de l'autre) : **non confirmé**.
 
@@ -1970,6 +1971,74 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - 2026-11-03. Contexte : fusion de `main` (D-157 à D-159 et cache v81 déjà pris) dans la PR des ordres d'assaut (D-160).
 - Choix : `VERSION` passe à `astra-p2p-v82` pour que les téléphones prennent le nouveau `session.js`.
 - Qui : Claude, par défaut. Source : session `fb0c1844`. Statut : en vigueur.
+
+**D-163 — Le froid détruit les flottes qu'il atteint (issue #33)**
+- 2026-11-06 17:40. Contexte : issue #33. Un joueur « prêt » qui ne fondait jamais sa planète mère
+  restait en vie pour toujours (`deadAt` renvoyait null sans planète, le froid ne touchait que les
+  planètes) : il bloquait la fin par conquête et gagnait vers 34 min, quand le froid avait pris
+  les planètes des autres. Aussi le cas d'un joueur prêt qui ferme l'appli avant que sa flotte
+  n'apparaisse (pas de `since`, pas de flotte).
+- Choix de Vincent (transmis par la session de coordination) : **le froid détruit les flottes
+  qu'il atteint**, en orbite ou en vol, celles de tous les joueurs. Un joueur qui cache sa seule
+  flotte près du soleil, le dernier endroit à geler, n'est pas un problème : les flottes
+  rapportent des points et l'adversaire peut la détruire. **Pas de règle en plus** (pas de délai
+  pour fonder, pas d'interdiction de gagner).
+- Choix de Claude, par défaut :
+  - Heure de destruction = première heure où la case de la flotte est gelée, calculée sur son
+    segment (`fleetFrostAt`), la même sur tous les téléphones. En vol, position regardée toutes
+    les secondes (`FROST_STEP`) ; arrêtée, `frostOf(case)` exactement.
+  - Une flotte qui arrive à destination avant le froid y arrive d'abord (se pose, fonde) ; celle
+    qui reste en orbite est détruite ensuite.
+  - Sans planète, perdre son dernier colonisateur au froid élimine **à l'heure du gel** (pas à
+    l'heure où le téléphone s'en aperçoit), avec les points d'avant le gel (`deathPts`).
+  - Les autres téléphones voient la flotte disparaître à l'heure du gel, sans attendre la fiche
+    du propriétaire (`sees` faux) ; `deadAt` voit la mort d'un joueur sans planète hors ligne.
+  - Combat : une flotte qu'un autre joueur a détruite (son rapport de combat lui enlève tous ses
+    vaisseaux) disparaît aussi pour tous à l'heure du combat, sans attendre la fiche du
+    propriétaire (`fleetKillAt`). Sans planète, perdre ainsi son dernier colonisateur élimine **à
+    l'heure du combat**, celle que les autres ont calculée.
+- Choix de Vincent, sur le joueur prêt qui se déconnecte avant que sa flotte n'apparaisse (question
+  posée par Claude, réponse transmise par la session de coordination) : « quand la partie
+  commence, Tous les joueurs pret ont une flotte qui apparait sur la map, meme si il sont tout de
+  suite deconnecté, cette flotte est destructible par un autre joueur ou par le froit ». Mise en
+  œuvre (Claude) :
+  - La flotte de départ (`startFleet`) se calcule à partir de la partie seule : un colonisateur
+    sur la case de départ (`startCell`), à `max(départ, ready)`, et un **identifiant tiré du gid
+    et du joueur** (plus au hasard). Tant que le téléphone du joueur ne l'a pas fait apparaître,
+    les autres la construisent eux-mêmes (`ghostFleet`, `fleetsOf`) : ils la voient sur la carte,
+    la prennent en chasse et la combattent, le froid la détruit.
+  - Détruite (combat ou froid) : le joueur est éliminé, même s'il ne revient jamais (`deadAt`).
+    S'il revient, `enterRace` crée exactement la même flotte (même identifiant) : le rapport de
+    combat s'applique à elle, ou le froid la détruit, à la même heure que chez les autres.
+  - Pas de problème réseau : la fiche du joueur absent existe (race, `ready`) ; le combat s'écrit
+    dans la fiche de l'attaquant (`effects`), comme d'habitude. Pas d'échange possible avec cette
+    flotte (personne pour répondre).
+- Précision de Vincent (transmise par la session de coordination) : « oui on peut attaquer les
+  planetes et les flottes d'un joueur deconnecté ». Les combats contre un joueur hors ligne sont
+  voulus ; la flotte de départ d'un joueur prêt jamais connecté s'attaque comme les autres, par
+  le même mécanisme : poursuite (`chaseFleet`) ou flotte agressive, y compris une rencontre que
+  personne ne regardait (`firstContact`, D-109).
+  - Conséquence acceptée : un retardataire dont la case de départ est déjà gelée perd sa flotte
+    en entrant et il est éliminé aussitôt.
+- Alternatives écartées : éliminer après un délai fixe sans planète (proposé d'abord, écarté par
+  Vincent au profit d'une règle de jeu) ; pour le joueur sans flotte, le tuer quand le froid
+  atteint le soleil (36 min, règle à part, il gagnerait encore contre un joueur gelé à 34 min) ;
+  pour le joueur sans flotte, compter seulement le gel de sa case de départ, sans flotte visible
+  ni combat (première version de cette PR, remplacée par le choix de Vincent) ;
+  chercher l'instant exact du gel en vol (racine) : une grille d'une seconde suffit et reste
+  identique partout.
+- Vérifié : `tests/frost-fleet.test.mjs` (6 scénarios, dont une flotte agressive qui croise la
+  flotte de départ de B déconnecté pendant que personne ne regarde : combat à l'heure de la
+  rencontre, D-109 ; et à quai, en vol, issue #33 avec rejeu
+  fidèle, flotte de départ d'un joueur déconnecté vue par tous et gelée avec rejeu fidèle, A
+  détruit au combat la flotte de départ de B déconnecté → B éliminé, A gagne, B retrouve la même
+  flotte et la même heure en revenant) ; « D-120 : tant qu'un joueur vole vers sa planète, la
+  partie ne finit pas » reste vert (pas de froid dans ce test) ; 218/218 ; vu dans le vrai jeu
+  (rapport de scénario, interface de test). Rejeu du scénario de combat non vérifié : le test
+  donne ses frégates à A à la main, hors de son journal d'ordres.
+- Qui : Vincent (règle, flotte de départ d'un joueur déconnecté), Claude (calcul). Source :
+  session `65b37922`.
+  Statut : en vigueur. Modifie D-120. Cache `astra-p2p-v83`.
 
 ## 6 novembre 2026 — sauvegarde abîmée (#87)
 
