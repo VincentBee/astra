@@ -2334,3 +2334,32 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
   version de cache pour que les téléphones les récupèrent. Prévu en v84 ; `main` est passé à v86
   (D-176), puis à v90 (#161, #162, #165, #166) avant les fusions, d'où v91.
 - Statut : en vigueur.
+
+## 6 novembre 2026 — IA coupée après une pause de la page (#38)
+
+Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autres PR en cours.
+
+**D-220 — Le lien en mémoire d'une IA ne se coupe jamais pour silence**
+- 2026-11-06 22:15. Contexte : issue #38. Une IA (D-151) est reliée à l'hôte par un lien en
+  mémoire (`LocalLink`, `js/bot.js`). `heartbeat()` (`js/session.js`) ferme tout lien muet depuis
+  30 s (`SILENCE_MS`). Si la page de l'hôte se fige plus de 30 s (téléphone verrouillé, appli en
+  arrière-plan), au réveil le battement passe avant le moindre message : le lien de l'IA était
+  fermé, et rien ne le recréait. L'IA jouait dans sa copie, mais l'hôte ne recevait plus ses
+  fiches (« déconnecté », « Seul en ligne · Rejoindre ») ; au rechargement, ses ordres joués
+  pendant la coupure étaient perdus.
+- Choix de Claude : `LocalLink` porte `local = true`, et `heartbeat` ne ferme pas pour silence un
+  lien `local` (il lui envoie toujours `hb`, pour la latence et « IA sur ce téléphone »). Les
+  deux bouts sont sur le même téléphone : un silence veut seulement dire que la page était en
+  pause, pendant laquelle l'IA non plus n'a pas joué. Le lien ne se ferme plus qu'à la fin
+  (`end()`). Le bandeau « Seul en ligne » suit tout seul : le lien de l'IA compte dans
+  `links`, donc `alone` reste faux ; `js/app.js` n'a pas changé.
+- Alternatives écartées : recréer l'IA quand son lien se ferme (`wakeBots` après avoir retiré
+  l'entrée morte de `host.bots`) : plus de code, et la nouvelle Session repartirait de la fiche
+  figée chez l'hôte, donc perdrait les ordres joués entre-temps ; faire de `lastSeen` un getter
+  de `LocalLink` (toujours « à l'instant ») : magie cachée, `attach` l'écrit.
+- Vérifié : scénario « D-220 : la page de l'hôte se fige 31 s… » (`tests/bot.test.mjs`), qui
+  échoue sans la correction (liens 1 → 0, IA hors ligne, `alone` vrai) ; vrai jeu (page bloquée
+  31 s, IA toujours en ligne, fiche qui avance, rien de perdu au rechargement). Cache `sw.js` :
+  `astra-p2p-v92` (v86 au départ ; v92 au merge, au-dessus de v91 de `main`).
+- Qui : Vincent (demande : corriger #38), Claude (méthode). Source : session `2f996c1d`.
+  Statut : en vigueur. Complète D-151.
