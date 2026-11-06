@@ -199,7 +199,18 @@ l'intègre par pas (`js/game.js:13-15`).
     le suivent (chaque chantier garde l'ordre du fil) ;
   - le premier élément prêt **a la priorité sur le stock** : `stateAt` avance l'économie pas à
     pas (`until`) jusqu'à ce que le stock couvre son prix, au plus jusqu'au prochain événement ;
-    ceux d'après attendent (on ne double pas dans le fil pour une question de prix).
+    ceux d'après attendent (on ne double pas dans le fil pour une question de prix) ;
+  - **sauf un élément prêt qu'on ne pourra pas payer avec la production actuelle** (D-270,
+    `starved`) : une ressource de son prix manque au stock et ne peut pas monter (solde ≤ 0,
+    ou demande pas couverte : famine pour la nourriture, panne pour l'énergie). Il ne bloque
+    personne, **pas même les éléments de son propre chantier** (le réacteur qui répare la
+    panne part même s'il est derrière un bâtiment qui coûte de l'énergie). Il reste candidat :
+    `planNext` rend la liste de ces éléments-là, suivie du premier élément prêt payable un
+    jour, et `until` lance le premier de la liste que le stock couvre (si la ressource se remet
+    à rentrer, il repasse devant ceux qui le suivent). Sans famine ni panne, la liste n'a qu'un
+    élément : le calcul est celui d'avant. `planForecast` affiche alors sa raison (« Pas de
+    nourriture qui rentre », « Pas d’énergie qui rentre », « Pas de minéraux qui rentrent »)
+    au lieu de « plus de 6 h ».
   Trouvé : il paye, remplit sa file, sort du fil, et note `{ kind: 'start', lane, i, … }`
   dans `done` (`i` : sa place dans le fil de départ). Le fil avance aussi pendant une absence.
   `planForecast(planet, now)` part d'une copie soldée à `now`, refait ce calcul 10 min puis
