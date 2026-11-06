@@ -266,3 +266,49 @@ scenario('D-106 : le plus grand lot de vaisseaux suit le stock, et le chantier l
   show(p, 'A lance le plus grand lot : 3 cargos au chantier');
   assert.equal(p.yard.count, 3);
 });
+
+// Calcul borné (D-175, #32) : une planète datée de très loin (fiche reçue avec at = 0) faisait des
+// millions de pas de 48 s et figeait la page. MAX_STEPS borne le nombre de pas ; sous ≈ 26,7 h,
+// les pas sont exactement ceux d'avant, donc l'économie d'une partie ne change pas.
+const DAY = 24 * HOUR;
+const oldStep = (total) => Math.max(1000, Math.min(120_000 / game.TEMPO, total / 300));
+
+scenario('une planète datée de l’an 1970 ou d’il y a 30 jours se calcule vite, en MAX_STEPS pas au plus', (film) => {
+  const { show } = stage(film, 'human');
+  const now = Date.now();
+  for (const [label, at] of [['at = 0', 0], ['30 jours', now - 30 * DAY]]) {
+    // Pas plus de MAX_STEPS pas pour l'économie entière…
+    assert.ok(Math.ceil((now - at) / game.stepOf(now - at)) <= game.MAX_STEPS, label);
+    // … et stateAt entier (fil d'attente plein, chantier en cours) finit en quelques millisecondes.
+    for (const race of ['human', 'machine', 'alien']) {
+      const p = game.newPlanet(race, at, game.planetsFor('gtest')[0]);
+      p.plan = Object.keys(game.RACES[race].buildings).slice(0, 6);
+      const t0 = performance.now();
+      const s = game.stateAt(p, now);
+      const ms = performance.now() - t0;
+      assert.ok(ms < 100, `${race} ${label} : ${ms.toFixed(1)} ms`);
+      for (const v of [...Object.values(s.stock), s.pop, ...Object.values(s.reserve || {})]) assert.ok(Number.isFinite(v) && v >= 0, `${race} ${label} : ${v}`);
+    }
+  }
+  const p = planet('human');
+  p.at = 0;
+  show(p, 'planète datée de at = 0, vue maintenant : calculée sans figer', T0);
+});
+
+scenario('sous 26 h d’écart, les pas de l’économie sont exactement ceux d’avant le plafond', () => {
+  for (const total of [1, 999, 5 * MIN, HOUR, 4 * HOUR, DAY, game.MAX_STEPS * oldStep(game.MAX_STEPS * 48_000)]) {
+    assert.equal(game.stepOf(total), oldStep(total), `écart ${total} ms`);
+  }
+  // Au-delà, les pas s'allongent juste assez pour rester à MAX_STEPS.
+  assert.equal(game.stepOf(30 * DAY), (30 * DAY) / game.MAX_STEPS);
+});
+
+scenario('une heure de partie calculée d’un coup ou soldée toutes les 250 ms : même planète à 0,1 % près', () => {
+  const once = planet('human');
+  const often = clone(once);
+  for (let t = T0 + 250; t <= T0 + 60 * MIN; t += 250) game.settle(often, t);
+  game.settle(once, T0 + 60 * MIN);
+  const gap = (a, b) => Math.abs(a - b) / Math.max(1, Math.abs(b));
+  assert.ok(gap(once.pop, often.pop) < 0.001, `population ${once.pop} contre ${often.pop}`);
+  for (const r of game.RES) assert.ok(gap(once.stock[r], often.stock[r]) < 0.001, `${r} ${once.stock[r]} contre ${often.stock[r]}`);
+});

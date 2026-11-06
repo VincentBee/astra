@@ -415,6 +415,12 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 |---|---|---|---|---|---|
 | 08:58 | `fb0c1844` | [Auto-fix] conflit avec `main` | Huitième fusion de `main` (D-157 à D-159, cache v81 déjà pris) : ma décision devient D-160, cache v82 (D-161) ; 212/212 | (cette PR) | D-160, D-161 |
 
+## 6 novembre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 22:10 | `424ded66` | Worker du router (bugs ouverts) : « Corriger l'issue #32 » (`stateAt` sans limite de pas fige la page) | Pas de l'économie pris dans `stepOf` : `MAX_STEPS` = 2 000 pas au plus par calcul, pas inchangés sous ≈ 26,7 h (`js/game.js`) ; `planetOk` ramène l'heure d'une planète reçue à `since` (planète mère) ou à `claimAt` (colonie) (`js/session.js`). 5 scénarios (`rules`, `hostile`) ; 217/217. Preuve : deux vraies `Session` à l'heure d'aujourd'hui, fiche reçue avec `at = 0` : 1 à 5 ms au lieu d'une page figée (tuée après 15 s sur `main`). Cache v86 | (PR, ferme #32) | D-175, D-176 |
+
 ### Travaux en cours au 2026-10-29
 
 - **Rythme des parties** (`26f178b9`) : commité sur `claude/swarm-it-game-pacing-1d4502`
