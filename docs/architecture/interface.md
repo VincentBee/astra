@@ -110,7 +110,7 @@ Toutes se ferment par leur croix (`.close-btn`), un toucher sur le fond sombre o
 | `#sheet-settings` | roue crantée (`[data-settings]` : accueil et `#btn-settings` dans la rangée du jeu) | Réglages de l'appareil : liste **Fond** (`#sky`, D-112). | branchement près de l'accueil dans `app.js` (D-114). |
 | `#sheet-invite` (219-248) | **Inviter un joueur** | QR de l'invitation + copier/partager ; scanner ou coller la réponse. | `openInviteSheet` 297-312, `useAnswer` 341-363, fermeture → `session.cancelInvite()` 328-331. |
 | `#sheet-fleet` (251-275) | **Décoller** (onglet Flottes) | Nombre de vaisseaux, cargaison, carburant ; calcule soutes, vitesse (et le vaisseau le plus lent, qui la fixe), réservoir, portée. | `openFleetSheet` 1147-1165, `updateFleetSheet` 1167-1180, `btn-fleet-go` 1185-1196. |
-| `#sheet-move` (278-295) | « Donner » (`#fi-beside`) ou **Scinder** | Vaisseaux, cargaison, carburant à passer à une autre flotte ou à une nouvelle. | `openMoveSheet` 1838-1860, `btn-move-go` 1864-1873. |
+| `#sheet-move` (278-295) | « Donner » (`#fi-beside`) ou **Scinder** | Vaisseaux, cargaison, carburant à passer à une autre flotte ou à une nouvelle. La fenêtre garde l'identifiant de sa flotte (`moveSheet.from`) et n'agit que sur elle ; si cette flotte (ou celle qui reçoit) disparaît, elle se ferme avec « Cette flotte n'existe plus. » (`refreshMoveSheet`, appelé par `renderFleetInfo` ; D-350). | `openMoveSheet`, `refreshMoveSheet`, `btn-move-go` (~2836-2890). |
 | `#sheet-trade` (298-315) | Bouton échange d'un joueur sur la même case | « Je donne » / « Je demande ». | `openTradeSheet` 1746-1757, `btn-trade-go` 1768-1774. |
 
 ### 3.3 Couches fixes

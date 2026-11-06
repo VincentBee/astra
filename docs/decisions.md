@@ -2248,3 +2248,31 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
 - Choix : `VERSION` passe à `astra-p2p-v89` pour que les téléphones prennent le nouveau
   `session.js`.
 - Qui : Claude, par défaut. Source : session `1d0dae27`. Statut : en vigueur.
+
+**D-350 — La fenêtre Scinder / Donner suit sa flotte**
+- 2026-11-06 22:45. Contexte : issue #73. La fenêtre « Scinder » / « Donner » était remplie une
+  fois, à l'ouverture. Si la flotte disparaissait pendant qu'elle était ouverte (combat, fusion,
+  élimination), la fenêtre restait, et son bouton ne faisait rien, sans message (`splitFleet`
+  renvoyait `false` avant tout `refuse`). Après une jonction (D-159), `selFleet` passait à la
+  flotte absorbante : le bouton aurait agi sur une autre flotte que celle affichée.
+- Choix : la fenêtre garde l'identifiant de la flotte pour laquelle elle a été ouverte
+  (`moveSheet.from`, `js/app.js`) et n'agit que sur elle, jamais sur `selFleet`. À chaque
+  rafraîchissement (`refreshMoveSheet`, appelé par `renderFleetInfo`, 5 fois par seconde), si
+  cette flotte, ou celle qui reçoit pour « Donner », n'existe plus, la fenêtre se ferme avec le
+  message « Cette flotte n'existe plus. ». `splitFleet` refuse une flotte inconnue avec
+  « Flotte introuvable. » (`transferFleet` le faisait déjà, par `pairOf`).
+- Hors de cette décision : la vue d'une colonie perdue qui revient en silence sur la planète
+  mère (`renderPlanet`, 4e critère de #73) n'est pas traitée ici.
+- Alternatives écartées : garder la fenêtre ouverte avec un message dedans (un bouton qui ne
+  peut plus rien faire reste à l'écran) ; suivre la flotte absorbante comme la fiche de flotte
+  (la fenêtre parlerait d'une flotte, et agirait sur une autre).
+- Qui : Claude, par défaut (texte du message, fermeture plutôt que message dans la fenêtre).
+  Source : session `c88abd15`, issue #73. Statut : en vigueur.
+- Tests : `tests/fleet.test.mjs`, scénario « flotte détruite au combat pendant « Scinder » ou
+  « Donner » … ».
+
+**D-351 — Cache `astra-p2p-v90`**
+- 2026-11-06. Contexte : v89 (PR #166) est dans `main`.
+- Choix : `VERSION` passe à `astra-p2p-v90` pour que les téléphones prennent les nouveaux
+  `app.js` et `session.js`.
+- Qui : Claude, par défaut. Source : session `c88abd15`. Statut : en vigueur.
