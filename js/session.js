@@ -20,7 +20,7 @@
 import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity } from './save.js';
-import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, PLAN_MAX, planItem, planId, planAhead, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, sunFor, fortOf, seeded } from './game.js';
+import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, PLAN_MAX, planItem, planId, planAhead, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, FROST, sunFor, fortOf, seeded } from './game.js';
 import { TECHS, SHIPS, sightRange, TEMPO, techMissing, shipUnlocked } from './tech.js';
 import { cleanReport } from './report.js';
 import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, firstContact, salvage, applyLosses, parkedCell, fleetPos, fleetCargo, fleetTank, ORDERS, MAX_FLEETS, STANCES, aggressive, armed } from './fleet.js';
@@ -85,6 +85,8 @@ const RAID_COOLDOWN_MS = (2 * 60_000) / TEMPO;
 const MAX_EFFECTS = 300;
 /** Entrées gardées dans mon carnet (combats et planètes perdues, sur ce téléphone seulement). */
 const JOURNAL_MAX = 100;
+/** Pas (ms) auquel on regarde si le froid atteint une flotte en vol (D-163). */
+const FROST_STEP = 1000;
 const HEARTBEAT_MS = 1500;
 // Sans nouvelles depuis ce délai, la connexion est considérée perdue (un
 // écran verrouillé quelques secondes ne doit pas faire sortir de la partie).
@@ -865,14 +867,76 @@ export class Session {
     if (start == null || !Number.isFinite(p.ready) || Number.isFinite(p.since) || p.home || p.out) return false;
     p.fleets ||= [];
     if (p.fleets.length >= MAX_FLEETS) return false;
-    const at = Math.min(now, Math.max(start, p.ready));
-    const ships = { colony: 1 };
-    const cell = this.startCell(p, start);
-    p.fleets.push({ id: this.newId(6), ships, cargo: { minerals: 0, food: 0 }, fuel: fleetTank(p.race, ships), origin: 'home', from: cell, to: { ...cell }, depart: at, arrive: at, order: null, stance: 'passive' });
+    // La même flotte que les autres téléphones voyaient déjà (ghostFleet), avec le même identifiant :
+    // les combats qu'ils lui ont livrés pendant mon absence s'appliquent à elle (D-163).
+    const f = this.startFleet(p, start);
+    const at = Math.min(now, f.depart);
+    f.depart = f.arrive = at;
+    p.fleets.push(f);
     p.since = at;
     this.addLog(`${p.name} entre dans la partie avec un seul vaisseau : ${SHIPS[p.race].colony.name}.`);
     this.ontoast?.(`Ta flotte de départ (${SHIPS[p.race].colony.name}) est sur la carte : envoie-la fonder ta planète mère sur une planète libre.`, 8000);
     return true;
+  }
+
+  /**
+   * Flotte de départ d'un joueur prêt (D-163) : un colonisateur, le plein fait, sur sa case de
+   * départ, à l'heure où il est prêt (au plus tôt au départ). Tout se calcule à partir de la
+   * partie (gid, départ, `ready`), identifiant compris : chaque téléphone construit la même.
+   */
+  startFleet(p, start = this.startedAt) {
+    const r = seeded(`${this.state.gid}/flotte/${p.id}`);
+    const id = Array.from({ length: 6 }, () => 'abcdefghijkmnpqrstuvwxyz23456789'[Math.floor(r() * 32)]).join('');
+    const ships = { colony: 1 };
+    const cell = this.startCell(p, start);
+    const at = Math.max(start, p.ready);
+    return { id, ships, cargo: { minerals: 0, food: 0 }, fuel: fleetTank(p.race, ships), origin: 'home', from: cell, to: { ...cell }, depart: at, arrive: at, order: null, stance: 'passive' };
+  }
+
+  /**
+   * La flotte de départ d'un autre joueur prêt dont le téléphone ne l'a pas encore fait apparaître
+   * (hors ligne depuis le départ), ou null (D-163). Elle existe pour tous : on la voit, on la
+   * combat, le froid la détruit. Toujours le même objet tant que rien ne change.
+   */
+  ghostFleet(p) {
+    const start = this.startedAt;
+    if (!p?.race || p.id === this.me || start == null || !Number.isFinite(p.ready) || Number.isFinite(p.since) || p.home || p.out != null) return null;
+    const key = `${this.state.gid}|${start}|${p.ready}`;
+    const memo = (this.ghostMemo ||= new Map()).get(p.id);
+    if (memo?.key === key) return memo.f;
+    const f = this.startFleet(p, start);
+    this.ghostMemo.set(p.id, { key, f });
+    return f;
+  }
+
+  /** Les flottes d'un joueur, avec sa flotte de départ s'il n'a pas encore pu la faire apparaître. */
+  fleetsOf(p) {
+    const g = this.ghostFleet(p);
+    return g ? [...(p.fleets || []), g] : p?.fleets || [];
+  }
+
+  /**
+   * Heure à laquelle un autre joueur a détruit la flotte `f` de `owner` (un rapport de combat qui
+   * lui enlève tous ses vaisseaux, pas encore lu par `owner`), Infinity sinon. Calculable par
+   * tous, même si `owner` est hors ligne et ne lira jamais ce rapport (D-163).
+   */
+  fleetKillAt(owner, f, now) {
+    if (!owner || !f) return Infinity;
+    const ids = [f.id, ...(f.absorbed || [])];
+    let t = Infinity;
+    for (const o of Object.values(this.state.players)) {
+      if (o.id === owner.id) continue;
+      for (const e of o.effects || []) {
+        if (e.to !== owner.id || !ids.includes(e.fleet) || !(e.at <= now) || e.at >= t || owner.applied?.includes(e.id)) continue;
+        if (Object.entries(f.ships || {}).every(([k, n]) => !(n > 0) || (e.ships?.[k] || 0) >= n)) t = e.at;
+      }
+    }
+    return t;
+  }
+
+  /** Heure de la fin de la flotte `f` de `owner` : froid ou combat, la première (D-163). */
+  fleetDeadAt(owner, f, now) {
+    return Math.min(this.fleetFrostAt(f), this.fleetKillAt(owner, f, now));
   }
 
   /**
@@ -920,6 +984,75 @@ export class Session {
     return frostAt(this.sunCache.sun, start, cell);
   }
 
+  /**
+   * Heure à laquelle le froid atteint une flotte et la détruit (D-163), Infinity : jamais. Calculée
+   * sur son segment (from, to, depart, arrive), donc la même sur tous les téléphones, même si son
+   * propriétaire est hors ligne. En vol, on regarde sa position toutes les secondes (FROST_STEP) :
+   * la première où sa case est gelée. Arrêtée, c'est l'heure du gel de sa case, frostOf(case).
+   */
+  fleetFrostAt(f) {
+    const start = this.startedAt;
+    if (start == null || !f?.from || !f?.to || !Number.isFinite(FROST.delayMs)) return Infinity;
+    const key = `${this.state.gid}|${start}|${FROST.delayMs}|${FROST.durationMs}|${f.depart}|${f.arrive}|${f.from.x},${f.from.y}|${f.to.x},${f.to.y}`;
+    const memo = (this.fleetFrostMemo ||= new WeakMap()).get(f);
+    if (memo?.key === key) return memo.t;
+    const rest = Math.max(f.arrive, this.frostOf(fleetPos(f, f.arrive)));
+    let t = rest;
+    for (let s = Math.max(f.depart, start + FROST.delayMs); s < Math.min(f.arrive, rest); s += FROST_STEP) {
+      if (this.frostOf(fleetPos(f, s)) <= s) {
+        t = s;
+        break;
+      }
+    }
+    this.fleetFrostMemo.set(f, { key, t });
+    return t;
+  }
+
+  /**
+   * Le froid détruit mes flottes qu'il a atteintes (D-163). `all` faux (avant les arrivées) : une
+   * flotte qui atteint sa destination avant le froid y arrive d'abord (elle s'y pose, fonde…).
+   * Sans planète, mon dernier colonisateur gelé m'élimine, à l'heure du gel.
+   */
+  freezeFleets(p, now, all) {
+    const dead = (p.fleets || [])
+      .map((f) => ({ f, at: this.fleetFrostAt(f) }))
+      .filter(({ f, at }) => at <= now && (all || !f.order || f.order.kind === 'chase' || at < f.arrive) && !(this.fleetKillAt(p, f, now) < at)) // détruite au combat avant : le rapport s'applique
+      .sort((a, b) => a.at - b.at);
+    if (!dead.length) return false;
+    const pts = this.scoreOf(p); // points d'avant le gel : ce qui départage s'il est éliminé
+    for (const { f, at } of dead) {
+      p.fleets = p.fleets.filter((x) => x !== f);
+      const pos = fleetPos(f, at);
+      const where = `[${Math.round(pos.x)}:${Math.round(pos.y)}]`;
+      const n = countShips(f.ships);
+      this.addLog(`Le froid détruit une flotte ${de(p.name)} en ${where} (${shipsText(n)}).`);
+      this.ontoast?.(`Le froid a détruit ta flotte en ${where}.`, 6000);
+      this.note(p, { at, kind: 'fleet', tone: 'bad', text: `Le froid a détruit ta flotte en ${where} (${shipsText(n)}).` });
+      const stuck = !p.home && p.out == null && Number.isFinite(p.since) && !(p.fleets || []).some((g) => g.ships?.colony > 0);
+      if (stuck && f.ships?.colony > 0) {
+        p.out = at;
+        p.deathPts = pts;
+        this.addLog(`${p.name} n’a plus de colonisateur pour fonder sa planète : ${p.name} est éliminé.`);
+        this.ontoast?.('Le froid a pris ton dernier colonisateur : tu es éliminé.', 8000);
+        this.note(p, { at, kind: 'planet', tone: 'bad', text: 'Le froid a pris ton dernier colonisateur : tu es éliminé.' });
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Heure à laquelle un joueur de la course qui n'a pas de planète perd son dernier colonisateur,
+   * au froid ou au combat (D-163), calculable par tous ; null s'il lui en reste un à `now`. Prêt
+   * mais pas encore entré (hors ligne depuis le départ) : sa flotte de départ compte (ghostFleet).
+   */
+  colonizerDeadAt(p, now) {
+    if (p.home) return null;
+    const fleets = this.fleetsOf(p).filter((f) => f.ships?.colony > 0);
+    if (!fleets.length) return null;
+    const t = Math.max(...fleets.map((f) => this.fleetDeadAt(p, f, now)));
+    return t <= now ? t : null;
+  }
+
   /** Planètes encore en vie d'un joueur : ni gelées, ni prises. */
   livePlanets(p, now = this.now()) {
     if (p?.out) return [];
@@ -928,10 +1061,12 @@ export class Session {
 
   /** Heure à laquelle un joueur a tout perdu, ou null s'il est encore en vie. Calculable par tous, même s'il est hors ligne. */
   deadAt(p, now = this.now()) {
-    if (!p?.race || !Number.isFinite(p.since)) return null;
+    if (!p?.race) return null;
     if (Number.isFinite(p.out)) return p.out;
+    if (!Number.isFinite(p.since)) return this.inRace(p) ? this.colonizerDeadAt(p, now) : null;
     const all = this.planetsOf(p);
-    if (!all.length || this.livePlanets(p, now).length) return null;
+    if (!all.length) return this.colonizerDeadAt(p, now);
+    if (this.livePlanets(p, now).length) return null;
     const frozen = all.map((pl) => this.frostOf(pl.cell)).filter((t) => t <= now);
     return frozen.length === all.length ? Math.max(...frozen) : now;
   }
@@ -1596,6 +1731,7 @@ export class Session {
   /** Une flotte est-elle visible de mon téléphone ? (les miennes, toujours) */
   sees(owner, f, now, eyes = this.eyes(now)) {
     if (owner?.id === this.me) return true;
+    if (this.fleetDeadAt(owner, f, now) <= now) return false; // détruite par le froid ou au combat (D-163), même si sa fiche ne le dit pas encore
     return this.seesCell(fleetPos(f, now), now, eyes);
   }
 
@@ -1675,7 +1811,7 @@ export class Session {
     const out = [];
     for (const p of Object.values(this.state.players)) {
       if (p.id === this.me || this.deadAt(p, now) != null) continue;
-      for (const f of p.fleets || []) {
+      for (const f of this.fleetsOf(p)) {
         if (!armed(p.race, f.ships, p.planet?.tech || {}) || !this.sees(p, f, now, eyes)) continue;
         const pos = fleetPos(f, now);
         const order = f.order;
@@ -1693,7 +1829,7 @@ export class Session {
 
   /** La flotte `id` d'un joueur, ou celle qui l'a absorbée en fusionnant. */
   fleetOf(p, id) {
-    const all = p?.fleets || [];
+    const all = p?.id === this.me ? p.fleets || [] : this.fleetsOf(p); // un autre : sa flotte de départ aussi (D-163)
     return all.find((f) => f.id === id) || all.find((f) => f.absorbed?.includes(id)) || null;
   }
 
@@ -1777,7 +1913,7 @@ export class Session {
     let missed = null; // rencontre que personne n'a regardée à temps (hors ligne) : la plus ancienne
     for (const enemy of Object.values(this.state.players)) {
       if (enemy.id === this.me) continue;
-      for (const target of enemy.fleets || []) {
+      for (const target of this.fleetsOf(enemy)) {
         if (this.pendingFight(p, f, enemy, target)) continue;
         if (!inContact(f, target, now)) {
           const t = firstContact(f, target, from, now);
@@ -2256,6 +2392,7 @@ export class Session {
       return;
     }
     if (this.freeze(p, now)) changed = true;
+    if (this.freezeFleets(p, now, false)) changed = true;
     let techAt = now; // fin de la dernière recherche terminée depuis le passage précédent
     let colonyTech = false; // une colonie a trouvé une technologie : les autres planètes la reçoivent
     const R = RACES[p.race];
@@ -2306,6 +2443,7 @@ export class Session {
       if (!p.fleets.includes(f)) continue; // détruite dans ce combat
       if (f.order && !moving(f, now) && this.arrive(p, f)) changed = true;
     }
+    if (this.freezeFleets(p, now, true)) changed = true; // celles restées en orbite après leur arrivée
     if (this.noColonizer(p, now)) changed = true;
     if (this.settleOffers(p, now)) changed = true;
     if (this.refuseExpired(p, now)) changed = true;
@@ -2620,11 +2758,22 @@ export class Session {
         rep: e.rep, side: 'd', tone: destroyed ? 'bad' : lost ? 'even' : 'good',
         text: destroyed ? `Ta flotte est détruite par ${other.name}.` : `${other.name} attaque ta flotte.`,
       });
+    const pts = this.scoreOf(p); // points d'avant le combat : ce qui départage s'il est éliminé
     if (!applyLosses(f, p.race, techOf(p), ships, e.take, now)) {
       p.fleets = p.fleets.filter((x) => x.id !== f.id);
       this.addLog(`Une flotte ${de(p.name)} est détruite par ${other.name}.`);
       this.ontoast?.(`${other.name} a détruit une de tes flottes !`);
       noteHit(true);
+      // Sans planète, mon dernier colonisateur détruit m'élimine à l'heure du combat, celle que les
+      // autres téléphones ont calculée sans moi (deadAt, D-163), pas à l'heure où je lis le rapport.
+      const stuck = !p.home && p.out == null && Number.isFinite(p.since) && !(p.fleets || []).some((g) => g.ships?.colony > 0);
+      if (stuck && f.ships?.colony > 0) {
+        p.out = e.at;
+        p.deathPts = pts;
+        this.addLog(`${p.name} n’a plus de colonisateur pour fonder sa planète : ${p.name} est éliminé.`);
+        this.ontoast?.(`${other.name} a détruit ton dernier colonisateur : tu es éliminé.`, 8000);
+        this.note(p, { at: e.at, kind: 'planet', tone: 'bad', text: `${other.name} a détruit ton dernier colonisateur : tu es éliminé.` });
+      }
       return true;
     }
     this.addLog(`Une flotte ${de(p.name)} est attaquée par ${other.name} : ${lost ? `${shipsText(lost)} perdu${lost > 1 ? 's' : ''}` : 'aucun vaisseau perdu'}.`);
