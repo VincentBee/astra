@@ -1098,7 +1098,8 @@ export class Session {
       const caps = players.flatMap((o) => (o.effects || []).filter((e) => e.capture && e.to === p.id && sameCell(e.cell, pl.cell) && e.at >= since && !this.goneBy(o, e.at)).map((e) => e.at));
       return caps.length ? Math.min(...caps) : now;
     };
-    return Math.min(now, Math.max(...all.map(lostAt)));
+    const t = Math.max(...all.map(lostAt));
+    return t <= now ? t : null; // demandé pour une heure d'avant la prise : encore en vie
   }
 
   /** Fin de la partie, ou null : { at, winner }, la plus ancienne qu'un joueur a vue. */

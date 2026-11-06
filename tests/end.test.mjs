@@ -422,6 +422,7 @@ scenario('éliminé et hors ligne : les autres ne voient plus sa flotte, ni ne l
   ]);
   assert.ok(ghost(), 'la copie de C a encore la flotte de B');
   assert.equal(C.deadAt(C.state.players[B.me]), takenAt, 'C date la mort de B à la prise, pas à sa lecture');
+  assert.equal(C.deadAt(C.state.players[B.me], takenAt - 1), null, 'juste avant la prise, B était en vie (rencontre d’avant sa mort)');
   clock.t = arrive + 2000;
   C.tick();
   film.look(C, 'l’heure d’arrivée passée : la garde de C ne combat pas un fantôme', [
