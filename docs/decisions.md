@@ -2134,9 +2134,11 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
   flotte ; attendre d'avoir un nombre minimal de vaisseaux avant d'attaquer : change le rythme de
   l'IA bien plus que le bug ne le demande.
 - Mesures (20 parties IA contre IA, mêmes graines avant/après, script de mesure local de la
-  session) : toutes les parties finissent par un gagnant avant et après ; durée moyenne et
-  gagnants : voir la PR. Plus aucun moment où une IA a deux flottes `conquer` vers la même
-  planète (avant : plus de 1 600 moments par série de 10 parties).
+  session) : toutes les parties finissent par un gagnant avant et après. Trois IA (humain,
+  machine, alien) : machine gagne 9 fois sur 10 avant, 10 sur 10 après (l'humain gagnait 1
+  fois) ; durée moyenne 28 → 26 min ; ordres `conquer` 1 238 → 639. Deux IA machines : 10/10
+  avant et après ; 28 → 27 min ; `conquer` 1 684 → 750. Moments où une IA a deux flottes
+  `conquer` vers la même planète : 1 633 → 0 et 2 357 → 0.
 - Limites : la file de vaisseaux posés ne tient pas compte d'une flotte de conquête partie
   d'une **autre** de mes planètes vers une cible plus lointaine ; non confirmé face à un vrai
   joueur.
