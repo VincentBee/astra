@@ -963,7 +963,7 @@ function showAbsence(gone) {
   if (!session?.state || gone < AWAY_MS || !j || !j.list.some((e) => e.n > awayFrom)) return;
   const min = Math.round(gone / 60_000);
   const text = min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}`;
-  openJournal({ n: awayFrom, since: Date.now() - gone, text });
+  openJournal({ n: awayFrom, since: session.now() - gone, text });
 }
 
 $('btn-journal').onclick = () => openJournal();

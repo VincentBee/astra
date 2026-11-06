@@ -95,15 +95,22 @@ const concerns = (s) => (s.state.log || []).filter((l) => l.text.includes(P(s).n
 const orderOf = (s, words) => concerns(s).filter((t) => t.startsWith(`La flotte ${de(P(s.peer).name)}`) && words.some((w) => t.includes(w)));
 const de = (name) => (/^[aeiouyhéèêàâîôû]/i.test(name) ? `d’${name}` : `de ${name}`);
 
-/** A (20 chasseurs, plein d'énergie) en panne à `dist` cases de la planète mère de B. */
+/**
+ * A (20 chasseurs, plein d'énergie) arrêté à `dist` cases de la planète mère de B, et un éclaireur
+ * de A (1 cargo) à 1 case de cette planète : A voit à qui elle est, donc sa ligne d'ordre nomme B
+ * (D-190). B voit l'éclaireur, pas la flotte d'attaque.
+ */
 function far(dist) {
   const g = newGame(2, ['human', 'human']);
   const [A, B] = g.players;
   const home = { ...P(B).home };
   const sx = home.x < 50 ? 1 : -1;
   const ap = P(A).planet;
-  ap.ships = { fighter: 20 };
+  ap.ships = { fighter: 20, cargo: 1 };
   ap.stock = { ...ap.stock, energy: 5000 };
+  const scout = A.takeOff('home', { cargo: 1 }, {}, 0);
+  const near = { x: home.x + sx, y: home.y };
+  Object.assign(A.myFleet(scout), { from: { ...near }, to: { ...near }, fuel: 40 });
   const id = A.takeOff('home', { fighter: 20 }, {}, 0);
   const at = { x: home.x + sx * dist, y: home.y };
   Object.assign(A.myFleet(id), { from: { ...at }, to: { ...at }, fuel: 1000 });
@@ -118,6 +125,7 @@ for (const [kind, word] of [['attack', 'attaque'], ['conquer', 'conquérir']]) {
   scenario(`ordre « ${kind} » depuis 19 cases : B ne le lit pas tant qu’il ne voit pas la flotte, A toujours`, (film) => {
     const { A, B, id, home, clock, sync } = far(19);
     assert.ok(A.moveFleet(id, home, kind), 'A donne l’ordre');
+    assert.ok(A.state.log.some((l) => l.fleet === id && l.text.includes(`(${P(B).name})`)), 'la ligne nomme B (A voit sa planète par son éclaireur)');
     sync(B, A);
     const f = () => B.state.players[A.me].fleets.find((x) => x.id === id);
     const mark = B.state.log.find((l) => l.text.includes(word));
