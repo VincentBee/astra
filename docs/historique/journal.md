@@ -415,6 +415,12 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 |---|---|---|---|---|---|
 | 08:58 | `fb0c1844` | [Auto-fix] conflit avec `main` | Huitième fusion de `main` (D-157 à D-159, cache v81 déjà pris) : ma décision devient D-160, cache v82 (D-161) ; 212/212 | (cette PR) | D-160, D-161 |
 
+## 6 novembre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 22:00 | `9e675a52` | Corriger l'issue #87 (worker du router) : « une sauvegarde locale abîmée fait planter le jeu » | `archive()` et `identities()` (`js/save.js`) ignorent un `astra.saves` / `astra.identities` qui n'est pas un objet simple et les entrées qui ne passent pas `valid()` ; réécrits propres à la prochaine sauvegarde. Scénario D-170 sur les 5 formes abîmées (échoue sans la correction) ; 213/213 ; vrai jeu vérifié avec `{"zzz":null}` et `"abc"` (accueil, ordre build, sauvegarde) ; cache v85 | (PR fermant #87) | D-170 |
+
 ### Travaux en cours au 2026-10-29
 
 - **Rythme des parties** (`26f178b9`) : commité sur `claude/swarm-it-game-pacing-1d4502`

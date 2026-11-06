@@ -1970,3 +1970,30 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - 2026-11-03. Contexte : fusion de `main` (D-157 à D-159 et cache v81 déjà pris) dans la PR des ordres d'assaut (D-160).
 - Choix : `VERSION` passe à `astra-p2p-v82` pour que les téléphones prennent le nouveau `session.js`.
 - Qui : Claude, par défaut. Source : session `fb0c1844`. Statut : en vigueur.
+
+## 6 novembre 2026 — sauvegarde abîmée (#87)
+
+Numéro pris haut (D-170) : les PR #158 (D-163) et celle de #45 (D-164 et suivants) prennent déjà
+les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
+
+**D-170 — Un historique de sauvegardes abîmé est ignoré, puis réécrit propre**
+- 2026-11-06 22:00. Contexte : issue #87. Une entrée invalide dans `astra.saves` (`null`, sans
+  `state`, tableau, texte JSON `"abc"`) faisait lever une `TypeError` dans `saveGame`, donc dans
+  chaque ordre : l'état changeait mais l'écran n'était pas prévenu. Avec un texte JSON, l'accueil
+  plantait aussi au démarrage (`listGames`). Cause externe (stockage abîmé, extension, outil) : le
+  joueur ne pouvait s'en sortir qu'en vidant les données du site.
+- Choix de Claude, par défaut : `archive()` (`js/save.js`) part de `{}` si `astra.saves` n'est pas
+  un objet simple (`isMap` : ni `null`, ni tableau, ni texte), et ne garde que les entrées qui passent
+  `valid()`. `saveGame`, `listGames`, `selectGame` et `forgetGame` passent tous par `archive()`, donc
+  ignorent tous les entrées abîmées. Rien n'est effacé à la lecture : l'historique est réécrit sans
+  elles à la prochaine écriture (`saveGame` ou `forgetGame`). Même garde pour `astra.identities`
+  (`identities()`), lu par `selectGame`, `forgetGame` et `saveIdentity`.
+- Alternatives écartées : tout effacer dès qu'une entrée est abîmée (on perdrait les bonnes
+  parties) ; purger à la lecture (une lecture qui écrit surprend, et la prochaine sauvegarde le fait
+  de toute façon, au plus tard au premier ordre).
+- Cache `sw.js` : `astra-p2p-v85` (v83 et v84 sont laissés aux PR #158 et #45).
+- Vérifié : scénario « D-170 : un historique abîmé… » (`tests/decisions-reseau.test.mjs`, les 5
+  formes de l'issue), qui échoue sans la correction ; vrai jeu avec `{"zzz":null}` puis `"abc"`.
+- Qui : Vincent (demande : corriger #87), Claude (forme de la correction). Source : session
+  `9e675a52`. Statut : en vigueur. Complète D-066.
+
