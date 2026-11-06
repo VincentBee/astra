@@ -2119,6 +2119,10 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
 - Limites (non corrigées) : les lignes du journal partagé écrites avec la mauvaise heure restent
   (le journal est une union des copies) ; ce que la fiche fautive a déjà fait chez les autres
   (dégâts appliqués) n'est pas défait ; une heure en retard sur une fiche relayée n'est pas vue.
+  Pendant les ~5 s avant le consensus (3 battements), la fiche fautive est adoptée par tous (toute
+  heure est acceptée) : si elle portait une fin de partie (`over`), l'écran « Fin de partie »
+  s'ouvrirait, et il ne se referme pas tout seul quand la fin disparaît (`showFinish`,
+  `js/app.js`). Cache : `astra-p2p-v86` (et non v84, pris trop bas une fois `main` à v85).
 - Alternatives écartées : refuser la fiche (D-164) ; à deux, personne n'est corrigé (avertissement
   seul).
 - Qui : Vincent (règle, duel, votants, sens de « resynchronisé »), Claude (marge, détails). Source :
