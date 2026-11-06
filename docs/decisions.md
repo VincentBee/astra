@@ -2110,3 +2110,34 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
 - Choix : `VERSION` passe à `astra-p2p-v86` pour que les téléphones prennent les nouveaux
   `game.js` et `session.js`.
 - Qui : Claude, par défaut. Source : session `424ded66`. Statut : en vigueur.
+
+## 6 novembre 2026 — Annuler le scanner à tout moment (#42)
+
+**D-250 — L'annulation du scan fait la course avec chaque attente**
+- 2026-11-06 22:27. Contexte : issue #42. `scanQr` ne posait son écouteur `abort` qu'après le
+  chargement de jsQR, `getUserMedia` et `play()`. Un « Annuler » arrivé avant était perdu : la
+  promesse ne finissait jamais, `#scanner` restait affiché, la caméra restait allumée, et un
+  second « Annuler » ne faisait rien. Numéro : D-163 à D-249 étant pris ou réservés, D-250.
+- Choix de Claude, par défaut :
+  1. Signal déjà annulé à l'appel → `AbortError` tout de suite, rien ne démarre.
+  2. L'écouteur `abort` est posé dès l'entrée ; il crée une promesse `aborted` qui rejette.
+     Chaque attente (`loadJsQR`, `getUserMedia`, `video.play`, boucle de lecture) passe par
+     `Promise.race([attente, aborted])` : le rejet arrive en quelques ms, à n'importe quelle étape.
+  3. Un flux donné par `getUserMedia` après l'annulation est éteint à son arrivée et n'est jamais
+     branché sur la vidéo.
+  4. `stop()` arrête toutes les pistes et débranche aussi la vidéo (`srcObject = null`), à
+     l'annulation comme après un QR lu ; l'écouteur est retiré à la fin.
+  5. `scan()` (`js/app.js`) annule un scan encore ouvert avant d'en ouvrir un autre, et seul le
+     scan courant cache `#scanner` dans son `finally`.
+- Alternatives écartées : vérifier `signal.aborted` après chaque `await` sans course (le rejet
+  attendrait la fin de la boîte d'autorisation, qui peut durer longtemps sur téléphone) ;
+  annuler la demande `getUserMedia` elle-même (impossible : l'API n'a pas de signal).
+- Sans effet sur #86 (chargement de jsQR raté qui reste raté) : `loadJsQR` n'est pas touché ; une
+  annulation pendant le chargement laisse ce chargement finir et servir au scan suivant.
+- Cache `sw.js` : `astra-p2p-v87` (v86 est dans `main`).
+- Vérifié : `tests/scanner.test.mjs` (caméra simulée, annulation à 100 ms, 1 s, au démarrage de la
+  vidéo et pendant la lecture ; 4 tests sur 7 restent bloqués sans la correction ; tests simples et
+  non scénarios filmés, car il n'y a ni partie ni carte à montrer) ; vrai Chrome sur
+  la vraie appli (Rejoindre → Scanner → Annuler à 100 ms, 1 s, 3 s ; scan normal d'un QR filmé).
+- Qui : Vincent (demande : corriger #42), Claude (forme de la correction). Source : session
+  `b919ce58`. Statut : en vigueur.
