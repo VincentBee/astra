@@ -1604,10 +1604,18 @@ export class Session {
     if (!f) return [];
     const w = this.planets.find((x) => sameCell(x, cell));
     const here = this.planetsAt(cell)[0];
+    // Brouillard (D-124, D-190) : hors de ma portée, le menu ne sait que ce que je sais.
+    const known = this.knownOwner(cell);
     const me0 = this.state.players[this.me];
     const out = [];
     if (here?.owner.id === this.me) out.push({ kind: 'dock', label: `Se poser sur ${here.name}` });
-    else if (here) {
+    else if (!known.live && known.owner) {
+      // Vue autrefois : son propriétaire retenu, pas son état (ni défense, ni estimation).
+      const name = w?.name || 'la planète';
+      const tail = ' · hors de portée : défense inconnue';
+      out.push({ kind: 'attack', label: `Attaquer ${name} (${known.owner.name})${tail}` });
+      out.push({ kind: 'conquer', label: `Conquérir ${name}${tail}` });
+    } else if (here && known.live) {
       // Les deux ordres livrent le même combat : défense de la planète et vaisseaux posés.
       const a = this.assaultView(id, here.owner, here.key);
       const ships = a.ships === null ? '? vaisseaux' : `${shipsText(countShips(a.ships))} posé${countShips(a.ships) > 1 ? 's' : ''}`;
@@ -1619,7 +1627,7 @@ export class Session {
     else if (w && f.ships.colony && !me0.home) {
       if (!w.kind || w.kind === 'planet') out.push({ kind: 'colonize', label: `Fonder ta planète mère sur ${w.name}` });
     } else if (w && f.ships.colony) out.push({ kind: 'colonize', label: `Coloniser ${w.name}` });
-    out.push({ kind: 'move', label: w || here ? 'Juste y aller (orbite)' : 'Y aller' });
+    out.push({ kind: 'move', label: w || (here && known.live) ? 'Juste y aller (orbite)' : 'Y aller' });
     const me = this.state.players[this.me];
     const now = this.now();
     const short = fuelNeed(f, me.race, cell, now) > fuelAt(f, me.race, now) + 1e-9;
@@ -1663,16 +1671,21 @@ export class Session {
     if (cell.x < 0 || cell.y < 0 || cell.x >= UNIVERSE.w || cell.y >= UNIVERSE.h) return false;
     const here = this.planetsAt(cell)[0];
     const w = this.planets.find((x) => sameCell(x, cell));
+    // Brouillard (D-190) : un refus ne doit pas dire ce que je ne vois pas. Hors de portée,
+    // l'ordre part et l'arrivée tranche (« déjà prise », ou personne à attaquer). La décision
+    // ne lit que la partie (`seesCell`), pas mes souvenirs (`intel`) : le replay la refait pareil.
+    const live = this.over || this.seesCell(cell, this.now());
     let order = null;
     if (kind === 'dock') {
       if (here?.owner.id !== this.me) return this.refuse('Ce n’est pas une de tes planètes.');
       order = { kind, key: here.key };
     } else if (kind === 'attack' || kind === 'conquer') {
-      if (!here || here.owner.id === this.me) return this.refuse('Aucune planète adverse ici.');
+      if (here ? here.owner.id === this.me : !w || live) return this.refuse('Aucune planète adverse ici.');
       if (!armed(p.race, f.ships, techOf(p))) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas attaquer.');
-      order = { kind, pid: here.owner.id, key: here.key };
+      // Libre en vrai, mais hors de ma vue : personne à viser, la flotte restera en orbite.
+      order = here ? { kind, pid: here.owner.id, key: here.key } : { kind, pid: null, key: null };
     } else if (kind === 'colonize') {
-      if (!w || here) return this.refuse('Cette planète n’est pas libre.');
+      if (!w || (here && live)) return this.refuse('Cette planète n’est pas libre.');
       if (!f.ships.colony) return this.refuse(`Il faut un vaisseau colonisateur (${SHIPS[p.race].colony.name}) pour coloniser.`);
       if (!p.home && w.kind && w.kind !== 'planet') return this.refuse(`${w.name} est trop petit pour une planète mère : vise une planète.`);
       order = { kind, world: w.id };
@@ -1681,7 +1694,7 @@ export class Session {
     if (err) return this.refuse(err);
     if (f.stranded) this.ontoast?.('Pas assez de carburant : la flotte tombera en panne en route.');
     // Au journal, seulement les ordres qui comptent : les simples déplacements le noieraient.
-    const who = here && here.owner.id !== this.me ? ` (${here.owner.name})` : '';
+    const who = here && live && here.owner.id !== this.me ? ` (${here.owner.name})` : ''; // hors de vue, pas de nom (D-190)
     this.touch(order ? this.addLog(`La flotte ${de(p.name)} ${ORDERS[order.kind].verb} ${here ? here.name : w.name}${who}.`) : null);
     this.changed();
     return true;
