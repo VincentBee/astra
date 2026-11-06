@@ -946,7 +946,7 @@ function openJournal(away = null) {
         .join('')
     : '<li class="j-empty">Aucun combat pour l’instant.</li>';
   const events = (session.state.log || [])
-    .filter((l) => me && l.text.includes(me.name) && (!away || l.at >= away.since))
+    .filter((l) => me && l.text.includes(me.name) && session.showsLog(l) && (!away || l.at >= away.since))
     .sort((a, b) => b.at - a.at)
     .slice(0, 20);
   $('journal-events').innerHTML = events.length

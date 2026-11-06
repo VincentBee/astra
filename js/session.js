@@ -1675,7 +1675,8 @@ export class Session {
     if (f.stranded) this.ontoast?.('Pas assez de carburant : la flotte tombera en panne en route.');
     // Au journal, seulement les ordres qui comptent : les simples déplacements le noieraient.
     const who = here && here.owner.id !== this.me ? ` (${here.owner.name})` : '';
-    this.touch(order ? this.addLog(`La flotte ${de(p.name)} ${ORDERS[order.kind].verb} ${here ? here.name : w.name}${who}.`) : null);
+    // Marquée de la flotte : la cible ne la lit que si elle voit la flotte (D-210, `showsLog`).
+    this.touch(order ? this.addLog(`La flotte ${de(p.name)} ${ORDERS[order.kind].verb} ${here ? here.name : w.name}${who}.`, { pid: this.me, fleet: f.id }) : null);
     this.changed();
     return true;
   }
@@ -1733,6 +1734,20 @@ export class Session {
     if (owner?.id === this.me) return true;
     if (this.fleetDeadAt(owner, f, now) <= now) return false; // détruite par le froid ou au combat (D-163), même si sa fiche ne le dit pas encore
     return this.seesCell(fleetPos(f, now), now, eyes);
+  }
+
+  /**
+   * Une ligne du journal partagé, montrée dans mon Journal (D-210) ? Une ligne marquée d'une
+   * flotte (ordre d'attaque, de conquête, de poursuite…) ne l'est que pour son auteur, ou tant
+   * que je vois cette flotte : sinon l'ordre trahirait une flotte que la carte me cache (D-128).
+   * Flotte disparue (posée, détruite, fusionnée hors de vue) : la ligne reste cachée ; le combat,
+   * lui, a ses propres lignes.
+   */
+  showsLog(l, now = this.now()) {
+    if (!l?.fleet || l.pid === this.me) return true;
+    const owner = this.state.players[l.pid];
+    const f = owner && this.fleetOf(owner, l.fleet);
+    return !!f && this.sees(owner, f, now);
   }
 
   /** Un point de la carte est-il dans ma détection ? */
@@ -1851,7 +1866,7 @@ export class Session {
     f.order = { kind: 'chase', pid, fleet: target.id, seen: null };
     this.tickLogs = []; // un combat immédiat écrit au journal : ses entrées partent avec ma fiche
     this.pursue(p, f, this.now());
-    if (f.order) this.addLog(`La flotte ${de(p.name)} prend en chasse une flotte ${de(enemy.name)}.`);
+    if (f.order) this.addLog(`La flotte ${de(p.name)} prend en chasse une flotte ${de(enemy.name)}.`, { pid: this.me, fleet: f.id }); // D-210
     const logs = this.tickLogs;
     this.tickLogs = null;
     this.touch(logs.length ? logs : null);
@@ -2805,8 +2820,9 @@ export class Session {
     this.save();
   }
 
-  addLog(text) {
-    const entry = { at: this.now(), text };
+  /** `mark` : { pid, fleet } pour un ordre de flotte, que les autres ne lisent que s'ils voient la flotte (D-210). */
+  addLog(text, mark = null) {
+    const entry = { at: this.now(), text, ...(mark ? { pid: mark.pid, fleet: mark.fleet } : {}) };
     this.pushLog(entry);
     this.tickLogs?.push(entry);
     return entry;
@@ -2815,7 +2831,8 @@ export class Session {
   pushLog(entry) {
     const log = this.state.log;
     if (log.some((l) => l.at === entry.at && l.text === entry.text)) return;
-    log.push({ at: entry.at, text: String(entry.text).slice(0, 120) });
+    const mark = typeof entry.pid === 'string' && typeof entry.fleet === 'string' ? { pid: entry.pid.slice(0, 64), fleet: entry.fleet.slice(0, 64) } : {};
+    log.push({ at: entry.at, text: String(entry.text).slice(0, 120), ...mark });
     log.sort((a, b) => a.at - b.at);
     if (log.length > 40) log.splice(0, log.length - 40);
   }
