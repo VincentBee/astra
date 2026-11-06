@@ -19,7 +19,8 @@
 
 import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Rendezvous } from './rendezvous.js';
-import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity } from './save.js';
+import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity, identityFor, savedGame } from './save.js';
+import { inviteGid } from './invite.js';
 import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, PLAN_MAX, planItem, planId, planAhead, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, FROST, sunFor, fortOf, seeded } from './game.js';
 import { TECHS, SHIPS, sightRange, TEMPO, techMissing, shipUnlocked } from './tech.js';
 import { cleanReport } from './report.js';
@@ -307,6 +308,7 @@ export class Session {
   async answer(offer) {
     this.pendingAnswer?.cancel();
     const ans = await answerInvite(offer);
+    this.inviteGid = inviteGid(offer); // la partie de l'hôte, si le lien la dit (D-260)
     this.pendingAnswer = ans;
     this.status = 'answering';
     ans.link.then(
@@ -327,7 +329,11 @@ export class Session {
     this.status = 'waiting';
     this.attach(link, null);
     this.firstLink = link;
-    const id = loadIdentity();
+    // D-260 : si l'invitation dit de quelle partie elle vient, je n'envoie que mon identité
+    // et ma copie de celle-là, jamais le secret d'une autre. Ancien lien ou code seul : comme
+    // avant, l'identité de la dernière partie ouverte.
+    const gid = this.inviteGid;
+    const id = gid ? identityFor(gid) : loadIdentity();
     this.newSecret = rid(16);
     const hello = {
       type: 'hello',
@@ -338,7 +344,7 @@ export class Session {
       secretHash: await sha256(this.newSecret),
       // Ma copie de la partie, si j'en ai une : ma progression faite hors
       // ligne est gardée.
-      copy: loadGame()?.state,
+      copy: (gid ? savedGame(gid) : loadGame())?.state,
     };
     // Le tout premier message d'un canal qui vient de s'ouvrir se perd
     // parfois : on le renvoie chaque seconde jusqu'à l'accusé de réception.
@@ -550,7 +556,7 @@ export class Session {
     if (link !== this.firstLink || !msg.state || typeof msg.from !== 'string') return;
     // On adopte la copie de l'hôte, complétée par la nôtre s'il s'agit de la
     // même partie (progression faite hors ligne).
-    const mine = loadGame();
+    const mine = savedGame(msg.state.gid); // ma copie de CETTE partie, pas forcément la dernière ouverte (D-260)
     let st = clean(msg.state);
     if (mine && mine.state.gid === st.gid) st = mergeStates(st, clean(mine.state));
     // Mon carnet de combats de cette partie, s'il est sur ce téléphone (même joueur).
@@ -560,8 +566,8 @@ export class Session {
     }
     this.me = msg.you;
     this.state = st;
-    const id = loadIdentity();
-    const secret = id?.gid === st.gid && id?.pid === msg.you ? id.secret : this.newSecret;
+    const id = identityFor(st.gid);
+    const secret = id?.pid === msg.you ? id.secret : this.newSecret;
     saveIdentity({ gid: st.gid, pid: msg.you, secret });
     this.firstLink = null;
     this.status = 'playing';
