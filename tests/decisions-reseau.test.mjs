@@ -47,9 +47,10 @@ async function sha256(text) {
 /**
  * localStorage neuf le temps de `fn` (le banc d'essai en partage un seul). `quota` : nombre de
  * caractères (clés + valeurs) au-delà duquel `setItem` lève `QuotaExceededError` sans rien écrire,
- * comme un navigateur. `fail` : `setItem` lève toujours (cette erreur-là).
+ * comme un navigateur. `fail` : `setItem` lève toujours (cette erreur-là). `refuse(k)` : la clé `k`
+ * est refusée (mémoire pleine).
  */
-async function withStore(fn, { quota = Infinity, fail = null } = {}) {
+async function withStore(fn, { quota = Infinity, fail = null, refuse = () => false } = {}) {
   const old = globalThis.localStorage;
   const m = new Map();
   const size = (k, v) => (v == null ? 0 : k.length + v.length);
@@ -58,6 +59,7 @@ async function withStore(fn, { quota = Infinity, fail = null } = {}) {
     getItem: (k) => m.get(k) ?? null,
     setItem(k, v) {
       if (fail) throw fail;
+      if (refuse(k)) throw new DOMException(`${k} refusé`, 'QuotaExceededError');
       v = String(v);
       const next = used - size(k, m.get(k)) + size(k, v);
       if (next > quota) throw new DOMException(`${k} (${v.length} car.)`, 'QuotaExceededError');
@@ -537,6 +539,35 @@ scenario('D-240 : reprendre une grosse partie à mémoire presque pleine ne fait
   film.look(A, 'une partie lancée après avoir repris une grosse partie : rien n’a été retiré', rows);
 });
 
+scenario('D-240 (#91) : un ordre n’écrit que la partie en cours, pas tout l’historique', async (film) => {
+  let A = null;
+  let row = null;
+  await withStore(async (m) => {
+    // 9 parties de 450 K (une partie à 8 joueurs de 40 min) en historique, puis une vraie partie.
+    for (let g = 0; g < 9; g++) save.saveGame('me', heavy(`h${g}`, 450_000));
+    A = soloNow('gvraie');
+    assert.equal(save.listGames().length, 10, '10 parties, partie en cours comprise');
+    const set = globalThis.localStorage.setItem;
+    let written = 0;
+    globalThis.localStorage.setItem = (k, v) => {
+      written += k.length + String(v).length;
+      return set(k, v);
+    };
+    try {
+      A.build(firstBuilding(A));
+    } finally {
+      globalThis.localStorage.setItem = set;
+    }
+    const cur = 'astra.save'.length + m.get('astra.save').length;
+    assert.ok(written > 0, 'l’ordre est sauvé');
+    assert.ok(written < 1.2 * cur, `écrit ${written} car. pour une partie de ${cur}`);
+    row = { written, cur, used: m.used() };
+  });
+  film.look(A, 'un ordre avec 10 parties en historique : seule la partie en cours est écrite', [
+    { show: `caractères écrits (partie : ${row.cur}, stockage : ${(row.used / 1e6).toFixed(2)} M)`, expected: `< ${Math.ceil(1.2 * row.cur)}`, got: row.written < 1.2 * row.cur ? `< ${Math.ceil(1.2 * row.cur)}` : row.written },
+  ]);
+});
+
 scenario('D-240 : une sauvegarde impossible prévient le joueur, sans planter ni rien perdre', async (film) => {
   let A = null;
   const rows = [];
@@ -624,10 +655,25 @@ scenario('D-240 : les sauvegardes de l’ancien format sont reprises sans perte'
     assert.equal(save.loadGame().savedAt, 5, 'la copie la plus récente gagne');
     assert.deepEqual(copies(m), ['C']);
   });
+  // Une partie de l'ancien format ne peut pas être recopiée : le joueur est prévenu, les autres passent.
+  await withStore((m) => {
+    const st = (gid, at) => ({ v: 1, me: 'me', savedAt: at, state: heavy(gid, 10, at) });
+    m.set('astra.save', JSON.stringify(st('C', 3)));
+    m.set('astra.saves', JSON.stringify({ A: st('A', 1), B: st('B', 2), C: st('C', 3) }));
+    const told = [];
+    save.onSaveFailed((kind, n) => told.push(`${kind} ${n}`));
+    try {
+      assert.deepEqual(save.listGames().map((x) => x.state.gid), ['C', 'A'], 'B refusée, A passe quand même');
+      assert.deepEqual(told, ['history 1'], 'le joueur est prévenu de la partie perdue');
+    } finally {
+      save.onSaveFailed(null);
+    }
+    rows.push({ n: 'B refusée', after: ['C', 'A'], used: 0, expected: 'C · A (prévenu)' , got: `C · A (${told.length ? 'prévenu' : 'muet'})` });
+  }, { refuse: (k) => k === 'astra.save.B' });
   film.look(A, 'une partie lancée après la reprise de l’ancien format : l’historique est intact', rows.map((r) => ({
-    show: `parties de ${r.n} car. (${(r.used / 1e6).toFixed(2)} M)`,
-    expected: 'gneuve · C · B · A',
-    got: r.after.join(' · '),
+    show: r.expected ? r.n : `parties de ${r.n} car. (${(r.used / 1e6).toFixed(2)} M)`,
+    expected: r.expected ?? 'gneuve · C · B · A',
+    got: r.got ?? r.after.join(' · '),
   })));
 });
 

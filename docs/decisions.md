@@ -2157,18 +2157,25 @@ Numéro pris haut (D-240) : D-163 à D-239 sont pris ou réservés par les autre
   retrait réécrit tout le bloc, et un seul bloc abîmé touche toutes les parties) ; compresser
   les parties (repousse la limite sans la supprimer) ; IndexedDB (asynchrone, change tout le
   code qui sauvegarde) ; un message à chaque partie retirée (bruit, alors que c'est voulu).
-- Effet de bord : règle aussi #91 (« chaque action réécrit tout l'historique ») : mesuré dans Node
-  avec 9 parties de 450 K en historique, une action écrit 450 140 car. au lieu de 4 951 504
-  (0,7 ms au lieu de 7 ms). Non mesuré sur téléphone.
+- Effet de bord : règle aussi #91 (« chaque action réécrit tout l'historique ») : avec 9 parties
+  de 450 K en historique, une action écrit 450 140 car. au lieu de 4 951 504 (Node) ;
+  `saveGame` prend 0,5 à 0,9 ms au lieu de 8,6 à 10,9 ms (Chromium, Mac, 10 parties de 451 K).
+  Scénario « D-240 (#91) » : un vrai ordre écrit moins de 1,2 × la taille de la partie en cours.
+  Non mesuré sur téléphone. La PR ferme donc aussi #91.
+- Reprise de l'ancien format qui échoue (une partie ne peut pas être recopiée, alors que
+  `astra.saves` est déjà effacé) : on essaie quand même les suivantes, et le joueur est prévenu
+  (`onSaveFailed('history', n)`, toast « Mémoire du téléphone pleine : n ancienne(s) partie(s)
+  n'a/ont pas pu être gardée(s). »). Demandé par le router à la vérification.
 - Limites : les identités des parties retirées restent dans `astra.identities` (quelques dizaines
   de caractères chacune) ; une partie en cours plus grosse que toute la mémoire n'est pas sauvée
   (message).
 - Cache : `sw.js` passe à `astra-p2p-v87` (v86 est dans `main`).
-- Vérifié : 4 scénarios D-240 (`tests/decisions-reseau.test.mjs`, quota simulé de 5 242 880
+- Vérifié : 5 scénarios D-240 (`tests/decisions-reseau.test.mjs`, quota simulé de 5 242 880
   car. qui lève `QuotaExceededError`) : 6 parties de 1 M jouées l'une après l'autre ; échec forcé
   (mémoire et stockage bloqué) ; reprise d'une partie de 1,2 M à mémoire presque pleine (aucune
   autre partie perdue ; échoue sans la correction) ; reprise de l'ancien format (petites parties, et 3 parties de 1,25 M
-  qui remplissent la mémoire). Scénario D-170 adapté. Vrai jeu dans Chromium : reprise de
+  qui remplissent la mémoire, et une partie refusée : prévenu) ; un ordre avec 10 parties en historique
+  n'écrit que la partie en cours (#91). Scénario D-170 adapté. Vrai jeu dans Chromium : reprise de
   l'ancien format (4 parties de 1,2 M), retrait de la plus vieille en reprenant une partie
   (quota simulé dans la page : ce navigateur accepte ≈ 26 M), toast quand l'écriture est refusée.
 - Qui : Vincent (demande, par le router : corriger #41), Claude (méthode). Source : session

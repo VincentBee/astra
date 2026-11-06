@@ -53,7 +53,8 @@ const RETELL = 60_000; // échecs à la suite : on prévient de nouveau au plus 
 /**
  * `fn()` est appelé quand une sauvegarde de la partie en cours échoue (au plus une fois par
  * minute). Il renvoie `false` si le message n'a pas pu être montré (appli cachée) : on
- * préviendra au prochain échec.
+ * préviendra au prochain échec. `fn('history', n)` : en reprenant l'ancien format, `n` parties
+ * de l'historique n'ont pas pu être recopiées (perdues).
  */
 export function onSaveFailed(fn) {
   failed = fn;
@@ -158,16 +159,24 @@ function migrate() {
   const fresher = all.find((s) => s.state.gid === curGid && s.savedAt > cur.savedAt);
   const list = all.filter((s) => s.state.gid !== curGid);
   remove(OLD_KEY);
-  if (fresher) write(SAVE_KEY, fresher); // l'ancien format écrivait deux copies : on garde la plus récente
+  let lost = 0;
+  // L'ancien format écrivait deux copies : on garde la plus récente (sinon `astra.save` reste, plus ancien).
+  if (fresher && !write(SAVE_KEY, fresher)) lost++;
   const idx = {};
   const prev = read(INDEX_KEY, {});
   if (isMap(prev)) Object.assign(idx, prev);
   for (const s of list.sort((a, b) => b.savedAt - a.savedAt)) {
     if (s.state.gid in idx || Object.keys(idx).length >= KEEP - 1) continue;
-    if (!write(GAME_KEY + s.state.gid, s)) break; // tenait avant : n'arrive pas en pratique
-    idx[s.state.gid] = s.savedAt;
+    // Tenait avant : n'arrive pas en pratique. Sinon on essaie les suivantes, et on prévient.
+    if (write(GAME_KEY + s.state.gid, s)) idx[s.state.gid] = s.savedAt;
+    else lost++;
   }
   write(INDEX_KEY, idx);
+  if (lost) {
+    try {
+      failed?.('history', lost);
+    } catch {}
+  }
 }
 
 /**
