@@ -1194,7 +1194,8 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   ajouter le carburant restant au stock (avantage aux départs proches d'une planète) ; donner
   aussi des cargos ou des chasseurs au départ (la demande dit « uniquement »).
 - Qui : Vincent (la demande), Claude (la forme). Source : session `012yisg3`.
-- Statut : en vigueur. 11 tests (`tests/start.test.mjs`), contrôlés par mutation. Vérifié dans
+- Statut : en vigueur, modifiée par D-163 (le froid détruit les flottes : un joueur sans planète
+  meurt quand il perd son dernier colonisateur au froid). 11 tests (`tests/start.test.mjs`), contrôlés par mutation. Vérifié dans
   Chromium (390 × 844), seul et à deux avec une vraie invitation WebRTC. Équilibre des cases de
   départ (une planète peut être plus proche de l'un que de l'autre) : **non confirmé**.
 
@@ -1971,6 +1972,145 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Choix : `VERSION` passe à `astra-p2p-v82` pour que les téléphones prennent le nouveau `session.js`.
 - Qui : Claude, par défaut. Source : session `fb0c1844`. Statut : en vigueur.
 
+**D-163 — Le froid détruit les flottes qu'il atteint (issue #33)**
+- 2026-11-06 17:40. Contexte : issue #33. Un joueur « prêt » qui ne fondait jamais sa planète mère
+  restait en vie pour toujours (`deadAt` renvoyait null sans planète, le froid ne touchait que les
+  planètes) : il bloquait la fin par conquête et gagnait vers 34 min, quand le froid avait pris
+  les planètes des autres. Aussi le cas d'un joueur prêt qui ferme l'appli avant que sa flotte
+  n'apparaisse (pas de `since`, pas de flotte).
+- Choix de Vincent (transmis par la session de coordination) : **le froid détruit les flottes
+  qu'il atteint**, en orbite ou en vol, celles de tous les joueurs. Un joueur qui cache sa seule
+  flotte près du soleil, le dernier endroit à geler, n'est pas un problème : les flottes
+  rapportent des points et l'adversaire peut la détruire. **Pas de règle en plus** (pas de délai
+  pour fonder, pas d'interdiction de gagner).
+- Choix de Claude, par défaut :
+  - Heure de destruction = première heure où la case de la flotte est gelée, calculée sur son
+    segment (`fleetFrostAt`), la même sur tous les téléphones. En vol, position regardée toutes
+    les secondes (`FROST_STEP`) ; arrêtée, `frostOf(case)` exactement.
+  - Une flotte qui arrive à destination avant le froid y arrive d'abord (se pose, fonde) ; celle
+    qui reste en orbite est détruite ensuite.
+  - Sans planète, perdre son dernier colonisateur au froid élimine **à l'heure du gel** (pas à
+    l'heure où le téléphone s'en aperçoit), avec les points d'avant le gel (`deathPts`).
+  - Les autres téléphones voient la flotte disparaître à l'heure du gel, sans attendre la fiche
+    du propriétaire (`sees` faux) ; `deadAt` voit la mort d'un joueur sans planète hors ligne.
+  - Combat : une flotte qu'un autre joueur a détruite (son rapport de combat lui enlève tous ses
+    vaisseaux) disparaît aussi pour tous à l'heure du combat, sans attendre la fiche du
+    propriétaire (`fleetKillAt`). Sans planète, perdre ainsi son dernier colonisateur élimine **à
+    l'heure du combat**, celle que les autres ont calculée.
+- Choix de Vincent, sur le joueur prêt qui se déconnecte avant que sa flotte n'apparaisse (question
+  posée par Claude, réponse transmise par la session de coordination) : « quand la partie
+  commence, Tous les joueurs pret ont une flotte qui apparait sur la map, meme si il sont tout de
+  suite deconnecté, cette flotte est destructible par un autre joueur ou par le froit ». Mise en
+  œuvre (Claude) :
+  - La flotte de départ (`startFleet`) se calcule à partir de la partie seule : un colonisateur
+    sur la case de départ (`startCell`), à `max(départ, ready)`, et un **identifiant tiré du gid
+    et du joueur** (plus au hasard). Tant que le téléphone du joueur ne l'a pas fait apparaître,
+    les autres la construisent eux-mêmes (`ghostFleet`, `fleetsOf`) : ils la voient sur la carte,
+    la prennent en chasse et la combattent, le froid la détruit.
+  - Détruite (combat ou froid) : le joueur est éliminé, même s'il ne revient jamais (`deadAt`).
+    S'il revient, `enterRace` crée exactement la même flotte (même identifiant) : le rapport de
+    combat s'applique à elle, ou le froid la détruit, à la même heure que chez les autres.
+  - Pas de problème réseau : la fiche du joueur absent existe (race, `ready`) ; le combat s'écrit
+    dans la fiche de l'attaquant (`effects`), comme d'habitude. Pas d'échange possible avec cette
+    flotte (personne pour répondre).
+- Précision de Vincent (transmise par la session de coordination) : « oui on peut attaquer les
+  planetes et les flottes d'un joueur deconnecté ». Les combats contre un joueur hors ligne sont
+  voulus ; la flotte de départ d'un joueur prêt jamais connecté s'attaque comme les autres, par
+  le même mécanisme : poursuite (`chaseFleet`) ou flotte agressive, y compris une rencontre que
+  personne ne regardait (`firstContact`, D-109).
+  - Conséquence acceptée : un retardataire dont la case de départ est déjà gelée perd sa flotte
+    en entrant et il est éliminé aussitôt.
+- Alternatives écartées : éliminer après un délai fixe sans planète (proposé d'abord, écarté par
+  Vincent au profit d'une règle de jeu) ; pour le joueur sans flotte, le tuer quand le froid
+  atteint le soleil (36 min, règle à part, il gagnerait encore contre un joueur gelé à 34 min) ;
+  pour le joueur sans flotte, compter seulement le gel de sa case de départ, sans flotte visible
+  ni combat (première version de cette PR, remplacée par le choix de Vincent) ;
+  chercher l'instant exact du gel en vol (racine) : une grille d'une seconde suffit et reste
+  identique partout.
+- Vérifié : `tests/frost-fleet.test.mjs` (6 scénarios, dont une flotte agressive qui croise la
+  flotte de départ de B déconnecté pendant que personne ne regarde : combat à l'heure de la
+  rencontre, D-109 ; et à quai, en vol, issue #33 avec rejeu
+  fidèle, flotte de départ d'un joueur déconnecté vue par tous et gelée avec rejeu fidèle, A
+  détruit au combat la flotte de départ de B déconnecté → B éliminé, A gagne, B retrouve la même
+  flotte et la même heure en revenant) ; « D-120 : tant qu'un joueur vole vers sa planète, la
+  partie ne finit pas » reste vert (pas de froid dans ce test) ; 218/218 ; vu dans le vrai jeu
+  (rapport de scénario, interface de test). Rejeu du scénario de combat non vérifié : le test
+  donne ses frégates à A à la main, hors de son journal d'ordres.
+- Qui : Vincent (règle, flotte de départ d'un joueur déconnecté), Claude (calcul). Source :
+  session `65b37922`.
+  Statut : en vigueur. Modifie D-120. Cache `astra-p2p-v83`.
+
+## 6 novembre 2026 — sauvegarde abîmée (#87)
+
+Numéro pris haut (D-170) : les PR #158 (D-163) et celle de #45 (D-164 et suivants) prennent déjà
+les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
+
+**D-170 — Un historique de sauvegardes abîmé est ignoré, puis réécrit propre**
+- 2026-11-06 22:00. Contexte : issue #87. Une entrée invalide dans `astra.saves` (`null`, sans
+  `state`, tableau, texte JSON `"abc"`) faisait lever une `TypeError` dans `saveGame`, donc dans
+  chaque ordre : l'état changeait mais l'écran n'était pas prévenu. Avec un texte JSON, l'accueil
+  plantait aussi au démarrage (`listGames`). Cause externe (stockage abîmé, extension, outil) : le
+  joueur ne pouvait s'en sortir qu'en vidant les données du site.
+- Choix de Claude, par défaut : `archive()` (`js/save.js`) part de `{}` si `astra.saves` n'est pas
+  un objet simple (`isMap` : ni `null`, ni tableau, ni texte), et ne garde que les entrées qui passent
+  `valid()`. `saveGame`, `listGames`, `selectGame` et `forgetGame` passent tous par `archive()`, donc
+  ignorent tous les entrées abîmées. Rien n'est effacé à la lecture : l'historique est réécrit sans
+  elles à la prochaine écriture (`saveGame` ou `forgetGame`). Même garde pour `astra.identities`
+  (`identities()`), lu par `selectGame`, `forgetGame` et `saveIdentity`.
+- Alternatives écartées : tout effacer dès qu'une entrée est abîmée (on perdrait les bonnes
+  parties) ; purger à la lecture (une lecture qui écrit surprend, et la prochaine sauvegarde le fait
+  de toute façon, au plus tard au premier ordre).
+- Cache `sw.js` : `astra-p2p-v85` (v83 et v84 sont laissés aux PR #158 et #45).
+- Vérifié : scénario « D-170 : un historique abîmé… » (`tests/decisions-reseau.test.mjs`, les 5
+  formes de l'issue), qui échoue sans la correction ; vrai jeu avec `{"zzz":null}` puis `"abc"`.
+- Qui : Vincent (demande : corriger #87), Claude (forme de la correction). Source : session
+  `9e675a52`. Statut : en vigueur. Complète D-066.
+
+**D-175 — Le calcul de l'économie est borné à 2 000 pas ; l'heure d'une planète reçue a un plancher**
+- 2026-11-06. Contexte : issue #32. `steps` et `until` intégraient l'économie par pas de 48 s
+  sans plafond : une planète datée de très loin faisait des millions de pas. `planetOk` acceptait
+  tout `at` fini : une fiche reçue avec `planet.at = 0` figeait la page de chaque téléphone qui
+  l'affichait (≈ 37 millions de pas par `stateAt`). Numéro : D-163 à D-169 étant pris ou réservés
+  par d'autres PR, cette PR prend D-175.
+- Choix de Claude :
+  1. **Nombre de pas borné** : `stepOf(durée) = max(1 s, min(2 h de jeu, durée / 300),
+     durée / MAX_STEPS)`, `MAX_STEPS = 2000`, dans `steps` et `until`. Le troisième terme ne
+     gagne qu'au-delà de 2 000 × 48 s ≈ 26,7 h : sous cette durée (donc toute partie normale,
+     et tout écart de moins de 4 h), les pas sont exactement ceux d'avant, l'économie ne change
+     pas d'un chiffre. Aucune question au router n'était donc nécessaire. Le calcul reste
+     déterministe : le pas ne dépend que de la durée. Au-delà de 26,7 h, les pas s'allongent :
+     le résultat reste fini et positif (vérifié sur les trois races à `at = 0`) mais
+     s'éloigne de ce que donneraient des passages réguliers.
+  2. **Plancher de l'heure dans `planetOk`** : `at` est **ramené** (pas refusé) au plancher
+     connu par la fiche elle-même : `since` (entrée dans la course, écrite une fois) pour la
+     planète mère ; le plus tardif de `since` et de `claimAt` pour une colonie. Aucune planète
+     n'existe avant ces heures (`newPlanet` naît à l'heure de l'installation ou de l'arrivée,
+     `settle` n'avance que vers l'avant). Ramener plutôt que refuser : `normalize` passe aussi
+     sur ma propre fiche au chargement (`clean`), un refus effacerait ma planète au moindre
+     écart ; ramener ne crée rien (le tricheur perd la production d'avant le plancher).
+- Alternatives écartées : couper la durée simulée (n'intégrer que les N dernières heures) :
+  aussi borné, mais change le résultat dès cette durée ; refuser la planète (`planet = null`) ;
+  plancher pris sur l'heure du téléphone qui reçoit (`now`, `startedAt`) : différent d'un
+  téléphone à l'autre, ou tiré des `go` que le tricheur peut aussi trafiquer ; plancher sur
+  `p.claimAt` de la planète mère (`claimPlanet` garde une planète existante avec `||=`, son `at`
+  peut être plus ancien).
+- Limites : une fiche sans `since` (partie d'avant la course, ou retiré par le tricheur) n'a pas
+  de plancher, seul `MAX_STEPS` la protège ; une heure loin dans le futur n'est pas bornée
+  (`normalize` ne connaît pas l'heure, et elle ne coûte rien).
+- Qui : Claude, par défaut (le ticket laissait le choix). Source : session `424ded66`, issue #32.
+  Statut : en vigueur.
+- Tests : `tests/rules.test.mjs` (planète datée de 1970 ou de 30 jours en moins de 100 ms ; pas
+  inchangés sous 26 h ; une heure calculée d'un coup ou soldée toutes les 250 ms à 0,1 % près),
+  `tests/hostile.test.mjs` (fiche reçue avec `at = 0` ramenée à `since` ; colonie ramenée à
+  sa prise).
+
+**D-176 — Cache `astra-p2p-v86`**
+- 2026-11-06. Contexte : v83 (PR #158, déjà dans `main`) et v85 (PR #159, déjà dans `main`) sont pris, v84 est
+  probablement réservé par la PR de #45 (non confirmé).
+- Choix : `VERSION` passe à `astra-p2p-v86` pour que les téléphones prennent les nouveaux
+  `game.js` et `session.js`.
+- Qui : Claude, par défaut. Source : session `424ded66`. Statut : en vigueur.
+
 **D-190 — Le menu d'ordres d'une flotte suit le brouillard**
 - 2026-11-06 22:15. Contexte : issue #35. Flotte choisie, toucher une planète des autres hors de
   ma portée affichait « Attaquer Orion (IA Véga) · défense ⚔ 12 ◇ 120 + ? vaisseaux · victoire
@@ -2002,7 +2142,8 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   « à portée : … hors de portée ensuite … », « ordre « Conquérir » vers une planète retenue, quittée… » ; `tests/end.test.mjs` « hors de ma détection : ni
   défense, ni vaisseaux posés, ni estimation (D-190) ». Vu dans le navigateur.
 
-**D-191 — Cache `astra-p2p-v83`**
-- 2026-11-06. Choix : `VERSION` passe à `astra-p2p-v83` pour que les téléphones prennent le
-  nouveau `session.js` (D-190). Si une autre PR prend v83 avant, monter au numéro suivant.
+**D-191 — Cache `astra-p2p-v87`**
+- 2026-11-06. Contexte : v83 à v86 sont pris dans `main` (D-163, D-170, D-176).
+- Choix : `VERSION` passe à `astra-p2p-v87` pour que les téléphones prennent le nouveau
+  `session.js` (D-190). Si une autre PR prend v87 avant, monter au numéro suivant.
 - Qui : Claude, par défaut. Source : session `5c1afab8`. Statut : en vigueur.
