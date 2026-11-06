@@ -1235,15 +1235,21 @@ function drawAlertDot(ctx, w, cx, cy, cell, pulse) {
   ctx.stroke();
 }
 
+let openName = null; // nom de la planète affichée au dernier rafraîchissement (#73)
+
 /** La planète ouverte (mère ou colonie) : ressources, population, chantiers, recherche, flottes. */
 function renderPlanet(me, now) {
   const R = RACES[me.race];
   let pl = session.planetOf(me, openKey);
   if (!pl) {
+    const lost = openKey !== 'home' && currentView === 'planet';
     openKey = 'home';
     pl = session.planetOf(me, 'home');
+    // La colonie affichée n'est plus à moi : on le dit avant de montrer la planète mère (#73).
+    if (lost && pl) toast(`Tu as perdu ta colonie${openName ? ` ${openName}` : ''} : retour à ta planète mère.`);
   }
   if (!pl) return;
+  openName = pl.name;
   const planet = pl.planet;
   const s = stateAt(planet, now);
   const f = s.prod;

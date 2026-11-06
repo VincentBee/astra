@@ -2261,15 +2261,19 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
   cette flotte, ou celle qui reçoit pour « Donner », n'existe plus, la fenêtre se ferme avec le
   message « Cette flotte n'existe plus. ». `splitFleet` refuse une flotte inconnue avec
   « Flotte introuvable. » (`transferFleet` le faisait déjà, par `pairOf`).
-- Hors de cette décision : la vue d'une colonie perdue qui revient en silence sur la planète
-  mère (`renderPlanet`, 4e critère de #73) n'est pas traitée ici.
+- Même idée pour la vue d'une colonie (4e critère de #73, demandé par le router) : si la colonie
+  affichée n'est plus à moi, `renderPlanet` revient sur la planète mère, comme avant, mais dit
+  d'abord « Tu as perdu ta colonie X : retour à ta planète mère. » (X : le nom affiché au
+  rafraîchissement d'avant, `openName`). Seulement si la vue planète est à l'écran : depuis la
+  carte, le retour reste silencieux (rien ne change à l'écran).
 - Alternatives écartées : garder la fenêtre ouverte avec un message dedans (un bouton qui ne
   peut plus rien faire reste à l'écran) ; suivre la flotte absorbante comme la fiche de flotte
   (la fenêtre parlerait d'une flotte, et agirait sur une autre).
-- Qui : Claude, par défaut (texte du message, fermeture plutôt que message dans la fenêtre).
-  Source : session `c88abd15`, issue #73. Statut : en vigueur.
+- Qui : Claude, par défaut (textes des messages, fermeture plutôt que message dans la fenêtre) ;
+  router (colonie perdue incluse dans la PR). Source : session `c88abd15`, issue #73. Statut : en vigueur.
 - Tests : `tests/fleet.test.mjs`, scénario « flotte détruite au combat pendant « Scinder » ou
-  « Donner » … ».
+  « Donner » … ». Fermeture de la fenêtre et message de la colonie : vérifiés dans le vrai jeu
+  (pas de DOM sous Node).
 
 **D-351 — Cache `astra-p2p-v90`**
 - 2026-11-06. Contexte : v89 (PR #166) est dans `main`.
