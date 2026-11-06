@@ -984,7 +984,7 @@ Résultat : `tests 34, pass 34, fail 0`, environ 5,6 s (le rejeu d'une partie de
 
 | Fichier | Tests | Ce qui est vérifié |
 |---|---|---|
-| `tests/end.test.mjs` | 13 | Score de tout l'empire ; le froid prend d'abord le bord ; planète mère gelée remplacée par la colonie la plus vieille, puis élimination ; à deux, le dernier en vie gagne même si l'autre est hors ligne, la fin se propage et bloque les ordres ; défense par race (`fortOf`) ; conquête qui élimine ; tourelles qui repoussent 3 frégates sans pillage ; colonisateur seul ou ordre « attaquer » ne prennent rien ; partie d'avant la course sans froid ; « Attaquer » et « Conquérir » : vaisseaux posés, « ? » hors détection, estimation du combat |
+| `tests/end.test.mjs` | 17 | Score de tout l'empire ; le froid prend d'abord le bord ; planète mère gelée remplacée par la colonie la plus vieille, puis élimination ; à deux, le dernier en vie gagne même si l'autre est hors ligne, la fin se propage et bloque les ordres ; défense par race (`fortOf`) ; conquête qui élimine ; tourelles qui repoussent 3 frégates sans pillage ; colonisateur seul ou ordre « attaquer » ne prennent rien ; partie d'avant la course sans froid ; « Attaquer » et « Conquérir » : vaisseaux posés, « ? » hors détection, estimation du combat ; éliminé pendant que sa flotte vole « Conquérir » ou « Attaquer », en ligne ou hors ligne : ses flottes disparaissent, rien n'est pris ni pillé (D-180) |
 | `tests/rules.test.mjs` | 11 | Déconstruire (moitié du prix rendue, place libérée à la fin) ; heure qui recule puis revient : pas de double production ; longue absence ≈ passages toutes les heures (population à moins de 2 %) ; arrachement refusé sans payer ; clés héritées (`constructor`, `__proto__`) refusées ; effectifs négatifs ou fractionnaires au combat ; soleil au centre et sans planète ; climat et production ; une place par niveau ; places lues sur la carte ; une colonie humaine sur le plus petit corps garde des places |
 | `tests/combat.test.mjs` | 4 | Attaques contre une planète : pas de butin créé avec un défenseur hors ligne ou plusieurs flottes arrivées ensemble ; 70 attaques avant le retour du défenseur ; les vaisseaux perdus emportent leur cargaison |
 | `tests/effects.test.mjs` | 1 | 5 joueurs, 4 attaquants × 70 combats : chaque perte subie une fois, puis rapports oubliés des deux côtés |
@@ -1072,6 +1072,24 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
   refusé).
 - `losePlanet` note les points de la vague (`this.wave` : joueur, heure, `scoreOf` avant la
   première perte de cette heure). À l'élimination, ils vont dans `p.deathPts` (D-102).
+- **Toutes les flottes d'un joueur éliminé disparaissent** à l'heure de l'élimination (D-180,
+  choix de Vincent) : plus de combat, de pillage ni de prise après cette heure, même en
+  interception. Un seul endroit : `eliminate(p, at, pts)` pose `p.out = at`, `p.deathPts = pts`
+  et vide `p.fleets`, quelle que soit la cause (planète prise ou gelée : `losePlanet` ; plus de
+  colonisateur : `noColonizer`, `freezeFleets`, `fleetHit`). Filet dans `tick` : une fiche avec
+  `p.out` et des flottes (vieille fiche) les perd avant les arrivées.
+- Ordre du `tick` : `freeze`, `freezeFleets` et `applyEffects` passent **avant** les arrivées.
+  Un joueur revenu en ligne après l'heure d'arrivée de sa flotte lit d'abord la prise de sa
+  planète : il est éliminé à l'heure de la prise, sa flotte n'arrive jamais.
+- Vu des autres téléphones, même si le mort est hors ligne : `sees` renvoie faux pour ses flottes
+  dès que `deadAt(owner, now)` est passé (plus dessinées, plus visées, plus combattues :
+  `engage`, `pursue`, `threats`, `tradePartners`, carte). `ownerAt` ignore un joueur `out` (il
+  ne possède rien) et une prise faite après la mort de l'attaquant (`goneBy`) ; `applyEffects`
+  ignore un rapport daté de l'heure de la mort de son auteur ou après.
+- Limite connue (non corrigée) : si le téléphone du mort livre l'arrivée de sa flotte **avant**
+  d'avoir reçu le rapport qui l'élimine (fiches reçues dans le désordre), ce combat a déjà été
+  écrit. Les téléphones qui lisent ce rapport après avoir vu `p.out` l'ignorent ; celui qui l'a
+  lu avant garde ses pertes. Non testé.
 
 ### 19.3 bis Le froid détruit les flottes (`fleetFrostAt`, `freezeFleets`, `colonizerDeadAt`, D-163)
 
@@ -1127,8 +1145,9 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
 ### 19.4 Qui est en vie, qui gagne (`livePlanets`, `deadAt`, `ranking`, `checkOver`)
 
 - `livePlanets(p)` : planètes ni gelées, ni prises (d'après `ownerAt`).
-- `deadAt(p)` : `p.out` s'il existe ; sinon, si plus aucune planète n'est en vie, l'heure du
-  dernier gel (ou maintenant pour une prise). Calculable par **tous**, même si le joueur est
+- `deadAt(p)` : `p.out` s'il existe ; sinon, si plus aucune planète n'est en vie, la dernière
+  des heures de perte : gel, ou prise lue dans le rapport de l'attaquant (`effects`, D-180) ;
+  maintenant si on ne sait pas. Calculable par **tous**, même si le joueur est
   hors ligne.
 - Joueur de la course **sans planète** (D-163, `colonizerDeadAt`) : mort à l'heure où il a
   perdu son dernier colonisateur, au froid ou au combat (`fleetDeadAt`) ; en vie tant qu'il en a

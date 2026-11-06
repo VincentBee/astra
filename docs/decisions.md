@@ -2177,3 +2177,99 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
 - Choix : `VERSION` passe à `astra-p2p-v87` pour que les téléphones prennent le nouveau
   `session.js` (D-190). Si une autre PR prend v87 avant, monter au numéro suivant.
 - Qui : Claude, par défaut. Source : session `5c1afab8`. Statut : en vigueur.
+
+**D-164 — Horloges décalées : bloquer « Prêt » et refuser les dates « déjà arrivées » du futur (remplacée par D-165 et D-166)**
+- 2026-11-06. Contexte : issue #45. Un téléphone en avance voit le froid trop tôt, écrit `p.over`
+  daté dans le futur, et les autres l'adoptent : la partie finit trop tôt pour tous.
+- Choix de Vincent (premier) : comparer les horloges au salon, message d'erreur et « Prêt »
+  impossible si l'une est décalée ; toute date « déjà arrivée » reçue dans le futur en erreur.
+  Codé sur la branche (seuil 10 s), jamais fusionné.
+- Pourquoi abandonné : refuser une fiche datée du futur bloque toute la synchro du joueur en
+  avance (chaque ordre date sa fiche, `actAt`, avec son heure) ; Vincent a préféré ne refuser
+  personne.
+- Qui : Vincent. Source : session `6a1c3a43` (via la session de coordination). Statut : remplacée
+  par D-165 et D-166 avant fusion.
+
+**D-165 — Heure commune : celle du créateur de la partie, avancée par l'horloge interne du navigateur**
+- 2026-11-06. Contexte : #45 (D-164 abandonnée).
+- Choix de Vincent : « n'importe laquelle est acceptée » : personne n'est refusé à cause de son
+  heure. Au salon, chaque téléphone envoie son heure ; la partie compte sur l'heure du créateur.
+- Comment (`js/session.js`) : `now()` = heure commune = heure du téléphone à l'ouverture de la page
+  + `clockOff`, puis avancée par `performance.now()` (`clock()`). Le créateur a l'heure commune
+  (`clockSynced`) ; un joueur qui ne l'a pas la prend au premier battement de cœur d'un joueur qui
+  l'a (`hb`/`hb-ack` portent `w` = heure commune, `sy`, `ep`). Gardée par partie dans
+  `localStorage['astra.clocks']` sous la forme « heure commune − heure du téléphone », 10
+  parties au plus. Les IA prennent l'heure de leur hôte.
+- Choix de Claude : `performance.now()` (changer l'heure du téléphone page ouverte ne change plus
+  rien) ; mesure comme NTP, médiane des 5 derniers battements ; garder l'écart dans une clé à part
+  plutôt que dans `astra.save` (ne pas toucher `js/save.js`, modifié par #87).
+- Alternatives écartées : médiane des heures au départ (plus de code pour le même résultat de
+  jeu) ; corriger seulement les dates reçues (chaque fonction de règle devrait savoir de qui vient
+  une date).
+- Effet : #45 corrigé (le froid, `checkOver` et `over` comptent sur la même heure partout).
+  #48 et #92 réduits mais pas fermés : leurs critères (tests précis, pillage) ne sont pas vérifiés.
+- Qui : Vincent (règle), Claude (moyens). Source : session `6a1c3a43`. Statut : en vigueur.
+- Tests : `tests/clock.test.mjs`.
+
+**D-166 — Heure qui a changé : les autres le disent, et s'ils sont tous d'accord il est resynchronisé**
+- 2026-11-06. Contexte : #45, suite de D-165. Reste possible : l'heure du téléphone change
+  pendant que l'appli est fermée ; à la réouverture, l'heure commune est fausse.
+- Choix de Vincent : à chaque battement, les autres comparent son heure à celle attendue ; trop
+  loin, ils lui envoient « ton heure a changé » (`clock-changed`, avec ce qu'ils savent de lui ;
+  `clock-ok` quand c'est revenu). Si **tous** les joueurs humains en ligne avec lui qui l'ont
+  mesuré (au moins 1 ; ni les IA, ni les hors ligne) le disent, il reprend l'heure du groupe, et ce
+  qu'il a fait avec sa mauvaise heure est remplacé par ce que les autres savent de lui. À deux, le
+  créateur de la partie l'emporte (« celui qui a fait la partie a plus de poids »).
+- Comment : chaque téléphone garde la dernière fiche de chaque joueur reçue quand son heure était
+  juste (`clockTrust` ; en attente tant qu'elle n'est pas mesurée). À la resynchronisation, sa
+  fiche devient la plus récente de ces copies, avec `clockFix` + 1 : une fiche au `clockFix` plus
+  grand l'emporte sur l'heure de fiche (`actAt`), une fiche au `clockFix` plus petit ne passe
+  plus. `FORMAT` passe à 11 (un téléphone d'avant garderait la fiche fautive).
+- Choix de Claude : marge de 10 s (`CLOCK_DRIFT_MS`) ; 3 mesures avant de juger ; duel sans le
+  créateur : le premier arrivé (`rank`) l'emporte ; fiche relayée (pas de lien direct) jugée juste
+  si elle n'est pas datée de plus de 10 s dans mon futur.
+- Limites (non corrigées) : les lignes du journal partagé écrites avec la mauvaise heure restent
+  (le journal est une union des copies) ; ce que la fiche fautive a déjà fait chez les autres
+  (dégâts appliqués) n'est pas défait ; une heure en retard sur une fiche relayée n'est pas vue.
+  Pendant les ~5 s avant le consensus (3 battements), la fiche fautive est adoptée par tous (toute
+  heure est acceptée) : si elle portait une fin de partie (`over`), l'écran « Fin de partie »
+  s'ouvrirait, et il ne se referme pas tout seul quand la fin disparaît (`showFinish`,
+  `js/app.js`). Cache : `astra-p2p-v88` (et non v84 : `main` est passé à v85, v86 puis v87 avec #159, #160 et #161).
+- Alternatives écartées : refuser la fiche (D-164) ; à deux, personne n'est corrigé (avertissement
+  seul).
+- Qui : Vincent (règle, duel, votants, sens de « resynchronisé »), Claude (marge, détails). Source :
+  session `6a1c3a43`. Statut : en vigueur.
+- Tests : `tests/clock.test.mjs` (consensus à 3, duel à 2 dans les deux sens, hors ligne, IA,
+  bruit < 10 s, téléphone d'avant).
+
+**D-180 — À l'élimination, toutes les flottes du joueur disparaissent**
+- 2026-11-06 22:16. Contexte : issue #34. Les flottes en vol d'un joueur éliminé exécutaient encore
+  leur ordre : une « conquête » prenait la planète d'un autre (et pouvait l'éliminer), le mort
+  possédait une colonie ; une « attaque » pillait.
+- Choix (Vincent, transmis par la session de coordination) : « au moment ou un joueur est
+  eliminé, toute ses flottes disparaissent ». À quai ou en vol, à l'heure de l'élimination
+  (`p.out`), pas à l'heure où un téléphone s'en aperçoit ; plus de combat, de pillage ni de prise
+  après, même en interception ; les autres téléphones ne voient plus ces flottes, même si le mort
+  est hors ligne.
+- Mise en œuvre (Claude) : `eliminate(p, at, pts)` dans `js/session.js`, seul endroit qui pose
+  `p.out`, appelé par `losePlanet`, `noColonizer`, `freezeFleets` et `fleetHit` (ces deux-là venus
+  de D-163). Filet dans `tick` pour une fiche `out` qui a encore des flottes. Autres téléphones :
+  `sees` (par `deadAt`), `ownerAt` (un joueur `out` ne possède rien ; prise après la mort de
+  l'attaquant ignorée, `goneBy`), `applyEffects` (rapport daté de la mort de l'auteur ou après
+  ignoré). `deadAt` date la prise d'un joueur hors ligne à l'heure du rapport de l'attaquant, plus
+  à « maintenant ».
+- Alternatives écartées : flottes gardées mais sans ordre, inertes (la piste de l'issue) : elles
+  resteraient sur la carte et dans les combats d'interception ; test de `p.out` dans `arrive` et
+  `capture` (deuxième endroit, et ne couvre pas les autres téléphones).
+- Limite : fiches reçues dans le désordre (le mort livre son arrivée avant de recevoir le rapport
+  qui l'élimine) : non corrigé, voir `regles.md` §19.3.
+- Qui : Vincent (règle), Claude (mise en œuvre). Source : session `1d0dae27`, issue #34. Statut :
+  en vigueur.
+- Tests : `tests/end.test.mjs`, trois scénarios « éliminé pendant que sa flotte vole… » et
+  « éliminé et hors ligne… ».
+
+**D-181 — Cache `astra-p2p-v89`**
+- 2026-11-06. Contexte : v86 (PR #160), v87 (PR #161) et v88 (PR #162) sont dans `main`.
+- Choix : `VERSION` passe à `astra-p2p-v89` pour que les téléphones prennent le nouveau
+  `session.js`.
+- Qui : Claude, par défaut. Source : session `1d0dae27`. Statut : en vigueur.
