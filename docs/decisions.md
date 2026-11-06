@@ -2126,12 +2126,17 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
   vers une planète prise hors de ma portée part ; l'arrivée dit « déjà prise : la flotte reste en
   orbite » (`arrive`, inchangé). « Attaquer » / « Conquérir » vers une planète retenue mais
   quittée depuis part aussi ; à l'arrivée, la flotte reste en orbite. Si la planète est encore
-  prise, l'ordre vise son vrai propriétaire, et le combat se joue comme avant. Le journal nomme le
-  propriétaire que je connais, pas le vrai. `moveFleet` ne devient jamais plus strict : l'IA
+  prise, l'ordre vise son vrai propriétaire, et le combat se joue comme avant. `moveFleet` ne devient jamais plus strict : l'IA
   (sans brouillard, D-124) l'appelle avec ses propres cibles. `moveFleet` décide avec la partie
   seule (`seesCell`), jamais avec mes souvenirs (`intel`, propres au téléphone) : le replay
   (`js/replay.js`) refait la même décision. Planète libre en vrai mais hors de vue : l'ordre part
-  sans cible (`pid: null`), la flotte reste en orbite.
+  sans cible (`pid: null`, `key: null`), la flotte reste en orbite : `arrive` ne trouve pas de
+  joueur et s'arrête là, sans planter (testé). Le journal (partagé, rejoué) ne lit pas `intel`
+  non plus : il nomme le propriétaire seulement à portée (« part conquérir Hadar (J1) »), hors de
+  vue juste la planète (« attaque Hadar »). Avec la PR de #36 (`arrive` attaque le propriétaire
+  actuel de la planète), une flotte partie vers une planète qui paraît libre combattra son vrai
+  propriétaire à l'arrivée : c'est voulu (le brouillard ne change que l'affichage et le choix de
+  l'ordre, pas ce qui se passe à l'arrivée). Non confirmé tant que #36 n'est pas fusionnée.
 - Alternatives écartées : garder le menu et cacher seulement les chiffres (le nom du joueur
   suffisait à trouver ses bases) ; refuser « Coloniser » au départ quand la planète est prise (le
   refus disait ce que je ne vois pas).

@@ -176,10 +176,11 @@ scenario('à portée : vrai propriétaire et défense ; hors de portée ensuite 
   assert.doesNotMatch(labels(memo), /⚔|◇|vaisseau|victoire|bataille/);
   assert.equal(blind.odds, undefined, 'pas d’estimation hors de portée');
   assert.equal(A.moveFleet(id, cell, 'conquer'), true, 'l’ordre part vers la planète retenue');
+  assert.doesNotMatch(A.state.log.at(-1).text, new RegExp(B.name), 'hors de vue, le journal ne nomme pas B');
 });
 
 scenario('ordre « Conquérir » vers une planète retenue, quittée hors de ma vue : il part, sans cible', (film) => {
-  const { A, B, id, cell, view, near } = target({ fighter: 3 });
+  const { A, B, id, cell, view, near, clock } = target({ fighter: 3 });
   view(near);
   A.ordersAt(id, cell); // A la voit : il retient B
   view([]);
@@ -189,6 +190,15 @@ scenario('ordre « Conquérir » vers une planète retenue, quittée hors de ma 
   // Le refus « Aucune planète adverse ici » dirait à A qu'elle est libre : l'ordre part.
   assert.equal(A.moveFleet(id, cell, 'conquer'), true);
   assert.deepEqual(A.myFleet(id).order, { kind: 'conquer', pid: null, key: null });
+  // Le journal ne lit pas les souvenirs de A (propres à son téléphone, D-190) : pas de nom hors de vue.
+  assert.doesNotMatch(A.state.log.at(-1).text, new RegExp(B.name), 'pas de propriétaire au journal');
+  // À l'arrivée, l'ordre sans cible ne plante pas : la flotte reste en orbite.
+  clock.t = A.myFleet(id).arrive + 1000;
+  A.tick();
+  film.look(A, 'arrivée : personne à combattre, la flotte attend en orbite', [{ show: 'ordre', at: [A, id], expected: null, got: A.myFleet(id)?.order ?? null }]);
+  assert.ok(A.myFleet(id), 'la flotte existe toujours');
+  assert.equal(A.myFleet(id).order, null);
+  assert.ok(game.sameCell(A.myFleet(id).to, cell));
   view(near);
   assert.equal(A.moveFleet(id, cell, 'conquer'), false, 'à portée, A voit qu’elle est libre : refusé');
 });

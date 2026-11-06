@@ -1694,10 +1694,8 @@ export class Session {
     if (err) return this.refuse(err);
     if (f.stranded) this.ontoast?.('Pas assez de carburant : la flotte tombera en panne en route.');
     // Au journal, seulement les ordres qui comptent : les simples déplacements le noieraient.
-    const known = this.knownOwner(cell).owner; // au journal, le propriétaire que je connais, pas le vrai
-    const seenOwner = known && known.id !== this.me ? known : null;
-    const who = seenOwner && order?.kind !== 'colonize' ? ` (${seenOwner.name})` : '';
-    this.touch(order ? this.addLog(`La flotte ${de(p.name)} ${ORDERS[order.kind].verb} ${w?.name || here?.name || 'la planète'}${who}.`) : null);
+    const who = here && live && here.owner.id !== this.me ? ` (${here.owner.name})` : ''; // hors de vue, pas de nom (D-190)
+    this.touch(order ? this.addLog(`La flotte ${de(p.name)} ${ORDERS[order.kind].verb} ${here ? here.name : w.name}${who}.`) : null);
     this.changed();
     return true;
   }
