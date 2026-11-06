@@ -427,7 +427,8 @@ export class Session {
   heartbeat() {
     const now = performance.now();
     for (const link of [...this.links.values()]) {
-      if (now - link.lastSeen > SILENCE_MS) link.close();
+      // Le lien d'une IA de ce téléphone (`local`) ne se coupe jamais pour silence (D-220).
+      if (!link.local && now - link.lastSeen > SILENCE_MS) link.close();
       else {
         link.send({ type: 'hb', t0: now });
         link.route?.().then((r) => r && (link.routeType = r));

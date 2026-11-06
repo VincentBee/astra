@@ -118,7 +118,7 @@ Découpage convenu avec code-regles : **ici** constructeur, création/arrivée, 
 | `start()` | 296 | Rejoint le rendez-vous (`meet`), lance `heartbeat` (1,5 s) et `tick` (250 ms), écoute `visibilitychange` (sauvegarde quand caché, `rdv.refresh()` au réveil si seul). |
 | `now()` / `newId()` | 319 / 327 | Heure figée pendant un ordre (`entry.t`) ; identifiants notés dans l'ordre pour le rejeu. |
 | `attach(link, pid)` | 350 | Branche un lien. Si un lien **rendez-vous** vivant existe déjà pour ce pid, un nouveau lien direct est fermé. Sinon le nouveau remplace l'ancien. |
-| `heartbeat()` | 371 | `hb` à chaque voisin ; ferme un lien muet depuis 30 s ; met à jour `routeType`. |
+| `heartbeat()` | 427 | `hb` à chaque voisin ; ferme un lien muet depuis 30 s, sauf le lien en mémoire d'une IA de ce téléphone (`link.local`, D-220) ; met à jour `routeType`. |
 | `onLinkClosed` | 383 | Invité coupé avant d'être accepté → `failed`. Sinon retire le lien. |
 | `onMessage` | 399 | Aiguillage des messages (§5). |
 | `onHello` | 445 | Hôte : accueil d'un nouveau ou retour d'un ancien joueur. |
@@ -221,14 +221,16 @@ Un pair qui arrive par le rendez-vous et par un lien direct garde le lien rendez
 - Copies jouées séparément : fusion par fiche (`mergeStates`), à `welcome` (copie locale), à `hello` (copie de l'invité), à chaque `sync`.
 
 ### 6.6 Départ d'un joueur
-Il n'y a **pas de message « je pars »**. Un départ = un lien qui se ferme : silence de 30 s (`heartbeat`), état WebRTC `failed/closed`, ou `disconnected` pendant 5 s. Le joueur passe hors ligne (`refreshOnline`) ; **sa fiche reste dans la partie**. Quitter l'écran (`data-go`, `app.js:137`) appelle `end()`. Resté seul (`alone`), l'écran montre un bouton pour rejoindre les autres (`app.js:289`, `762`).
+Il n'y a **pas de message « je pars »**. Un départ = un lien qui se ferme : silence de 30 s (`heartbeat` ; jamais pour le lien d'une IA du même téléphone, D-220), état WebRTC `failed/closed`, ou `disconnected` pendant 5 s. Le joueur passe hors ligne (`refreshOnline`) ; **sa fiche reste dans la partie**. Quitter l'écran (`data-go`, `app.js:137`) appelle `end()`. Resté seul (`alone`), l'écran montre un bouton pour rejoindre les autres (`app.js:289`, `762`).
 
 ### 6.7 IA sur le téléphone de l'hôte (D-151, D-155)
 - `addBot(host)` (`js/bot.js`) : l'hôte fait comme pour un invité (`addPlayer` avec une empreinte
   de secret au hasard, entrée au journal, `spread` de la fiche), puis crée la `Session` de l'IA
   sur une copie de sa partie (`snapshot`), reliée par `localPair()` : deux `LocalLink` qui
   passent les messages en texte JSON par `queueMicrotask`, `route()` = `'bot'` (« IA sur ce
-  téléphone » dans la fenêtre Joueurs), `viaRoom` faux. `host.attach(lien, pid de l'IA)` :
+  téléphone » dans la fenêtre Joueurs), `viaRoom` faux, `local` vrai : `heartbeat` ne le ferme
+  jamais pour silence (D-220, issue #38 : une page figée plus de 30 s, téléphone verrouillé,
+  coupait l'IA pour de bon). `host.attach(lien, pid de l'IA)` :
   l'IA est **en ligne** chez l'hôte, donc comptée par `notReady` (elle est prête aussitôt).
 - La `Session` de l'IA : `save`, `scheduleSave`, `meet`, `dial`, `start` neutralisés ; un
   minuteur d'1 s fait `tick`, `checkStart` et, toutes les 3 s, `think`. Elle répond aux `hb` de

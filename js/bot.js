@@ -404,6 +404,8 @@ class LocalLink {
     this.peer = null;
     this.closed = false;
     this.viaRoom = false;
+    // Même téléphone : le silence ne veut rien dire, la page était seulement en pause (D-220).
+    this.local = true;
     this.queue = [];
     this.handler = null;
     this.closer = null;
