@@ -108,7 +108,7 @@ Découpage convenu avec code-regles : **ici** constructeur, création/arrivée, 
 
 | Élément | Ligne | Rôle |
 |---|---|---|
-| `FORMAT = 10` (D-158 ; 9 : D-120) | 45 | Version du format des fiches (10 : recherches et vaisseaux dans le fil `plan`), écrite dans `p.v` par `touch`. `outdated` (l.1812) est vrai si un autre a un `v` plus grand → `app.js:830` prévient de recharger. |
+| `FORMAT = 11` (D-166 ; 10 : D-158 ; 9 : D-120) | 45 | Version du format des fiches (10 : recherches et vaisseaux dans le fil `plan`), écrite dans `p.v` par `touch`. `outdated` (l.1812) est vrai si un autre a un `v` plus grand → `app.js:830` prévient de recharger. |
 | constantes | 54-72 | `MAX_PLAYERS = 8`, `HEARTBEAT_MS = 1500`, `SILENCE_MS = 30000`, `MAX_ORDERS = 1500`. |
 | `normalize(p)` | 90 | Remet une fiche reçue au format actuel et la nettoie (nom ≤ 16, couleur `#rrggbb`, race connue, planètes valides via `planetOk` (heure `at` ramenée au plancher `since` / `claimAt` de la fiche, D-175), quantités bornées via `cleanAmounts` l.158, etc.). Exportée (utilisée par `js/replay.js`). |
 | `pidOk(pid)` | 169 | `[A-Za-z0-9-]{1,24}` : pas de `__proto__`. |
@@ -120,7 +120,7 @@ Découpage convenu avec code-regles : **ici** constructeur, création/arrivée, 
 | `start()` | 296 | Rejoint le rendez-vous (`meet`), lance `heartbeat` (1,5 s) et `tick` (250 ms), écoute `visibilitychange` (sauvegarde quand caché, `rdv.refresh()` au réveil si seul). |
 | `now()` / `newId()` | 319 / 327 | Heure figée pendant un ordre (`entry.t`) ; identifiants notés dans l'ordre pour le rejeu. |
 | `attach(link, pid)` | 350 | Branche un lien. Si un lien **rendez-vous** vivant existe déjà pour ce pid, un nouveau lien direct est fermé. Sinon le nouveau remplace l'ancien. |
-| `heartbeat()` | 371 | `hb` à chaque voisin ; ferme un lien muet depuis 30 s ; met à jour `routeType`. |
+| `heartbeat()` | 427 | `hb` à chaque voisin ; ferme un lien muet depuis 30 s, sauf le lien en mémoire d'une IA de ce téléphone (`link.local`, D-220) ; met à jour `routeType`. |
 | `onLinkClosed` | 383 | Invité coupé avant d'être accepté → `failed`. Sinon retire le lien. |
 | `onMessage` | 399 | Aiguillage des messages (§5). |
 | `onHello` | 445 | Hôte : accueil d'un nouveau ou retour d'un ancien joueur. |
@@ -155,8 +155,10 @@ Au niveau partie (`session.js:399-442`) :
 
 | Type | Sens | Contenu | Effet |
 |---|---|---|---|
-| `hb` | tous | `t0` | Répondu par `hb-ack`. |
-| `hb-ack` | tous | `t0` | `link.rtt` (latence). |
+| `hb` | tous | `t0, w, sy, ep` | Répondu par `hb-ack`. `w` : mon heure commune ; `sy` : je l'ai ; `ep` : mes corrections (D-165). |
+| `hb-ack` | tous | `t0, w0, w, sy, ep` | `link.rtt` (latence) ; `onClock` : écart d'horloge, prise de l'heure commune, changement d'heure (§6.8). |
+| `clock-changed` | tous | `drift, rec?` | « Ton heure a changé » : un vote, avec la dernière fiche de lui reçue quand son heure était juste (D-166). |
+| `clock-ok` | tous | — | Son heure est revenue : le vote est retiré. |
 | `hello` | invité → hôte | `name, gid?, pid?, secret?, secretHash, copy?` | Demande d'entrée. `gid/pid/secret` = identité gardée (retour d'un joueur) ; `secretHash` = hash d'un nouveau secret ; `copy` = **toute** la copie locale (c'est surtout pour ces gros messages que `part` existe). Renvoyé chaque seconde. |
 | `hello-ack` | hôte → invité | — | « Demande reçue » ; arrête les renvois. |
 | `welcome` | hôte → invité | `you, from, state` | Entrée acceptée : mon pid, celui de l'hôte, copie complète. |
@@ -223,14 +225,16 @@ Un pair qui arrive par le rendez-vous et par un lien direct garde le lien rendez
 - Copies jouées séparément : fusion par fiche (`mergeStates`), à `welcome` (copie locale), à `hello` (copie de l'invité), à chaque `sync`.
 
 ### 6.6 Départ d'un joueur
-Il n'y a **pas de message « je pars »**. Un départ = un lien qui se ferme : silence de 30 s (`heartbeat`), état WebRTC `failed/closed`, ou `disconnected` pendant 5 s. Le joueur passe hors ligne (`refreshOnline`) ; **sa fiche reste dans la partie**. Quitter l'écran (`data-go`, `app.js:137`) appelle `end()`. Resté seul (`alone`), l'écran montre un bouton pour rejoindre les autres (`app.js:289`, `762`).
+Il n'y a **pas de message « je pars »**. Un départ = un lien qui se ferme : silence de 30 s (`heartbeat` ; jamais pour le lien d'une IA du même téléphone, D-220), état WebRTC `failed/closed`, ou `disconnected` pendant 5 s. Le joueur passe hors ligne (`refreshOnline`) ; **sa fiche reste dans la partie**. Quitter l'écran (`data-go`, `app.js:137`) appelle `end()`. Resté seul (`alone`), l'écran montre un bouton pour rejoindre les autres (`app.js:289`, `762`).
 
 ### 6.7 IA sur le téléphone de l'hôte (D-151, D-155)
 - `addBot(host)` (`js/bot.js`) : l'hôte fait comme pour un invité (`addPlayer` avec une empreinte
   de secret au hasard, entrée au journal, `spread` de la fiche), puis crée la `Session` de l'IA
   sur une copie de sa partie (`snapshot`), reliée par `localPair()` : deux `LocalLink` qui
   passent les messages en texte JSON par `queueMicrotask`, `route()` = `'bot'` (« IA sur ce
-  téléphone » dans la fenêtre Joueurs), `viaRoom` faux. `host.attach(lien, pid de l'IA)` :
+  téléphone » dans la fenêtre Joueurs), `viaRoom` faux, `local` vrai : `heartbeat` ne le ferme
+  jamais pour silence (D-220, issue #38 : une page figée plus de 30 s, téléphone verrouillé,
+  coupait l'IA pour de bon). `host.attach(lien, pid de l'IA)` :
   l'IA est **en ligne** chez l'hôte, donc comptée par `notReady` (elle est prête aussitôt).
 - La `Session` de l'IA : `save`, `scheduleSave`, `meet`, `dial`, `start` neutralisés ; un
   minuteur d'1 s fait `tick`, `checkStart` et, toutes les 3 s, `think`. Elle répond aux `hb` de
@@ -239,6 +243,23 @@ Il n'y a **pas de message « je pars »**. Un départ = un lien qui se ferme : s
   intel, bots)`) ; `Session.resume` le relit (`botIds`, identifiants valides et présents dans
   la partie) ; `app.js` appelle `wakeBots(session)` juste après la reprise. `host.bots` (Map pid
   → Session) ; `Session.end` appelle `end()` de chaque IA (minuteur arrêté, lien fermé).
+
+### 6.8 Heure commune et changement d'heure (D-165, D-166)
+- `now()` est l'**heure commune** : `clock()` = heure du téléphone à l'ouverture de la page +
+  `clockOff`, puis avancée par `performance.now()`. Changer l'heure du téléphone page ouverte ne
+  change rien. `wall()` et `mono()` (heure du téléphone, horloge interne) se remplacent en test.
+- Le créateur (`isCreator` : plus petit `rank`) a l'heure commune (`clockSynced`). Les autres la
+  prennent au premier `hb-ack` d'un joueur qui l'a (`onClock` → `shiftClock`). Toute heure est
+  acceptée. Gardée par partie dans `localStorage['astra.clocks']` (`storeClock` à chaque `save`,
+  `loadClock` à la reprise et à `welcome`).
+- Changement d'heure (appli fermée) : si l'écart mesuré (médiane de 5, après 3 mesures) dépasse
+  `CLOCK_DRIFT_MS` = 10 s, j'envoie `clock-changed`. `checkClock` (à chaque vote et à chaque
+  battement) : si tous les humains en ligne qui m'ont mesuré me l'ont dit (à un seul votant, le
+  créateur, sinon le premier arrivé, l'emporte : `outranks`), `resyncClock` : je reprends leur heure
+  (médiane des écarts), ma fiche devient la plus récente des copies reçues, `clockFix` + 1.
+- `clockTrust[pid]` : dernière fiche de `pid` adoptée quand son heure était juste (`afterRec`) ;
+  `clockPending` tant qu'elle n'est pas mesurée. `onRecord` et `mergeIn` : le plus grand `clockFix`
+  l'emporte avant `actAt`.
 
 ## 7. Ordres et synchronisation
 
@@ -261,12 +282,12 @@ Le sens de ce journal pour le rejeu (`seenNews`, `replayIds`) est décrit dans `
 
 **Pièges**
 - `clean()` supprime `epoch` et `nextRank`, `mergeStates` les recalcule, `mergeIn` les supprime à nouveau (l.521). Ce sont des restes d'anciennes versions.
-- `actAt` repose sur l'horloge du téléphone ; d'où la marge d'un jour (l.540) et d'une minute (l.556).
+- `actAt` repose sur l'heure commune (D-165), elle-même tirée de l'horloge d'un téléphone ; d'où la marge d'un jour (l.540) et d'une minute (l.556).
 - `Link.send` ne fait rien si le canal n'est pas ouvert : pas d'erreur.
 - Un message de plus de 256 Ko dépasserait la limite annoncée par `a=max-message-size` (`invite.js:166`, `peer.js:35`) : passer toujours par `Link.send`, qui découpe.
 - Changer le format du code d'invitation : changer `VERSION` dans `invite.js` (sinon décodage faux).
 - Changer le format des fiches : incrémenter `FORMAT` et compléter son commentaire (l.32-40).
-- `sw.js` : changer `VERSION` (`astra-p2p-v87` au 2026-11-06) à chaque mise en ligne. `cache.addAll` est tout ou rien : un fichier absent de `FILES` qui renvoie 404 casse l'installation.
+- `sw.js` : changer `VERSION` (`astra-p2p-v93` au 2026-11-06) à chaque mise en ligne. `cache.addAll` est tout ou rien : un fichier absent de `FILES` qui renvoie 404 casse l'installation.
 - **`sw.js`, réseau muet (D-230)** : chaque requête fait la course entre le réseau et un délai de 3 s (`NET_WAIT`). Réseau d'abord s'il répond à temps ; sinon la copie en cache (`caches.match`, `ignoreSearch`). Pas de copie en cache : on continue d'attendre le réseau. Après un délai dépassé, le drapeau `mute` fait répondre le cache **tout de suite** aux requêtes suivantes (sans lui, chaque `import` de la chaîne des modules attendait 3 s : l'accueil mettait plus de 10 s dans Chromium) ; la première réponse du réseau le remet à faux. La réponse du réseau, même arrivée après le délai, est écrite dans le cache (`e.waitUntil` appelé tout de suite) : la prochaine ouverture a la nouvelle version. Piège : juste après le retour du réseau, une ouverture peut encore servir le cache une fois (le drapeau tombe à la première réponse) ; `mute` est perdu quand le navigateur arrête le service worker, ce qui revient au comportement normal.
 - **`technologies.html` et `js/techtree.js` ne sont pas dans `FILES`** (`sw.js:5-34`). Ils ne sont pas pré-cachés ; ils ne marchent hors ligne que s'ils ont déjà été ouverts en ligne (le `fetch` met en cache ce qu'il télécharge, `sw.js:67-75`).
 - Le service worker n'est enregistré qu'en https ou sur `localhost` (`app.js:1964`). La caméra aussi exige https (`scanner.js:25`).
