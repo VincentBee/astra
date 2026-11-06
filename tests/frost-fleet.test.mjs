@@ -298,3 +298,50 @@ scenario('D-163 : A détruit au combat la flotte de départ de B, déconnecté d
   // (Pas de rejeu ici : le test donne à A ses frégates et leur carburant à la main, hors de son
   // journal d'ordres. Le rejeu de la flotte de départ est vérifié dans le scénario du froid.)
 });
+
+scenario('D-163 + D-109 : une flotte agressive qui passe sur la flotte de départ de B déconnecté la combat, même sans que personne ne regarde', (film) => {
+  const { players: [A, B], clock, sync, online } = newLobby(2, ['human', 'machine']);
+  A.ready();
+  B.ready();
+  all([A, B], sync);
+  A.checkStart();
+  all([A, B], sync);
+  online.delete(B.me); // B ferme l'appli tout de suite
+  A.refreshOnline();
+  A.tick();
+  const b = A.state.players[B.me];
+  const ghost = A.fleetsOf(b)[0];
+  const pos = me(A).fleets[0].to;
+  const w = A.planets.filter((x) => x.kind === 'planet' && !A.ownerAt(x)).sort((a, z) => Math.hypot(a.x - pos.x, a.y - pos.y) - Math.hypot(z.x - pos.x, z.y - pos.y))[0];
+  assert.ok(A.moveFleet(me(A).fleets[0].id, { x: w.x, y: w.y }, 'colonize'));
+  clock.t = me(A).fleets[0].arrive + 1;
+  A.tick();
+  me(A).planet.ships = { ...(me(A).planet.ships || {}), fighter: 3 };
+  const id = A.takeOff('home', { fighter: 3 }, {}, 3);
+  me(A).fleets.find((f) => f.id === id).fuel = fleet.fleetTank('human', { fighter: 3 });
+  assert.ok(A.setFleetStance(id, 'aggressive'), 'flotte agressive');
+  // Cap au-delà de la case de B, en passant dessus : A ne regarde pas pendant le trajet.
+  const home = me(A).fleets.find((x) => x.id === id).from;
+  const n = Math.hypot(ghost.to.x - home.x, ghost.to.y - home.y);
+  let f;
+  let met = null;
+  for (let k = 2; k <= 6 && !met; k++) {
+    const beyond = { x: Math.round(ghost.to.x + ((ghost.to.x - home.x) / n) * k), y: Math.round(ghost.to.y + ((ghost.to.y - home.y) / n) * k) };
+    assert.ok(A.moveFleet(id, beyond), 'cap au-delà de la case de départ de B');
+    f = me(A).fleets.find((x) => x.id === id);
+    met = fleet.firstContact(f, ghost, f.depart, f.arrive);
+  }
+  assert.ok(met && met < f.arrive, 'le trajet croise la flotte de B');
+  clock.t = f.arrive + 60_000; // A revient sur l'appli après l'arrivée
+  A.tick();
+  const e = (me(A).effects || []).find((x) => x.to === B.me);
+  film.look(A, 'A rouvre l’appli : sa flotte agressive a combattu la flotte de B au passage, à l’heure de la rencontre', [
+    { show: 'combat à l’heure de la rencontre', expected: met, got: e?.at ?? 'aucun' },
+    { show: 'B mort à', expected: met, got: A.deadAt(b) ?? 'en vie' },
+    { show: 'gagnant', expected: 'p0', got: A.over?.winner ?? null },
+  ]);
+  assert.equal(e?.at, met, 'combat livré à l’heure de la rencontre (D-109)');
+  assert.equal(e.fleet, ghost.id);
+  assert.equal(A.deadAt(b), met);
+  assert.equal(A.over?.winner, 'p0');
+});

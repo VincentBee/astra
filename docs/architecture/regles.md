@@ -1086,6 +1086,8 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
   (`fleetSpots`, liste des joueurs), `engage`, `threats` et `fleetOf` (donc `chaseFleet`,
   `pursue`). Pas pour les échanges (`tradePartners`) : personne pour répondre. Pas dans le rejeu
   affiché (`replay-view.js` dessine les fiches).
+- Attaquable comme toute flotte d'un joueur hors ligne (précision de Vincent) : poursuite, ou
+  flotte agressive, y compris une rencontre que personne ne regardait (`firstContact`, D-109).
 - Le combat s'écrit comme d'habitude dans la fiche de l'attaquant (`effects`, `fleet` =
   l'identifiant calculé). Revenu, le joueur entre (`enterRace` pousse `startFleet`, même
   identifiant) et lit le rapport : sa flotte est détruite, il est éliminé à l'heure du combat.

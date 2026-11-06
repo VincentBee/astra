@@ -2013,6 +2013,11 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   - Pas de problème réseau : la fiche du joueur absent existe (race, `ready`) ; le combat s'écrit
     dans la fiche de l'attaquant (`effects`), comme d'habitude. Pas d'échange possible avec cette
     flotte (personne pour répondre).
+- Précision de Vincent (transmise par la session de coordination) : « oui on peut attaquer les
+  planetes et les flottes d'un joueur deconnecté ». Les combats contre un joueur hors ligne sont
+  voulus ; la flotte de départ d'un joueur prêt jamais connecté s'attaque comme les autres, par
+  le même mécanisme : poursuite (`chaseFleet`) ou flotte agressive, y compris une rencontre que
+  personne ne regardait (`firstContact`, D-109).
   - Conséquence acceptée : un retardataire dont la case de départ est déjà gelée perd sa flotte
     en entrant et il est éliminé aussitôt.
 - Alternatives écartées : éliminer après un délai fixe sans planète (proposé d'abord, écarté par
@@ -2022,11 +2027,13 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   ni combat (première version de cette PR, remplacée par le choix de Vincent) ;
   chercher l'instant exact du gel en vol (racine) : une grille d'une seconde suffit et reste
   identique partout.
-- Vérifié : `tests/frost-fleet.test.mjs` (5 scénarios : à quai, en vol, issue #33 avec rejeu
+- Vérifié : `tests/frost-fleet.test.mjs` (6 scénarios, dont une flotte agressive qui croise la
+  flotte de départ de B déconnecté pendant que personne ne regarde : combat à l'heure de la
+  rencontre, D-109 ; et à quai, en vol, issue #33 avec rejeu
   fidèle, flotte de départ d'un joueur déconnecté vue par tous et gelée avec rejeu fidèle, A
   détruit au combat la flotte de départ de B déconnecté → B éliminé, A gagne, B retrouve la même
   flotte et la même heure en revenant) ; « D-120 : tant qu'un joueur vole vers sa planète, la
-  partie ne finit pas » reste vert (pas de froid dans ce test) ; 217/217 ; vu dans le vrai jeu
+  partie ne finit pas » reste vert (pas de froid dans ce test) ; 218/218 ; vu dans le vrai jeu
   (rapport de scénario, interface de test). Rejeu du scénario de combat non vérifié : le test
   donne ses frégates à A à la main, hors de son journal d'ordres.
 - Qui : Vincent (règle, flotte de départ d'un joueur déconnecté), Claude (calcul). Source :
