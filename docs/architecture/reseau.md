@@ -106,7 +106,7 @@ Découpage convenu avec code-regles : **ici** constructeur, création/arrivée, 
 
 | Élément | Ligne | Rôle |
 |---|---|---|
-| `FORMAT = 10` (D-158 ; 9 : D-120) | 45 | Version du format des fiches (10 : recherches et vaisseaux dans le fil `plan`), écrite dans `p.v` par `touch`. `outdated` (l.1812) est vrai si un autre a un `v` plus grand → `app.js:830` prévient de recharger. |
+| `FORMAT = 11` (D-166 ; 10 : D-158 ; 9 : D-120) | 45 | Version du format des fiches (10 : recherches et vaisseaux dans le fil `plan`), écrite dans `p.v` par `touch`. `outdated` (l.1812) est vrai si un autre a un `v` plus grand → `app.js:830` prévient de recharger. |
 | constantes | 54-72 | `MAX_PLAYERS = 8`, `HEARTBEAT_MS = 1500`, `SILENCE_MS = 30000`, `MAX_ORDERS = 1500`. |
 | `normalize(p)` | 90 | Remet une fiche reçue au format actuel et la nettoie (nom ≤ 16, couleur `#rrggbb`, race connue, planètes valides via `planetOk` (heure `at` ramenée au plancher `since` / `claimAt` de la fiche, D-175), quantités bornées via `cleanAmounts` l.158, etc.). Exportée (utilisée par `js/replay.js`). |
 | `pidOk(pid)` | 169 | `[A-Za-z0-9-]{1,24}` : pas de `__proto__`. |
@@ -153,8 +153,10 @@ Au niveau partie (`session.js:399-442`) :
 
 | Type | Sens | Contenu | Effet |
 |---|---|---|---|
-| `hb` | tous | `t0` | Répondu par `hb-ack`. |
-| `hb-ack` | tous | `t0` | `link.rtt` (latence). |
+| `hb` | tous | `t0, w, sy, ep` | Répondu par `hb-ack`. `w` : mon heure commune ; `sy` : je l'ai ; `ep` : mes corrections (D-165). |
+| `hb-ack` | tous | `t0, w0, w, sy, ep` | `link.rtt` (latence) ; `onClock` : écart d'horloge, prise de l'heure commune, changement d'heure (§6.8). |
+| `clock-changed` | tous | `drift, rec?` | « Ton heure a changé » : un vote, avec la dernière fiche de lui reçue quand son heure était juste (D-166). |
+| `clock-ok` | tous | — | Son heure est revenue : le vote est retiré. |
 | `hello` | invité → hôte | `name, gid?, pid?, secret?, secretHash, copy?` | Demande d'entrée. `gid/pid/secret` = identité gardée (retour d'un joueur) ; `secretHash` = hash d'un nouveau secret ; `copy` = **toute** la copie locale (c'est surtout pour ces gros messages que `part` existe). Renvoyé chaque seconde. |
 | `hello-ack` | hôte → invité | — | « Demande reçue » ; arrête les renvois. |
 | `welcome` | hôte → invité | `you, from, state` | Entrée acceptée : mon pid, celui de l'hôte, copie complète. |
@@ -238,6 +240,23 @@ Il n'y a **pas de message « je pars »**. Un départ = un lien qui se ferme : s
   la partie) ; `app.js` appelle `wakeBots(session)` juste après la reprise. `host.bots` (Map pid
   → Session) ; `Session.end` appelle `end()` de chaque IA (minuteur arrêté, lien fermé).
 
+### 6.8 Heure commune et changement d'heure (D-165, D-166)
+- `now()` est l'**heure commune** : `clock()` = heure du téléphone à l'ouverture de la page +
+  `clockOff`, puis avancée par `performance.now()`. Changer l'heure du téléphone page ouverte ne
+  change rien. `wall()` et `mono()` (heure du téléphone, horloge interne) se remplacent en test.
+- Le créateur (`isCreator` : plus petit `rank`) a l'heure commune (`clockSynced`). Les autres la
+  prennent au premier `hb-ack` d'un joueur qui l'a (`onClock` → `shiftClock`). Toute heure est
+  acceptée. Gardée par partie dans `localStorage['astra.clocks']` (`storeClock` à chaque `save`,
+  `loadClock` à la reprise et à `welcome`).
+- Changement d'heure (appli fermée) : si l'écart mesuré (médiane de 5, après 3 mesures) dépasse
+  `CLOCK_DRIFT_MS` = 10 s, j'envoie `clock-changed`. `checkClock` (à chaque vote et à chaque
+  battement) : si tous les humains en ligne qui m'ont mesuré me l'ont dit (à un seul votant, le
+  créateur, sinon le premier arrivé, l'emporte : `outranks`), `resyncClock` : je reprends leur heure
+  (médiane des écarts), ma fiche devient la plus récente des copies reçues, `clockFix` + 1.
+- `clockTrust[pid]` : dernière fiche de `pid` adoptée quand son heure était juste (`afterRec`) ;
+  `clockPending` tant qu'elle n'est pas mesurée. `onRecord` et `mergeIn` : le plus grand `clockFix`
+  l'emporte avant `actAt`.
+
 ## 7. Ordres et synchronisation
 
 `session.js:1872-1893` enveloppe chaque méthode de `ORDER_KINDS` et `tick` :
@@ -259,7 +278,7 @@ Le sens de ce journal pour le rejeu (`seenNews`, `replayIds`) est décrit dans `
 
 **Pièges**
 - `clean()` supprime `epoch` et `nextRank`, `mergeStates` les recalcule, `mergeIn` les supprime à nouveau (l.521). Ce sont des restes d'anciennes versions.
-- `actAt` repose sur l'horloge du téléphone ; d'où la marge d'un jour (l.540) et d'une minute (l.556).
+- `actAt` repose sur l'heure commune (D-165), elle-même tirée de l'horloge d'un téléphone ; d'où la marge d'un jour (l.540) et d'une minute (l.556).
 - `Link.send` ne fait rien si le canal n'est pas ouvert : pas d'erreur.
 - Un message de plus de 256 Ko dépasserait la limite annoncée par `a=max-message-size` (`invite.js:166`, `peer.js:35`) : passer toujours par `Link.send`, qui découpe.
 - Changer le format du code d'invitation : changer `VERSION` dans `invite.js` (sinon décodage faux).

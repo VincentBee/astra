@@ -42,8 +42,9 @@ const de = (name) => (/^[aeiouyhàâéèêëîïôöûü]/i.test(name) ? `d’${
  * 9 : départ quand tous les joueurs présents sont prêts (`ready`, `go`), flotte de départ
  *     avec un seul colonisateur qui fonde la planète mère.
  * 10 : recherches et lots de vaisseaux dans le fil d'attente (`plan`, D-158).
+ * 11 : heure commune et resynchronisation d'une fiche (`clockFix`, D-165, D-166).
  */
-export const FORMAT = 10;
+export const FORMAT = 11;
 
 const shipsText = (n) => `${n} vaisseau${n > 1 ? 'x' : ''}`;
 
@@ -88,6 +89,41 @@ const JOURNAL_MAX = 100;
 /** Pas (ms) auquel on regarde si le froid atteint une flotte en vol (D-163). */
 const FROST_STEP = 1000;
 const HEARTBEAT_MS = 1500;
+/**
+ * Changement d'heure (D-166, choix de Claude) : si l'heure commune d'un joueur s'écarte de plus de
+ * 10 s de la mienne (ou de l'écart de référence, s'il n'a pas encore l'heure commune), son heure a
+ * changé. La mesure (battement de cœur) est juste à 1 s près.
+ */
+export const CLOCK_DRIFT_MS = 10_000;
+/** Battements gardés pour mesurer l'écart d'horloge d'un lien (la médiane écarte un message lent). */
+const SKEW_SAMPLES = 5;
+/** Heure commune de chaque partie sur ce téléphone : astra.clocks = { gid: { off, synced, at } } (D-165). */
+const CLOCKS_KEY = 'astra.clocks';
+function loadClock(gid) {
+  try {
+    const c = JSON.parse(localStorage.getItem(CLOCKS_KEY) || '{}')?.[gid];
+    return c && Number.isFinite(c.off) ? c : null;
+  } catch {
+    return null;
+  }
+}
+function storeClock(gid, c) {
+  try {
+    let all = JSON.parse(localStorage.getItem(CLOCKS_KEY) || '{}');
+    if (!isObj(all)) all = {};
+    all[gid] = c;
+    all = Object.fromEntries(Object.entries(all).filter(([, v]) => isObj(v)).sort((a, b) => (b[1].at || 0) - (a[1].at || 0)).slice(0, 10));
+    localStorage.setItem(CLOCKS_KEY, JSON.stringify(all));
+  } catch {
+    // stockage plein ou interdit : l'heure commune sera reprise des autres au prochain contact
+  }
+}
+/** « 40 s », « 10 min », « 3 h » : un écart d'horloge, pour un joueur. */
+const gapText = (ms) => {
+  const sec = Math.round(Math.abs(ms) / 1000);
+  return sec < 120 ? `${sec} s` : sec < 7200 ? `${Math.round(sec / 60)} min` : `${Math.round(sec / 3600)} h`;
+};
+const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
 // Sans nouvelles depuis ce délai, la connexion est considérée perdue (un
 // écran verrouillé quelques secondes ne doit pas faire sortir de la partie).
 const SILENCE_MS = 30000;
@@ -164,7 +200,7 @@ export function normalize(p) {
   if (!Array.isArray(p.orders)) p.orders = [];
   if (p.deathPts !== undefined && !Number.isFinite(p.deathPts)) delete p.deathPts;
   // Prêt (heure) et départ de la partie vu par ce joueur (heure) : des nombres, ou rien.
-  for (const k of ['ready', 'go']) if (p[k] !== undefined && !Number.isFinite(p[k])) delete p[k];
+  for (const k of ['ready', 'go', 'clockFix']) if (p[k] !== undefined && !Number.isFinite(p[k])) delete p[k];
   return p;
 }
 
@@ -257,6 +293,16 @@ export class Session {
     this.me = null;
     this.state = null; // { gid, key, players: {}, log: [] }
     this.links = new Map(); // pid -> Link
+    // Heure commune (D-165) : clockOff = heure commune − heure du téléphone au moment de l'ancrage ;
+    // clockSynced : j'ai l'heure commune (créateur de la partie, ou reprise d'un joueur qui l'a) ;
+    // clockEpoch : change à chaque correction, pour que les autres recommencent leurs mesures.
+    this.clockOff = 0;
+    this.clockSynced = false;
+    this.clockEpoch = 0;
+    this.clockRef = {}; // pid -> écart de référence de son horloge sur la mienne (joueur sans heure commune)
+    this.clockVotes = {}; // pid -> { drift, rec } : ce joueur me dit que mon heure a changé (D-166)
+    this.clockTrust = {}; // pid -> sa dernière fiche reçue quand son heure était juste (D-166)
+    this.clockPending = {}; // pid -> fiche reçue avant que son heure soit mesurée
     this.status = 'idle'; // idle | answering | waiting | playing | failed | refused
     this.invite = null;
     this.dialing = new Map(); // pid -> offre en cours vers ce joueur
@@ -275,6 +321,7 @@ export class Session {
     // key : clé de la partie, qui protège le rendez-vous automatique.
     s.state = { gid: rid(6), key: rid(16), players: {}, log: [] };
     s.addPlayer(s.me, name, await sha256(secret));
+    s.clockSynced = true; // le créateur donne l'heure commune (D-165)
     s.addLog(`${name} ouvre la partie.`);
     saveIdentity({ gid: s.state.gid, pid: s.me, secret });
     s.status = 'playing';
@@ -293,6 +340,7 @@ export class Session {
     s.me = saved.me;
     s.state = clean(saved.state);
     s.status = 'playing';
+    s.loadClock();
     s.intel = saved.intel || {}; // brouillard (D-124) : ce que j'ai vu des planètes des autres
     s.journal = saved.journal || null; // avant le rattrapage : les combats de l'absence s'y inscrivent
     s.botIds = Array.isArray(saved.bots) ? saved.bots.filter((pid) => pidOk(pid) && s.state.players[pid]) : []; // IA jouées par ce téléphone (D-151), réveillées par js/bot.js
@@ -376,11 +424,57 @@ export class Session {
   // ----- état ------------------------------------------------------------------
 
   /**
-   * Heure de la partie : celle du téléphone (réglée automatiquement par le
-   * réseau). Figée le temps d'un ordre, pour qu'il se rejoue à l'identique.
+   * Heure de la partie : l'heure commune (D-165). Figée le temps d'un ordre, pour qu'il se rejoue
+   * à l'identique.
    */
   now() {
-    return this.entry?.t ?? Date.now();
+    return this.entry?.t ?? this.clock();
+  }
+
+  /** Heure du téléphone et horloge interne du navigateur (que les réglages ne changent pas) ; remplacées en test. */
+  wall() {
+    return Date.now();
+  }
+  mono() {
+    return performance.now();
+  }
+
+  /**
+   * Heure commune (D-165) : heure du téléphone + clockOff, prise une fois (ancrage), puis avancée
+   * par l'horloge interne. Changer l'heure du téléphone page ouverte ne change donc rien.
+   */
+  clock() {
+    const m = this.mono();
+    if (!this.clockAnchor) this.clockAnchor = { wall: this.wall(), mono: m };
+    return Math.round(this.clockAnchor.wall + (m - this.clockAnchor.mono) + this.clockOff);
+  }
+
+  /** Décale l'heure commune de `ms` ; les mesures des autres sur moi et les miennes repartent de zéro. */
+  shiftClock(ms) {
+    this.clockOff += ms;
+    this.clockEpoch++;
+    this.clockRef = {};
+    this.clockVotes = {};
+    for (const l of this.links.values()) Object.assign(l, { skews: [], skew: undefined, driftSent: false });
+    this.storeClock();
+  }
+
+  /** Reprend l'heure commune gardée pour cette partie (sinon : le créateur l'a, les autres la reprendront). */
+  loadClock() {
+    const c = loadClock(this.state.gid);
+    if (c) Object.assign(this, { clockOff: c.off, clockSynced: !!c.synced });
+    else this.clockSynced = this.isCreator(this.me);
+  }
+
+  /** Garde l'heure commune : l'écart avec l'heure du téléphone maintenant (juste même si elle a sauté page ouverte). */
+  storeClock() {
+    if (this.state?.gid && !this.isBot) storeClock(this.state.gid, { off: this.clock() - this.wall(), synced: this.clockSynced, at: this.wall() });
+  }
+
+  /** Le créateur de la partie : le premier arrivé (`rank`), à égalité le plus petit identifiant. */
+  isCreator(pid) {
+    const first = Object.values(this.state?.players || {}).sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity) || (a.id < b.id ? -1 : 1))[0];
+    return !!first && first.id === pid;
   }
 
   /**
@@ -428,7 +522,134 @@ export class Session {
       this.links.set(pid, link);
       if (prev && prev !== link) prev.close();
       this.refreshOnline();
+      // Premier battement tout de suite : l'écart d'horloge est connu sans attendre 1,5 s (D-165).
+      link.send(this.beatMsg('hb', performance.now()));
     }
+  }
+
+  /** Battement de cœur : mon heure commune, si je l'ai, et mon nombre de corrections (D-165). */
+  beatMsg(type, t0, extra) {
+    return { type, t0, ...extra, w: this.clock(), sy: this.clockSynced, ep: this.clockEpoch };
+  }
+
+  /**
+   * Réponse à un battement (D-165, D-166) : écart entre l'heure de ce joueur et la mienne, comme
+   * NTP (son heure à la réponse, moins le milieu de l'aller-retour à mon heure), médiane des 5
+   * derniers. Toute heure est acceptée :
+   * - je n'ai pas l'heure commune et lui l'a : je la prends (clockOff += écart) ;
+   * - tous deux l'avons : l'écart attendu est 0 ; sinon, le premier écart mesuré est la référence ;
+   * - au-delà de CLOCK_DRIFT_MS de l'attendu, son heure a changé : je le lui dis (`clock-changed`,
+   *   avec ce que je sais de lui), une fois, et `clock-ok` quand c'est revenu.
+   * Un téléphone d'avant ne renvoie pas son heure (`noClock`) : rien à comparer.
+   */
+  onClock(link, msg) {
+    if (!Number.isFinite(msg.w) || !Number.isFinite(msg.w0)) {
+      link.noClock = true;
+      return;
+    }
+    const pid = link.pid;
+    if (!pid || link.local) return; // une IA a l'horloge de ce téléphone
+    if (msg.ep !== link.ep) {
+      // Il a corrigé son heure : on recommence à le mesurer.
+      Object.assign(link, { ep: msg.ep, skews: [], skew: undefined, driftSent: false });
+      delete this.clockRef[pid];
+      delete this.clockVotes[pid]; // ses votes dataient d'avant sa correction
+    }
+    link.sy = !!msg.sy;
+    const sample = msg.w - (msg.w0 + this.clock()) / 2;
+    if (!this.clockSynced && link.sy) {
+      this.clockSynced = true;
+      return this.shiftClock(Math.round(sample));
+    }
+    link.skews = [...(link.skews || []), sample].slice(-SKEW_SAMPLES);
+    link.skew = Math.round(median(link.skews));
+    if (link.skews.length < 3) return; // 3 mesures avant de juger
+    if (!(this.clockSynced && link.sy) && !Number.isFinite(this.clockRef[pid])) this.clockRef[pid] = link.skew;
+    const changed = this.clockState(link) === 'drift';
+    if (!changed && this.clockPending[pid]) this.clockTrust[pid] = this.clockPending[pid];
+    if (!changed) delete this.clockPending[pid];
+    if (changed && !link.driftSent) {
+      const rec = this.clockTrust[pid];
+      const { online, ...data } = rec || {};
+      link.send({ type: 'clock-changed', drift: this.clockDrift(link), ...(rec ? { rec: data } : {}) });
+    } else if (!changed && link.driftSent) link.send({ type: 'clock-ok' });
+    link.driftSent = changed;
+  }
+
+  /** Écart entre l'heure de ce joueur et celle attendue (0 si nous avons l'heure commune, sinon la référence). */
+  clockDrift(link) {
+    return link.skew - (this.clockSynced && link.sy ? 0 : this.clockRef[link.pid] ?? link.skew);
+  }
+
+  /** Heure d'un joueur relié : 'ok', 'wait' (pas encore mesurée) ou 'drift' (elle a changé). */
+  clockState(link) {
+    if (!link || link.local || link.noClock) return 'ok';
+    if (!Number.isFinite(link.skew) || (link.skews?.length || 0) < 3) return 'wait';
+    return Math.abs(this.clockDrift(link)) > CLOCK_DRIFT_MS ? 'drift' : 'ok';
+  }
+
+  /** Avant d'adopter une fiche de `pid` : ce que je savais de lui, si je n'en ai rien gardé (D-166). */
+  beforeRec(pid) {
+    if (!Object.hasOwn(this.clockTrust, pid) && this.state.players[pid]) this.clockTrust[pid] = this.state.players[pid];
+  }
+
+  /**
+   * Fiche de `pid` adoptée : gardée comme sûre si son heure est juste, en attente si pas encore
+   * mesurée. Sans lien direct avec lui (fiche relayée, ou reçue avant que son lien soit branché) :
+   * sûre seulement si elle n'est pas datée de mon futur.
+   */
+  afterRec(pid) {
+    const link = this.links.get(pid);
+    const p = this.state.players[pid];
+    const st = link ? this.clockState(link) : (p?.actAt || 0) <= this.now() + CLOCK_DRIFT_MS ? 'ok' : 'wait';
+    if (st === 'ok') this.clockTrust[pid] = this.state.players[pid];
+    else if (st === 'wait') this.clockPending[pid] = this.state.players[pid];
+  }
+
+  /**
+   * Consensus (D-166) : si tous les joueurs humains en ligne avec moi, qui ont mesuré mon heure,
+   * me disent qu'elle a changé, je me resynchronise. À deux, le créateur de la partie l'emporte
+   * (sinon le plus ancien joueur) : il ne se corrige pas sur la parole de l'autre.
+   */
+  checkClock() {
+    const voters = [...this.links.values()].filter((l) => l.pid && !l.closed && !l.local && !l.noClock && (l.skews?.length || 0) >= 3);
+    if (!voters.length || !voters.every((l) => this.clockVotes[l.pid])) return false;
+    if (voters.length === 1 && this.outranks(this.me, voters[0].pid)) return false;
+    return this.resyncClock(voters.map((l) => this.clockVotes[l.pid]));
+  }
+
+  /** `a` l'emporte sur `b` dans un duel d'horloges : le créateur, sinon le premier arrivé. */
+  outranks(a, b) {
+    if (this.isCreator(a)) return true;
+    if (this.isCreator(b)) return false;
+    const [pa, pb] = [this.state.players[a], this.state.players[b]];
+    return (pa?.rank ?? Infinity) < (pb?.rank ?? Infinity) || ((pa?.rank ?? Infinity) === (pb?.rank ?? Infinity) && a < b);
+  }
+
+  /**
+   * Resynchronisation (D-166) : je reprends l'heure du groupe (médiane des écarts qu'ils voient),
+   * et ce que j'ai fait avec ma mauvaise heure est remplacé par ce que les autres savent de moi
+   * (la plus récente des fiches qu'ils m'envoient). `clockFix` augmente : les autres adoptent
+   * cette fiche même si elle paraît plus vieille que celle datée avec ma mauvaise heure.
+   */
+  resyncClock(votes) {
+    const drift = median(votes.map((v) => v.drift));
+    const mine = this.state.players[this.me];
+    const known = votes.map((v) => v.rec).filter((r) => isObj(r) && r.id === this.me && r.secretHash === mine.secretHash).sort((a, b) => (b.actAt || 0) - (a.actAt || 0))[0];
+    this.clockSynced = true;
+    this.shiftClock(-drift);
+    if (known) {
+      const p = normalize(JSON.parse(JSON.stringify(known)));
+      p.online = true;
+      p.clockFix = Math.max(mine.clockFix || 0, p.clockFix || 0) + 1;
+      this.state.players[this.me] = p;
+    } else mine.clockFix = (mine.clockFix || 0) + 1;
+    const p = this.state.players[this.me];
+    const ahead = drift > 0;
+    this.touch(this.addLog(`L’heure du téléphone ${de(p.name)} avait changé : ${p.name} reprend l’heure des autres joueurs.`));
+    this.ontoast?.(`L’heure de ton téléphone ${ahead ? 'avançait' : 'retardait'} de ${gapText(drift)} sur celle des autres joueurs : la partie a repris leur heure${known ? ', et ce que tu as fait pendant ce temps est remplacé par ce qu’ils savaient de toi' : ''}.`, 10000);
+    this.changed();
+    return true;
   }
 
   heartbeat() {
@@ -436,11 +657,12 @@ export class Session {
     for (const link of [...this.links.values()]) {
       if (now - link.lastSeen > SILENCE_MS) link.close();
       else {
-        link.send({ type: 'hb', t0: now });
+        link.send(this.beatMsg('hb', now));
         link.route?.().then((r) => r && (link.routeType = r));
       }
     }
     if (this.firstLink && !this.firstLink.closed && now - this.firstLink.lastSeen > SILENCE_MS) this.firstLink.close();
+    if (this.status === 'playing' && this.state) this.checkClock(); // un votant parti : le consensus a pu changer
   }
 
   onLinkClosed(link) {
@@ -462,9 +684,18 @@ export class Session {
   async onMessage(link, msg) {
     switch (msg.type) {
       case 'hb':
-        return link.send({ type: 'hb-ack', t0: msg.t0 });
+        // w0 : son heure à l'envoi ; w : la mienne à la réponse (D-165).
+        return link.send(Number.isFinite(msg.w) ? this.beatMsg('hb-ack', msg.t0, { w0: msg.w }) : { type: 'hb-ack', t0: msg.t0 });
       case 'hb-ack':
         if (Number.isFinite(msg.t0)) link.rtt = Math.round(performance.now() - msg.t0);
+        return this.onClock(link, msg);
+      case 'clock-changed':
+        // Un joueur me dit que mon heure a changé (D-166) : son vote, et ce qu'il sait de moi.
+        if (!link.pid || !Number.isFinite(msg.drift) || !this.state) return;
+        this.clockVotes[link.pid] = { drift: msg.drift, rec: isObj(msg.rec) ? msg.rec : null };
+        return this.checkClock();
+      case 'clock-ok':
+        if (link.pid) delete this.clockVotes[link.pid];
         return;
 
       // --- côté hôte (celui qui a invité) ---
@@ -560,6 +791,7 @@ export class Session {
     }
     this.me = msg.you;
     this.state = st;
+    this.loadClock(); // nouveau venu : pas d'heure commune, il la prend de son hôte au premier battement (D-165)
     const id = loadIdentity();
     const secret = id?.gid === st.gid && id?.pid === msg.you ? id.secret : this.newSecret;
     saveIdentity({ gid: st.gid, pid: msg.you, secret });
@@ -586,12 +818,23 @@ export class Session {
       incoming.players[pid] = normalize(JSON.parse(JSON.stringify(rec)));
     }
     const merged = mergeStates(before, incoming);
+    // Resynchronisation d'horloge (D-166) : le plus grand clockFix l'emporte, avant l'heure de la fiche.
+    const took = [];
+    for (const [pid, rec] of Object.entries(incoming.players)) {
+      const old = before.players[pid];
+      const fix = (rec.clockFix || 0) - (old?.clockFix || 0);
+      if (old && fix > 0) merged.players[pid] = { ...JSON.parse(JSON.stringify(rec)), online: old.online };
+      else if (old && fix < 0) merged.players[pid] = JSON.parse(JSON.stringify(old));
+      if (!old || fix > 0 || (fix === 0 && (rec.actAt || 0) > (old.actAt || 0))) took.push(pid);
+    }
+    for (const pid of took) this.beforeRec(pid);
     delete merged.epoch;
     delete merged.nextRank;
     this.state = merged;
     this.refreshOnline();
-    for (const [pid, p] of Object.entries(merged.players)) {
-      if ((p.actAt || 0) > (before.players[pid]?.actAt || 0)) this.spread(p, null, from);
+    for (const pid of took) {
+      this.afterRec(pid);
+      this.spread(merged.players[pid], null, from);
     }
     this.changed();
   }
@@ -632,9 +875,14 @@ export class Session {
   onRecord(link, rec, log) {
     if (!rec || typeof rec.id !== 'string' || !this.state || !this.recordOk(rec.id, rec)) return;
     const ours = this.state.players[rec.id];
-    if (ours && (rec.actAt || 0) <= (ours.actAt || 0)) return; // déjà vue
+    // Déjà vue (plus vieille). Une fiche resynchronisée (D-166, clockFix plus grand) passe quand même ;
+    // une fiche d'avant sa resynchronisation, jamais.
+    const fix = (rec.clockFix || 0) - (ours?.clockFix || 0);
+    if (ours && (fix < 0 || (fix === 0 && (rec.actAt || 0) <= (ours.actAt || 0)))) return;
     if (!ours && Object.keys(this.state.players).length >= MAX_PLAYERS * 2) return;
+    this.beforeRec(rec.id);
     this.state.players[rec.id] = normalize({ ...JSON.parse(JSON.stringify(rec)), online: this.online(rec.id) });
+    this.afterRec(rec.id);
     // Une ou plusieurs entrées de journal accompagnent la fiche.
     for (const l of [].concat(log || []).slice(0, 10)) {
       if (l && typeof l.text === 'string' && Number.isFinite(l.at)) this.pushLog(l);
@@ -1634,10 +1882,18 @@ export class Session {
     if (!f) return [];
     const w = this.planets.find((x) => sameCell(x, cell));
     const here = this.planetsAt(cell)[0];
+    // Brouillard (D-124, D-190) : hors de ma portée, le menu ne sait que ce que je sais.
+    const known = this.knownOwner(cell);
     const me0 = this.state.players[this.me];
     const out = [];
     if (here?.owner.id === this.me) out.push({ kind: 'dock', label: `Se poser sur ${here.name}` });
-    else if (here) {
+    else if (!known.live && known.owner) {
+      // Vue autrefois : son propriétaire retenu, pas son état (ni défense, ni estimation).
+      const name = w?.name || 'la planète';
+      const tail = ' · hors de portée : défense inconnue';
+      out.push({ kind: 'attack', label: `Attaquer ${name} (${known.owner.name})${tail}` });
+      out.push({ kind: 'conquer', label: `Conquérir ${name}${tail}` });
+    } else if (here && known.live) {
       // Les deux ordres livrent le même combat : défense de la planète et vaisseaux posés.
       const a = this.assaultView(id, here.owner, here.key);
       const ships = a.ships === null ? '? vaisseaux' : `${shipsText(countShips(a.ships))} posé${countShips(a.ships) > 1 ? 's' : ''}`;
@@ -1649,7 +1905,7 @@ export class Session {
     else if (w && f.ships.colony && !me0.home) {
       if (!w.kind || w.kind === 'planet') out.push({ kind: 'colonize', label: `Fonder ta planète mère sur ${w.name}` });
     } else if (w && f.ships.colony) out.push({ kind: 'colonize', label: `Coloniser ${w.name}` });
-    out.push({ kind: 'move', label: w || here ? 'Juste y aller (orbite)' : 'Y aller' });
+    out.push({ kind: 'move', label: w || (here && known.live) ? 'Juste y aller (orbite)' : 'Y aller' });
     const me = this.state.players[this.me];
     const now = this.now();
     const short = fuelNeed(f, me.race, cell, now) > fuelAt(f, me.race, now) + 1e-9;
@@ -1693,16 +1949,21 @@ export class Session {
     if (cell.x < 0 || cell.y < 0 || cell.x >= UNIVERSE.w || cell.y >= UNIVERSE.h) return false;
     const here = this.planetsAt(cell)[0];
     const w = this.planets.find((x) => sameCell(x, cell));
+    // Brouillard (D-190) : un refus ne doit pas dire ce que je ne vois pas. Hors de portée,
+    // l'ordre part et l'arrivée tranche (« déjà prise », ou personne à attaquer). La décision
+    // ne lit que la partie (`seesCell`), pas mes souvenirs (`intel`) : le replay la refait pareil.
+    const live = this.over || this.seesCell(cell, this.now());
     let order = null;
     if (kind === 'dock') {
       if (here?.owner.id !== this.me) return this.refuse('Ce n’est pas une de tes planètes.');
       order = { kind, key: here.key };
     } else if (kind === 'attack' || kind === 'conquer') {
-      if (!here || here.owner.id === this.me) return this.refuse('Aucune planète adverse ici.');
+      if (here ? here.owner.id === this.me : !w || live) return this.refuse('Aucune planète adverse ici.');
       if (!armed(p.race, f.ships, techOf(p))) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas attaquer.');
-      order = { kind, pid: here.owner.id, key: here.key };
+      // Libre en vrai, mais hors de ma vue : personne à viser, la flotte restera en orbite.
+      order = here ? { kind, pid: here.owner.id, key: here.key } : { kind, pid: null, key: null };
     } else if (kind === 'colonize') {
-      if (!w || here) return this.refuse('Cette planète n’est pas libre.');
+      if (!w || (here && live)) return this.refuse('Cette planète n’est pas libre.');
       if (!f.ships.colony) return this.refuse(`Il faut un vaisseau colonisateur (${SHIPS[p.race].colony.name}) pour coloniser.`);
       if (!p.home && w.kind && w.kind !== 'planet') return this.refuse(`${w.name} est trop petit pour une planète mère : vise une planète.`);
       order = { kind, world: w.id };
@@ -1711,7 +1972,7 @@ export class Session {
     if (err) return this.refuse(err);
     if (f.stranded) this.ontoast?.('Pas assez de carburant : la flotte tombera en panne en route.');
     // Au journal, seulement les ordres qui comptent : les simples déplacements le noieraient.
-    const who = here && here.owner.id !== this.me ? ` (${here.owner.name})` : '';
+    const who = here && live && here.owner.id !== this.me ? ` (${here.owner.name})` : ''; // hors de vue, pas de nom (D-190)
     this.touch(order ? this.addLog(`La flotte ${de(p.name)} ${ORDERS[order.kind].verb} ${here ? here.name : w.name}${who}.`) : null);
     this.changed();
     return true;
@@ -2886,6 +3147,7 @@ export class Session {
   }
 
   save() {
+    if (this.state && this.me && this.status === 'playing') this.storeClock();
     if (this.state && this.me && this.status === 'playing') saveGame(this.me, this.state, this.journal, this.intel, this.botIds?.length ? this.botIds : null);
   }
 

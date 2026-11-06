@@ -249,21 +249,19 @@ scenario('la même planète sans vaisseaux posés : victoire probable', (film) =
   assert.match(o.label, /\+ 0 vaisseau posé · victoire probable/);
 });
 
-scenario('hors de ma détection : vaisseaux posés inconnus, victoire au mieux incertaine', (film) => {
-  const { A, cell, id } = facing({ fighter: 30 }, { fighter: 7 });
+scenario('hors de ma détection : ni défense, ni vaisseaux posés, ni estimation (D-190)', (film) => {
+  const { A, B, cell, id } = facing({ fighter: 30 }, { fighter: 7 });
+  A.ordersAt(id, cell); // A la voit encore : il retient à qui elle est (D-124)
   film.look(A, '30 frégates de A face à 7 vaisseaux posés, avant de perdre la vue');
   A.eyes = () => [];
   const o = A.ordersAt(id, cell).find((x) => x.kind === 'conquer');
-  film.look(A, 'plus de vue : les vaisseaux posés deviennent « ? »', [
-    { show: 'vaisseaux posés', at: cell, expected: '+ ? vaisseaux', got: o.label.match(/\+ [^·]+/)?.[0].trim(), ok: /\+ \? vaisseaux/.test(o.label) },
-    { show: 'estimation', at: [A, id], expected: 'unsure', got: o.odds },
+  film.look(A, 'plus de vue : l’ordre reste, sans l’état de la planète', [
+    { show: 'ordre', at: cell, expected: 'Conquérir … · hors de portée : défense inconnue', got: o.label, ok: /hors de portée : défense inconnue$/.test(o.label) },
+    { show: 'estimation', at: [A, id], expected: null, got: o.odds ?? null },
   ]);
-  assert.match(o.label, /\+ \? vaisseaux · victoire incertaine/);
-  assert.equal(o.odds, 'unsure');
-  // Même sans voir les vaisseaux, la défense seule suffit à dire « perdu ».
-  const weak = facing({ fighter: 1 }, {}, { turret: 3 });
-  weak.A.eyes = () => [];
-  assert.equal(weak.A.ordersAt(weak.id, weak.cell).find((x) => x.kind === 'attack').odds, 'lose');
+  assert.doesNotMatch(o.label, /⚔|◇|vaisseau|victoire|bataille/);
+  assert.equal(o.odds, undefined);
+  assert.match(A.ordersAt(id, cell).find((x) => x.kind === 'attack').label, new RegExp(`\\(${me(B).name}\\)`), 'le propriétaire retenu reste nommé');
 });
 
 scenario('une partie d’avant la course n’a ni froid ni fin', (film) => {
