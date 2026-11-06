@@ -415,6 +415,12 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 |---|---|---|---|---|---|
 | 08:58 | `fb0c1844` | [Auto-fix] conflit avec `main` | Huitième fusion de `main` (D-157 à D-159, cache v81 déjà pris) : ma décision devient D-160, cache v82 (D-161) ; 212/212 | (cette PR) | D-160, D-161 |
 
+## 6 novembre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 17:40 | `65b37922` | Issue #33, transmise par la session de coordination : « le froid détruit les flottes qu'il atteint » (un joueur qui ne fonde jamais sa planète ne doit plus gagner) | Le froid détruit les flottes, à quai et en vol (`fleetFrostAt`, `freezeFleets`) ; sans planète, le dernier colonisateur gelé élimine à l'heure du gel ; `deadAt` le voit pour un joueur hors ligne, et pour un joueur prêt sans flotte (sa case de départ) ; flotte gelée invisible pour les autres. `tests/frost-fleet.test.mjs` (4 scénarios) ; 216/216 ; vu dans le vrai jeu ; cache v83 | (cette PR) | D-163 |
+
 ### Travaux en cours au 2026-10-29
 
 - **Rythme des parties** (`26f178b9`) : commité sur `claude/swarm-it-game-pacing-1d4502`

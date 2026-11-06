@@ -1052,12 +1052,44 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
 - `losePlanet` note les points de la vague (`this.wave` : joueur, heure, `scoreOf` avant la
   première perte de cette heure). À l'élimination, ils vont dans `p.deathPts` (D-102).
 
+### 19.3 bis Le froid détruit les flottes (`fleetFrostAt`, `freezeFleets`, `colonizerFrostAt`, D-163)
+
+- Une flotte que le froid atteint est **détruite**, à quai comme en vol, quel que soit son
+  propriétaire.
+- `fleetFrostAt(f)` : l'heure où le froid atteint la flotte, calculée sur son segment (`from`,
+  `to`, `depart`, `arrive`), donc la même sur tous les téléphones. En vol, on regarde sa
+  position toutes les secondes (`FROST_STEP`, depuis `depart` ou le départ du froid) : la
+  première seconde où sa case est gelée. Arrêtée : `frostOf(case)` (pas avant `arrive`).
+  Résultat gardé en mémoire par flotte (`fleetFrostMemo`), tant que son segment ne change pas.
+- `freezeFleets(p, now, all)`, dans `tick` du propriétaire : une première fois juste après
+  `freeze` (une flotte qui atteint sa destination avant le froid y arrive d'abord : se pose,
+  fonde…), une seconde fois après les arrivées (celles restées en orbite). Journal « Le froid
+  détruit une flotte de X en [x:y] (n vaisseaux). », toast et carnet du propriétaire.
+- Sans planète, perdre son dernier colonisateur au froid **élimine** : `p.out` = l'heure du gel
+  (pas l'heure du passage), `p.deathPts` = les points d'avant le gel.
+- Les autres téléphones n'attendent pas la fiche du propriétaire : `sees` renvoie faux pour une
+  flotte gelée (plus dessinée, plus visée, plus combattue), et `deadAt` voit la mort (§19.4).
+- Conséquences : plus aucune flotte ne survit à `start + delayMs + durationMs` (36 min) ; un
+  retardataire dont la case de départ est déjà gelée perd sa flotte de départ en entrant, et il
+  est éliminé aussitôt. Les branches « est gelée : la flotte reste en orbite » (`arrive`,
+  `found`) restent, mais la flotte est détruite au passage suivant.
+- Limites connues : `scoreOf` d'un adversaire hors ligne compte encore sa flotte gelée tant que
+  sa fiche ne l'a pas retirée (choisi pour rester d'accord avec `deathPts`). Au rattrapage d'un
+  téléphone resté longtemps hors ligne, une flotte retirée avant les combats (`freezeFleets`
+  avant `engage`) ne livre pas une rencontre qu'elle aurait eue entre le passage précédent et son
+  gel : non confirmé, pas testé.
+
 ### 19.4 Qui est en vie, qui gagne (`livePlanets`, `deadAt`, `ranking`, `checkOver`)
 
 - `livePlanets(p)` : planètes ni gelées, ni prises (d'après `ownerAt`).
 - `deadAt(p)` : `p.out` s'il existe ; sinon, si plus aucune planète n'est en vie, l'heure du
   dernier gel (ou maintenant pour une prise). Calculable par **tous**, même si le joueur est
   hors ligne.
+- Joueur de la course **sans planète** (D-163, `colonizerFrostAt`) : mort à l'heure où le
+  froid a pris son dernier colonisateur ; en vie tant qu'il en a un hors du froid. Prêt mais
+  pas encore entré (pas de `since` : son téléphone n'a pas fait apparaître sa flotte) : on
+  compte la flotte de départ qu'il aura, sur sa case de départ (`startCell`), à partir de
+  `max(départ, ready)`. Il ne bloque donc plus la fin de partie (issue #33).
 - `scoreOf(p)` : ce que le joueur possède **maintenant** ; tout perdu : 0 (hors flottes en vol).
 - `ranking` : `{ id, pts, dead, best }`. `best` départage les joueurs tombés à la même heure :
   `deathPts` (points juste avant la chute), ou `scoreOf` si la fiche n'a pas encore vu la chute

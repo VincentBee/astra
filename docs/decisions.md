@@ -1194,7 +1194,8 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   ajouter le carburant restant au stock (avantage aux départs proches d'une planète) ; donner
   aussi des cargos ou des chasseurs au départ (la demande dit « uniquement »).
 - Qui : Vincent (la demande), Claude (la forme). Source : session `012yisg3`.
-- Statut : en vigueur. 11 tests (`tests/start.test.mjs`), contrôlés par mutation. Vérifié dans
+- Statut : en vigueur, modifiée par D-163 (le froid détruit les flottes : un joueur sans planète
+  meurt quand il perd son dernier colonisateur au froid). 11 tests (`tests/start.test.mjs`), contrôlés par mutation. Vérifié dans
   Chromium (390 × 844), seul et à deux avec une vraie invitation WebRTC. Équilibre des cases de
   départ (une planète peut être plus proche de l'un que de l'autre) : **non confirmé**.
 
@@ -1970,3 +1971,42 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - 2026-11-03. Contexte : fusion de `main` (D-157 à D-159 et cache v81 déjà pris) dans la PR des ordres d'assaut (D-160).
 - Choix : `VERSION` passe à `astra-p2p-v82` pour que les téléphones prennent le nouveau `session.js`.
 - Qui : Claude, par défaut. Source : session `fb0c1844`. Statut : en vigueur.
+
+**D-163 — Le froid détruit les flottes qu'il atteint (issue #33)**
+- 2026-11-06 17:40. Contexte : issue #33. Un joueur « prêt » qui ne fondait jamais sa planète mère
+  restait en vie pour toujours (`deadAt` renvoyait null sans planète, le froid ne touchait que les
+  planètes) : il bloquait la fin par conquête et gagnait vers 34 min, quand le froid avait pris
+  les planètes des autres. Aussi le cas d'un joueur prêt qui ferme l'appli avant que sa flotte
+  n'apparaisse (pas de `since`, pas de flotte).
+- Choix de Vincent (transmis par la session de coordination) : **le froid détruit les flottes
+  qu'il atteint**, en orbite ou en vol, celles de tous les joueurs. Un joueur qui cache sa seule
+  flotte près du soleil, le dernier endroit à geler, n'est pas un problème : les flottes
+  rapportent des points et l'adversaire peut la détruire. **Pas de règle en plus** (pas de délai
+  pour fonder, pas d'interdiction de gagner).
+- Choix de Claude, par défaut :
+  - Heure de destruction = première heure où la case de la flotte est gelée, calculée sur son
+    segment (`fleetFrostAt`), la même sur tous les téléphones. En vol, position regardée toutes
+    les secondes (`FROST_STEP`) ; arrêtée, `frostOf(case)` exactement.
+  - Une flotte qui arrive à destination avant le froid y arrive d'abord (se pose, fonde) ; celle
+    qui reste en orbite est détruite ensuite.
+  - Sans planète, perdre son dernier colonisateur au froid élimine **à l'heure du gel** (pas à
+    l'heure où le téléphone s'en aperçoit), avec les points d'avant le gel (`deathPts`).
+  - Les autres téléphones voient la flotte disparaître à l'heure du gel, sans attendre la fiche
+    du propriétaire (`sees` faux) ; `deadAt` voit la mort d'un joueur sans planète hors ligne.
+  - Joueur prêt dont la flotte n'est jamais apparue : on compte la flotte de départ qu'il aura
+    (sa case de départ `startCell`, calculable par tous) ; il meurt quand le froid atteint cette
+    case. Même règle que les autres, pas de constante en plus. Question posée à la session de
+    coordination (option recommandée) ; non confirmé par Vincent au moment du commit.
+  - Conséquence acceptée : un retardataire dont la case de départ est déjà gelée perd sa flotte
+    en entrant et il est éliminé aussitôt.
+- Alternatives écartées : éliminer après un délai fixe sans planète (proposé d'abord, écarté par
+  Vincent au profit d'une règle de jeu) ; pour le joueur sans flotte, le tuer quand le froid
+  atteint le soleil (36 min, règle à part, il gagnerait encore contre un joueur gelé à 34 min) ;
+  chercher l'instant exact du gel en vol (racine) : une grille d'une seconde suffit et reste
+  identique partout.
+- Vérifié : `tests/frost-fleet.test.mjs` (4 scénarios : à quai, en vol, issue #33 avec rejeu
+  fidèle, joueur prêt sans flotte) ; « D-120 : tant qu'un joueur vole vers sa planète, la partie
+  ne finit pas » reste vert (pas de froid dans ce test) ; 216/216 ; vu dans le vrai jeu (rapport
+  de scénario, interface de test).
+- Qui : Vincent (règle), Claude (calcul, cas du joueur sans flotte). Source : session `65b37922`.
+  Statut : en vigueur. Modifie D-120. Cache `astra-p2p-v83`.
