@@ -2217,3 +2217,34 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
 - Tests : `tests/clock.test.mjs` (consensus à 3, duel à 2 dans les deux sens, hors ligne, IA,
   bruit < 10 s, téléphone d'avant).
 
+**D-180 — À l'élimination, toutes les flottes du joueur disparaissent**
+- 2026-11-06 22:16. Contexte : issue #34. Les flottes en vol d'un joueur éliminé exécutaient encore
+  leur ordre : une « conquête » prenait la planète d'un autre (et pouvait l'éliminer), le mort
+  possédait une colonie ; une « attaque » pillait.
+- Choix (Vincent, transmis par la session de coordination) : « au moment ou un joueur est
+  eliminé, toute ses flottes disparaissent ». À quai ou en vol, à l'heure de l'élimination
+  (`p.out`), pas à l'heure où un téléphone s'en aperçoit ; plus de combat, de pillage ni de prise
+  après, même en interception ; les autres téléphones ne voient plus ces flottes, même si le mort
+  est hors ligne.
+- Mise en œuvre (Claude) : `eliminate(p, at, pts)` dans `js/session.js`, seul endroit qui pose
+  `p.out`, appelé par `losePlanet`, `noColonizer`, `freezeFleets` et `fleetHit` (ces deux-là venus
+  de D-163). Filet dans `tick` pour une fiche `out` qui a encore des flottes. Autres téléphones :
+  `sees` (par `deadAt`), `ownerAt` (un joueur `out` ne possède rien ; prise après la mort de
+  l'attaquant ignorée, `goneBy`), `applyEffects` (rapport daté de la mort de l'auteur ou après
+  ignoré). `deadAt` date la prise d'un joueur hors ligne à l'heure du rapport de l'attaquant, plus
+  à « maintenant ».
+- Alternatives écartées : flottes gardées mais sans ordre, inertes (la piste de l'issue) : elles
+  resteraient sur la carte et dans les combats d'interception ; test de `p.out` dans `arrive` et
+  `capture` (deuxième endroit, et ne couvre pas les autres téléphones).
+- Limite : fiches reçues dans le désordre (le mort livre son arrivée avant de recevoir le rapport
+  qui l'élimine) : non corrigé, voir `regles.md` §19.3.
+- Qui : Vincent (règle), Claude (mise en œuvre). Source : session `1d0dae27`, issue #34. Statut :
+  en vigueur.
+- Tests : `tests/end.test.mjs`, trois scénarios « éliminé pendant que sa flotte vole… » et
+  « éliminé et hors ligne… ».
+
+**D-181 — Cache `astra-p2p-v89`**
+- 2026-11-06. Contexte : v86 (PR #160), v87 (PR #161) et v88 (PR #162) sont dans `main`.
+- Choix : `VERSION` passe à `astra-p2p-v89` pour que les téléphones prennent le nouveau
+  `session.js`.
+- Qui : Claude, par défaut. Source : session `1d0dae27`. Statut : en vigueur.

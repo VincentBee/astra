@@ -1223,12 +1223,26 @@ export class Session {
   noColonizer(p, now) {
     if (!Number.isFinite(p.ready) || !Number.isFinite(p.since) || p.home || p.out != null) return false;
     if ((p.fleets || []).some((f) => f.ships?.colony > 0)) return false;
-    p.deathPts = this.scoreOf(p);
-    p.out = now;
     this.addLog(`${p.name} n’a plus de colonisateur pour fonder sa planète : ${p.name} est éliminé.`);
+    this.eliminate(p, now, this.scoreOf(p));
     this.ontoast?.('Plus de colonisateur pour fonder ta planète : tu es éliminé.', 8000);
     this.note(p, { at: now, kind: 'planet', tone: 'bad', text: 'Plus de colonisateur pour fonder ta planète : tu es éliminé.' });
     return true;
+  }
+
+  /**
+   * Le joueur `p` est éliminé à l'heure `at` (D-180), quelle qu'en soit la cause (planète prise,
+   * planète gelée, plus de colonisateur) : `pts` départage le classement (ses points d'avant la
+   * chute). Toutes ses flottes, à quai ou en vol, disparaissent à cette heure : plus de combat,
+   * de pillage ni de prise après sa mort. Les autres téléphones ne les voient plus dès qu'ils
+   * savent qu'il est mort (`sees`, par `deadAt`), même s'il est hors ligne.
+   */
+  eliminate(p, at, pts) {
+    p.out = at;
+    p.deathPts = pts;
+    const n = (p.fleets || []).length;
+    p.fleets = [];
+    if (n) this.addLog(`Les flottes ${de(p.name)} disparaissent avec lui (${n} flotte${n > 1 ? 's' : ''}).`);
   }
 
   /** Heure à laquelle le froid prend la case `cell` (Infinity : partie sans froid). */
@@ -1276,6 +1290,7 @@ export class Session {
     if (!dead.length) return false;
     const pts = this.scoreOf(p); // points d'avant le gel : ce qui départage s'il est éliminé
     for (const { f, at } of dead) {
+      if (!p.fleets.includes(f)) continue; // disparue avec son joueur, éliminé plus tôt dans ce passage (D-180)
       p.fleets = p.fleets.filter((x) => x !== f);
       const pos = fleetPos(f, at);
       const where = `[${Math.round(pos.x)}:${Math.round(pos.y)}]`;
@@ -1285,9 +1300,8 @@ export class Session {
       this.note(p, { at, kind: 'fleet', tone: 'bad', text: `Le froid a détruit ta flotte en ${where} (${shipsText(n)}).` });
       const stuck = !p.home && p.out == null && Number.isFinite(p.since) && !(p.fleets || []).some((g) => g.ships?.colony > 0);
       if (stuck && f.ships?.colony > 0) {
-        p.out = at;
-        p.deathPts = pts;
         this.addLog(`${p.name} n’a plus de colonisateur pour fonder sa planète : ${p.name} est éliminé.`);
+        this.eliminate(p, at, pts);
         this.ontoast?.('Le froid a pris ton dernier colonisateur : tu es éliminé.', 8000);
         this.note(p, { at, kind: 'planet', tone: 'bad', text: 'Le froid a pris ton dernier colonisateur : tu es éliminé.' });
       }
@@ -1322,8 +1336,18 @@ export class Session {
     const all = this.planetsOf(p);
     if (!all.length) return this.colonizerDeadAt(p, now);
     if (this.livePlanets(p, now).length) return null;
-    const frozen = all.map((pl) => this.frostOf(pl.cell)).filter((t) => t <= now);
-    return frozen.length === all.length ? Math.max(...frozen) : now;
+    // Chaque planète perdue à l'heure du gel, ou de la prise lue dans le rapport de l'attaquant
+    // (D-180) : la mort d'un joueur hors ligne tombe à sa vraie heure, pas quand on s'en aperçoit.
+    const players = Object.values(this.state?.players || {});
+    const lostAt = (pl) => {
+      const frost = this.frostOf(pl.cell);
+      if (frost <= now) return frost;
+      const since = pl.key === 'home' ? p.claimAt || p.rank || 0 : pl.planet.claimAt || 0;
+      const caps = players.flatMap((o) => (o.effects || []).filter((e) => e.capture && e.to === p.id && sameCell(e.cell, pl.cell) && e.at >= since && !this.goneBy(o, e.at)).map((e) => e.at));
+      return caps.length ? Math.min(...caps) : now;
+    };
+    const t = Math.max(...all.map(lostAt));
+    return t <= now ? t : null; // demandé pour une heure d'avant la prise : encore en vie
   }
 
   /** Fin de la partie, ou null : { at, winner }, la plus ancienne qu'un joueur a vue. */
@@ -1398,9 +1422,8 @@ export class Session {
       .sort((a, b) => (a.planet.claimAt || 0) - (b.planet.claimAt || 0) || (a.key < b.key ? -1 : 1))[0];
     if (!next) {
       p.home = null;
-      p.out = at;
-      p.deathPts = this.wave.pts;
       this.addLog(`${p.name} perd ${pl.name} (${why}) : plus aucune planète, ${p.name} est éliminé.`);
+      this.eliminate(p, at, this.wave.pts);
       this.ontoast?.(`${pl.name} perdue (${why}) : tu es éliminé.`, 8000);
       this.note(p, { at, kind: 'planet', tone: 'bad', text: `${pl.name} perdue (${why}) : tu es éliminé.` });
       return;
@@ -1490,6 +1513,11 @@ export class Session {
    * moment (ou coupés l'un de l'autre) ; c'est le plus ancien qui compte,
    * partout pareil.
    */
+  /** `o` s'est-il déclaré éliminé à l'heure `at` ou avant ? Ses actes d'après ne comptent pas (D-180). */
+  goneBy(o, at) {
+    return Number.isFinite(o?.out) && at >= o.out;
+  }
+
   ownerAt(cell) {
     let best = null;
     const consider = (p, t) => {
@@ -1499,9 +1527,11 @@ export class Session {
     const w = this.planets.find((x) => sameCell(x, cell));
     const players = Object.values(this.state?.players || {});
     // Prise par un attaquant dont le rapport n'est pas encore lu : elle n'est déjà plus à son ancien propriétaire.
-    const taken = players.flatMap((o) => (o.effects || []).filter((e) => e.capture && sameCell(e.cell, cell)));
+    // Une prise après la mort de l'attaquant ne compte pas (D-180).
+    const taken = players.flatMap((o) => (o.effects || []).filter((e) => e.capture && sameCell(e.cell, cell) && !this.goneBy(o, e.at)));
     const lost = (p, t) => taken.some((e) => e.to === p.id && e.at >= t);
     for (const p of players) {
+      if (Number.isFinite(p.out)) continue; // un joueur éliminé ne possède rien (D-180)
       const t = p.claimAt || p.rank || 0;
       if (sameCell(p.home, cell) && !lost(p, t)) consider(p, t);
       const col = w && p.colonies?.[w.id];
@@ -2000,6 +2030,9 @@ export class Session {
   sees(owner, f, now, eyes = this.eyes(now)) {
     if (owner?.id === this.me) return true;
     if (this.fleetDeadAt(owner, f, now) <= now) return false; // détruite par le froid ou au combat (D-163), même si sa fiche ne le dit pas encore
+    // Joueur éliminé : ses flottes ont disparu avec lui (D-180), même si sa fiche, hors ligne, en montre encore.
+    const dead = this.deadAt(owner, now);
+    if (dead != null && dead <= now) return false;
     return this.seesCell(fleetPos(f, now), now, eyes);
   }
 
@@ -2702,6 +2735,11 @@ export class Session {
     if (colonyTech) for (const pl of mine) shareTech(pl);
     // Les combats des autres d'abord : mes flottes agissent ensuite avec leurs vraies pertes.
     if (this.applyEffects(p, now)) changed = true;
+    // Filet (D-180) : éliminé par un chemin qui n'est pas passé par eliminate() (vieille fiche…), ses flottes disparaissent aussi.
+    if (Number.isFinite(p.out) && p.fleets?.length) {
+      p.fleets = [];
+      changed = true;
+    }
     for (const f of [...(p.fleets || [])]) {
       if (f.order?.kind === 'chase') {
         if (this.pursue(p, f, now, from)) changed = true;
@@ -2957,6 +2995,7 @@ export class Session {
         if (p.applied.includes(e.id)) continue;
         p.applied = [...p.applied, e.id];
         any = true;
+        if (this.goneBy(other, e.at)) continue; // livré après sa mort : ses flottes n'existaient plus (D-180)
         if (e.fleet && this.fleetHit(p, other, e, now)) continue;
         // Une prise vise une case : ma planète mère a pu changer depuis (la clé « home » ne suffit pas).
         const pl = e.capture
@@ -3036,9 +3075,8 @@ export class Session {
       // autres téléphones ont calculée sans moi (deadAt, D-163), pas à l'heure où je lis le rapport.
       const stuck = !p.home && p.out == null && Number.isFinite(p.since) && !(p.fleets || []).some((g) => g.ships?.colony > 0);
       if (stuck && f.ships?.colony > 0) {
-        p.out = e.at;
-        p.deathPts = pts;
         this.addLog(`${p.name} n’a plus de colonisateur pour fonder sa planète : ${p.name} est éliminé.`);
+        this.eliminate(p, e.at, pts);
         this.ontoast?.(`${other.name} a détruit ton dernier colonisateur : tu es éliminé.`, 8000);
         this.note(p, { at: e.at, kind: 'planet', tone: 'bad', text: `${other.name} a détruit ton dernier colonisateur : tu es éliminé.` });
       }
