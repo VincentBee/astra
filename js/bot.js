@@ -404,6 +404,7 @@ class LocalLink {
     this.peer = null;
     this.closed = false;
     this.viaRoom = false;
+    this.local = true; // même téléphone, même horloge (D-165)
     this.queue = [];
     this.handler = null;
     this.closer = null;
@@ -473,6 +474,8 @@ function botSession(host, pid, timers, clock) {
     start() {},
   });
   bot.state.log = [...host.state.log];
+  // Même téléphone : l'heure commune de l'hôte (D-165).
+  Object.assign(bot, { clock: () => host.clock(), clockSynced: true });
   // Horloge de test : l'heure reste figée pendant un ordre, comme Session.now.
   if (clock) bot.now = () => bot.entry?.t ?? clock();
   const [h, b] = localPair();
