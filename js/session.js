@@ -2552,7 +2552,8 @@ export class Session {
         f.order = { kind: 'dock', key: pl.key };
         return this.arrive(p, f);
       }
-      if (enemy.id !== order.pid) this.addLog(`${enemy.name} a pris ${pl.name}${was ? ` à ${was.name}` : ''} entre-temps : la flotte ${de(p.name)} l'attaque.`);
+      // Un ordre sans cible (pid null : planète vue libre, D-190) n'a pas d'ancien propriétaire à citer.
+      if (order.pid && enemy.id !== order.pid) this.addLog(`${enemy.name} a pris ${pl.name}${was ? ` à ${was.name}` : ''} entre-temps : la flotte ${de(p.name)} l'attaque.`);
       // Je calcule le combat avec ce que je sais du défenseur à l'heure de l'arrivée ;
       // son téléphone appliquera ses pertes en lisant mon rapport.
       const def = this.defenseAt(p, enemy, pl, f.arrive);
