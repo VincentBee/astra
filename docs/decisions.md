@@ -1267,7 +1267,7 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Non traité : la fenêtre Joueurs montre toujours le nombre de planètes et de vaisseaux à quai
   de chacun.
 - Qui : Vincent (la règle), Claude (la forme). Source : cette session.
-- Statut : en vigueur. 3 tests (`tests/fog.test.mjs`). Rendu dans le navigateur : non confirmé.
+- Statut : en vigueur, précisée par D-190 (le menu d'ordres d'une flotte suit aussi le brouillard). 3 tests (`tests/fog.test.mjs`). Rendu dans le navigateur : non confirmé.
 
 **D-125 — Cache `astra-p2p-v68`**
 - 2026-10-31. Choix de Claude : `js/app.js`, `js/session.js`, `js/save.js` changent (D-124).
@@ -1964,7 +1964,7 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   l'heure présente, pas à l'arrivée : la planète peut bâtir ou recevoir des renforts d'ici là.
 - Alternatives écartées : additionner vaisseaux et bâtiments en un seul ⚔ ◇ (on ne voit plus ce
   qui vient d'où) ; simuler à l'heure d'arrivée (on ne connaît pas ce que l'autre fera d'ici là).
-- Qui : Vincent (demande), Claude (forme et seuils). Source : session `fb0c1844`. Statut : en vigueur.
+- Qui : Vincent (demande), Claude (forme et seuils). Source : session `fb0c1844`. Statut : en vigueur, modifiée par D-190 (hors de ma détection, plus de défense ni d'estimation).
 - Tests : `tests/end.test.mjs`, trois tests « Attaquer » et « Conquérir »… / sans vaisseaux posés / hors de ma détection.
 
 **D-161 — Cache `astra-p2p-v82`**
@@ -2111,6 +2111,48 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
   `game.js` et `session.js`.
 - Qui : Claude, par défaut. Source : session `424ded66`. Statut : en vigueur.
 
+**D-190 — Le menu d'ordres d'une flotte suit le brouillard**
+- 2026-11-06 22:15. Contexte : issue #35. Flotte choisie, toucher une planète des autres hors de
+  ma portée affichait « Attaquer Orion (IA Véga) · défense ⚔ 12 ◇ 120 + ? vaisseaux · victoire
+  incertaine », alors que la fiche de la planète la disait libre (D-124). Il suffisait de choisir
+  une flotte et de toucher chaque planète pour trouver les bases ennemies et leur force. Un
+  colonisateur se voyait proposer « Attaquer » au lieu de « Coloniser ».
+- Choix : `ordersAt` part de `knownOwner(cell)`, comme la fiche. Dans ma portée : rien ne change
+  (vrai propriétaire, défense, vaisseaux posés, estimation, D-160). Hors de portée, propriétaire
+  retenu : « Attaquer X (joueur) · hors de portée : défense inconnue » et « Conquérir X · hors de
+  portée : défense inconnue », sans estimation (`odds` absent). Hors de portée, jamais vue (ou vue
+  libre) : les ordres d'une planète libre (« Coloniser » avec un colonisateur, « Juste y aller »).
+- Choix de Claude, par défaut : `moveFleet` ne refuse plus ce que je ne vois pas. « Coloniser »
+  vers une planète prise hors de ma portée part ; l'arrivée dit « déjà prise : la flotte reste en
+  orbite » (`arrive`, inchangé). « Attaquer » / « Conquérir » vers une planète retenue mais
+  quittée depuis part aussi ; à l'arrivée, la flotte reste en orbite. Si la planète est encore
+  prise, l'ordre vise son vrai propriétaire, et le combat se joue comme avant. `moveFleet` ne devient jamais plus strict : l'IA
+  (sans brouillard, D-124) l'appelle avec ses propres cibles. `moveFleet` décide avec la partie
+  seule (`seesCell`), jamais avec mes souvenirs (`intel`, propres au téléphone) : le replay
+  (`js/replay.js`) refait la même décision. Planète libre en vrai mais hors de vue : l'ordre part
+  sans cible (`pid: null`, `key: null`), la flotte reste en orbite : `arrive` ne trouve pas de
+  joueur et s'arrête là, sans planter (testé). Le journal (partagé, rejoué) ne lit pas `intel`
+  non plus : il nomme le propriétaire seulement à portée (« part conquérir Hadar (J1) »), hors de
+  vue juste la planète (« attaque Hadar »). Avec la PR de #36 (`arrive` attaque le propriétaire
+  actuel de la planète), une flotte partie vers une planète qui paraît libre combattra son vrai
+  propriétaire à l'arrivée : c'est voulu (le brouillard ne change que l'affichage et le choix de
+  l'ordre, pas ce qui se passe à l'arrivée). Non confirmé tant que #36 n'est pas fusionnée.
+- Alternatives écartées : garder le menu et cacher seulement les chiffres (le nom du joueur
+  suffisait à trouver ses bases) ; refuser « Coloniser » au départ quand la planète est prise (le
+  refus disait ce que je ne vois pas).
+- Qui : Vincent (la règle D-124, l'issue), Claude (la forme du libellé, `moveFleet`). Source :
+  session `5c1afab8`. Statut : en vigueur. Précise D-124, modifie D-160 (cas « hors de ma
+  détection »).
+- Tests : `tests/vision.test.mjs`, quatre scénarios « … le menu la croit libre », « colonisateur… »,
+  « à portée : … hors de portée ensuite … », « ordre « Conquérir » vers une planète retenue, quittée… » ; `tests/end.test.mjs` « hors de ma détection : ni
+  défense, ni vaisseaux posés, ni estimation (D-190) ». Vu dans le navigateur.
+
+**D-191 — Cache `astra-p2p-v87`**
+- 2026-11-06. Contexte : v83 à v86 sont pris dans `main` (D-163, D-170, D-176).
+- Choix : `VERSION` passe à `astra-p2p-v87` pour que les téléphones prennent le nouveau
+  `session.js` (D-190). Si une autre PR prend v87 avant, monter au numéro suivant.
+- Qui : Claude, par défaut. Source : session `5c1afab8`. Statut : en vigueur.
+
 **D-164 — Horloges décalées : bloquer « Prêt » et refuser les dates « déjà arrivées » du futur (remplacée par D-165 et D-166)**
 - 2026-11-06. Contexte : issue #45. Un téléphone en avance voit le froid trop tôt, écrit `p.over`
   daté dans le futur, et les autres l'adoptent : la partie finit trop tôt pour tous.
@@ -2167,7 +2209,7 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
   Pendant les ~5 s avant le consensus (3 battements), la fiche fautive est adoptée par tous (toute
   heure est acceptée) : si elle portait une fin de partie (`over`), l'écran « Fin de partie »
   s'ouvrirait, et il ne se referme pas tout seul quand la fin disparaît (`showFinish`,
-  `js/app.js`). Cache : `astra-p2p-v87` (et non v84 : `main` est passé à v85 puis v86 avec #159 et #160).
+  `js/app.js`). Cache : `astra-p2p-v88` (et non v84 : `main` est passé à v85, v86 puis v87 avec #159, #160 et #161).
 - Alternatives écartées : refuser la fiche (D-164) ; à deux, personne n'est corrigé (avertissement
   seul).
 - Qui : Vincent (règle, duel, votants, sens de « resynchronisé »), Claude (marge, détails). Source :
