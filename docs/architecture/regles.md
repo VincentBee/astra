@@ -562,6 +562,20 @@ pas (`ORDERS[kind]?.name || 'Ordre'`) et n'exécute jamais les ordres des flotte
   (`assaultView`, D-160) joue `battle` à l'heure présente avec ce que je vois : « bataille
   perdue » si perdu, « victoire incertaine » si gagné sans voir les vaisseaux ou en perdant plus de
   la moitié de la flotte, sinon « victoire probable ».
+- **La cible se relit à l'arrivée** (D-200) : l'ordre garde `{ pid, key }` du propriétaire au
+  moment de l'ordre, mais la planète a pu changer de main pendant le trajet. `arrive` cherche
+  donc le propriétaire **actuel** de la case (`ownerAt(f.to)`, ce que mon téléphone sait au
+  passage qui traite l'arrivée) et sa planète sur cette case, pas la fiche de l'ancien
+  propriétaire (qui la montre encore tant qu'il n'a pas lu le rapport de prise).
+  - Propriétaire actuel = un autre joueur que celui de l'ordre : le même ordre (attaquer ou
+    conquérir) vise ce nouveau propriétaire, avec sa défense et son stock ; le journal dit
+    « C a pris Hadar à B entre-temps : la flotte de A l'attaque. ». Aucun rapport n'est écrit
+    pour l'ancien propriétaire.
+  - Propriétaire actuel = moi (une autre de mes flottes l'a prise juste avant) : pas de combat,
+    la flotte s'y pose (ordre `dock`), ses vaisseaux s'ajoutent à ceux de la colonie. Deux
+    conquêtes de suite font donc une seule prise.
+  - Plus de propriétaire : la flotte reste en orbite (« Plus personne n'habite … »).
+  - Pas d'alliances dans le jeu : aucun autre cas.
 - Hors de ma détection (D-190), `ordersAt` part de `knownOwner(cell)` : propriétaire retenu →
   « Attaquer X (joueur) · hors de portée : défense inconnue » (et « Conquérir »), sans défense
   ni estimation ; jamais vue → les ordres d'une planète libre. `moveFleet` ne refuse pas ce que
@@ -586,7 +600,8 @@ pas (`ORDERS[kind]?.name || 'Ordre'`) et n'exécute jamais les ordres des flotte
 - **Conquête** (`conquer` gagné, sur une case que le froid n'a pas prise) : le rapport porte en
   plus `capture: true` et `cell`. `Session.capture` crée tout de suite une colonie neuve de ma
   race sur la case (`newPlanet`, les bâtiments adverses sont perdus), avec les survivants, la
-  cargaison, le butin et le carburant ; la flotte s'y pose. `ownerAt` ne compte plus l'ancien
+  cargaison, le butin et le carburant ; la flotte s'y pose. La colonie porte `captured: true` :
+  elle n'a consommé aucun colonisateur (D-200). `ownerAt` ne compte plus l'ancien
   propriétaire dès que le rapport existe (même s'il ne l'a pas lu) ; `checkClaim` ne confond pas
   cette perte avec une installation simultanée. Le téléphone du perdant, en lisant le rapport
   (`applyEffects`, par la case et non la clé), appelle `losePlanet` (section 19).
@@ -788,7 +803,8 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
   à l'heure d'arrivée `f.arrive` (`takenBefore`, `js/session.js:794-799`).
 - **Perdant** (choix simultanés, partie coupée en deux) : `checkClaim` rend la planète.
   Pour une colonie, `evacuate` remet vaisseaux (colonisateur compris), cargaison et carburant
-  en orbite (`js/session.js:840-889`). Pour une planète mère fondée par le colonisateur de
+  en orbite ; une colonie prise au combat (`captured`) ne rend que ses vaisseaux, sans
+  colonisateur en plus (D-200) (`js/session.js:840-889`). Pour une planète mère fondée par le colonisateur de
   départ (D-120), `evacuate` le remet de même en orbite : le joueur l'envoie sur une autre.
   Dans une partie d'avant, le joueur doit en choisir une autre (`js/session.js:853-862`).
 - **Fiche antidatée** (`backdated`) : une planète mère datée d'avant la fiche qui ne l'avait pas

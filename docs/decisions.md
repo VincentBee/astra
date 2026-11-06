@@ -692,7 +692,7 @@ Aucune conversation ne les prouve.
   de la planète ; la planète est rebâtie à neuf pour la race du vainqueur.
 - Alternative écartée : conquête automatique à chaque attaque gagnée (on n'aurait plus pu
   seulement piller).
-- Qui : Vincent (règle), Claude (ordre séparé). Statut : en vigueur (`9b37782`).
+- Qui : Vincent (règle), Claude (ordre séparé). Statut : en vigueur (`9b37782`), modifiée par D-200 (à l'arrivée, la cible est le propriétaire actuel de la case).
 
 **D-093 — Bâtiments de défense par race**
 - 2026-10-29 08:45. Demande : « rajoute des batiments de defences comme des bouclier ou des
@@ -2273,3 +2273,44 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
 - Choix : `VERSION` passe à `astra-p2p-v89` pour que les téléphones prennent le nouveau
   `session.js`.
 - Qui : Claude, par défaut. Source : session `1d0dae27`. Statut : en vigueur.
+
+**D-200 — Une flotte qui arrive sur une planète qui a changé de main vise son propriétaire actuel (issue #36)**
+- 2026-11-06. Contexte : issue #36 (constats code-flotte-02 et code-fin-08). Une flotte
+  « Attaquer » ou « Conquérir » gardait `{ pid, key }` de l'ancien propriétaire ; à l'arrivée,
+  `arrive` se battait contre la fiche de cet ancien propriétaire sans regarder `ownerAt`. Si un
+  3e joueur avait pris la planète pendant le trajet, on pillait un stock fantôme (ressources
+  créées de rien), on écrivait un rapport à un joueur qui ne l'appliquerait jamais, et la
+  conquête finissait évacuée par `checkClaim` avec un colonisateur offert par `evacuate`. Deux
+  conquêtes de suite par le même joueur : la 2e refaisait le combat et écrasait la colonie de la
+  1re (vaisseaux effacés, 2 rapports de prise).
+- Choix :
+  - **Vincent** (via la session de coordination, ses mots : « Attaquer le nouveau
+    propriétaire ») : à l'arrivée, si la case n'est plus au joueur visé, la flotte combat le
+    propriétaire actuel, avec sa défense et son stock, et le même ordre.
+  - Propriétaire actuel = moi : pas de combat, la flotte se pose (`dock`) et ajoute ses vaisseaux
+    (consigne de la coordination). Pas d'alliances dans le jeu, donc pas de cas « allié ».
+  - **Choix de Claude** : case sans propriétaire → la flotte reste en orbite, même pour une
+    conquête avec un colonisateur à bord (coloniser demanderait les contrôles de `colonize` :
+    froid, taille, `takenBefore` ; le joueur peut donner l'ordre lui-même).
+  - **Choix de Claude** : le propriétaire actuel est `ownerAt(f.to)` au passage (`tick`) qui
+    traite l'arrivée, pas un `ownerAt` « à l'heure `f.arrive` » : les fiches ne gardent pas
+    l'historique des propriétaires (les rapports lus disparaissent), et les flottes d'un même
+    passage ne sont pas traitées dans l'ordre de leurs arrivées. Le rejeu refait les mêmes
+    passages sur les mêmes fiches, donc le résultat reste rejouable (comme `defenseAt`).
+  - **Choix de Claude** : une colonie prise au combat porte `captured: true` ; `evacuate` ne lui
+    ajoute pas de colonisateur (il n'en a consommé aucun). Les colonies fondées par un
+    colonisateur, et les vieilles fiches sans ce champ, gardent le +1.
+- Alternatives écartées : annuler l'ordre (« la planète a changé de main ») et rester en orbite,
+  proposé par l'issue (Vincent a choisi d'attaquer) ; comparer seulement à `order.pid` et tomber
+  en orbite si la case est à moi (la 2e flotte serait restée en vol au lieu de renforcer la prise).
+- Critère de l'issue non suivi tel quel : « ses vaisseaux et sa soute sont inchangés » à
+  l'arrivée de A ; avec la règle de Vincent, A combat C, donc sa flotte et sa soute changent. Ce
+  qui reste vrai : aucun rapport vers B, et le butin sort du stock de C (C le perd en lisant le
+  rapport), donc rien n'est créé.
+- Preuve : 4 scénarios dans `tests/end.test.mjs` (échouent sur l'ancien code, passent après) ;
+  4 parties IA contre IA (3 et 4 IA) : 0 re-capture, rejeu identique, mais l'ancien code n'en
+  faisait pas non plus dans ces parties : ce n'est pas une preuve du correctif. Le script d'audit
+  `recapture.mjs` n'est pas publié : **non rejoué**.
+- Qui : Vincent (règle), Claude (cas sans propriétaire, heure du propriétaire, marque
+  `captured`). Source : worker `worker-cible`, issue #36.
+- Statut : en vigueur. Modifie D-092 (conquête). Cache `astra-p2p-v90` (v84 avant la fusion de `main`, qui avait déjà v89).
