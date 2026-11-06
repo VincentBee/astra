@@ -164,9 +164,16 @@ temps de réponse humains.
 L'économie n'a pas de formule fermée (la population grandit ou meurt selon les stocks) : on
 l'intègre par pas (`js/game.js:13-15`).
 
-- `steps` (`js/game.js:519-531`) : pas `dt = max(1 s, min(2 min, durée / 300))`. Donc
-  des pas de 1 s sous 5 min, exactement 300 pas entre 5 min et 10 h, et des pas de 2 min
-  réelles au-delà (une journée = 720 pas).
+- `steps` et `until` (`js/game.js`) prennent leur pas dans `stepOf(durée)` :
+  `dt = max(1 s, min(2 h de jeu, durée / 300), durée / MAX_STEPS)`, avec 2 h de jeu = 48 s
+  réelles (TEMPO 2,5) et `MAX_STEPS = 2000` (D-175). Donc des pas de 1 s sous 5 min,
+  exactement 300 pas entre 5 min et 4 h, des pas de 48 s au-delà (une journée = 1 800 pas),
+  et jamais plus de 2 000 pas : au-delà de 2 000 × 48 s ≈ 26,7 h, les pas s'allongent
+  (30 jours : pas de 21,6 min). Une partie (36 min) garde exactement ses pas d'avant ; seule
+  une planète restée plus d'un jour sans calcul est intégrée plus grossièrement (résultat fini
+  et positif, mais pas identique à des passages réguliers). Avant D-175, rien ne bornait le
+  nombre de pas : une fiche reçue avec `at = 0` demandait ≈ 37 millions de pas et figeait la
+  page (#32).
 - `simulate` (`js/game.js:534-541`) coupe le calcul à la fin d'une transe : production
   doublée (`boost = 2`) jusque-là.
 - `advance` (`js/game.js:483-511`) fait un pas : flux (`flows`), plafonds des entrepôts,
@@ -513,8 +520,9 @@ pas (`ORDERS[kind]?.name || 'Ordre'`) et n'exécute jamais les ordres des flotte
   partie (`saveGame(…, intel)`), jamais envoyé aux autres. Hors de portée : le propriétaire vu
   la dernière fois (même s'il l'a perdue depuis), ou rien (elle paraît libre). Vue libre :
   le souvenir s'efface. `scout` passe toutes les planètes des autres à chaque `tick`, carte
-  fermée comprise. Partie finie (`over`) : tout est visible.
-- Tests : `tests/fog.test.mjs` (planètes) et `tests/vision.test.mjs` (flottes, D-128, 6 scénarios D-129) : flotte
+  fermée comprise. Partie finie (`over`) : tout est visible. Le menu d'ordres d'une flotte
+  (`ordersAt`) suit la même règle (D-190, §9.2).
+- Tests : `tests/fog.test.mjs` (planètes) et `tests/vision.test.mjs` (flottes, D-128, 6 scénarios D-129 ; plus 4 sur le menu d'ordres, D-190) : flotte
   ennemie visible jusqu'à la portée d'une de mes planètes ou de mes flottes, cachée une case
   au-delà, distance à vol d'oiseau, les miennes toujours visibles, une flotte en route qui sort
   de ma portée puis y revient. Ils testent `sees`, pas le dessin du `canvas` (`fleetSpots`,
@@ -550,7 +558,7 @@ pas (`ORDERS[kind]?.name || 'Ordre'`) et n'exécute jamais les ordres des flotte
 - Il faut une flotte armée. Deux ordres : `attack` (piller) et `conquer` (prendre la planète,
   D-092) ; `ordersAt` propose les deux sur une planète adverse, avec la défense affichée
   (« Conquérir Hadar · défense ⚔ 8 ◇ 80 + 3 vaisseaux posés · victoire probable »). Les vaisseaux
-  posés ne sont comptés que dans ma détection (`seesCell`), sinon « ? ». L'estimation
+  posés ne sont comptés que dans ma détection (`seesCell`). L'estimation
   (`assaultView`, D-160) joue `battle` à l'heure présente avec ce que je vois : « bataille
   perdue » si perdu, « victoire incertaine » si gagné sans voir les vaisseaux ou en perdant plus de
   la moitié de la flotte, sinon « victoire probable ».
@@ -568,6 +576,10 @@ pas (`ORDERS[kind]?.name || 'Ordre'`) et n'exécute jamais les ordres des flotte
     conquêtes de suite font donc une seule prise.
   - Plus de propriétaire : la flotte reste en orbite (« Plus personne n'habite … »).
   - Pas d'alliances dans le jeu : aucun autre cas.
+- Hors de ma détection (D-190), `ordersAt` part de `knownOwner(cell)` : propriétaire retenu →
+  « Attaquer X (joueur) · hors de portée : défense inconnue » (et « Conquérir »), sans défense
+  ni estimation ; jamais vue → les ordres d'une planète libre. `moveFleet` ne refuse pas ce que
+  je ne vois pas (coloniser une planète prise hors de vue part, l'arrivée dit « déjà prise »).
 - À l'arrivée (`arrive`), le défenseur = **les vaisseaux posés sur la planète** à l'heure
   d'arrivée (`def.ships`) **et la défense de la planète** (`fortOf`, D-093, D-095), qui se bat
   comme un seul gros vaisseau (champ `fort` de `battle`, qui l'ajoute aux vaisseaux du camp et
@@ -861,6 +873,14 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
 - Ne pas compter deux fois : `defenseAt`, `pendingFight`, `engaged`/`ack`, `applied`,
   `RAID_COOLDOWN_MS`.
 - `normalize`, `planetOk`, `cleanAmounts` (formes et bornes des fiches reçues) : reseau.md.
+- Heure d'une planète reçue (D-175, #32) : `planetOk` ramène `at` à un plancher tiré de la fiche
+  elle-même, s'il est connu : l'entrée du joueur dans la course (`since`) pour la planète mère,
+  et pour une colonie le plus tardif de `since` et de son heure de prise (`claimAt`). Ce
+  plancher ne dépend que de la fiche : tous les téléphones trouvent la même heure. Une fiche
+  sans `since` (partie d'avant la course, ou tricheur qui l'a retirée) n'a pas de plancher ;
+  là, seul `MAX_STEPS` (§4.2) protège : le calcul reste borné. Une heure loin dans le futur
+  n'est pas bornée ici (`normalize` ne connaît pas l'heure) : elle ne coûte rien
+  (`steps` s'arrête aussitôt).
 
 ## 15. Constantes d'équilibrage : où les changer
 
@@ -980,7 +1000,7 @@ Résultat : `tests 34, pass 34, fail 0`, environ 5,6 s (le rejeu d'une partie de
 
 | Fichier | Tests | Ce qui est vérifié |
 |---|---|---|
-| `tests/end.test.mjs` | 13 | Score de tout l'empire ; le froid prend d'abord le bord ; planète mère gelée remplacée par la colonie la plus vieille, puis élimination ; à deux, le dernier en vie gagne même si l'autre est hors ligne, la fin se propage et bloque les ordres ; défense par race (`fortOf`) ; conquête qui élimine ; tourelles qui repoussent 3 frégates sans pillage ; colonisateur seul ou ordre « attaquer » ne prennent rien ; partie d'avant la course sans froid ; « Attaquer » et « Conquérir » : vaisseaux posés, « ? » hors détection, estimation du combat |
+| `tests/end.test.mjs` | 17 | Score de tout l'empire ; le froid prend d'abord le bord ; planète mère gelée remplacée par la colonie la plus vieille, puis élimination ; à deux, le dernier en vie gagne même si l'autre est hors ligne, la fin se propage et bloque les ordres ; défense par race (`fortOf`) ; conquête qui élimine ; tourelles qui repoussent 3 frégates sans pillage ; colonisateur seul ou ordre « attaquer » ne prennent rien ; partie d'avant la course sans froid ; « Attaquer » et « Conquérir » : vaisseaux posés, « ? » hors détection, estimation du combat ; éliminé pendant que sa flotte vole « Conquérir » ou « Attaquer », en ligne ou hors ligne : ses flottes disparaissent, rien n'est pris ni pillé (D-180) |
 | `tests/rules.test.mjs` | 11 | Déconstruire (moitié du prix rendue, place libérée à la fin) ; heure qui recule puis revient : pas de double production ; longue absence ≈ passages toutes les heures (population à moins de 2 %) ; arrachement refusé sans payer ; clés héritées (`constructor`, `__proto__`) refusées ; effectifs négatifs ou fractionnaires au combat ; soleil au centre et sans planète ; climat et production ; une place par niveau ; places lues sur la carte ; une colonie humaine sur le plus petit corps garde des places |
 | `tests/combat.test.mjs` | 4 | Attaques contre une planète : pas de butin créé avec un défenseur hors ligne ou plusieurs flottes arrivées ensemble ; 70 attaques avant le retour du défenseur ; les vaisseaux perdus emportent leur cargaison |
 | `tests/effects.test.mjs` | 1 | 5 joueurs, 4 attaquants × 70 combats : chaque perte subie une fois, puis rapports oubliés des deux côtés |
@@ -1013,11 +1033,12 @@ avec leur date et leur source.
 
 À corriger un jour dans le code (rien n'est cassé, ce sont des commentaires) :
 
-1. `js/game.js:14-15` dit « 300 [pas] au plus par calcul, même après une journée
-   d'absence ». Le code (`js/game.js:524`) plafonne le pas à 2 min : une journée réelle donne
-   720 pas.
-2. `js/game.js:516-517` parle de pas qui s'allongent « au-delà de 2000 pas ». Le code ne le
-   fait pas ; le commentaire juste au-dessus du calcul (`js/game.js:523`) dit le contraire.
+1. ~~`js/game.js:14-15` dit « 300 [pas] au plus par calcul, même après une journée
+   d'absence ». Le code plafonne le pas à 2 h de jeu : une journée réelle donne 1 800 pas.~~
+   Corrigé par D-175 (#32) : le code borne maintenant le calcul à `MAX_STEPS` pas, et le
+   commentaire dit la vraie règle.
+2. ~~`js/game.js:516-517` parle de pas qui s'allongent « au-delà de 2000 pas ». Le code ne le
+   fait pas.~~ Corrigé par D-175 (#32) : c'est maintenant la règle (`stepOf`).
 3. `js/game.js:969` dit « de 12 à 22 places » ; `PLANET_PLACES` vaut `[14, 22]`
    (`js/game.js:818`, dont le commentaire explique que 12 était trop peu).
 4. `js/tech.js:224-226` : « un plein mène à 30 [cases] (machines) ». Seule la sonde
@@ -1067,6 +1088,24 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
   refusé).
 - `losePlanet` note les points de la vague (`this.wave` : joueur, heure, `scoreOf` avant la
   première perte de cette heure). À l'élimination, ils vont dans `p.deathPts` (D-102).
+- **Toutes les flottes d'un joueur éliminé disparaissent** à l'heure de l'élimination (D-180,
+  choix de Vincent) : plus de combat, de pillage ni de prise après cette heure, même en
+  interception. Un seul endroit : `eliminate(p, at, pts)` pose `p.out = at`, `p.deathPts = pts`
+  et vide `p.fleets`, quelle que soit la cause (planète prise ou gelée : `losePlanet` ; plus de
+  colonisateur : `noColonizer`, `freezeFleets`, `fleetHit`). Filet dans `tick` : une fiche avec
+  `p.out` et des flottes (vieille fiche) les perd avant les arrivées.
+- Ordre du `tick` : `freeze`, `freezeFleets` et `applyEffects` passent **avant** les arrivées.
+  Un joueur revenu en ligne après l'heure d'arrivée de sa flotte lit d'abord la prise de sa
+  planète : il est éliminé à l'heure de la prise, sa flotte n'arrive jamais.
+- Vu des autres téléphones, même si le mort est hors ligne : `sees` renvoie faux pour ses flottes
+  dès que `deadAt(owner, now)` est passé (plus dessinées, plus visées, plus combattues :
+  `engage`, `pursue`, `threats`, `tradePartners`, carte). `ownerAt` ignore un joueur `out` (il
+  ne possède rien) et une prise faite après la mort de l'attaquant (`goneBy`) ; `applyEffects`
+  ignore un rapport daté de l'heure de la mort de son auteur ou après.
+- Limite connue (non corrigée) : si le téléphone du mort livre l'arrivée de sa flotte **avant**
+  d'avoir reçu le rapport qui l'élimine (fiches reçues dans le désordre), ce combat a déjà été
+  écrit. Les téléphones qui lisent ce rapport après avoir vu `p.out` l'ignorent ; celui qui l'a
+  lu avant garde ses pertes. Non testé.
 
 ### 19.3 bis Le froid détruit les flottes (`fleetFrostAt`, `freezeFleets`, `colonizerDeadAt`, D-163)
 
@@ -1122,8 +1161,9 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
 ### 19.4 Qui est en vie, qui gagne (`livePlanets`, `deadAt`, `ranking`, `checkOver`)
 
 - `livePlanets(p)` : planètes ni gelées, ni prises (d'après `ownerAt`).
-- `deadAt(p)` : `p.out` s'il existe ; sinon, si plus aucune planète n'est en vie, l'heure du
-  dernier gel (ou maintenant pour une prise). Calculable par **tous**, même si le joueur est
+- `deadAt(p)` : `p.out` s'il existe ; sinon, si plus aucune planète n'est en vie, la dernière
+  des heures de perte : gel, ou prise lue dans le rapport de l'attaquant (`effects`, D-180) ;
+  maintenant si on ne sait pas. Calculable par **tous**, même si le joueur est
   hors ligne.
 - Joueur de la course **sans planète** (D-163, `colonizerDeadAt`) : mort à l'heure où il a
   perdu son dernier colonisateur, au froid ou au combat (`fleetDeadAt`) ; en vie tant qu'il en a

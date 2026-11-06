@@ -1267,7 +1267,7 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Non traité : la fenêtre Joueurs montre toujours le nombre de planètes et de vaisseaux à quai
   de chacun.
 - Qui : Vincent (la règle), Claude (la forme). Source : cette session.
-- Statut : en vigueur. 3 tests (`tests/fog.test.mjs`). Rendu dans le navigateur : non confirmé.
+- Statut : en vigueur, précisée par D-190 (le menu d'ordres d'une flotte suit aussi le brouillard). 3 tests (`tests/fog.test.mjs`). Rendu dans le navigateur : non confirmé.
 
 **D-125 — Cache `astra-p2p-v68`**
 - 2026-10-31. Choix de Claude : `js/app.js`, `js/session.js`, `js/save.js` changent (D-124).
@@ -1964,7 +1964,7 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   l'heure présente, pas à l'arrivée : la planète peut bâtir ou recevoir des renforts d'ici là.
 - Alternatives écartées : additionner vaisseaux et bâtiments en un seul ⚔ ◇ (on ne voit plus ce
   qui vient d'où) ; simuler à l'heure d'arrivée (on ne connaît pas ce que l'autre fera d'ici là).
-- Qui : Vincent (demande), Claude (forme et seuils). Source : session `fb0c1844`. Statut : en vigueur.
+- Qui : Vincent (demande), Claude (forme et seuils). Source : session `fb0c1844`. Statut : en vigueur, modifiée par D-190 (hors de ma détection, plus de défense ni d'estimation).
 - Tests : `tests/end.test.mjs`, trois tests « Attaquer » et « Conquérir »… / sans vaisseaux posés / hors de ma détection.
 
 **D-161 — Cache `astra-p2p-v82`**
@@ -2040,6 +2040,215 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   session `65b37922`.
   Statut : en vigueur. Modifie D-120. Cache `astra-p2p-v83`.
 
+## 6 novembre 2026 — sauvegarde abîmée (#87)
+
+Numéro pris haut (D-170) : les PR #158 (D-163) et celle de #45 (D-164 et suivants) prennent déjà
+les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
+
+**D-170 — Un historique de sauvegardes abîmé est ignoré, puis réécrit propre**
+- 2026-11-06 22:00. Contexte : issue #87. Une entrée invalide dans `astra.saves` (`null`, sans
+  `state`, tableau, texte JSON `"abc"`) faisait lever une `TypeError` dans `saveGame`, donc dans
+  chaque ordre : l'état changeait mais l'écran n'était pas prévenu. Avec un texte JSON, l'accueil
+  plantait aussi au démarrage (`listGames`). Cause externe (stockage abîmé, extension, outil) : le
+  joueur ne pouvait s'en sortir qu'en vidant les données du site.
+- Choix de Claude, par défaut : `archive()` (`js/save.js`) part de `{}` si `astra.saves` n'est pas
+  un objet simple (`isMap` : ni `null`, ni tableau, ni texte), et ne garde que les entrées qui passent
+  `valid()`. `saveGame`, `listGames`, `selectGame` et `forgetGame` passent tous par `archive()`, donc
+  ignorent tous les entrées abîmées. Rien n'est effacé à la lecture : l'historique est réécrit sans
+  elles à la prochaine écriture (`saveGame` ou `forgetGame`). Même garde pour `astra.identities`
+  (`identities()`), lu par `selectGame`, `forgetGame` et `saveIdentity`.
+- Alternatives écartées : tout effacer dès qu'une entrée est abîmée (on perdrait les bonnes
+  parties) ; purger à la lecture (une lecture qui écrit surprend, et la prochaine sauvegarde le fait
+  de toute façon, au plus tard au premier ordre).
+- Cache `sw.js` : `astra-p2p-v85` (v83 et v84 sont laissés aux PR #158 et #45).
+- Vérifié : scénario « D-170 : un historique abîmé… » (`tests/decisions-reseau.test.mjs`, les 5
+  formes de l'issue), qui échoue sans la correction ; vrai jeu avec `{"zzz":null}` puis `"abc"`.
+- Qui : Vincent (demande : corriger #87), Claude (forme de la correction). Source : session
+  `9e675a52`. Statut : en vigueur. Complète D-066.
+
+**D-175 — Le calcul de l'économie est borné à 2 000 pas ; l'heure d'une planète reçue a un plancher**
+- 2026-11-06. Contexte : issue #32. `steps` et `until` intégraient l'économie par pas de 48 s
+  sans plafond : une planète datée de très loin faisait des millions de pas. `planetOk` acceptait
+  tout `at` fini : une fiche reçue avec `planet.at = 0` figeait la page de chaque téléphone qui
+  l'affichait (≈ 37 millions de pas par `stateAt`). Numéro : D-163 à D-169 étant pris ou réservés
+  par d'autres PR, cette PR prend D-175.
+- Choix de Claude :
+  1. **Nombre de pas borné** : `stepOf(durée) = max(1 s, min(2 h de jeu, durée / 300),
+     durée / MAX_STEPS)`, `MAX_STEPS = 2000`, dans `steps` et `until`. Le troisième terme ne
+     gagne qu'au-delà de 2 000 × 48 s ≈ 26,7 h : sous cette durée (donc toute partie normale,
+     et tout écart de moins de 4 h), les pas sont exactement ceux d'avant, l'économie ne change
+     pas d'un chiffre. Aucune question au router n'était donc nécessaire. Le calcul reste
+     déterministe : le pas ne dépend que de la durée. Au-delà de 26,7 h, les pas s'allongent :
+     le résultat reste fini et positif (vérifié sur les trois races à `at = 0`) mais
+     s'éloigne de ce que donneraient des passages réguliers.
+  2. **Plancher de l'heure dans `planetOk`** : `at` est **ramené** (pas refusé) au plancher
+     connu par la fiche elle-même : `since` (entrée dans la course, écrite une fois) pour la
+     planète mère ; le plus tardif de `since` et de `claimAt` pour une colonie. Aucune planète
+     n'existe avant ces heures (`newPlanet` naît à l'heure de l'installation ou de l'arrivée,
+     `settle` n'avance que vers l'avant). Ramener plutôt que refuser : `normalize` passe aussi
+     sur ma propre fiche au chargement (`clean`), un refus effacerait ma planète au moindre
+     écart ; ramener ne crée rien (le tricheur perd la production d'avant le plancher).
+- Alternatives écartées : couper la durée simulée (n'intégrer que les N dernières heures) :
+  aussi borné, mais change le résultat dès cette durée ; refuser la planète (`planet = null`) ;
+  plancher pris sur l'heure du téléphone qui reçoit (`now`, `startedAt`) : différent d'un
+  téléphone à l'autre, ou tiré des `go` que le tricheur peut aussi trafiquer ; plancher sur
+  `p.claimAt` de la planète mère (`claimPlanet` garde une planète existante avec `||=`, son `at`
+  peut être plus ancien).
+- Limites : une fiche sans `since` (partie d'avant la course, ou retiré par le tricheur) n'a pas
+  de plancher, seul `MAX_STEPS` la protège ; une heure loin dans le futur n'est pas bornée
+  (`normalize` ne connaît pas l'heure, et elle ne coûte rien).
+- Qui : Claude, par défaut (le ticket laissait le choix). Source : session `424ded66`, issue #32.
+  Statut : en vigueur.
+- Tests : `tests/rules.test.mjs` (planète datée de 1970 ou de 30 jours en moins de 100 ms ; pas
+  inchangés sous 26 h ; une heure calculée d'un coup ou soldée toutes les 250 ms à 0,1 % près),
+  `tests/hostile.test.mjs` (fiche reçue avec `at = 0` ramenée à `since` ; colonie ramenée à
+  sa prise).
+
+**D-176 — Cache `astra-p2p-v86`**
+- 2026-11-06. Contexte : v83 (PR #158, déjà dans `main`) et v85 (PR #159, déjà dans `main`) sont pris, v84 est
+  probablement réservé par la PR de #45 (non confirmé).
+- Choix : `VERSION` passe à `astra-p2p-v86` pour que les téléphones prennent les nouveaux
+  `game.js` et `session.js`.
+- Qui : Claude, par défaut. Source : session `424ded66`. Statut : en vigueur.
+
+**D-190 — Le menu d'ordres d'une flotte suit le brouillard**
+- 2026-11-06 22:15. Contexte : issue #35. Flotte choisie, toucher une planète des autres hors de
+  ma portée affichait « Attaquer Orion (IA Véga) · défense ⚔ 12 ◇ 120 + ? vaisseaux · victoire
+  incertaine », alors que la fiche de la planète la disait libre (D-124). Il suffisait de choisir
+  une flotte et de toucher chaque planète pour trouver les bases ennemies et leur force. Un
+  colonisateur se voyait proposer « Attaquer » au lieu de « Coloniser ».
+- Choix : `ordersAt` part de `knownOwner(cell)`, comme la fiche. Dans ma portée : rien ne change
+  (vrai propriétaire, défense, vaisseaux posés, estimation, D-160). Hors de portée, propriétaire
+  retenu : « Attaquer X (joueur) · hors de portée : défense inconnue » et « Conquérir X · hors de
+  portée : défense inconnue », sans estimation (`odds` absent). Hors de portée, jamais vue (ou vue
+  libre) : les ordres d'une planète libre (« Coloniser » avec un colonisateur, « Juste y aller »).
+- Choix de Claude, par défaut : `moveFleet` ne refuse plus ce que je ne vois pas. « Coloniser »
+  vers une planète prise hors de ma portée part ; l'arrivée dit « déjà prise : la flotte reste en
+  orbite » (`arrive`, inchangé). « Attaquer » / « Conquérir » vers une planète retenue mais
+  quittée depuis part aussi ; à l'arrivée, la flotte reste en orbite. Si la planète est encore
+  prise, l'ordre vise son vrai propriétaire, et le combat se joue comme avant. `moveFleet` ne devient jamais plus strict : l'IA
+  (sans brouillard, D-124) l'appelle avec ses propres cibles. `moveFleet` décide avec la partie
+  seule (`seesCell`), jamais avec mes souvenirs (`intel`, propres au téléphone) : le replay
+  (`js/replay.js`) refait la même décision. Planète libre en vrai mais hors de vue : l'ordre part
+  sans cible (`pid: null`, `key: null`), la flotte reste en orbite : `arrive` ne trouve pas de
+  joueur et s'arrête là, sans planter (testé). Le journal (partagé, rejoué) ne lit pas `intel`
+  non plus : il nomme le propriétaire seulement à portée (« part conquérir Hadar (J1) »), hors de
+  vue juste la planète (« attaque Hadar »). Avec la PR de #36 (`arrive` attaque le propriétaire
+  actuel de la planète), une flotte partie vers une planète qui paraît libre combattra son vrai
+  propriétaire à l'arrivée : c'est voulu (le brouillard ne change que l'affichage et le choix de
+  l'ordre, pas ce qui se passe à l'arrivée). Non confirmé tant que #36 n'est pas fusionnée.
+- Alternatives écartées : garder le menu et cacher seulement les chiffres (le nom du joueur
+  suffisait à trouver ses bases) ; refuser « Coloniser » au départ quand la planète est prise (le
+  refus disait ce que je ne vois pas).
+- Qui : Vincent (la règle D-124, l'issue), Claude (la forme du libellé, `moveFleet`). Source :
+  session `5c1afab8`. Statut : en vigueur. Précise D-124, modifie D-160 (cas « hors de ma
+  détection »).
+- Tests : `tests/vision.test.mjs`, quatre scénarios « … le menu la croit libre », « colonisateur… »,
+  « à portée : … hors de portée ensuite … », « ordre « Conquérir » vers une planète retenue, quittée… » ; `tests/end.test.mjs` « hors de ma détection : ni
+  défense, ni vaisseaux posés, ni estimation (D-190) ». Vu dans le navigateur.
+
+**D-191 — Cache `astra-p2p-v87`**
+- 2026-11-06. Contexte : v83 à v86 sont pris dans `main` (D-163, D-170, D-176).
+- Choix : `VERSION` passe à `astra-p2p-v87` pour que les téléphones prennent le nouveau
+  `session.js` (D-190). Si une autre PR prend v87 avant, monter au numéro suivant.
+- Qui : Claude, par défaut. Source : session `5c1afab8`. Statut : en vigueur.
+
+**D-164 — Horloges décalées : bloquer « Prêt » et refuser les dates « déjà arrivées » du futur (remplacée par D-165 et D-166)**
+- 2026-11-06. Contexte : issue #45. Un téléphone en avance voit le froid trop tôt, écrit `p.over`
+  daté dans le futur, et les autres l'adoptent : la partie finit trop tôt pour tous.
+- Choix de Vincent (premier) : comparer les horloges au salon, message d'erreur et « Prêt »
+  impossible si l'une est décalée ; toute date « déjà arrivée » reçue dans le futur en erreur.
+  Codé sur la branche (seuil 10 s), jamais fusionné.
+- Pourquoi abandonné : refuser une fiche datée du futur bloque toute la synchro du joueur en
+  avance (chaque ordre date sa fiche, `actAt`, avec son heure) ; Vincent a préféré ne refuser
+  personne.
+- Qui : Vincent. Source : session `6a1c3a43` (via la session de coordination). Statut : remplacée
+  par D-165 et D-166 avant fusion.
+
+**D-165 — Heure commune : celle du créateur de la partie, avancée par l'horloge interne du navigateur**
+- 2026-11-06. Contexte : #45 (D-164 abandonnée).
+- Choix de Vincent : « n'importe laquelle est acceptée » : personne n'est refusé à cause de son
+  heure. Au salon, chaque téléphone envoie son heure ; la partie compte sur l'heure du créateur.
+- Comment (`js/session.js`) : `now()` = heure commune = heure du téléphone à l'ouverture de la page
+  + `clockOff`, puis avancée par `performance.now()` (`clock()`). Le créateur a l'heure commune
+  (`clockSynced`) ; un joueur qui ne l'a pas la prend au premier battement de cœur d'un joueur qui
+  l'a (`hb`/`hb-ack` portent `w` = heure commune, `sy`, `ep`). Gardée par partie dans
+  `localStorage['astra.clocks']` sous la forme « heure commune − heure du téléphone », 10
+  parties au plus. Les IA prennent l'heure de leur hôte.
+- Choix de Claude : `performance.now()` (changer l'heure du téléphone page ouverte ne change plus
+  rien) ; mesure comme NTP, médiane des 5 derniers battements ; garder l'écart dans une clé à part
+  plutôt que dans `astra.save` (ne pas toucher `js/save.js`, modifié par #87).
+- Alternatives écartées : médiane des heures au départ (plus de code pour le même résultat de
+  jeu) ; corriger seulement les dates reçues (chaque fonction de règle devrait savoir de qui vient
+  une date).
+- Effet : #45 corrigé (le froid, `checkOver` et `over` comptent sur la même heure partout).
+  #48 et #92 réduits mais pas fermés : leurs critères (tests précis, pillage) ne sont pas vérifiés.
+- Qui : Vincent (règle), Claude (moyens). Source : session `6a1c3a43`. Statut : en vigueur.
+- Tests : `tests/clock.test.mjs`.
+
+**D-166 — Heure qui a changé : les autres le disent, et s'ils sont tous d'accord il est resynchronisé**
+- 2026-11-06. Contexte : #45, suite de D-165. Reste possible : l'heure du téléphone change
+  pendant que l'appli est fermée ; à la réouverture, l'heure commune est fausse.
+- Choix de Vincent : à chaque battement, les autres comparent son heure à celle attendue ; trop
+  loin, ils lui envoient « ton heure a changé » (`clock-changed`, avec ce qu'ils savent de lui ;
+  `clock-ok` quand c'est revenu). Si **tous** les joueurs humains en ligne avec lui qui l'ont
+  mesuré (au moins 1 ; ni les IA, ni les hors ligne) le disent, il reprend l'heure du groupe, et ce
+  qu'il a fait avec sa mauvaise heure est remplacé par ce que les autres savent de lui. À deux, le
+  créateur de la partie l'emporte (« celui qui a fait la partie a plus de poids »).
+- Comment : chaque téléphone garde la dernière fiche de chaque joueur reçue quand son heure était
+  juste (`clockTrust` ; en attente tant qu'elle n'est pas mesurée). À la resynchronisation, sa
+  fiche devient la plus récente de ces copies, avec `clockFix` + 1 : une fiche au `clockFix` plus
+  grand l'emporte sur l'heure de fiche (`actAt`), une fiche au `clockFix` plus petit ne passe
+  plus. `FORMAT` passe à 11 (un téléphone d'avant garderait la fiche fautive).
+- Choix de Claude : marge de 10 s (`CLOCK_DRIFT_MS`) ; 3 mesures avant de juger ; duel sans le
+  créateur : le premier arrivé (`rank`) l'emporte ; fiche relayée (pas de lien direct) jugée juste
+  si elle n'est pas datée de plus de 10 s dans mon futur.
+- Limites (non corrigées) : les lignes du journal partagé écrites avec la mauvaise heure restent
+  (le journal est une union des copies) ; ce que la fiche fautive a déjà fait chez les autres
+  (dégâts appliqués) n'est pas défait ; une heure en retard sur une fiche relayée n'est pas vue.
+  Pendant les ~5 s avant le consensus (3 battements), la fiche fautive est adoptée par tous (toute
+  heure est acceptée) : si elle portait une fin de partie (`over`), l'écran « Fin de partie »
+  s'ouvrirait, et il ne se referme pas tout seul quand la fin disparaît (`showFinish`,
+  `js/app.js`). Cache : `astra-p2p-v88` (et non v84 : `main` est passé à v85, v86 puis v87 avec #159, #160 et #161).
+- Alternatives écartées : refuser la fiche (D-164) ; à deux, personne n'est corrigé (avertissement
+  seul).
+- Qui : Vincent (règle, duel, votants, sens de « resynchronisé »), Claude (marge, détails). Source :
+  session `6a1c3a43`. Statut : en vigueur.
+- Tests : `tests/clock.test.mjs` (consensus à 3, duel à 2 dans les deux sens, hors ligne, IA,
+  bruit < 10 s, téléphone d'avant).
+
+**D-180 — À l'élimination, toutes les flottes du joueur disparaissent**
+- 2026-11-06 22:16. Contexte : issue #34. Les flottes en vol d'un joueur éliminé exécutaient encore
+  leur ordre : une « conquête » prenait la planète d'un autre (et pouvait l'éliminer), le mort
+  possédait une colonie ; une « attaque » pillait.
+- Choix (Vincent, transmis par la session de coordination) : « au moment ou un joueur est
+  eliminé, toute ses flottes disparaissent ». À quai ou en vol, à l'heure de l'élimination
+  (`p.out`), pas à l'heure où un téléphone s'en aperçoit ; plus de combat, de pillage ni de prise
+  après, même en interception ; les autres téléphones ne voient plus ces flottes, même si le mort
+  est hors ligne.
+- Mise en œuvre (Claude) : `eliminate(p, at, pts)` dans `js/session.js`, seul endroit qui pose
+  `p.out`, appelé par `losePlanet`, `noColonizer`, `freezeFleets` et `fleetHit` (ces deux-là venus
+  de D-163). Filet dans `tick` pour une fiche `out` qui a encore des flottes. Autres téléphones :
+  `sees` (par `deadAt`), `ownerAt` (un joueur `out` ne possède rien ; prise après la mort de
+  l'attaquant ignorée, `goneBy`), `applyEffects` (rapport daté de la mort de l'auteur ou après
+  ignoré). `deadAt` date la prise d'un joueur hors ligne à l'heure du rapport de l'attaquant, plus
+  à « maintenant ».
+- Alternatives écartées : flottes gardées mais sans ordre, inertes (la piste de l'issue) : elles
+  resteraient sur la carte et dans les combats d'interception ; test de `p.out` dans `arrive` et
+  `capture` (deuxième endroit, et ne couvre pas les autres téléphones).
+- Limite : fiches reçues dans le désordre (le mort livre son arrivée avant de recevoir le rapport
+  qui l'élimine) : non corrigé, voir `regles.md` §19.3.
+- Qui : Vincent (règle), Claude (mise en œuvre). Source : session `1d0dae27`, issue #34. Statut :
+  en vigueur.
+- Tests : `tests/end.test.mjs`, trois scénarios « éliminé pendant que sa flotte vole… » et
+  « éliminé et hors ligne… ».
+
+**D-181 — Cache `astra-p2p-v89`**
+- 2026-11-06. Contexte : v86 (PR #160), v87 (PR #161) et v88 (PR #162) sont dans `main`.
+- Choix : `VERSION` passe à `astra-p2p-v89` pour que les téléphones prennent le nouveau
+  `session.js`.
+- Qui : Claude, par défaut. Source : session `1d0dae27`. Statut : en vigueur.
+
 **D-200 — Une flotte qui arrive sur une planète qui a changé de main vise son propriétaire actuel (issue #36)**
 - 2026-11-06. Contexte : issue #36 (constats code-flotte-02 et code-fin-08). Une flotte
   « Attaquer » ou « Conquérir » gardait `{ pid, key }` de l'ancien propriétaire ; à l'arrivée,
@@ -2079,4 +2288,4 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   `recapture.mjs` n'est pas publié : **non rejoué**.
 - Qui : Vincent (règle), Claude (cas sans propriétaire, heure du propriétaire, marque
   `captured`). Source : worker `worker-cible`, issue #36.
-- Statut : en vigueur. Modifie D-092 (conquête). Cache `astra-p2p-v84`.
+- Statut : en vigueur. Modifie D-092 (conquête). Cache `astra-p2p-v90` (v84 avant la fusion de `main`, qui avait déjà v89).
