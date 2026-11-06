@@ -2734,3 +2734,25 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
   par ligne, et l'onglet ne le fait pas).
 - Qui : Vincent (demande), router (endroit), Claude (Max, ligne d'état, `planAhead`). Source :
   session `b2e2c598`. Statut : en vigueur. Complète D-106 et D-158. Cache `astra-p2p-v102`.
+
+**D-398 — Une invitation abandonnée pendant sa préparation est fermée (jeton numéroté)**
+- 2026-11-06. Contexte : issue #70. `openInvite` attendait `createInvite()` (collecte des
+  adresses, jusqu'à 3,5 s) avant de ranger l'invitation : fermer « Inviter » pendant cette
+  attente n'annulait rien, et plusieurs ouvertures rapides laissaient des `RTCPeerConnection`
+  orphelines, même après `session.end()`.
+- Choix : chaque `openInvite` prend un jeton numéroté (`inviteTicket`), que `cancelInvite`
+  change. Si le jeton a changé à la fin de l'attente (fenêtre fermée, ou nouvelle invitation),
+  l'invitation obtenue est fermée et `openInvite` renvoie `null` ; une erreur de
+  `createInvite` survenue pendant une préparation abandonnée est ignorée (personne n'attend
+  plus ce message). `openInviteSheet` ne dessine rien quand il reçoit `null`. Une invitation
+  acceptée n'est plus dans `session.invite` : la fermer ou rouvrir ne touche pas sa connexion.
+  Cache `astra-p2p-v103` (v87 au départ, relevée au-dessus de v102 de `main` au rebase).
+- Alternatives écartées : désactiver « Fermer » tant que le QR n'est pas prêt (attente subie,
+  et rouvrir vite fuirait toujours) ; ranger la promesse en cours dans `session.invite`
+  (change le type que lit `acceptAnswer`).
+- Qui : Claude, par défaut (piste de l'issue). Source : session `6ca7574f`, issue #70.
+  Statut : en vigueur.
+- Tests : `tests/invite-open.test.mjs` (fausse `RTCPeerConnection` qui compte les connexions
+  ouvertes : 1 et 5 ouvertures/fermetures → 0 ouverte ; 3 ouvertures d'affilée → 1 ; une
+  invitation acceptée reste ouverte).
+
