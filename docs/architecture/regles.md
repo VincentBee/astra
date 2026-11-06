@@ -1052,7 +1052,7 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
 - `losePlanet` note les points de la vague (`this.wave` : joueur, heure, `scoreOf` avant la
   première perte de cette heure). À l'élimination, ils vont dans `p.deathPts` (D-102).
 
-### 19.3 bis Le froid détruit les flottes (`fleetFrostAt`, `freezeFleets`, `colonizerFrostAt`, D-163)
+### 19.3 bis Le froid détruit les flottes (`fleetFrostAt`, `freezeFleets`, `colonizerDeadAt`, D-163)
 
 - Une flotte que le froid atteint est **détruite**, à quai comme en vol, quel que soit son
   propriétaire.
@@ -1069,6 +1069,28 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
   (pas l'heure du passage), `p.deathPts` = les points d'avant le gel.
 - Les autres téléphones n'attendent pas la fiche du propriétaire : `sees` renvoie faux pour une
   flotte gelée (plus dessinée, plus visée, plus combattue), et `deadAt` voit la mort (§19.4).
+  Pareil pour une flotte détruite au combat : `fleetKillAt` cherche, dans les fiches des autres,
+  un rapport (`effects`) pas encore lu par le propriétaire qui lui enlève tous ses vaisseaux ;
+  `fleetDeadAt` = la première des deux heures. `freezeFleets` laisse au rapport une flotte
+  détruite au combat avant le froid. `fleetHit` élimine à l'heure du combat (`e.at`) celui qui
+  y perd son dernier colonisateur sans planète.
+
+### 19.3 ter La flotte de départ d'un joueur déconnecté (`startFleet`, `ghostFleet`, `fleetsOf`, D-163)
+
+- Au départ, chaque joueur prêt a sa flotte de départ sur la carte, **même si son téléphone est
+  éteint** (choix de Vincent). `startFleet(p)` la calcule à partir de la partie seule : un
+  colonisateur, le plein fait, sur `startCell`, à `max(départ, ready)`, identifiant tiré de
+  `gid/flotte/pid` (`seeded`).
+- Tant que la fiche du joueur n'a pas de `since`, les autres téléphones la construisent
+  (`ghostFleet`, toujours le même objet) et l'ajoutent à ses flottes (`fleetsOf`) pour la carte
+  (`fleetSpots`, liste des joueurs), `engage`, `threats` et `fleetOf` (donc `chaseFleet`,
+  `pursue`). Pas pour les échanges (`tradePartners`) : personne pour répondre. Pas dans le rejeu
+  affiché (`replay-view.js` dessine les fiches).
+- Le combat s'écrit comme d'habitude dans la fiche de l'attaquant (`effects`, `fleet` =
+  l'identifiant calculé). Revenu, le joueur entre (`enterRace` pousse `startFleet`, même
+  identifiant) et lit le rapport : sa flotte est détruite, il est éliminé à l'heure du combat.
+- Un joueur dont la fiche n'a jamais dit `ready` à personne n'existe pas pour les autres : rien à
+  faire.
 - Conséquences : plus aucune flotte ne survit à `start + delayMs + durationMs` (36 min) ; un
   retardataire dont la case de départ est déjà gelée perd sa flotte de départ en entrant, et il
   est éliminé aussitôt. Les branches « est gelée : la flotte reste en orbite » (`arrive`,
@@ -1085,11 +1107,13 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
 - `deadAt(p)` : `p.out` s'il existe ; sinon, si plus aucune planète n'est en vie, l'heure du
   dernier gel (ou maintenant pour une prise). Calculable par **tous**, même si le joueur est
   hors ligne.
-- Joueur de la course **sans planète** (D-163, `colonizerFrostAt`) : mort à l'heure où le
-  froid a pris son dernier colonisateur ; en vie tant qu'il en a un hors du froid. Prêt mais
-  pas encore entré (pas de `since` : son téléphone n'a pas fait apparaître sa flotte) : on
-  compte la flotte de départ qu'il aura, sur sa case de départ (`startCell`), à partir de
-  `max(départ, ready)`. Il ne bloque donc plus la fin de partie (issue #33).
+- Joueur de la course **sans planète** (D-163, `colonizerDeadAt`) : mort à l'heure où il a
+  perdu son dernier colonisateur, au froid ou au combat (`fleetDeadAt`) ; en vie tant qu'il en a
+  un. Prêt mais pas encore entré (pas de `since`) : sa flotte de départ compte (`ghostFleet`,
+  §19.3 ter). Il ne bloque donc plus la fin de partie (issue #33).
+- Limite connue : un combat qui ne détruit qu'une partie d'une flotte (le colonisateur mais pas
+  son escorte) ne se voit pas sans la fiche du propriétaire ; seule une flotte détruite en entier
+  compte pour les autres. Non confirmé, pas testé.
 - `scoreOf(p)` : ce que le joueur possède **maintenant** ; tout perdu : 0 (hors flottes en vol).
 - `ranking` : `{ id, pts, dead, best }`. `best` départage les joueurs tombés à la même heure :
   `deathPts` (points juste avant la chute), ou `scoreOf` si la fiche n'a pas encore vu la chute

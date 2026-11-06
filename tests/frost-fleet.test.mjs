@@ -181,30 +181,38 @@ scenario('D-163 (issue #33) : A fonde, B garde son colonisateur en vol ; le froi
   for (const q of Object.values(A.state.players)) assert.equal(r.faithful[q.id], true, `fiche de ${q.name} rejouée à l’identique`);
 });
 
-scenario('D-163 : un joueur prêt dont la flotte n’est jamais apparue meurt quand le froid atteint sa case de départ', (film) => {
+scenario('D-163 : la flotte de départ d’un joueur prêt mais déconnecté existe pour tous, et le froid la détruit', (film) => {
   frost();
   const { players: [A, B, C], clock, sync } = newLobby(3, ['human', 'machine', 'alien']);
   for (const s of [A, B, C]) s.ready();
   all([A, B, C], sync);
   A.checkStart();
   all([A, B, C], sync);
-  // C ferme l'appli avant d'avoir fait un passage : pas de since, pas de flotte.
+  // C ferme l'appli avant d'avoir fait un passage : sa fiche n'a ni since ni flotte.
   A.tick();
   B.tick();
   all([A, B], sync);
   const c = A.state.players[C.me];
-  assert.ok(!Number.isFinite(c.since) && A.inRace(c), 'C est dans la course sans flotte');
+  assert.ok(!Number.isFinite(c.since) && !(c.fleets || []).length && A.inRace(c), 'C est dans la course, sans flotte dans sa fiche');
   const cell = A.startCell(c, A.startedAt);
+  const ghostA = A.fleetsOf(c)[0];
+  const ghostB = B.fleetsOf(B.state.players[C.me])[0];
   const t = A.frostOf(cell);
-  film.look(A, 'C prêt mais téléphone éteint : sa flotte de départ n’est jamais apparue', [
+  film.look(A, 'C prêt mais téléphone éteint : les autres voient quand même sa flotte de départ', [
+    { show: 'flotte de départ de C, chez A', at: cell, expected: `colonisateur en [${cell.x}:${cell.y}]`, got: ghostA ? `colonisateur en [${ghostA.to.x}:${ghostA.to.y}]` : 'aucune' },
+    { show: 'même flotte chez B (identifiant)', expected: ghostA?.id, got: ghostB?.id },
     { show: 'C mort, vu par A (min)', expected: 'en vie', got: A.deadAt(c) == null ? 'en vie' : min(A, A.deadAt(c)) },
     { show: 'gel de sa case de départ (min)', at: cell, expected: min(A, t), got: min(A, t) },
   ]);
+  assert.ok(ghostA && ghostA.ships.colony === 1 && game.sameCell(ghostA.to, cell), 'un colonisateur sur sa case de départ');
+  assert.equal(ghostA.depart, Math.max(A.startedAt, c.ready), 'apparue au départ (ou quand il a été prêt)');
+  assert.deepEqual(ghostB, ghostA, 'la même flotte sur les deux téléphones');
   assert.equal(A.deadAt(c), null, 'en vie avant le gel de sa case');
   clock.t = t;
-  assert.equal(A.deadAt(c), t, 'mort au gel de sa case de départ');
+  assert.equal(A.sees(c, ghostA, clock.t), false, 'gelée : plus visible');
+  assert.equal(A.deadAt(c), t, 'mort au gel de sa flotte de départ');
   assert.equal(B.deadAt(B.state.players[C.me]), t, 'même heure chez B');
-  // Revenu après, son téléphone fait apparaître sa flotte… déjà gelée : même heure.
+  // Revenu après, son téléphone fait apparaître la même flotte… déjà gelée : même heure.
   clock.t = t + 5000;
   C.tick();
   film.look(C, 'C revient après le gel : sa flotte de départ est détruite, il est éliminé à la même heure', [
@@ -212,4 +220,81 @@ scenario('D-163 : un joueur prêt dont la flotte n’est jamais apparue meurt qu
   ]);
   assert.equal(me(C).out, t);
   assert.equal(me(C).fleets.length, 0);
+  assert.match(C.state.log.map((l) => l.text).join('\n'), new RegExp(`Le froid détruit une flotte de J2 en \\[${cell.x}:${cell.y}\\]`));
+  // La partie se rejoue à l'identique : la flotte de départ de C, son identifiant, son gel.
+  for (const s of [A, B]) sync(s, C);
+  sync(C, A);
+  sync(C, B);
+  const r = replay(A.state);
+  for (const q of Object.values(A.state.players)) assert.equal(r.faithful[q.id], true, `fiche de ${q.name} rejouée à l’identique`);
+});
+
+scenario('D-163 : A détruit au combat la flotte de départ de B, déconnecté depuis le départ : B est éliminé, A gagne', (film) => {
+  const { players: [A, B], clock, sync, online } = newLobby(2, ['human', 'machine']);
+  A.ready();
+  B.ready();
+  all([A, B], sync);
+  A.checkStart();
+  all([A, B], sync);
+  // B ferme l'appli tout de suite : son téléphone ne fera aucun passage.
+  online.delete(B.me);
+  A.refreshOnline();
+  A.tick();
+  const b = A.state.players[B.me];
+  const ghost = A.fleetsOf(b)[0];
+  assert.ok(ghost && !(b.fleets || []).length, 'A voit la flotte de départ de B, que la fiche de B n’a pas');
+  // A fonde sa planète mère sur la planète libre la plus proche, puis arme 3 frégates.
+  const pos = me(A).fleets[0].to;
+  const w = A.planets.filter((x) => x.kind === 'planet' && !A.ownerAt(x)).sort((a, z) => Math.hypot(a.x - pos.x, a.y - pos.y) - Math.hypot(z.x - pos.x, z.y - pos.y))[0];
+  assert.ok(A.moveFleet(me(A).fleets[0].id, { x: w.x, y: w.y }, 'colonize'));
+  clock.t = me(A).fleets[0].arrive + 1;
+  A.tick();
+  assert.ok(me(A).home, 'A a fondé');
+  me(A).planet.ships = { ...(me(A).planet.ships || {}), fighter: 3 };
+  const id = A.takeOff('home', { fighter: 3 }, {}, 3);
+  assert.ok(id, 'les frégates décollent');
+  me(A).fleets.find((f) => f.id === id).fuel = fleet.fleetTank('human', { fighter: 3 }); // le plein, pour aller loin
+  // Elles vont jusqu'à la case de départ de B, puis A prend sa flotte en chasse.
+  assert.ok(A.moveFleet(id, { ...ghost.to }), 'cap sur la case de départ de B');
+  clock.t = me(A).fleets.find((f) => f.id === id).arrive + 1;
+  A.tick();
+  film.look(A, 'les frégates de A arrivent sur la case de départ de B, où attend son colonisateur', [
+    { show: 'A voit la flotte de B', at: ghost.to, expected: true, got: A.sees(b, ghost, clock.t) },
+    { show: 'fiche de B : flottes', expected: 0, got: (b.fleets || []).length },
+  ]);
+  assert.equal(A.sees(b, ghost, clock.t), true);
+  const fightAt = clock.t;
+  assert.ok(A.chaseFleet(id, B.me, ghost.id), 'A attaque');
+  const e = me(A).effects.find((x) => x.to === B.me);
+  assert.ok(e && e.fleet === ghost.id && e.ships.colony === 1, 'rapport : le colonisateur de B détruit');
+  A.tick();
+  film.look(A, 'combat gagné : B, toujours hors ligne, est éliminé et A gagne', [
+    { show: 'B mort (heure du combat)', expected: fightAt, got: A.deadAt(b) },
+    { show: 'A voit encore la flotte de B', expected: false, got: A.sees(b, ghost, clock.t) },
+    { show: 'gagnant', expected: 'p0', got: A.over?.winner ?? null },
+  ]);
+  assert.equal(e.at, fightAt);
+  assert.equal(A.deadAt(b), fightAt, 'B mort à l’heure du combat, sans que sa fiche ait changé');
+  assert.equal(A.sees(b, ghost, clock.t), false, 'sa flotte a disparu de la carte');
+  assert.equal(A.over?.winner, 'p0', 'A gagne');
+  assert.equal(A.over?.at, fightAt);
+  // B revient bien plus tard : son téléphone retrouve la même flotte, et le combat qui l'a détruite.
+  clock.t += 20 * 60_000;
+  online.add(B.me);
+  sync(B, A);
+  B.tick();
+  film.look(B, 'B revient : sa flotte de départ (même identifiant) a été détruite, il est éliminé à l’heure du combat', [
+    { show: 'B éliminé à', expected: fightAt, got: me(B).out ?? 'non' },
+    { show: 'flottes de B', expected: 0, got: me(B).fleets.length },
+    { show: 'gagnant vu par B', expected: 'p0', got: B.over?.winner ?? null },
+  ]);
+  assert.equal(me(B).since, ghost.depart, 'entré à l’heure du départ');
+  assert.equal(me(B).out, fightAt, 'éliminé à l’heure du combat, pas à son retour');
+  assert.equal(me(B).fleets.length, 0, 'pas de nouvelle flotte');
+  assert.match(B.state.log.map((l) => l.text).join('\n'), /Une flotte de J1 est détruite par J0\./);
+  assert.equal(B.over?.winner, 'p0');
+  sync(A, B);
+  assert.deepEqual(A.ranking().map((r) => r.id), ['p0', 'p1']);
+  // (Pas de rejeu ici : le test donne à A ses frégates et leur carburant à la main, hors de son
+  // journal d'ordres. Le rejeu de la flotte de départ est vérifié dans le scénario du froid.)
 });
