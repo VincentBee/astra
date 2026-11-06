@@ -1057,7 +1057,7 @@ function renderLive() {
     const nPlanets = session.planetsOf(p).length;
     const docked = session.planetsOf(p).reduce((t, x) => t + countShips(stateAt(x.planet, now).ships), 0);
     const eyes = session.eyes(now);
-    const flying = (p.fleets || []).filter((f) => session.sees(p, f, now, eyes)).length; // les autres : seulement celles que je vois
+    const flying = session.fleetsOf(p).filter((f) => session.sees(p, f, now, eyes)).length; // les autres : seulement celles que je vois
     const space = [
       nPlanets > 1 ? `${nPlanets} planètes` : null,
       docked ? `${docked} vaisseau${docked > 1 ? 'x' : ''}` : null,
@@ -2279,7 +2279,7 @@ function fleetSpots(now) {
   const parked = new Map(); // « x:y » -> nombre de flottes déjà placées sur la case
   const eyes = session.eyes(now);
   for (const p of Object.values(session.state.players)) {
-    for (const f of p.fleets || []) {
+    for (const f of session.fleetsOf(p)) { // avec la flotte de départ d'un joueur hors ligne (D-163)
       if (!session.sees(p, f, now, eyes)) continue; // hors de ma portée de détection
       if (moving(f, now)) {
         const pos = fleetPos(f, now);
