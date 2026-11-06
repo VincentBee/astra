@@ -50,7 +50,9 @@ pas la différence, sauf `link.viaRoom` (voir §6, `attach`).
 | `js/rendezvous.js` | Reconnexion automatique sans rescanner : salon Trystero/Nostr propre à la partie, chiffré par la clé de la partie. Classe `Rendezvous` l.82. |
 | `js/session.js` | Classe `Session` l.197 : création/arrivée, messages, fusion des copies, maillage, sauvegarde. Contient aussi toutes les règles (l.696-1771, voir `regles.md`). |
 | `js/save.js` | Copie locale de la partie et identité dans `localStorage` ; historique de 10 parties ; `mergeStates` (fusion de deux copies). |
-| `sw.js` | Service worker : cache hors ligne, « réseau d'abord ». |
+| `sw.js` | Service worker : cache hors ligne, « réseau d'abord », cache si le réseau ne répond pas en 3 s (D-230). |
+| `tests/sw.test.mjs` | Test de `sw.js` (vrai fichier dans un `vm`, cache en mémoire, serveur local qui répond, lent, muet ou coupé). |
+| `tests/sw-browser.mjs` | Même parcours dans un vrai Chromium (Playwright pris hors du dépôt), hors de `node --test`. |
 | `manifest.json` | Appli installable (PWA) : nom Astra, `display: standalone`, portrait, icônes 192/512/svg. |
 | `vendor/` | Bibliothèques tierces copiées telles quelles (pas de build, voir `vendor/README.txt`) : `qrcode.mjs` (qrcode-generator 2.0.4, dessin des QR), `jsQR.js` (jsQR 1.4.0, lecture des QR), `trystero-nostr.mjs` (Trystero 0.26.0 stratégie Nostr + @noble/secp256k1, empaqueté par esbuild). |
 | `tests/peer.test.mjs` | Test du découpage des gros messages de `Link`. |
@@ -285,8 +287,9 @@ Le sens de ce journal pour le rejeu (`seenNews`, `replayIds`) est décrit dans `
 - Un message de plus de 256 Ko dépasserait la limite annoncée par `a=max-message-size` (`invite.js:166`, `peer.js:35`) : passer toujours par `Link.send`, qui découpe.
 - Changer le format du code d'invitation : changer `VERSION` dans `invite.js` (sinon décodage faux).
 - Changer le format des fiches : incrémenter `FORMAT` et compléter son commentaire (l.32-40).
-- `sw.js` : changer `VERSION` (`astra-p2p-v53` au 2026-10-30) à chaque mise en ligne. `cache.addAll` est tout ou rien : un fichier absent de `FILES` qui renvoie 404 casse l'installation.
-- **`technologies.html` et `js/techtree.js` ne sont pas dans `FILES`** (`sw.js:5-34`). Ils ne sont pas pré-cachés ; ils ne marchent hors ligne que s'ils ont déjà été ouverts en ligne (le `fetch` met en cache ce qu'il télécharge, l.53-57).
+- `sw.js` : changer `VERSION` (`astra-p2p-v94` au 2026-11-06) à chaque mise en ligne. `cache.addAll` est tout ou rien : un fichier absent de `FILES` qui renvoie 404 casse l'installation.
+- **`sw.js`, réseau muet (D-230)** : chaque requête fait la course entre le réseau et un délai de 3 s (`NET_WAIT`). Réseau d'abord s'il répond à temps ; sinon la copie en cache (`caches.match`, `ignoreSearch`). Pas de copie en cache : on continue d'attendre le réseau. Après un délai dépassé, le drapeau `mute` fait répondre le cache **tout de suite** aux requêtes suivantes (sans lui, chaque `import` de la chaîne des modules attendait 3 s : l'accueil mettait plus de 10 s dans Chromium) ; la première réponse du réseau le remet à faux. La réponse du réseau, même arrivée après le délai, est écrite dans le cache (`e.waitUntil` appelé tout de suite) : la prochaine ouverture a la nouvelle version. Piège : juste après le retour du réseau, une ouverture peut encore servir le cache une fois (le drapeau tombe à la première réponse) ; `mute` est perdu quand le navigateur arrête le service worker, ce qui revient au comportement normal.
+- **`technologies.html` et `js/techtree.js` ne sont pas dans `FILES`** (`sw.js:5-34`). Ils ne sont pas pré-cachés ; ils ne marchent hors ligne que s'ils ont déjà été ouverts en ligne (le `fetch` met en cache ce qu'il télécharge, `sw.js:67-75`).
 - Le service worker n'est enregistré qu'en https ou sur `localhost` (`app.js:1964`). La caméra aussi exige https (`scanner.js:25`).
 - `route()` est copié dans `peer.js:125` et `rendezvous.js:23`.
 - Pas de TURN : derrière certains opérateurs (CGNAT), la connexion peut échouer (`config.js:6-8`).
@@ -306,6 +309,16 @@ node --test tests/*.test.mjs
 Résultat (2026-10-29) : 35 tests, 35 réussis, 0 échec (≈ 5,7 s).
 
 ⚠️ `node --test tests/` échoue : Node prend le dossier pour un fichier de test.
+
+```bash
+node --test tests/sw.test.mjs
+```
+Résultat (2026-11-06) : 6 tests, 6 réussis (≈ 10,6 s, le délai de 3 s est le vrai). Avec le `sw.js` d'avant D-230, « serveur muet » et « serveur lent » échouent.
+
+```bash
+ASTRA_PLAYWRIGHT=/chemin/vers/node_modules/playwright/index.mjs node tests/sw-browser.mjs capture.png
+```
+Résultat (2026-11-06, Chromium de Playwright) : 4/4 — serveur muet : accueil depuis le cache en ≈ 3,1 s (avant D-230 : rien après 10 s) ; serveur qui répond : `index.html` modifié servi ; serveur coupé : cache en ≈ 60 ms.
 
 - `tests/harness.mjs` simule `localStorage`, `document`, `window`, fixe l'heure (`clock.t`) et crée `n` sessions. Son `sync(a, b)` est `a.mergeIn(b.snapshot(), {pid: b.me})` : il **contourne** `peer.js` et `rendezvous.js`. Les tests ne vérifient donc ni WebRTC, ni QR, ni Nostr.
 - `tests/hostile.test.mjs` teste les garde-fous de réception (`recordOk`, `normalize`, `backdated`, horloges décalées) ; certains de ses tests touchent aussi aux règles (ex. heure qui recule et production).
