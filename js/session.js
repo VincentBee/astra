@@ -743,10 +743,27 @@ export class Session {
 
   // ----- invitations (tout le monde peut inviter) ---------------------------
 
+  /**
+   * Prépare une invitation et renvoie son code, ou null si elle a été abandonnée pendant sa
+   * préparation (#70) : chaque appel prend un jeton numéroté ; si cancelInvite ou un autre
+   * openInvite passe pendant l'attente, le jeton change et l'invitation obtenue est fermée
+   * au lieu d'être rangée. Ouvrir une invitation ferme la précédente.
+   */
   async openInvite() {
-    this.invite?.cancel();
-    this.invite = await createInvite();
-    return this.invite.code;
+    const ticket = this.cancelInvite();
+    let invite;
+    try {
+      invite = await createInvite();
+    } catch (e) {
+      if (ticket !== this.inviteTicket) return null;
+      throw e;
+    }
+    if (ticket !== this.inviteTicket) {
+      invite.cancel();
+      return null;
+    }
+    this.invite = invite;
+    return invite.code;
   }
 
   async acceptAnswer(answer) {
@@ -758,9 +775,12 @@ export class Session {
     return link;
   }
 
+  /** Ferme l'invitation ouverte et abandonne celle en préparation ; renvoie le nouveau jeton. */
   cancelInvite() {
     this.invite?.cancel();
     this.invite = null;
+    this.inviteTicket = (this.inviteTicket ?? 0) + 1;
+    return this.inviteTicket;
   }
 
   // ----- jeu ---------------------------------------------------------------------
