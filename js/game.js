@@ -11,8 +11,8 @@
 // gameplay différent, choisies une fois pour toutes en arrivant dans la partie.
 //
 // Comme la population grandit ou meurt de faim selon les stocks, l'économie
-// n'a pas de formule fermée : on l'intègre par petits pas (300 au plus par
-// calcul, même après une journée d'absence).
+// n'a pas de formule fermée : on l'intègre par petits pas (2 h de jeu au plus
+// chacun, et MAX_STEPS au plus par calcul quelle que soit l'absence, D-175).
 
 import { techBonus, TECHS, SHIPS, techCost, techMissing, researchDuration, shipUnlocked, shipDuration, TEMPO } from './tech.js';
 
@@ -585,6 +585,21 @@ function advance(race, s, ms, boost) {
 }
 
 /**
+ * Nombre de pas au plus par calcul (D-175). Sans lui, une planète datée de très
+ * loin (une fiche reçue avec `at = 0`) demandait des millions de pas et figeait
+ * la page. Il ne joue qu'au-delà de MAX_STEPS × 2 h de jeu (≈ 26,7 h réelles) :
+ * une partie normale garde exactement ses pas d'avant.
+ */
+export const MAX_STEPS = 2000;
+
+/**
+ * Durée d'un pas pour un calcul de `total` ms : 1 s au moins, 2 h de jeu au plus
+ * (de plus grands pas changeaient la population), 300 pas sous 4 h ; au-delà de
+ * MAX_STEPS pas de 2 h de jeu, les pas s'allongent pour rester à MAX_STEPS.
+ */
+export const stepOf = (total) => Math.max(1000, Math.min(120_000 / TEMPO, total / 300), total / MAX_STEPS);
+
+/**
  * Fait avancer de `from` à `to` (ms réelles). Des pas de 2 h de jeu au plus
  * (2 min réelles au tempo d'origine) : plus longs, une longue absence ne
  * donnerait pas la même population que des passages réguliers.
@@ -593,8 +608,7 @@ function steps(race, s, from, to, boost) {
   let t = from;
   const total = to - from;
   if (total <= 0) return s;
-  // Pas de 2 h de jeu au plus, même après des jours d'absence : de plus grands pas changeaient la population.
-  const dt = Math.max(1000, Math.min(120_000 / TEMPO, total / 300));
+  const dt = stepOf(total);
   while (t < to) {
     const ms = Math.min(dt, to - t);
     s = advance(race, s, ms, boost);
@@ -734,11 +748,11 @@ const freePlaces = (places, levels) => (Number.isFinite(places) ? places - usedP
 /**
  * Fait avancer `s` de `from` vers `to` jusqu'à ce que le stock couvre `cost`
  * (vérifié avant de partir, puis après chaque pas). Les pas sont ceux de
- * `steps` (300 au plus, 2 h de jeu au plus). Renvoie { s, at, ok }.
+ * `steps` (`stepOf` : 2 h de jeu au plus, MAX_STEPS au plus). Renvoie { s, at, ok }.
  */
 function until(race, s, from, to, cost, trance) {
   if (covers(s.stock, cost)) return { s, at: from, ok: true };
-  const dt = Math.max(1000, Math.min(120_000 / TEMPO, (to - from) / 300));
+  const dt = stepOf(to - from);
   let t = from;
   while (t < to) {
     const ms = Math.min(dt, to - t);
