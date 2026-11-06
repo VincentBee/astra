@@ -2138,7 +2138,8 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
   machine, alien) : machine gagne 9 fois sur 10 avant, 10 sur 10 après (l'humain gagnait 1
   fois) ; durée moyenne 28 → 26 min ; ordres `conquer` 1 238 → 639. Deux IA machines : 10/10
   avant et après ; 28 → 27 min ; `conquer` 1 684 → 750. Moments où une IA a deux flottes
-  `conquer` vers la même planète : 1 633 → 0 et 2 357 → 0.
+  `conquer` vers la même planète : 1 633 → 0 et 2 357 → 0. Les machines gagnent donc un peu
+  plus souvent à trois IA (9/10 → 10/10) : à suivre avec l'issue d'équilibrage #56.
 - Limites : la file de vaisseaux posés ne tient pas compte d'une flotte de conquête partie
   d'une **autre** de mes planètes vers une cible plus lointaine ; non confirmé face à un vrai
   joueur.
