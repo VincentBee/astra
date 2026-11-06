@@ -401,13 +401,13 @@ Les demandes de Vincent derrière l'interface sont datées dans [journal.md](../
 
 Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.md](regles.md) §4.1 et §19.
 
-- **Bandeau de course** `#race` (`index.html`, sous `#lost`), rempli par `renderRace(now)` dans
-  `renderLive` (chaque seconde) : avant le départ du froid « Le soleil s'éteint · dernier en vie
-  gagne · n en vie » ; ensuite « Ta planète la plus exposée gèle dans m:ss · va vers le
-  soleil » ; « Éliminé · encore n en vie » ; « Victoire ! », « X gagne. » ou, seul, « Perdu. » (D-142) · partie finie, suivi du bouton **Classement** (rouvre l'écran de fin, D-143) et du lien **Voir la courbe des points**
-  (`replay.html#points`, D-104). Classe
-  `hot` (bordure orange) à moins de 3 min du gel, quand on est éliminé ou qu'un autre a gagné.
-  Caché pour une partie d'avant la course.
+- **Bandeau de fin** `#race` (`index.html`, sous `#lost`), rempli par `renderRace()` dans
+  `renderLive` : **caché pendant la partie et quand on est éliminé** (D-201 ; il disait avant
+  « Ta planète la plus exposée gèle dans m:ss · va vers le soleil · n en vie », « Le soleil
+  s'éteint… », « Éliminé… »). Il n'apparaît qu'en fin de partie : « Victoire ! », « X gagne. » ou,
+  seul, « Perdu. » (D-142) · partie finie, suivi du bouton **Classement** (rouvre l'écran de fin,
+  D-143, seul moyen de le rouvrir après l'avoir fermé) et du lien **Voir la courbe des points**
+  (`replay.html#points`, D-104). Classe `hot` (bordure orange) quand un autre a gagné.
 - **Carte** : `drawFrost` voile en bleu tout ce qui est hors du cercle de froid (remplissage
   `evenodd`) et trace le cercle en pointillés ; il s'arrête à l'heure de fin. Les planètes
   gelées sont dessinées presque effacées (opacité 0,15). En-tête « éliminé » au lieu de « à
