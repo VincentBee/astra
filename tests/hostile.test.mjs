@@ -111,3 +111,53 @@ scenario('un téléphone en avance de quelques heures reste visible des autres',
   film.look(A, 'A, à l’heure juste, reçoit la fiche de B : il voit son chantier', [{ show: 'chantier de B, vu par A', at: P(B).home, expected: true, got: !!A.state.players[B.me].planet.queue }]);
   assert.ok(A.state.players[B.me].planet.queue, 'A voit le chantier de B');
 });
+
+scenario('une planète datée de at = 0 dans une fiche reçue est ramenée à l’entrée du joueur, et se calcule vite', (film) => {
+  const { players: [A, B, C], clock } = newGame(3);
+  const since = A.state.players[B.me].since;
+  film.look(A, 'au départ, trois joueurs');
+  clock.t += 60_000;
+  forge(A, B, (st) => {
+    const b = st.players[B.me];
+    b.planet.at = 0; // 37 millions de pas de 48 s avant D-175 : la page de A se figeait
+    b.actAt = clock.t;
+  });
+  const pl = A.state.players[B.me].planet;
+  // L'horloge des tests part de 1970 : on calcule à l'heure d'aujourd'hui, 56 ans plus loin.
+  const t0 = performance.now();
+  game.stateAt(pl, Date.now());
+  const ms = performance.now() - t0;
+  film.look(A, 'A reçoit la fiche de B avec sa planète datée de 1970 : l’heure est ramenée à l’entrée de B', [
+    { show: 'heure de la planète de B', at: P(B).home, expected: since, got: pl.at },
+    { show: 'calcul de la planète de B', at: P(B).home, expected: 'moins de 100 ms', got: `${ms.toFixed(1)} ms`, ok: ms < 100 },
+  ]);
+  assert.equal(pl.at, since);
+  assert.ok(ms < 100, `${ms} ms`);
+  // Sans heure d'entrée (fiche d'avant la course, ou retirée par le tricheur), rien ne sert de plancher :
+  // la planète garde at = 0, mais le calcul reste borné à MAX_STEPS pas.
+  clock.t += 60_000;
+  forge(A, C, (st) => {
+    const c = st.players[C.me];
+    delete c.since;
+    c.planet.at = 0;
+    c.actAt = clock.t;
+  });
+  const old = A.state.players[C.me].planet;
+  const t1 = performance.now();
+  const s = game.stateAt(old, Date.now());
+  const ms1 = performance.now() - t1;
+  assert.equal(old.at, 0);
+  assert.ok(ms1 < 100, `${ms1} ms`);
+  assert.ok(Object.values(s.stock).every((v) => Number.isFinite(v) && v >= 0));
+});
+
+scenario('une colonie datée d’avant sa prise est ramenée à l’heure de sa prise', () => {
+  const { players: [A, B], clock } = newGame(2);
+  clock.t += 60_000;
+  forge(A, B, (st) => {
+    const b = st.players[B.me];
+    b.colonies = { x1: { ...clone(b.planet), at: 0, claimAt: clock.t - 1000 } };
+    b.actAt = clock.t;
+  });
+  assert.equal(A.state.players[B.me].colonies.x1.at, clock.t - 1000);
+});

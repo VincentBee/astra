@@ -2066,3 +2066,47 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
 - Qui : Vincent (demande : corriger #87), Claude (forme de la correction). Source : session
   `9e675a52`. Statut : en vigueur. Complète D-066.
 
+**D-175 — Le calcul de l'économie est borné à 2 000 pas ; l'heure d'une planète reçue a un plancher**
+- 2026-11-06. Contexte : issue #32. `steps` et `until` intégraient l'économie par pas de 48 s
+  sans plafond : une planète datée de très loin faisait des millions de pas. `planetOk` acceptait
+  tout `at` fini : une fiche reçue avec `planet.at = 0` figeait la page de chaque téléphone qui
+  l'affichait (≈ 37 millions de pas par `stateAt`). Numéro : D-163 à D-169 étant pris ou réservés
+  par d'autres PR, cette PR prend D-175.
+- Choix de Claude :
+  1. **Nombre de pas borné** : `stepOf(durée) = max(1 s, min(2 h de jeu, durée / 300),
+     durée / MAX_STEPS)`, `MAX_STEPS = 2000`, dans `steps` et `until`. Le troisième terme ne
+     gagne qu'au-delà de 2 000 × 48 s ≈ 26,7 h : sous cette durée (donc toute partie normale,
+     et tout écart de moins de 4 h), les pas sont exactement ceux d'avant, l'économie ne change
+     pas d'un chiffre. Aucune question au router n'était donc nécessaire. Le calcul reste
+     déterministe : le pas ne dépend que de la durée. Au-delà de 26,7 h, les pas s'allongent :
+     le résultat reste fini et positif (vérifié sur les trois races à `at = 0`) mais
+     s'éloigne de ce que donneraient des passages réguliers.
+  2. **Plancher de l'heure dans `planetOk`** : `at` est **ramené** (pas refusé) au plancher
+     connu par la fiche elle-même : `since` (entrée dans la course, écrite une fois) pour la
+     planète mère ; le plus tardif de `since` et de `claimAt` pour une colonie. Aucune planète
+     n'existe avant ces heures (`newPlanet` naît à l'heure de l'installation ou de l'arrivée,
+     `settle` n'avance que vers l'avant). Ramener plutôt que refuser : `normalize` passe aussi
+     sur ma propre fiche au chargement (`clean`), un refus effacerait ma planète au moindre
+     écart ; ramener ne crée rien (le tricheur perd la production d'avant le plancher).
+- Alternatives écartées : couper la durée simulée (n'intégrer que les N dernières heures) :
+  aussi borné, mais change le résultat dès cette durée ; refuser la planète (`planet = null`) ;
+  plancher pris sur l'heure du téléphone qui reçoit (`now`, `startedAt`) : différent d'un
+  téléphone à l'autre, ou tiré des `go` que le tricheur peut aussi trafiquer ; plancher sur
+  `p.claimAt` de la planète mère (`claimPlanet` garde une planète existante avec `||=`, son `at`
+  peut être plus ancien).
+- Limites : une fiche sans `since` (partie d'avant la course, ou retiré par le tricheur) n'a pas
+  de plancher, seul `MAX_STEPS` la protège ; une heure loin dans le futur n'est pas bornée
+  (`normalize` ne connaît pas l'heure, et elle ne coûte rien).
+- Qui : Claude, par défaut (le ticket laissait le choix). Source : session `424ded66`, issue #32.
+  Statut : en vigueur.
+- Tests : `tests/rules.test.mjs` (planète datée de 1970 ou de 30 jours en moins de 100 ms ; pas
+  inchangés sous 26 h ; une heure calculée d'un coup ou soldée toutes les 250 ms à 0,1 % près),
+  `tests/hostile.test.mjs` (fiche reçue avec `at = 0` ramenée à `since` ; colonie ramenée à
+  sa prise).
+
+**D-176 — Cache `astra-p2p-v86`**
+- 2026-11-06. Contexte : v83 (PR #158, déjà dans `main`) et v85 (PR #159, déjà dans `main`) sont pris, v84 est
+  probablement réservé par la PR de #45 (non confirmé).
+- Choix : `VERSION` passe à `astra-p2p-v86` pour que les téléphones prennent les nouveaux
+  `game.js` et `session.js`.
+- Qui : Claude, par défaut. Source : session `424ded66`. Statut : en vigueur.
