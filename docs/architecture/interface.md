@@ -104,6 +104,14 @@ Les panneaux sont filtrés en CSS selon `#view-planet[data-tab]` (`style.css:463
 
 Toutes se ferment par leur croix (`.close-btn`), un toucher sur le fond sombre ou Échap (`js/app.js:689-698` : ces deux gestes cliquent la croix).
 
+Échap ne ferme que la fenêtre du dessus (D-192, issue #72) : toutes les fenêtres ont le même
+`z-index` (20, `.sheet` dans `style.css`), donc celle qui se voit devant est la **dernière visible
+dans l'ordre du HTML** ; le gestionnaire la prend avec `findLast` (`js/app.js`, « Toutes les
+fenêtres se ferment… »). Un deuxième Échap ferme la suivante. `tests/escape.test.mjs` vérifie ce
+dont la règle a besoin : un seul `z-index` pour les fenêtres, une croix dans chacune, `findLast`
+dans le gestionnaire. Si un jour une fenêtre reçoit son propre `z-index`, ou sort de l'ordre du
+HTML, cette règle ne tient plus : il faudra une pile d'ouverture.
+
 | Fenêtre | Ouverte par | Contenu / action | Code |
 |---|---|---|---|
 | `#sheet-players` (`index.html:203-216`) | `#net` | Détail réseau, **Inviter un joueur**, classement (`#players`). | 319-327 ; liste `renderState` 765-779 ; lignes `renderLive` 835-865 (score, `style.order` pour trier sans redessiner, 864). |

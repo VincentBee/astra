@@ -2153,6 +2153,30 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
   `session.js` (D-190). Si une autre PR prend v87 avant, monter au numéro suivant.
 - Qui : Claude, par défaut. Source : session `5c1afab8`. Statut : en vigueur.
 
+**D-192 — Échap ferme la fenêtre du dessus : la dernière visible dans l'ordre du HTML**
+- 2026-11-06. Contexte : issue #72. Échap prenait la première fenêtre visible du HTML
+  (`find`) ; la fiche de planète est la première de la page, donc avec le journal ouvert par-dessus,
+  Échap fermait la fiche cachée dessous et laissait le journal.
+- Choix : prendre la dernière visible (`findLast`). Toutes les fenêtres ont le même `z-index` (20)
+  et aucun parent ne crée de contexte d'empilement : celle qui se voit devant est donc toujours la
+  dernière du HTML. Un deuxième Échap ferme la suivante.
+- Alternatives écartées : une pile dans l'ordre d'ouverture. Elle peut contredire l'écran : une
+  fenêtre plus haut dans le HTML, ouverte après une autre (par exemple « Fin de partie » ouverte
+  pendant que le journal est affiché), s'affiche **sous** elle ; la pile fermerait alors celle
+  qu'on ne voit pas. Remettre chaque fenêtre devant à son ouverture (`z-index` croissant) changerait
+  l'affichage, hors du sujet de #72.
+- Hors sujet, noté : le menu d'ordres de la carte a son propre Échap (`closeMenu`) ; s'il est
+  ouvert en même temps qu'une fenêtre, un seul Échap ferme les deux (comme avant). Le focus qui
+  reste derrière les fenêtres (#148) n'est pas touché.
+- Qui : Claude, par défaut (worker de la session « Regarde les issues du projet »). Source :
+  session `a4571475`. Statut : en vigueur. Tests : `tests/escape.test.mjs` ; vu dans le vrai jeu.
+
+**D-193 — Cache `astra-p2p-v89`**
+- 2026-11-06. Contexte : `main` est à v88 (D-165, D-166).
+- Choix : `VERSION` passe à `astra-p2p-v89` pour que les téléphones prennent le nouveau `app.js`
+  (D-192). Si une autre PR prend v89 avant, monter au numéro suivant.
+- Qui : Claude, par défaut. Source : session `a4571475`. Statut : en vigueur.
+
 **D-164 — Horloges décalées : bloquer « Prêt » et refuser les dates « déjà arrivées » du futur (remplacée par D-165 et D-166)**
 - 2026-11-06. Contexte : issue #45. Un téléphone en avance voit le froid trop tôt, écrit `p.over`
   daté dans le futur, et les autres l'adoptent : la partie finit trop tôt pour tous.
