@@ -334,7 +334,9 @@ function dockNearest(ctx, f) {
 /**
  * Attaque : quand les vaisseaux de guerre posés sur une de mes planètes battent à coup sûr la
  * défense d'une planète adverse (calcul du combat avec ce que le jeu en montre), ils décollent
- * et partent la conquérir. Sans cible à leur portée, ils restent posés et défendent.
+ * et partent la conquérir. Sans cible à leur portée, ils restent posés et défendent. Une
+ * planète déjà visée par une de mes flottes de conquête ne l'est pas une 2e fois : les
+ * vaisseaux partent la rejoindre (`joinFleet`), ou visent une autre planète (D-280).
  */
 function attack(ctx, mine) {
   const { s, p, now } = ctx;
@@ -348,6 +350,7 @@ function attack(ctx, mine) {
     }
   }
   if (!targets.length) return;
+  const aimed = aimedTargets(p);
   for (const base of mine) {
     if (ctx.left < 2) return;
     const st = stateAt(base.planet, now);
@@ -373,15 +376,39 @@ function attack(ctx, mine) {
       .filter((t) => t.won)
       // Les planètes qui tiendront le plus longtemps d'abord, puis les plus proches.
       .sort((a, b) => s.frostOf(b.pl.cell) - s.frostOf(a.pl.cell) - (b.d - a.d) * 20_000);
-    const t = options[0];
-    if (!t) continue;
-    const fuel = Math.min(tank, Math.floor(st.stock.energy || 0), Math.ceil(burn * t.d * 2) + 2);
-    let id = null;
-    ctx.order(() => (id = s.takeOff(base.key, ships, {}, fuel)));
-    if (!id) continue;
-    ctx.order(() => s.moveFleet(id, { ...t.pl.cell }, 'conquer'));
-    return;
+    for (const t of options) {
+      // Déjà visée par une de mes flottes de conquête (D-280) : jamais une 2e conquête, ces
+      // vaisseaux la rejoignent en renfort, ou bien visent la cible suivante.
+      const g = aimed.get(`${t.o.id}:${t.pl.key}`);
+      if (g && !canJoin(ctx, base, g, { speed, tank, burn, energy: st.stock.energy })) continue;
+      const d = g ? distance(base.cell, g.to) : t.d;
+      const fuel = Math.min(tank, Math.floor(st.stock.energy || 0), Math.ceil(burn * d * 2) + 2);
+      let id = null;
+      ctx.order(() => (id = s.takeOff(base.key, ships, {}, fuel)));
+      if (!id) break;
+      if (g) ctx.order(() => s.joinFleet(id, g.id));
+      else ctx.order(() => s.moveFleet(id, { ...t.pl.cell }, 'conquer'));
+      return;
+    }
   }
+}
+
+/** Mes flottes de conquête en route, par cible (« pid:clé »). */
+function aimedTargets(p) {
+  const aimed = new Map();
+  for (const f of p.fleets || []) if (f.order?.kind === 'conquer') aimed.set(`${f.order.pid}:${f.order.key}`, f);
+  return aimed;
+}
+
+/**
+ * Des vaisseaux partis de `base` peuvent rejoindre la flotte de conquête `g` : assez de
+ * carburant, et ils arrivent après elle. Arrivés avant, la fusion effacerait son ordre de
+ * conquête (merge) : la planète ne serait plus attaquée.
+ */
+function canJoin(ctx, base, g, { speed, tank, burn, energy }) {
+  if (ctx.s.locked(g.id)) return false;
+  const d = distance(base.cell, g.to);
+  return burn * d <= Math.min(tank, Math.floor(energy || 0)) && ctx.now + tripMs(base.cell, g.to, speed) >= g.arrive;
 }
 
 // ----- l'IA sur le téléphone de l'hôte ---------------------------------------------------

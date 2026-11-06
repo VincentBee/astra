@@ -2110,3 +2110,43 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
 - Choix : `VERSION` passe à `astra-p2p-v86` pour que les téléphones prennent les nouveaux
   `game.js` et `session.js`.
 - Qui : Claude, par défaut. Source : session `424ded66`. Statut : en vigueur.
+
+**D-280 — L'IA ne lance pas une 2e conquête vers une planète déjà visée : les renforts rejoignent la flotte en route**
+- 2026-11-06. Contexte : issue #47. `attack()` (`js/bot.js`) ne regardait pas ses propres flottes
+  en vol : chaque chasseur sorti du chantier partait seul, 3 s après le précédent, vers la même
+  planète. Ces flottes arrivaient après la prise et « reprenaient » la colonie que la 1re venait
+  de prendre (bug de re-conquête de `session.js`, code-fin-08), et les deux IA s'affaiblissaient
+  toutes seules. Numéro : D-163 à D-279 étant pris ou réservés par d'autres PR, cette PR prend
+  D-280 (et D-281 pour le cache).
+- Choix de Claude :
+  1. **Jamais deux conquêtes de la même planète en même temps** : `attack()` liste ses flottes
+     dont l'ordre est `conquer` (`aimedTargets`, clé « joueur:planète »). Une cible de cette
+     liste n'est plus visée en `conquer`.
+  2. **Les renforts vont en `join`** : si la meilleure cible des vaisseaux posés est déjà visée,
+     ils décollent et rejoignent la flotte en route (`joinFleet`, D-159), si le carburant suffit
+     et s'ils **arrivent après elle** (`canJoin`). Arrivés avant, la fusion (`merge`) effacerait
+     l'ordre de conquête de la 1re flotte et la planète ne serait pas attaquée. Sinon, ils visent
+     la cible suivante, ou restent posés (et grossissent avec les suivants : ils partiront
+     groupés). Après la prise, le renfort ne trouve plus la flotte : il reste en orbite, puis se
+     pose sur la planète la plus proche (`dockNearest`), souvent celle qui vient d'être prise.
+- Alternatives écartées : seulement retirer les cibles visées (la piste de base de l'issue) :
+  les chasseurs restaient posés ou partaient vers une 2e cible plus faible, sans aider la 1re
+  flotte ; attendre d'avoir un nombre minimal de vaisseaux avant d'attaquer : change le rythme de
+  l'IA bien plus que le bug ne le demande.
+- Mesures (20 parties IA contre IA, mêmes graines avant/après, script de mesure local de la
+  session) : toutes les parties finissent par un gagnant avant et après ; durée moyenne et
+  gagnants : voir la PR. Plus aucun moment où une IA a deux flottes `conquer` vers la même
+  planète (avant : plus de 1 600 moments par série de 10 parties).
+- Limites : la file de vaisseaux posés ne tient pas compte d'une flotte de conquête partie
+  d'une **autre** de mes planètes vers une cible plus lointaine ; non confirmé face à un vrai
+  joueur.
+- Qui : Claude, par défaut (le ticket laissait le choix). Source : session `9ae32aeb`, issue #47.
+  Statut : en vigueur.
+- Tests : `tests/bot.test.mjs` (scénario « des vaisseaux sortis après le départ d'une conquête
+  rejoignent la flotte en route » ; partie de 2 IA machines jusqu'au bout sans deux conquêtes
+  vers la même planète).
+
+**D-281 — Cache `astra-p2p-v92`**
+- 2026-11-06. Contexte : v86 est dans `main` ; v87 à v91 sont pris par des PR ouvertes.
+- Choix : `VERSION` passe à `astra-p2p-v92` pour que les téléphones prennent le nouveau `bot.js`.
+- Qui : Claude, par défaut. Source : session `9ae32aeb`. Statut : en vigueur.
