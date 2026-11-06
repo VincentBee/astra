@@ -28,6 +28,7 @@ Fichiers d'interface partagés :
 | `js/icons.js` | Icônes d'interface (`ic`, `fillIcons`). |
 | `js/game.js:31-52` | Icônes des ressources (`resIcon`) et des races (`raceIcon`), à côté des données qu'elles illustrent. |
 | `js/sky.js` | `drawSun` : le soleil, dessiné par la carte du jeu et celle du replay. |
+| `js/spark.js` | Historique des mini-graphes des tuiles, une série par planète (D-340) : `ownHistory`, `addSample`, `sparkPath`. Fonctions pures, testées par `tests/spark.test.mjs`. |
 | `js/galaxy.js` | `startGalaxy` : fond étoilé immobile, derrière toutes les vues du jeu (D-137). |
 | `icons/` | `icon.svg` (favicon), `icon-192.png`, `icon-512.png` (icônes PWA, `manifest.json`). |
 
@@ -158,7 +159,7 @@ Conventions de rendu, à respecter pour ne pas casser le toucher :
 - **Éléments repérés par `data-*`** (`data-res`, `data-cost`, `data-build`, `data-tlevel`…), créés par `buildStatic` et mis à jour par les `render*`.
 - **Délégation d'événements** : un seul écouteur par conteneur (`#buildings` 747-750, `#techs`, `#ships`, `#powers` 604-615, `#games`, `#races`, `#trades`, `#fi-choice`, `#fi-beside`…), qui lit le `data-*` du bouton touché.
 - Carte de bâtiment : le nom est un bouton qui déplie la description (`cardHead` 547-548, écouteur global 551-556, CSS `.building.open` `style.css:512`). Barre de progression en bas de la carte pendant un chantier (`cardProgress` 991-997).
-- Mini-graphes (« sparklines ») dans les tuiles : un relevé toutes les 5 s, 10 min gardées dans `localStorage['astra.hist']`, par partie, joueur et planète (`sampleHistory` 632-655, `drawSparks` 658-680).
+- Mini-graphes (« sparklines ») dans les tuiles : un relevé toutes les 5 s de la planète ouverte, 10 min gardées **par planète** dans `localStorage['astra.hist']` (`{ id: 'partie|joueur', p: { clé: { t, v } } }`, D-340). Logique pure dans `js/spark.js` (`ownHistory`, `addSample`, `sparkPath`) ; `sampleHistory` et `drawSparks` (`js/app.js`) lisent/écrivent localStorage et le SVG. Moins de 2 relevés pour la planète affichée : tracé vide (jamais la courbe d'une autre planète).
 
 ### 4.4 Formats d'affichage (helpers)
 

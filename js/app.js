@@ -8,6 +8,7 @@ import {
   shipsAffordable, planetAlerts, FROST,
 } from './game.js';
 import { drawSun } from './sky.js';
+import { ownHistory, addSample, sparkPath } from './spark.js';
 import { readTap, underFinger, contenders, menuPlace } from './aim.js';
 import { ic, fillIcons } from './icons.js';
 import { startGalaxy, skyMode, setSkyMode } from './galaxy.js';
@@ -683,63 +684,39 @@ $('ships').addEventListener('click', (e) => {
 // ---------------------------------------------------------------------------
 //
 // Chaque téléphone relève ses propres valeurs toutes les 5 s et garde les
-// 10 dernières minutes, pour la partie en cours (gardées au rechargement).
+// 10 dernières minutes, pour la partie en cours et pour chaque planète (gardées au rechargement).
 
 const HISTORY_KEY = 'astra.hist';
-const SAMPLE_MS = 5000;
-const HISTORY_MS = 10 * 60_000;
-let hist = null; // { id, t: [instants], v: { clé: [valeurs] } } (pas « history » : ce nom est celui du navigateur)
+// Un historique par planète (js/spark.js) : { id: 'partie|joueur', p: { clé: { t, v } } }.
+// (pas « history » : ce nom est celui du navigateur)
+let hist = null;
 
 const spark = (k) =>
   `<svg class="spark" data-spark="${k}" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><path class="spark-area"/><path class="spark-line"/></svg>`;
 
 function sampleHistory(now, values, key) {
-  const id = `${session.state.gid}|${session.me}|${key}`;
+  const id = `${session.state.gid}|${session.me}`;
   if (hist?.id !== id) {
+    let saved = null;
     try {
-      hist = JSON.parse(localStorage.getItem(HISTORY_KEY) || 'null');
-    } catch {
-      hist = null;
-    }
-    if (hist?.id !== id) hist = { id, t: [], v: {} };
+      saved = JSON.parse(localStorage.getItem(HISTORY_KEY) || 'null');
+    } catch {}
+    hist = ownHistory(saved, id);
   }
-  if (hist.t.length && now - hist.t[hist.t.length - 1] < SAMPLE_MS) return;
-  hist.t.push(now);
-  for (const [k, v] of Object.entries(values)) (hist.v[k] ||= []).push(Math.round(v * 10) / 10);
-  // On oublie ce qui a plus de 10 minutes.
-  const drop = hist.t.findIndex((t) => now - t <= HISTORY_MS);
-  if (drop > 0) {
-    hist.t.splice(0, drop);
-    for (const a of Object.values(hist.v)) a.splice(0, a.length - hist.t.length);
+  if (addSample(hist, key, now, values)) {
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(hist));
+    } catch {}
   }
-  try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(hist));
-  } catch {}
-  drawSparks();
+  drawSparks(key);
 }
 
-/** Courbe de chaque tuile, à l'échelle de ses propres valeurs (de la plus basse à la plus haute). */
-function drawSparks() {
-  if (!hist) return;
+/** Courbe de chaque tuile pour la planète `key`, vide s'il y a moins de 2 relevés. */
+function drawSparks(key = openKey) {
   for (const svg of document.querySelectorAll('[data-spark]')) {
-    const vals = hist.v[svg.dataset.spark] || [];
-    const n = Math.min(vals.length, hist.t.length);
-    if (n < 2) continue;
-    // Axe du temps : du plus ancien relevé au plus récent (10 min au plus).
-    const t1 = hist.t[hist.t.length - 1];
-    const t0 = hist.t[hist.t.length - n];
-    const width = Math.max(1, t1 - t0);
-    const lo = Math.min(...vals), hi = Math.max(...vals);
-    const span = hi - lo || 1;
-    const pts = [];
-    for (let i = vals.length - n; i < vals.length; i++) {
-      const x = ((hist.t[i - vals.length + hist.t.length] - t0) / width) * 100;
-      const y = hi === lo ? 15 : 28 - ((vals[i] - lo) / span) * 26;
-      pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
-    }
-    const line = `M${pts.join('L')}`;
-    svg.querySelector('.spark-line').setAttribute('d', line);
-    svg.querySelector('.spark-area').setAttribute('d', `${line}L${pts[pts.length - 1].split(',')[0]},30L${pts[0].split(',')[0]},30Z`);
+    const path = sparkPath(hist, key, svg.dataset.spark);
+    svg.querySelector('.spark-line').setAttribute('d', path?.line ?? '');
+    svg.querySelector('.spark-area').setAttribute('d', path?.area ?? '');
   }
 }
 
