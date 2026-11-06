@@ -2326,7 +2326,7 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
 - Alternatives écartées : le coefficient sur la ligne du débit (« +12 / min ») ; garder aussi les
   chiffres sur la ligne du climat.
 - Source : capture et message de Vincent, transmis par la session « Affichage aide ».
-- Statut : en vigueur (PR #179).
+- Statut : en vigueur (PR suivante, après #179).
 
 **D-210 — Le Journal ne trahit plus l'ordre d'une flotte que je ne vois pas (issue #37)**
 - 2026-11-06 22:18. Contexte : issue #37. `moveFleet` (attaque, conquête) et `chaseFleet`
