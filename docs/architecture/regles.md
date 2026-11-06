@@ -514,6 +514,9 @@ pas (`ORDERS[kind]?.name || 'Ordre'`) et n'exécute jamais les ordres des flotte
   visible (`js/session.js:1088`), on perd la poursuite si la cible sort de vue
   (`js/session.js:1114-1119`), et on ne peut échanger qu'avec une flotte visible
   (`js/session.js:1228`).
+- **Journal** (D-210) : l'ordre d'une flotte (attaque, conquête, poursuite) est marqué de cette
+  flotte au journal partagé ; « Ce qui me concerne » ne le montre aux autres que tant qu'ils la
+  voient (`showsLog`). L'auteur le lit toujours ; le résultat du combat, toujours tout le monde.
 - **Brouillard sur les planètes** (D-124) : `knownOwner(cell)` dit ce que je sais d'une case.
   Mes planètes : toujours vues. Une case dans ma portée (`seesCell`) : son vrai propriétaire,
   retenu dans `intel` ({ "x,y": { pid, at } }), propre à ce téléphone, sauvegardé avec la

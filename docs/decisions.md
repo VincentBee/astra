@@ -2289,3 +2289,48 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
 - Qui : Vincent (règle), Claude (cas sans propriétaire, heure du propriétaire, marque
   `captured`). Source : worker `worker-cible`, issue #36.
 - Statut : en vigueur. Modifie D-092 (conquête). Cache `astra-p2p-v90` (v84 avant la fusion de `main`, qui avait déjà v89).
+
+**D-210 — Le Journal ne trahit plus l'ordre d'une flotte que je ne vois pas (issue #37)**
+- 2026-11-06 22:18. Contexte : issue #37. `moveFleet` (attaque, conquête) et `chaseFleet`
+  (poursuite) écrivaient au journal partagé « La flotte de A attaque Rigel (B) » ou « … prend en
+  chasse une flotte de B ». La fenêtre Journal (« Ce qui me concerne », D-110) montrait à B toutes
+  les lignes qui contiennent son nom : B apprenait l'attaque dès l'ordre, flotte hors de sa
+  détection, alors que la carte (D-128) et l'alerte (D-133) ne montraient rien.
+- Choix de Claude : **marquer et filtrer**. Une ligne d'ordre de flotte porte `{ pid, fleet }`
+  (le joueur et sa flotte) dans le journal partagé ; `showsLog(l)` (`js/session.js`) la montre à
+  son auteur toujours, aux autres seulement tant qu'ils voient cette flotte (`sees`, la règle de
+  la carte et de l'alerte). Flotte disparue (posée, détruite) : la ligne reste cachée ; le
+  combat a ses propres lignes (« est attaquée par », « prend … à », carnet D-110), jamais
+  marquées, toujours montrées. `openJournal` (`js/app.js`) passe par `showsLog`. Une marque mal
+  formée reçue du réseau est ignorée (`pushLog` : `pid` et `fleet` doivent être du texte) ; la
+  ligne redevient ordinaire. Tous les ordres de `moveFleet` sont marqués (coloniser et se poser
+  ne nomment que l'auteur : aucun changement pour eux).
+- Alternative écartée : garder ces lignes hors du journal partagé (journal local de l'auteur
+  seulement). Il aurait fallu un second journal, sauvegardé à part, et B n'aurait jamais lu
+  l'ordre, même flotte en vue. La marque garde un seul journal et suit la même règle que la
+  carte. Comme D-128, c'est un **filtre d'affichage, pas un secret** : la ligne voyage toujours
+  avec la fiche (la fiche contient d'ailleurs déjà l'ordre de la flotte), et la console
+  (`printLog`) la montre toujours, pour le débogage.
+- Avec D-190 (fusionné avant) : la ligne ne nomme la cible que si l'auteur voit sa planète
+  (`live`). Hors de sa vue, la ligne ne contient pas le nom de B et n'est déjà pas dans son
+  Journal. La marque reste utile quand l'auteur voit la planète (un éclaireur, du radar) mais que
+  la cible ne voit pas la flotte d'attaque : les scénarios d'attaque et de conquête placent un
+  éclaireur de A à 1 case de la planète de B pour couvrir ce cas.
+- Rejeu (`js/replay.js`) : inchangé. Son journal rejoué ne garde que `{ at, pid, text }`, et la
+  marque ne change pas l'état de la partie ; `tests/replay.test.mjs` passe sans changement.
+- Vérifié : 4 scénarios (`tests/journal.test.mjs`) : attaque et conquête depuis 19 cases (B ne lit
+  pas l'ordre tant qu'il ne voit pas la flotte, A toujours ; flotte à 2 cases : B la voit,
+  l'alerte sonne, l'ordre se lit ; après le combat, B lit le résultat) ; poursuite (A, radar 3,
+  voit le cargo de B à 4 cases, B ne voit pas A) ; marque gardée par `onRecord`, marque mal formée
+  ignorée. Contrôlés par mutation (`showsLog` qui renvoie toujours vrai : les 4 échouent).
+  222/222. Vu dans le vrai jeu (interface de test, contre l'IA) : Journal de B avant, flotte en
+  vue, après le combat.
+- Qui : Claude (choix de méthode, demandé par la session de coordination). Source : session
+  `89918100`.
+  Statut : en vigueur. Applique D-128 et D-133 au Journal (D-110).
+
+**D-211 — Cache `astra-p2p-v91`**
+- 2026-11-06. Choix de Claude : `js/app.js` et `js/session.js` changent (D-210) ; nouvelle
+  version de cache pour que les téléphones les récupèrent. Prévu en v84 ; `main` est passé à v86
+  (D-176), puis à v90 (#161, #162, #165, #166) avant les fusions, d'où v91.
+- Statut : en vigueur.
