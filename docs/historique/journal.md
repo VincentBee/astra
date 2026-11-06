@@ -415,6 +415,13 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 |---|---|---|---|---|---|
 | 08:58 | `fb0c1844` | [Auto-fix] conflit avec `main` | Huitième fusion de `main` (D-157 à D-159, cache v81 déjà pris) : ma décision devient D-160, cache v82 (D-161) ; 212/212 | (cette PR) | D-160, D-161 |
 
+## 6 novembre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 21:00 | `6a1c3a43` | (transmise par la session de coordination) issue #45 : « avant que les joueurs disent "pret", les horloges des telephones doivent etre comparé, et si l'une est desynchronisé, il faut qu'il ai un message d'erreur et l'impossibilité de cliquer sur "pret" » et « les dates dans le futur sont automatiquement en erreur » | Mesure de l'écart d'horloge dans `hb`/`hb-ack`, blocage de « Prêt » (seuil 10 s), testé dans le vrai jeu ; question posée : refuser une fiche entière bloque la synchro du joueur en avance | (branche, remplacé) | D-164 |
+| 21:40 | `6a1c3a43` | Nouvelle règle de Vincent : « on ne va plus refuser un joueur avec une date differente… si tous les joueurs envoient un message a un joueur comme quoi il a changé sa date… alors il est resynchronisé avec les informations des autres, et non les siennes » ; puis « 1 oui, 2 a deux joueur, celui qui a fait la partie a plus de poid que l'autre ; 3 oui et 4 Ce qu'il a fait avec sa mauvaise heure est remplacé par ce que les autres savent de lui » | Blocage retiré. Heure commune (celle du créateur, avancée par `performance.now()`), messages `clock-changed`/`clock-ok`, consensus, resynchronisation (`clockFix`), `FORMAT` 11, cache v84 ; `tests/clock.test.mjs` (10 scénarios) ; vrai jeu à 3 (consensus) et à 2 (duel) ; 222/222 | (cette PR) | D-165, D-166 |
+
 ### Travaux en cours au 2026-10-29
 
 - **Rythme des parties** (`26f178b9`) : commité sur `claude/swarm-it-game-pacing-1d4502`
