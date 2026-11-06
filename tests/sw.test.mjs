@@ -166,10 +166,13 @@ test('serveur muet, page jamais mise en cache : on continue d’attendre le rés
 });
 
 test('serveur lent (4 s) : le cache d’abord, puis la réponse tardive met le cache à jour', async () => {
+  // Une réponse du réseau remet le drapeau « muet » à faux : la course de 3 s reprend.
+  mode = 'up';
+  await Promise.all((await get('/style.css')).waits);
   mode = 'slow';
   override.set('/index.html', '<!doctype html><title>Astra</title>VERSION LENTE');
   const r = await get('/index.html');
-  assert.ok(r.ms < 5000, `servie en ${r.ms} ms`);
+  assert.ok(r.ms < 5000 && r.ms >= 2900, `servie en ${r.ms} ms, après le délai de 3 s`);
   assert.match(r.text, /NOUVELLE VERSION/, 'la copie en cache, pas encore la version lente');
   await Promise.all(r.waits);
   assert.match(await cached('/index.html'), /VERSION LENTE/, 'la prochaine ouverture aura la nouvelle version');

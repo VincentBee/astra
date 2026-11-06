@@ -2131,8 +2131,11 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
   plus de 10 s) ; délai plus court (1 s : une vraie 4G lente perdrait trop souvent la nouvelle
   version) ; `AbortController` sur le `fetch` (on perdrait la réponse tardive qui met le cache
   à jour).
-- Limites : juste après le retour du réseau, une ouverture peut encore servir le cache une
-  fois ; le drapeau est perdu quand le navigateur arrête le service worker (retour au
+- Limites : sur un réseau lent mais vivant, `index.html` peut arriver du réseau avant 3 s et un
+  module du cache après 3 s : une page neuve avec d'anciens modules pour cette ouverture (le
+  risque existait déjà si le réseau lâchait en plein chargement ; la réponse tardive mise en
+  cache répare l'ouverture suivante). Juste après le retour du réseau, une ouverture peut
+  encore servir le cache une fois ; le drapeau est perdu quand le navigateur arrête le service worker (retour au
   comportement normal). Ne touche ni #84 (`technologies.html` absente de `FILES`) ni #89 (les
   réponses d'erreur sont mises en cache, y compris la réponse tardive, comme avant).
 - Qui : **choix de Claude** (le ticket laissait le choix de la méthode). Source : session
