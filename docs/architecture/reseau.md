@@ -85,19 +85,24 @@ pas la différence, sauf `link.viaRoom` (voir §6, `attach`).
 - `routeOf(pc)` l.23 est une copie de `Link.route()`.
 
 ### js/save.js
-Clés `localStorage` (l.13-16) :
+Clés `localStorage` (l.13-18, format D-240) :
 
 | Clé | Contenu |
 |---|---|
-| `astra.save` | partie en cours `{ v: 1, me, savedAt, state, journal?, intel?, bots? }` (`journal` : mon carnet de combats, D-110, propre au téléphone ; `bots` : les IA que ce téléphone fait jouer, D-155) |
-| `astra.saves` | historique `{ gid: sauvegarde }`, 10 plus récentes (`KEEP`, l.17) |
+| `astra.save` | la partie en cours, **elle seule** `{ v: 1, me, savedAt, state, journal?, intel?, bots? }` (`journal` : mon carnet de combats, D-110, propre au téléphone ; `bots` : les IA que ce téléphone fait jouer, D-155). Seule clé réécrite à chaque action |
+| `astra.save.<gid>` | une partie de l'historique (même forme), autre que celle en cours : une clé par partie |
+| `astra.games` | index de l'historique `{ gid: savedAt }` (sans la partie en cours) ; au plus `KEEP - 1` = 9 parties, 10 avec celle en cours (`KEEP`, l.19) |
+| `astra.saves` | **ancien format** (avant D-240) : tout l'historique d'un bloc, partie en cours comprise. Repris puis effacé au premier accès (`migrate()`) |
 | `astra.identity` | mon identité dans la partie en cours `{ gid, pid, secret }` |
 | `astra.identities` | historique `{ gid: identité }` |
 
 Autres clés lues ailleurs : `astra.relays` (`js/config.js:18`), `astra.name` (`js/app.js:133`), `astra.sky` (réglage « Fond », `js/galaxy.js`, D-112).
 
-- `saveGame(me, state, journal)` l.41 (`journal` facultatif ; `Session.resume` et `onWelcome` le reprennent, même partie et même joueur), `loadGame()` l.51, `listGames()` l.70, `selectGame(gid)` l.76 (la remet en cours, avec son identité), `forgetGame(gid)` l.86, `saveIdentity(id)` l.111, `loadIdentity()` l.108, `describeSave(save)` l.150.
-- Stockage abîmé (D-170) : `archive()` ne garde de `astra.saves` que les entrées qui passent `valid()`, et part de `{}` si la valeur n'est pas un objet simple (`null`, tableau, texte) ; idem `identities()` pour `astra.identities`. Les entrées abîmées sont ignorées partout (`saveGame`, `listGames`, `selectGame`, `forgetGame`) et disparaissent à la prochaine écriture.
+- `saveGame(me, state, journal, intel, bots)` l.179 (renvoie `true` si la partie est sauvée ; `Session.resume` et `onWelcome` reprennent `journal`, même partie et même joueur), `loadGame()` l.203, `listGames()` l.216 (historique + partie en cours, la plus récente d'abord), `selectGame(gid)` l.227 (la remet en cours, avec son identité ; l'ancienne partie en cours rejoint l'historique), `forgetGame(gid)` l.252, `saveIdentity(id)` l.276, `loadIdentity()` l.273, `describeSave(save)`, `onSaveFailed(fn)` l.54.
+- **Mémoire pleine (D-240)** : toute écriture d'une partie passe par `fit()` (l.102). Si le navigateur lève `QuotaExceededError` (`isFull`), on retire la plus ancienne partie de l'historique (jamais la partie en cours, ni celle qu'on range) et on réessaie, jusqu'à ce que ça passe. Si rien n'y fait (partie en cours plus grosse que toute la mémoire, ou stockage bloqué : autre erreur, sans rien retirer), les parties retirées sont remises, `astra.save` garde la dernière sauvegarde réussie, et `onSaveFailed` prévient `app.js`, qui montre un toast (au plus une fois par minute, `RETELL` l.52).
+- Changement de partie (`saveGame` avec un autre `gid`, `selectGame`) : la nouvelle partie est écrite d'abord dans `astra.save`, puis l'ancienne est rangée dans `astra.save.<gid>` (`archiveSave`, l.126), en retirant les plus vieilles au-delà de 9. Une action ordinaire n'écrit que `astra.save` (≈ la taille de la partie : règle aussi #91).
+- Ancien format (`migrate()`, l.140) : `astra.saves` est lu en mémoire, effacé d'abord (sinon la place manque pour recopier), puis chaque partie reçoit sa clé, la plus récente d'abord ; la copie de la partie en cours n'est pas recopiée (si elle était plus récente que `astra.save`, elle la remplace). JS synchrone : rien ne peut s'intercaler entre l'effacement et la recopie.
+- Stockage abîmé (D-170, modifié par D-240) : seules les entrées qui passent `valid()` sont reprises de l'ancien `astra.saves` ; un index `astra.games` abîmé (pas un objet simple) est ignoré ; une clé `astra.save.<gid>` abîmée est sautée par `listGames` et `selectGame`. L'index est complété par les clés `astra.save.*` présentes (`keys()`, l.82, si le navigateur sait les énumérer) : un index perdu ou en retard ne cache aucune partie. Idem `identities()` pour `astra.identities`.
 - `js/replay-view.js:5` lit `loadGame()` : c'est pourquoi « Revoir » fait d'abord `selectGame(gid)` puis ouvre `replay.html` (`app.js:182-184`).
 - `mergeStates(base, other)` l.123 : même `gid` obligatoire ; pour chaque joueur, garde la fiche au plus grand `actAt` (`base` gagne à égalité) ; garde `online` de `base` ; journal = union sans doublon (`at|text`), trié, 40 dernières entrées.
 
@@ -215,7 +220,7 @@ Trois chemins :
 Un pair qui arrive par le rendez-vous et par un lien direct garde le lien rendez-vous (`attach`, l.352).
 
 ### 6.5 Sauvegarde et reprise
-- Sauvegarde à chaque `changed()` (après action), différée de 500 ms à la réception d'une fiche, à `visibilitychange` caché, à `pagehide` (`app.js:191`), à `end()`.
+- Sauvegarde (de la seule partie en cours, D-240) à chaque `changed()` (après action), différée de 500 ms à la réception d'une fiche, à `visibilitychange` caché, à `pagehide` (`app.js:191`), à `end()`.
 - Écran d'accueil : `listGames` → reprendre (`selectGame` + `Session.resume`), revoir (`replay.html`), oublier (`forgetGame`) (`app.js:153-189`).
 - Une partie « continue » hors connexion : tout se calcule depuis le temps écoulé ; à la reprise `tick()` rattrape.
 - Copies jouées séparément : fusion par fiche (`mergeStates`), à `welcome` (copie locale), à `hello` (copie de l'invité), à chaque `sync`.
@@ -264,7 +269,7 @@ Le sens de ce journal pour le rejeu (`seenNews`, `replayIds`) est décrit dans `
 - Un message de plus de 256 Ko dépasserait la limite annoncée par `a=max-message-size` (`invite.js:166`, `peer.js:35`) : passer toujours par `Link.send`, qui découpe.
 - Changer le format du code d'invitation : changer `VERSION` dans `invite.js` (sinon décodage faux).
 - Changer le format des fiches : incrémenter `FORMAT` et compléter son commentaire (l.32-40).
-- `sw.js` : changer `VERSION` (`astra-p2p-v53` au 2026-10-30) à chaque mise en ligne. `cache.addAll` est tout ou rien : un fichier absent de `FILES` qui renvoie 404 casse l'installation.
+- `sw.js` : changer `VERSION` (`astra-p2p-v87` au 2026-11-06) à chaque mise en ligne. `cache.addAll` est tout ou rien : un fichier absent de `FILES` qui renvoie 404 casse l'installation.
 - **`technologies.html` et `js/techtree.js` ne sont pas dans `FILES`** (`sw.js:5-34`). Ils ne sont pas pré-cachés ; ils ne marchent hors ligne que s'ils ont déjà été ouverts en ligne (le `fetch` met en cache ce qu'il télécharge, l.53-57).
 - Le service worker n'est enregistré qu'en https ou sur `localhost` (`app.js:1964`). La caméra aussi exige https (`scanner.js:25`).
 - `route()` est copié dans `peer.js:125` et `rendezvous.js:23`.
@@ -295,7 +300,7 @@ Résultat (2026-10-29) : 35 tests, 35 réussis, 0 échec (≈ 5,7 s).
 Les numéros D-xxx renvoient à [decisions.md](../decisions.md) ; les demandes datées sont dans [journal.md](../historique/journal.md). Le code ci-dessus est la référence ; ces lignes expliquent seulement l'origine.
 - Découpage des messages en morceaux : limite de 256 Ko par message WebRTC (commit `7f5fabe`, D-046 ; journal des ordres D-044, ordres refusés notés D-045).
 - Journal des ordres dans chaque fiche, plafonné à 1 500 entrées, avec le compte des entrées des autres connues (`69d687e`, D-049, D-050).
-- Historique de 10 parties et identité gardée par partie (`astra.saves`, `astra.identities`, `1eeb2c1`, D-066).
+- Historique de 10 parties et identité gardée par partie (`astra.saves`, `astra.identities`, `1eeb2c1`, D-066) ; une clé par partie et ménage quand la mémoire est pleine (D-240, issue #41).
 - Garde-fous de réception (`recordOk`, `backdated`, tolérance d'horloge d'un jour au lieu de 10 min) : `061744b`, D-061.
 - Assumé, non corrigé : un joueur qui modifie son code peut inventer un combat dans sa propre fiche ; signer les fiches a été jugé trop lourd (D-057).
 - `technologies.html` non mis en cache par `sw.js` : déjà signalé le 2026-10-28 à 15:12 (session `01be156b`), toujours vrai au commit 1eeb2c1.

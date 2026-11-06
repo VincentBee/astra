@@ -1,5 +1,5 @@
 import { Session, threatText } from './session.js';
-import { loadGame, listGames, selectGame, forgetGame, describeSave } from './save.js';
+import { loadGame, listGames, selectGame, forgetGame, describeSave, onSaveFailed } from './save.js';
 import { inviteLink, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
 import {
@@ -75,6 +75,8 @@ function toast(text, ms = 3200) {
   if (toasts.length > 6) toasts.splice(Math.max(0, toasts.findIndex((t) => t.ms <= 3200)), 1); // les longs (élimination) restent
   if (!toastTimer) nextToast();
 }
+// Mémoire du téléphone pleine malgré le ménage de l'historique (D-240) : le joueur est prévenu.
+onSaveFailed(() => toast('Sauvegarde impossible : la mémoire du téléphone est pleine. La partie continue, mais elle ne sera pas gardée si tu fermes l’appli.', 8000));
 function nextToast() {
   const t = $('toast');
   const next = toasts.shift();
