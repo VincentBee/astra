@@ -29,6 +29,8 @@ const write = (k, v) => {
   } catch {}
 };
 const valid = (s) => s && s.v === 1 && s.state?.players;
+// Objet simple { clé: valeur } : ni null, ni tableau, ni texte (stockage abîmé, D-170).
+const isMap = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
 /**
  * Range la partie en cours et la garde dans l'historique (les plus récentes seulement).
@@ -51,9 +53,14 @@ export function loadGame() {
   return valid(s) ? s : null;
 }
 
-/** L'historique, sauvegardes d'avant l'historique comprises. */
+/**
+ * L'historique, sauvegardes d'avant l'historique comprises. Les entrées abîmées (null, sans
+ * `state`, texte…) sont laissées de côté, et disparaissent à la prochaine écriture (D-170).
+ */
 function archive() {
-  const all = read(SAVES_KEY, {});
+  const raw = read(SAVES_KEY, {});
+  const all = {};
+  if (isMap(raw)) for (const [gid, s] of Object.entries(raw)) if (valid(s)) all[gid] = s;
   const cur = loadGame();
   if (cur && !all[cur.state.gid]) all[cur.state.gid] = cur;
   return all;
@@ -62,7 +69,6 @@ function archive() {
 /** Les dernières parties jouées sur ce téléphone, la plus récente d'abord. */
 export function listGames() {
   return Object.values(archive())
-    .filter(valid)
     .sort((a, b) => b.savedAt - a.savedAt);
 }
 
@@ -92,7 +98,8 @@ export function forgetGame(gid) {
 }
 
 function identities() {
-  const ids = read(IDS_KEY, {});
+  const raw = read(IDS_KEY, {});
+  const ids = isMap(raw) ? raw : {};
   const cur = read(ID_KEY, null);
   if (cur?.gid && !ids[cur.gid]) ids[cur.gid] = cur;
   return ids;

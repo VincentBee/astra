@@ -328,6 +328,62 @@ scenario('D-066 : l’identité est gardée par partie ; reprendre et oublier', 
   });
 });
 
+// ----- D-170 : un historique abîmé est ignoré (issue #87)
+
+/** Les 5 formes abîmées de `astra.saves` (texte brut, tel que rangé dans localStorage). */
+const BROKEN_SAVES = {
+  'entrée null': '{"zzz":null}',
+  'entrée sans state': '{"zzz":{"v":1,"me":"p0","savedAt":1}}',
+  tableau: '[{"v":1}]',
+  'texte JSON': '"abc"',
+  'JSON cassé': '{pas du json',
+};
+
+scenario('D-170 : un historique abîmé n’empêche ni l’accueil, ni les ordres, ni la sauvegarde', async (film) => {
+  const rows = [];
+  for (const [name, raw] of Object.entries(BROKEN_SAVES)) {
+    await withStore(async (m) => {
+      const st = (gid) => ({ gid, players: { me: { id: 'me', name: 'Moi', rank: 0 } }, log: [] });
+      save.saveGame('me', st('old'));
+      m.set('astra.saves', raw);
+      // Accueil : la liste se lit sans planter (la partie en cours y figure toujours).
+      const listed = save.listGames().map((x) => x.state.gid);
+      assert.deepEqual(listed, ['old'], `${name} : accueil`);
+      assert.equal(save.selectGame('zzz'), null, `${name} : selectGame ignore l’entrée abîmée`);
+      assert.equal(save.selectGame('old').state.gid, 'old', `${name} : selectGame`);
+      // Un ordre, l'historique de nouveau abîmé juste avant : l'écran est prévenu et la sauvegarde suit.
+      const A = soloNow('gcorrupt');
+      m.set('astra.saves', raw);
+      let told = 0;
+      A.onchange = () => told++;
+      A.build(firstBuilding(A));
+      const saved = JSON.parse(m.get('astra.save'));
+      assert.equal(told, 1, `${name} : écran prévenu`);
+      assert.equal(saved.state.gid, 'gcorrupt', `${name} : ordre sauvé`);
+      assert.equal(saved.state.players.p0.actAt, P(A).actAt, `${name} : chantier sauvé`);
+      // L'historique est réécrit propre, sans l'entrée abîmée.
+      const after = JSON.parse(m.get('astra.saves'));
+      assert.deepEqual(Object.keys(after), ['gcorrupt'], `${name} : historique propre`);
+      m.set('astra.saves', raw);
+      save.forgetGame('gcorrupt');
+      assert.deepEqual(save.listGames(), [], `${name} : forgetGame`);
+      rows.push({ name, A, listed, told, kept: Object.keys(after).sort() });
+    });
+  }
+  // Historique d'identités abîmé (texte) : saveIdentity, selectGame et forgetGame tiennent aussi.
+  await withStore((m) => {
+    m.set('astra.identities', '"abc"');
+    save.saveIdentity({ gid: 'X', pid: 'px', secret: 'sx' });
+    assert.equal(JSON.parse(m.get('astra.identities')).X.pid, 'px');
+  });
+  const last = rows.at(-1);
+  film.look(last.A, 'un ordre donné avec un historique abîmé : l’écran suit, la partie est sauvée', rows.map((r) => ({
+    show: r.name,
+    expected: 'accueil old · écran 1 · historique gcorrupt',
+    got: `accueil ${r.listed.join('+')} · écran ${r.told} · historique ${r.kept.join('+')}`,
+  })));
+});
+
 // ----- D-045 / D-049 / D-050 : journal des ordres
 
 scenario('D-045 : un ordre refusé est noté et date la fiche', (film) => {
