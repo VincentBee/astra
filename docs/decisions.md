@@ -2040,6 +2040,77 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   session `65b37922`.
   Statut : en vigueur. Modifie D-120. Cache `astra-p2p-v83`.
 
+## 6 novembre 2026 — sauvegarde abîmée (#87)
+
+Numéro pris haut (D-170) : les PR #158 (D-163) et celle de #45 (D-164 et suivants) prennent déjà
+les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
+
+**D-170 — Un historique de sauvegardes abîmé est ignoré, puis réécrit propre**
+- 2026-11-06 22:00. Contexte : issue #87. Une entrée invalide dans `astra.saves` (`null`, sans
+  `state`, tableau, texte JSON `"abc"`) faisait lever une `TypeError` dans `saveGame`, donc dans
+  chaque ordre : l'état changeait mais l'écran n'était pas prévenu. Avec un texte JSON, l'accueil
+  plantait aussi au démarrage (`listGames`). Cause externe (stockage abîmé, extension, outil) : le
+  joueur ne pouvait s'en sortir qu'en vidant les données du site.
+- Choix de Claude, par défaut : `archive()` (`js/save.js`) part de `{}` si `astra.saves` n'est pas
+  un objet simple (`isMap` : ni `null`, ni tableau, ni texte), et ne garde que les entrées qui passent
+  `valid()`. `saveGame`, `listGames`, `selectGame` et `forgetGame` passent tous par `archive()`, donc
+  ignorent tous les entrées abîmées. Rien n'est effacé à la lecture : l'historique est réécrit sans
+  elles à la prochaine écriture (`saveGame` ou `forgetGame`). Même garde pour `astra.identities`
+  (`identities()`), lu par `selectGame`, `forgetGame` et `saveIdentity`.
+- Alternatives écartées : tout effacer dès qu'une entrée est abîmée (on perdrait les bonnes
+  parties) ; purger à la lecture (une lecture qui écrit surprend, et la prochaine sauvegarde le fait
+  de toute façon, au plus tard au premier ordre).
+- Cache `sw.js` : `astra-p2p-v85` (v83 et v84 sont laissés aux PR #158 et #45).
+- Vérifié : scénario « D-170 : un historique abîmé… » (`tests/decisions-reseau.test.mjs`, les 5
+  formes de l'issue), qui échoue sans la correction ; vrai jeu avec `{"zzz":null}` puis `"abc"`.
+- Qui : Vincent (demande : corriger #87), Claude (forme de la correction). Source : session
+  `9e675a52`. Statut : en vigueur. Complète D-066.
+
+**D-175 — Le calcul de l'économie est borné à 2 000 pas ; l'heure d'une planète reçue a un plancher**
+- 2026-11-06. Contexte : issue #32. `steps` et `until` intégraient l'économie par pas de 48 s
+  sans plafond : une planète datée de très loin faisait des millions de pas. `planetOk` acceptait
+  tout `at` fini : une fiche reçue avec `planet.at = 0` figeait la page de chaque téléphone qui
+  l'affichait (≈ 37 millions de pas par `stateAt`). Numéro : D-163 à D-169 étant pris ou réservés
+  par d'autres PR, cette PR prend D-175.
+- Choix de Claude :
+  1. **Nombre de pas borné** : `stepOf(durée) = max(1 s, min(2 h de jeu, durée / 300),
+     durée / MAX_STEPS)`, `MAX_STEPS = 2000`, dans `steps` et `until`. Le troisième terme ne
+     gagne qu'au-delà de 2 000 × 48 s ≈ 26,7 h : sous cette durée (donc toute partie normale,
+     et tout écart de moins de 4 h), les pas sont exactement ceux d'avant, l'économie ne change
+     pas d'un chiffre. Aucune question au router n'était donc nécessaire. Le calcul reste
+     déterministe : le pas ne dépend que de la durée. Au-delà de 26,7 h, les pas s'allongent :
+     le résultat reste fini et positif (vérifié sur les trois races à `at = 0`) mais
+     s'éloigne de ce que donneraient des passages réguliers.
+  2. **Plancher de l'heure dans `planetOk`** : `at` est **ramené** (pas refusé) au plancher
+     connu par la fiche elle-même : `since` (entrée dans la course, écrite une fois) pour la
+     planète mère ; le plus tardif de `since` et de `claimAt` pour une colonie. Aucune planète
+     n'existe avant ces heures (`newPlanet` naît à l'heure de l'installation ou de l'arrivée,
+     `settle` n'avance que vers l'avant). Ramener plutôt que refuser : `normalize` passe aussi
+     sur ma propre fiche au chargement (`clean`), un refus effacerait ma planète au moindre
+     écart ; ramener ne crée rien (le tricheur perd la production d'avant le plancher).
+- Alternatives écartées : couper la durée simulée (n'intégrer que les N dernières heures) :
+  aussi borné, mais change le résultat dès cette durée ; refuser la planète (`planet = null`) ;
+  plancher pris sur l'heure du téléphone qui reçoit (`now`, `startedAt`) : différent d'un
+  téléphone à l'autre, ou tiré des `go` que le tricheur peut aussi trafiquer ; plancher sur
+  `p.claimAt` de la planète mère (`claimPlanet` garde une planète existante avec `||=`, son `at`
+  peut être plus ancien).
+- Limites : une fiche sans `since` (partie d'avant la course, ou retiré par le tricheur) n'a pas
+  de plancher, seul `MAX_STEPS` la protège ; une heure loin dans le futur n'est pas bornée
+  (`normalize` ne connaît pas l'heure, et elle ne coûte rien).
+- Qui : Claude, par défaut (le ticket laissait le choix). Source : session `424ded66`, issue #32.
+  Statut : en vigueur.
+- Tests : `tests/rules.test.mjs` (planète datée de 1970 ou de 30 jours en moins de 100 ms ; pas
+  inchangés sous 26 h ; une heure calculée d'un coup ou soldée toutes les 250 ms à 0,1 % près),
+  `tests/hostile.test.mjs` (fiche reçue avec `at = 0` ramenée à `since` ; colonie ramenée à
+  sa prise).
+
+**D-176 — Cache `astra-p2p-v86`**
+- 2026-11-06. Contexte : v83 (PR #158, déjà dans `main`) et v85 (PR #159, déjà dans `main`) sont pris, v84 est
+  probablement réservé par la PR de #45 (non confirmé).
+- Choix : `VERSION` passe à `astra-p2p-v86` pour que les téléphones prennent les nouveaux
+  `game.js` et `session.js`.
+- Qui : Claude, par défaut. Source : session `424ded66`. Statut : en vigueur.
+
 **D-210 — Le Journal ne trahit plus l'ordre d'une flotte que je ne vois pas (issue #37)**
 - 2026-11-06 22:18. Contexte : issue #37. `moveFleet` (attaque, conquête) et `chaseFleet`
   (poursuite) écrivaient au journal partagé « La flotte de A attaque Rigel (B) » ou « … prend en
@@ -2074,7 +2145,8 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   `89918100`.
   Statut : en vigueur. Applique D-128 et D-133 au Journal (D-110).
 
-**D-211 — Cache `astra-p2p-v84`**
+**D-211 — Cache `astra-p2p-v87`**
 - 2026-11-06. Choix de Claude : `js/app.js` et `js/session.js` changent (D-210) ; nouvelle
-  version de cache pour que les téléphones les récupèrent.
+  version de cache pour que les téléphones les récupèrent. Prévu en v84 ; `main` est passé à v86
+  (D-176) avant la fusion, d'où v87.
 - Statut : en vigueur.

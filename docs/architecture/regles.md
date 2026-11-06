@@ -164,9 +164,16 @@ temps de réponse humains.
 L'économie n'a pas de formule fermée (la population grandit ou meurt selon les stocks) : on
 l'intègre par pas (`js/game.js:13-15`).
 
-- `steps` (`js/game.js:519-531`) : pas `dt = max(1 s, min(2 min, durée / 300))`. Donc
-  des pas de 1 s sous 5 min, exactement 300 pas entre 5 min et 10 h, et des pas de 2 min
-  réelles au-delà (une journée = 720 pas).
+- `steps` et `until` (`js/game.js`) prennent leur pas dans `stepOf(durée)` :
+  `dt = max(1 s, min(2 h de jeu, durée / 300), durée / MAX_STEPS)`, avec 2 h de jeu = 48 s
+  réelles (TEMPO 2,5) et `MAX_STEPS = 2000` (D-175). Donc des pas de 1 s sous 5 min,
+  exactement 300 pas entre 5 min et 4 h, des pas de 48 s au-delà (une journée = 1 800 pas),
+  et jamais plus de 2 000 pas : au-delà de 2 000 × 48 s ≈ 26,7 h, les pas s'allongent
+  (30 jours : pas de 21,6 min). Une partie (36 min) garde exactement ses pas d'avant ; seule
+  une planète restée plus d'un jour sans calcul est intégrée plus grossièrement (résultat fini
+  et positif, mais pas identique à des passages réguliers). Avant D-175, rien ne bornait le
+  nombre de pas : une fiche reçue avec `at = 0` demandait ≈ 37 millions de pas et figeait la
+  page (#32).
 - `simulate` (`js/game.js:534-541`) coupe le calcul à la fin d'une transe : production
   doublée (`boost = 2`) jusque-là.
 - `advance` (`js/game.js:483-511`) fait un pas : flux (`flows`), plafonds des entrepôts,
@@ -848,6 +855,14 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
 - Ne pas compter deux fois : `defenseAt`, `pendingFight`, `engaged`/`ack`, `applied`,
   `RAID_COOLDOWN_MS`.
 - `normalize`, `planetOk`, `cleanAmounts` (formes et bornes des fiches reçues) : reseau.md.
+- Heure d'une planète reçue (D-175, #32) : `planetOk` ramène `at` à un plancher tiré de la fiche
+  elle-même, s'il est connu : l'entrée du joueur dans la course (`since`) pour la planète mère,
+  et pour une colonie le plus tardif de `since` et de son heure de prise (`claimAt`). Ce
+  plancher ne dépend que de la fiche : tous les téléphones trouvent la même heure. Une fiche
+  sans `since` (partie d'avant la course, ou tricheur qui l'a retirée) n'a pas de plancher ;
+  là, seul `MAX_STEPS` (§4.2) protège : le calcul reste borné. Une heure loin dans le futur
+  n'est pas bornée ici (`normalize` ne connaît pas l'heure) : elle ne coûte rien
+  (`steps` s'arrête aussitôt).
 
 ## 15. Constantes d'équilibrage : où les changer
 
@@ -1000,11 +1015,12 @@ avec leur date et leur source.
 
 À corriger un jour dans le code (rien n'est cassé, ce sont des commentaires) :
 
-1. `js/game.js:14-15` dit « 300 [pas] au plus par calcul, même après une journée
-   d'absence ». Le code (`js/game.js:524`) plafonne le pas à 2 min : une journée réelle donne
-   720 pas.
-2. `js/game.js:516-517` parle de pas qui s'allongent « au-delà de 2000 pas ». Le code ne le
-   fait pas ; le commentaire juste au-dessus du calcul (`js/game.js:523`) dit le contraire.
+1. ~~`js/game.js:14-15` dit « 300 [pas] au plus par calcul, même après une journée
+   d'absence ». Le code plafonne le pas à 2 h de jeu : une journée réelle donne 1 800 pas.~~
+   Corrigé par D-175 (#32) : le code borne maintenant le calcul à `MAX_STEPS` pas, et le
+   commentaire dit la vraie règle.
+2. ~~`js/game.js:516-517` parle de pas qui s'allongent « au-delà de 2000 pas ». Le code ne le
+   fait pas.~~ Corrigé par D-175 (#32) : c'est maintenant la règle (`stepOf`).
 3. `js/game.js:969` dit « de 12 à 22 places » ; `PLANET_PLACES` vaut `[14, 22]`
    (`js/game.js:818`, dont le commentaire explique que 12 était trop peu).
 4. `js/tech.js:224-226` : « un plein mène à 30 [cases] (machines) ». Seule la sonde

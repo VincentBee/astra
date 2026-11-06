@@ -125,10 +125,13 @@ export function normalize(p) {
   }
   // Une fiche vient d'un autre téléphone, peut-être abîmée ou trafiquée : ce qui
   // n'a pas la bonne forme est écarté, plutôt que de faire planter chaque passage.
-  if (p.planet && !planetOk(p.race, p.planet)) p.planet = null;
+  // Heure plancher d'une planète (D-175) : l'entrée du joueur dans la course (`since`, écrite une
+  // fois), et pour une colonie son heure de prise (`claimAt`). Aucune planète n'existe avant.
+  const since = Number.isFinite(p.since) ? p.since : -Infinity;
+  if (p.planet && !planetOk(p.race, p.planet, since)) p.planet = null;
   // Colonies, flottes en route, dégâts infligés aux autres (et reçus, déjà appliqués).
   if (!isObj(p.colonies)) p.colonies = {};
-  for (const [id, c] of Object.entries(p.colonies)) if (!planetOk(p.race, c)) delete p.colonies[id];
+  for (const [id, c] of Object.entries(p.colonies)) if (!planetOk(p.race, c, Math.max(since, Number.isFinite(c?.claimAt) ? c.claimAt : -Infinity))) delete p.colonies[id];
   if (!Array.isArray(p.fleets)) p.fleets = [];
   p.fleets = p.fleets.filter((f) => isObj(f) && isCell(f.from) && isCell(f.to) && isObj(f.ships));
   p.fleets.forEach(upgradeFleet);
@@ -167,9 +170,13 @@ export function normalize(p) {
 
 const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
 const isCell = (c) => isObj(c) && Number.isFinite(c.x) && Number.isFinite(c.y);
-/** Planète utilisable : stock, niveaux, et un chantier en cours sur un vrai bâtiment de sa race. */
-function planetOk(race, pl) {
+/**
+ * Planète utilisable : stock, niveaux, et un chantier en cours sur un vrai bâtiment de sa race.
+ * Une heure `at` d'avant `floor` (la planète n'existait pas encore) est ramenée à `floor` (D-175).
+ */
+function planetOk(race, pl, floor = -Infinity) {
   if (!isObj(pl) || !isObj(pl.stock) || !isObj(pl.levels) || !Number.isFinite(pl.at)) return false;
+  if (pl.at < floor) pl.at = floor;
   // Gisements : pour chaque ressource du sol, un maximum et une repousse, et ce qu'il en reste.
   const soilOk = isObj(pl.nature) && isObj(pl.reserve) && SOIL.every((r) => !pl.nature[r] || (isObj(pl.nature[r]) && Number.isFinite(pl.nature[r].max) && Number.isFinite(pl.nature[r].regen) && Number.isFinite(pl.reserve[r])));
   if (!soilOk) {
