@@ -2290,6 +2290,24 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
   `captured`). Source : worker `worker-cible`, issue #36.
 - Statut : en vigueur. Modifie D-092 (conquête). Cache `astra-p2p-v90` (v84 avant la fusion de `main`, qui avait déjà v89).
 
+**D-201 — Plus de carte « Ta planète gèle dans… » pendant la partie : le bandeau `#race` ne sert qu'à la fin**
+- 2026-11-06. Contexte : Vincent envoie une capture du bandeau du haut (« Ta planète gèle dans
+  30:53 · va vers le soleil · 2 en vie ») : « n'affiche plus l'aide comme ceci », puis, à la
+  question de ce qu'il faut changer : « retire toute la card ».
+- Choix :
+  - **Vincent** : la carte disparaît pendant la partie (toutes ses variantes : « Ta planète la
+    plus exposée gèle… », « Le soleil s'éteint… »).
+  - **Choix de Claude par défaut** (session router « Affichage aide ») : elle disparaît aussi
+    quand le joueur est éliminé (« Éliminé · encore n en vie »), mais on la **garde en fin de
+    partie** (« Victoire ! / Perdu. · partie finie · Classement · Voir la courbe des points »),
+    car son bouton Classement est le seul moyen de rouvrir l'écran de fin (D-143) une fois fermé.
+  - La règle du froid ne change pas (`frostOf`, `ranking`, cercle sur la carte) ; le bandeau
+    rouge de menace `#threat` reste.
+- Alternatives écartées : retirer aussi la carte en fin de partie (on perdrait l'accès au
+  Classement) ; garder le texte « Éliminé ».
+- Source : capture et messages de Vincent, transmis par la session « Affichage aide ».
+- Statut : en vigueur (cette PR). Change le bandeau de course de la session `26f178b9` (`interface.md` §12) ; D-104 (lien vers la courbe) et D-143 (bouton Classement) restent vrais.
+
 **D-210 — Le Journal ne trahit plus l'ordre d'une flotte que je ne vois pas (issue #37)**
 - 2026-11-06 22:18. Contexte : issue #37. `moveFleet` (attaque, conquête) et `chaseFleet`
   (poursuite) écrivaient au journal partagé « La flotte de A attaque Rigel (B) » ou « … prend en
@@ -2395,9 +2413,10 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
 - Tests : `tests/sw.test.mjs` (vrai `sw.js` dans un `vm`, serveur local qui répond, lent, muet,
   coupé) ; `tests/sw-browser.mjs` (même parcours dans Chromium, hors `node --test`).
 
-**D-231 — Cache `astra-p2p-v93`**
+**D-231 — Cache `astra-p2p-v94`**
 - 2026-11-06. Contexte : à l'ouverture de la PR, v86 était dans `main` (D-176) et la PR prenait
-  v87 ; à la fusion de `main` (#161 à #166 mergées), `main` est à v92.
-- Choix : `VERSION` passe à `astra-p2p-v93`, au-dessus de `main`, pour que les téléphones
+  v87 ; à la fusion de `main` (#161 à #166 mergées), `main` était à v92 (PR à v93), puis #179
+  a pris v93 à son tour.
+- Choix : `VERSION` passe à `astra-p2p-v94`, au-dessus de `main`, pour que les téléphones
   prennent le nouveau `sw.js`.
 - Qui : Claude, par défaut. Source : session `7bec2792`. Statut : en vigueur.
