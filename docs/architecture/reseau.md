@@ -96,9 +96,10 @@ Clés `localStorage` (l.13-16) :
 
 Autres clés lues ailleurs : `astra.relays` (`js/config.js:18`), `astra.name` (`js/app.js:133`), `astra.sky` (réglage « Fond », `js/galaxy.js`, D-112).
 
-- `saveGame(me, state, journal)` l.37 (`journal` facultatif ; `Session.resume` et `onWelcome` le reprennent, même partie et même joueur), `loadGame()` l.44, `listGames()` l.58, `selectGame(gid)` l.65 (la remet en cours, avec son identité), `forgetGame(gid)` l.75, `saveIdentity(id)` l.99, `loadIdentity()` l.96, `describeSave(save)` l.138.
+- `saveGame(me, state, journal)` l.41 (`journal` facultatif ; `Session.resume` et `onWelcome` le reprennent, même partie et même joueur), `loadGame()` l.51, `listGames()` l.70, `selectGame(gid)` l.76 (la remet en cours, avec son identité), `forgetGame(gid)` l.86, `saveIdentity(id)` l.111, `loadIdentity()` l.108, `describeSave(save)` l.150.
+- Stockage abîmé (D-170) : `archive()` ne garde de `astra.saves` que les entrées qui passent `valid()`, et part de `{}` si la valeur n'est pas un objet simple (`null`, tableau, texte) ; idem `identities()` pour `astra.identities`. Les entrées abîmées sont ignorées partout (`saveGame`, `listGames`, `selectGame`, `forgetGame`) et disparaissent à la prochaine écriture.
 - `js/replay-view.js:5` lit `loadGame()` : c'est pourquoi « Revoir » fait d'abord `selectGame(gid)` puis ouvre `replay.html` (`app.js:182-184`).
-- `mergeStates(base, other)` l.111 : même `gid` obligatoire ; pour chaque joueur, garde la fiche au plus grand `actAt` (`base` gagne à égalité) ; garde `online` de `base` ; journal = union sans doublon (`at|text`), trié, 40 dernières entrées.
+- `mergeStates(base, other)` l.123 : même `gid` obligatoire ; pour chaque joueur, garde la fiche au plus grand `actAt` (`base` gagne à égalité) ; garde `online` de `base` ; journal = union sans doublon (`at|text`), trié, 40 dernières entrées.
 
 ### js/session.js (partie réseau)
 Découpage convenu avec code-regles : **ici** constructeur, création/arrivée, connexions, messages, fusion, maillage, invitations, sauvegarde, `normalize`/`clean`/garde-fous ; **dans `regles.md`** `addPlayer` et tout ce qui va de `chooseRace` (l.722) à `fleetHit` (l.1771), ainsi que le sens du journal d'ordres pour le rejeu.

@@ -2040,6 +2040,32 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   session `65b37922`.
   Statut : en vigueur. Modifie D-120. Cache `astra-p2p-v83`.
 
+## 6 novembre 2026 — sauvegarde abîmée (#87)
+
+Numéro pris haut (D-170) : les PR #158 (D-163) et celle de #45 (D-164 et suivants) prennent déjà
+les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
+
+**D-170 — Un historique de sauvegardes abîmé est ignoré, puis réécrit propre**
+- 2026-11-06 22:00. Contexte : issue #87. Une entrée invalide dans `astra.saves` (`null`, sans
+  `state`, tableau, texte JSON `"abc"`) faisait lever une `TypeError` dans `saveGame`, donc dans
+  chaque ordre : l'état changeait mais l'écran n'était pas prévenu. Avec un texte JSON, l'accueil
+  plantait aussi au démarrage (`listGames`). Cause externe (stockage abîmé, extension, outil) : le
+  joueur ne pouvait s'en sortir qu'en vidant les données du site.
+- Choix de Claude, par défaut : `archive()` (`js/save.js`) part de `{}` si `astra.saves` n'est pas
+  un objet simple (`isMap` : ni `null`, ni tableau, ni texte), et ne garde que les entrées qui passent
+  `valid()`. `saveGame`, `listGames`, `selectGame` et `forgetGame` passent tous par `archive()`, donc
+  ignorent tous les entrées abîmées. Rien n'est effacé à la lecture : l'historique est réécrit sans
+  elles à la prochaine écriture (`saveGame` ou `forgetGame`). Même garde pour `astra.identities`
+  (`identities()`), lu par `selectGame`, `forgetGame` et `saveIdentity`.
+- Alternatives écartées : tout effacer dès qu'une entrée est abîmée (on perdrait les bonnes
+  parties) ; purger à la lecture (une lecture qui écrit surprend, et la prochaine sauvegarde le fait
+  de toute façon, au plus tard au premier ordre).
+- Cache `sw.js` : `astra-p2p-v85` (v83 et v84 sont laissés aux PR #158 et #45).
+- Vérifié : scénario « D-170 : un historique abîmé… » (`tests/decisions-reseau.test.mjs`, les 5
+  formes de l'issue), qui échoue sans la correction ; vrai jeu avec `{"zzz":null}` puis `"abc"`.
+- Qui : Vincent (demande : corriger #87), Claude (forme de la correction). Source : session
+  `9e675a52`. Statut : en vigueur. Complète D-066.
+
 **D-175 — Le calcul de l'économie est borné à 2 000 pas ; l'heure d'une planète reçue a un plancher**
 - 2026-11-06. Contexte : issue #32. `steps` et `until` intégraient l'économie par pas de 48 s
   sans plafond : une planète datée de très loin faisait des millions de pas. `planetOk` acceptait
@@ -2079,7 +2105,7 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   sa prise).
 
 **D-176 — Cache `astra-p2p-v86`**
-- 2026-11-06. Contexte : v83 (PR #158, déjà dans `main`) et v85 (PR #159) sont pris, v84 est
+- 2026-11-06. Contexte : v83 (PR #158, déjà dans `main`) et v85 (PR #159, déjà dans `main`) sont pris, v84 est
   probablement réservé par la PR de #45 (non confirmé).
 - Choix : `VERSION` passe à `astra-p2p-v86` pour que les téléphones prennent les nouveaux
   `game.js` et `session.js`.
