@@ -1266,7 +1266,7 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Non traité : la fenêtre Joueurs montre toujours le nombre de planètes et de vaisseaux à quai
   de chacun.
 - Qui : Vincent (la règle), Claude (la forme). Source : cette session.
-- Statut : en vigueur. 3 tests (`tests/fog.test.mjs`). Rendu dans le navigateur : non confirmé.
+- Statut : en vigueur, précisée par D-190 (le menu d'ordres d'une flotte suit aussi le brouillard). 3 tests (`tests/fog.test.mjs`). Rendu dans le navigateur : non confirmé.
 
 **D-125 — Cache `astra-p2p-v68`**
 - 2026-10-31. Choix de Claude : `js/app.js`, `js/session.js`, `js/save.js` changent (D-124).
@@ -1963,10 +1963,46 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   l'heure présente, pas à l'arrivée : la planète peut bâtir ou recevoir des renforts d'ici là.
 - Alternatives écartées : additionner vaisseaux et bâtiments en un seul ⚔ ◇ (on ne voit plus ce
   qui vient d'où) ; simuler à l'heure d'arrivée (on ne connaît pas ce que l'autre fera d'ici là).
-- Qui : Vincent (demande), Claude (forme et seuils). Source : session `fb0c1844`. Statut : en vigueur.
+- Qui : Vincent (demande), Claude (forme et seuils). Source : session `fb0c1844`. Statut : en vigueur, modifiée par D-190 (hors de ma détection, plus de défense ni d'estimation).
 - Tests : `tests/end.test.mjs`, trois tests « Attaquer » et « Conquérir »… / sans vaisseaux posés / hors de ma détection.
 
 **D-161 — Cache `astra-p2p-v82`**
 - 2026-11-03. Contexte : fusion de `main` (D-157 à D-159 et cache v81 déjà pris) dans la PR des ordres d'assaut (D-160).
 - Choix : `VERSION` passe à `astra-p2p-v82` pour que les téléphones prennent le nouveau `session.js`.
 - Qui : Claude, par défaut. Source : session `fb0c1844`. Statut : en vigueur.
+
+**D-190 — Le menu d'ordres d'une flotte suit le brouillard**
+- 2026-11-06 22:15. Contexte : issue #35. Flotte choisie, toucher une planète des autres hors de
+  ma portée affichait « Attaquer Orion (IA Véga) · défense ⚔ 12 ◇ 120 + ? vaisseaux · victoire
+  incertaine », alors que la fiche de la planète la disait libre (D-124). Il suffisait de choisir
+  une flotte et de toucher chaque planète pour trouver les bases ennemies et leur force. Un
+  colonisateur se voyait proposer « Attaquer » au lieu de « Coloniser ».
+- Choix : `ordersAt` part de `knownOwner(cell)`, comme la fiche. Dans ma portée : rien ne change
+  (vrai propriétaire, défense, vaisseaux posés, estimation, D-160). Hors de portée, propriétaire
+  retenu : « Attaquer X (joueur) · hors de portée : défense inconnue » et « Conquérir X · hors de
+  portée : défense inconnue », sans estimation (`odds` absent). Hors de portée, jamais vue (ou vue
+  libre) : les ordres d'une planète libre (« Coloniser » avec un colonisateur, « Juste y aller »).
+- Choix de Claude, par défaut : `moveFleet` ne refuse plus ce que je ne vois pas. « Coloniser »
+  vers une planète prise hors de ma portée part ; l'arrivée dit « déjà prise : la flotte reste en
+  orbite » (`arrive`, inchangé). « Attaquer » / « Conquérir » vers une planète retenue mais
+  quittée depuis part aussi ; à l'arrivée, la flotte reste en orbite. Si la planète est encore
+  prise, l'ordre vise son vrai propriétaire, et le combat se joue comme avant. Le journal nomme le
+  propriétaire que je connais, pas le vrai. `moveFleet` ne devient jamais plus strict : l'IA
+  (sans brouillard, D-124) l'appelle avec ses propres cibles. `moveFleet` décide avec la partie
+  seule (`seesCell`), jamais avec mes souvenirs (`intel`, propres au téléphone) : le replay
+  (`js/replay.js`) refait la même décision. Planète libre en vrai mais hors de vue : l'ordre part
+  sans cible (`pid: null`), la flotte reste en orbite.
+- Alternatives écartées : garder le menu et cacher seulement les chiffres (le nom du joueur
+  suffisait à trouver ses bases) ; refuser « Coloniser » au départ quand la planète est prise (le
+  refus disait ce que je ne vois pas).
+- Qui : Vincent (la règle D-124, l'issue), Claude (la forme du libellé, `moveFleet`). Source :
+  session `5c1afab8`. Statut : en vigueur. Précise D-124, modifie D-160 (cas « hors de ma
+  détection »).
+- Tests : `tests/vision.test.mjs`, quatre scénarios « … le menu la croit libre », « colonisateur… »,
+  « à portée : … hors de portée ensuite … », « ordre « Conquérir » vers une planète retenue, quittée… » ; `tests/end.test.mjs` « hors de ma détection : ni
+  défense, ni vaisseaux posés, ni estimation (D-190) ». Vu dans le navigateur.
+
+**D-191 — Cache `astra-p2p-v83`**
+- 2026-11-06. Choix : `VERSION` passe à `astra-p2p-v83` pour que les téléphones prennent le
+  nouveau `session.js` (D-190). Si une autre PR prend v83 avant, monter au numéro suivant.
+- Qui : Claude, par défaut. Source : session `5c1afab8`. Statut : en vigueur.

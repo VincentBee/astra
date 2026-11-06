@@ -108,3 +108,87 @@ scenario('flotte ennemie en route : cachée en sortant de ma portée, visible en
   film.roll(A, clock, theirs().arrive, 'retour', second);
   film.look(A, 'revenue dans la portée de A', [{ fleet: [B, id], visible: true }]);
 });
+
+// Brouillard dans le menu d'ordres (D-124, D-190, issue #35) : flotte choisie, toucher une
+// planète des autres hors de ma portée ne donne ni son propriétaire, ni sa défense.
+
+/** A a une flotte `ships` chez lui ; `cell` est la planète mère de B ; `view(eyes)` règle la vue de A. */
+function target(ships) {
+  const g = duel();
+  const [A, B] = g.players;
+  const id = park(A, ships, { ...P(A).home }, 100_000);
+  const cell = { ...P(B).home };
+  const view = (eyes) => (A.eyes = () => eyes);
+  return { ...g, A, B, id, cell, view, near: [{ x: cell.x, y: cell.y, r: 1 }] };
+}
+const kinds = (orders) => orders.map((o) => o.kind).join(', ');
+const labels = (orders) => orders.map((o) => o.label).join(' | ');
+
+scenario('flotte armée, planète de B jamais vue et hors de portée : le menu la croit libre', (film) => {
+  const { A, B, id, cell, view } = target({ fighter: 3 });
+  view([]);
+  const orders = A.ordersAt(id, cell);
+  film.look(A, 'A touche la planète de B, qu’il n’a jamais vue', [
+    { show: 'ordres', at: cell, expected: 'move', got: kinds(orders) },
+    { show: 'nom de B dans le menu', at: cell, expected: false, got: labels(orders).includes(B.name) },
+    { show: '« défense » dans le menu', at: cell, expected: false, got: /défense/.test(labels(orders)) },
+  ]);
+  assert.equal(kinds(orders), 'move');
+  assert.doesNotMatch(labels(orders), new RegExp(`${B.name}|défense|victoire|bataille`));
+});
+
+scenario('colonisateur, planète de B jamais vue : « Coloniser », pas « Attaquer »', (film) => {
+  const { A, B, id, cell, view } = target({ colony: 1 });
+  view([]);
+  const orders = A.ordersAt(id, cell);
+  film.look(A, 'A vise la planète de B avec son colonisateur', [
+    { show: 'ordres', at: cell, expected: 'colonize, move', got: kinds(orders) },
+  ]);
+  assert.equal(kinds(orders), 'colonize, move');
+  assert.doesNotMatch(labels(orders), new RegExp(`${B.name}|défense`));
+  // L'ordre part : le refus « pas libre » dirait ce que A ne voit pas. L'arrivée tranchera.
+  assert.equal(A.moveFleet(id, cell, 'colonize'), true, 'colonisation acceptée vers une planète qui paraît libre');
+});
+
+scenario('à portée : vrai propriétaire et défense ; hors de portée ensuite : le propriétaire retenu, sans sa défense', (film) => {
+  const { A, B, id, cell, view, near } = target({ fighter: 3 });
+  view(near);
+  const seen = A.ordersAt(id, cell);
+  const attack = seen.find((o) => o.kind === 'attack');
+  film.look(A, 'A voit la planète de B', [
+    { show: 'ordres', at: cell, expected: 'attack, conquer, move', got: kinds(seen) },
+    { show: 'défense montrée', at: cell, expected: true, got: /défense ⚔ \d+ ◇ \d+ \+ 0 vaisseau posé/.test(attack.label) },
+  ]);
+  assert.equal(kinds(seen), 'attack, conquer, move');
+  assert.match(attack.label, new RegExp(`\\(${B.name}\\) · défense ⚔ \\d+ ◇ \\d+ \\+ 0 vaisseau posé · victoire`));
+  assert.ok(attack.odds, 'une estimation à portée');
+
+  view([]);
+  const memo = A.ordersAt(id, cell);
+  const blind = memo.find((o) => o.kind === 'attack');
+  film.look(A, 'A ne la voit plus : il se souvient de B, pas de sa défense', [
+    { show: 'ordres', at: cell, expected: 'attack, conquer, move', got: kinds(memo) },
+    { show: 'B nommé', at: cell, expected: true, got: blind.label.includes(`(${B.name})`) },
+    { show: 'défense montrée', at: cell, expected: false, got: /⚔|◇|vaisseau|victoire|bataille/.test(labels(memo)) },
+  ]);
+  assert.equal(kinds(memo), 'attack, conquer, move');
+  assert.match(blind.label, new RegExp(`^Attaquer .+ \\(${B.name}\\) · hors de portée : défense inconnue$`));
+  assert.doesNotMatch(labels(memo), /⚔|◇|vaisseau|victoire|bataille/);
+  assert.equal(blind.odds, undefined, 'pas d’estimation hors de portée');
+  assert.equal(A.moveFleet(id, cell, 'conquer'), true, 'l’ordre part vers la planète retenue');
+});
+
+scenario('ordre « Conquérir » vers une planète retenue, quittée hors de ma vue : il part, sans cible', (film) => {
+  const { A, B, id, cell, view, near } = target({ fighter: 3 });
+  view(near);
+  A.ordersAt(id, cell); // A la voit : il retient B
+  view([]);
+  A.state.players[B.me].home = { x: -99, y: -99 }; // B la quitte, A ne le voit pas
+  const orders = A.ordersAt(id, cell);
+  film.look(A, 'A croit la planète encore à B', [{ show: 'ordres', at: cell, expected: 'attack, conquer, move', got: kinds(orders) }]);
+  // Le refus « Aucune planète adverse ici » dirait à A qu'elle est libre : l'ordre part.
+  assert.equal(A.moveFleet(id, cell, 'conquer'), true);
+  assert.deepEqual(A.myFleet(id).order, { kind: 'conquer', pid: null, key: null });
+  view(near);
+  assert.equal(A.moveFleet(id, cell, 'conquer'), false, 'à portée, A voit qu’elle est libre : refusé');
+});

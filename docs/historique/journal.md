@@ -415,6 +415,12 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 |---|---|---|---|---|---|
 | 08:58 | `fb0c1844` | [Auto-fix] conflit avec `main` | Huitième fusion de `main` (D-157 à D-159, cache v81 déjà pris) : ma décision devient D-160, cache v82 (D-161) ; 212/212 | (cette PR) | D-160, D-161 |
 
+## 6 novembre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 22:15 | `5c1afab8` | Worker de la session « Regarde les issues du projet » : corriger l'issue #35 (le menu d'ordres d'une flotte révèle le propriétaire et la défense d'une planète cachée) | `ordersAt` part de `knownOwner` : hors de portée, planète jamais vue → ordres d'une planète libre ; retenue → propriétaire nommé, « défense inconnue », sans estimation ; à portée, rien ne change. `moveFleet` ne refuse plus ce que je ne vois pas (l'arrivée tranche), journal avec le propriétaire connu. `moveFleet` décide sans lire `intel` (le replay refait pareil). 4 scénarios (`vision.test.mjs`), 1 réécrit (`end.test.mjs`) ; 216/216 ; vu dans le jeu contre l'IA ; cache v83 | (cette PR) | D-190, D-191 |
+
 ### Travaux en cours au 2026-10-29
 
 - **Rythme des parties** (`26f178b9`) : commité sur `claude/swarm-it-game-pacing-1d4502`
