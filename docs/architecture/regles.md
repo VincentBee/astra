@@ -520,8 +520,9 @@ pas (`ORDERS[kind]?.name || 'Ordre'`) et n'exécute jamais les ordres des flotte
   partie (`saveGame(…, intel)`), jamais envoyé aux autres. Hors de portée : le propriétaire vu
   la dernière fois (même s'il l'a perdue depuis), ou rien (elle paraît libre). Vue libre :
   le souvenir s'efface. `scout` passe toutes les planètes des autres à chaque `tick`, carte
-  fermée comprise. Partie finie (`over`) : tout est visible.
-- Tests : `tests/fog.test.mjs` (planètes) et `tests/vision.test.mjs` (flottes, D-128, 6 scénarios D-129) : flotte
+  fermée comprise. Partie finie (`over`) : tout est visible. Le menu d'ordres d'une flotte
+  (`ordersAt`) suit la même règle (D-190, §9.2).
+- Tests : `tests/fog.test.mjs` (planètes) et `tests/vision.test.mjs` (flottes, D-128, 6 scénarios D-129 ; plus 4 sur le menu d'ordres, D-190) : flotte
   ennemie visible jusqu'à la portée d'une de mes planètes ou de mes flottes, cachée une case
   au-delà, distance à vol d'oiseau, les miennes toujours visibles, une flotte en route qui sort
   de ma portée puis y revient. Ils testent `sees`, pas le dessin du `canvas` (`fleetSpots`,
@@ -557,10 +558,14 @@ pas (`ORDERS[kind]?.name || 'Ordre'`) et n'exécute jamais les ordres des flotte
 - Il faut une flotte armée. Deux ordres : `attack` (piller) et `conquer` (prendre la planète,
   D-092) ; `ordersAt` propose les deux sur une planète adverse, avec la défense affichée
   (« Conquérir Hadar · défense ⚔ 8 ◇ 80 + 3 vaisseaux posés · victoire probable »). Les vaisseaux
-  posés ne sont comptés que dans ma détection (`seesCell`), sinon « ? ». L'estimation
+  posés ne sont comptés que dans ma détection (`seesCell`). L'estimation
   (`assaultView`, D-160) joue `battle` à l'heure présente avec ce que je vois : « bataille
   perdue » si perdu, « victoire incertaine » si gagné sans voir les vaisseaux ou en perdant plus de
   la moitié de la flotte, sinon « victoire probable ».
+- Hors de ma détection (D-190), `ordersAt` part de `knownOwner(cell)` : propriétaire retenu →
+  « Attaquer X (joueur) · hors de portée : défense inconnue » (et « Conquérir »), sans défense
+  ni estimation ; jamais vue → les ordres d'une planète libre. `moveFleet` ne refuse pas ce que
+  je ne vois pas (coloniser une planète prise hors de vue part, l'arrivée dit « déjà prise »).
 - À l'arrivée (`arrive`), le défenseur = **les vaisseaux posés sur la planète** à l'heure
   d'arrivée (`def.ships`) **et la défense de la planète** (`fortOf`, D-093, D-095), qui se bat
   comme un seul gros vaisseau (champ `fort` de `battle`, qui l'ajoute aux vaisseaux du camp et
