@@ -2110,3 +2110,39 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
 - Choix : `VERSION` passe à `astra-p2p-v86` pour que les téléphones prennent les nouveaux
   `game.js` et `session.js`.
 - Qui : Claude, par défaut. Source : session `424ded66`. Statut : en vigueur.
+
+**D-230 — Service worker : le cache répond si le réseau se tait 3 s (issue #40)**
+- 2026-11-06. Contexte : `sw.js` faisait `fetch` puis, seulement en cas d'échec, `caches.match`.
+  Sur un réseau qui accepte la connexion sans répondre (portail captif, métro, 4G à une barre),
+  `fetch` n'échoue pas avant longtemps : page blanche alors que les 32 fichiers sont en cache.
+- Choix : **course entre le réseau et un délai de 3 s** (`NET_WAIT`), pour chaque requête.
+  1. Le réseau répond avant 3 s : sa réponse est servie et mise en cache (comme avant).
+  2. Délai dépassé : la copie en cache est servie ; s'il n'y en a pas, on continue d'attendre le
+     réseau (une page jamais mise en cache ne doit pas échouer juste parce qu'elle est lente).
+  3. Le réseau échoue : la copie en cache (comme avant).
+  4. Drapeau `mute` : après un délai dépassé, les requêtes suivantes prennent le cache tout de
+     suite ; la première réponse du réseau le remet à faux. Sans lui, chaque `import` de la
+     chaîne des modules attendait 3 s de plus (vu dans Chromium : rien après 10 s).
+  5. La réponse du réseau arrivée après le délai est quand même écrite dans le cache
+     (`e.waitUntil` appelé tout de suite) : la prochaine ouverture a la nouvelle version.
+- Alternatives écartées : « stale-while-revalidate » (cache d'abord, réseau en fond) : plus
+  rapide, mais chaque mise à jour n'arrive qu'à l'ouverture suivante, et `index.html` neuf
+  pourrait charger d'anciens modules ; délai sans drapeau `mute` (3 s par niveau d'`import`,
+  plus de 10 s) ; délai plus court (1 s : une vraie 4G lente perdrait trop souvent la nouvelle
+  version) ; `AbortController` sur le `fetch` (on perdrait la réponse tardive qui met le cache
+  à jour).
+- Limites : juste après le retour du réseau, une ouverture peut encore servir le cache une
+  fois ; le drapeau est perdu quand le navigateur arrête le service worker (retour au
+  comportement normal). Ne touche ni #84 (`technologies.html` absente de `FILES`) ni #89 (les
+  réponses d'erreur sont mises en cache, y compris la réponse tardive, comme avant).
+- Qui : **choix de Claude** (le ticket laissait le choix de la méthode). Source : session
+  `7bec2792`, issue #40. Statut : en vigueur.
+- Tests : `tests/sw.test.mjs` (vrai `sw.js` dans un `vm`, serveur local qui répond, lent, muet,
+  coupé) ; `tests/sw-browser.mjs` (même parcours dans Chromium, hors `node --test`).
+
+**D-231 — Cache `astra-p2p-v87`**
+- 2026-11-06. Contexte : v86 est dans `main` (D-176) ; d'autres PR en cours changent aussi
+  `VERSION` (non confirmé lesquelles).
+- Choix : `VERSION` passe à `astra-p2p-v87` pour que les téléphones prennent le nouveau `sw.js`.
+  Au merge, garder une valeur plus grande que celle de `main`.
+- Qui : Claude, par défaut. Source : session `7bec2792`. Statut : en vigueur.
