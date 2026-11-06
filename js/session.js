@@ -1357,7 +1357,9 @@ export class Session {
     p.fleets ||= [];
     if (!colony || p.fleets.length >= MAX_FLEETS) return null;
     settle(colony, now);
-    colony.ships = { ...(colony.ships || {}), colony: (colony.ships?.colony || 0) + 1 };
+    // Le colonisateur qui l'a fondée repart avec la flotte ; une colonie prise au combat n'en a pas consommé (D-200).
+    colony.ships = { ...(colony.ships || {}) };
+    if (!colony.captured) colony.ships.colony = (colony.ships.colony || 0) + 1;
     let room = fleetCargo(p.race, colony.ships);
     const cargo = {};
     for (const r of SOIL) {
@@ -2534,9 +2536,23 @@ export class Session {
     }
 
     if (order.kind === 'attack' || order.kind === 'conquer') {
-      const enemy = this.state.players[order.pid];
-      const pl = enemy && this.planetOf(enemy, order.key);
-      if (!pl || !sameCell(pl.cell, f.to)) return true;
+      // La planète a pu changer de main pendant le trajet (D-200) : on vise son propriétaire
+      // d'aujourd'hui, pas celui de l'ordre, dont la fiche la montre encore tant qu'il n'a pas lu le rapport de prise.
+      const enemy = this.ownerAt(f.to);
+      const pl = enemy && this.planetsOf(enemy).find((x) => sameCell(x.cell, f.to));
+      const was = this.state.players[order.pid];
+      const gone = was && this.planetOf(was, order.key);
+      const here = this.planets.find((x) => sameCell(x, f.to))?.name || gone?.name || `[${f.to.x}:${f.to.y}]`;
+      if (!pl) {
+        this.addLog(`Plus personne n'habite ${here} : la flotte ${de(p.name)} reste en orbite.`);
+        return true;
+      }
+      if (enemy.id === this.me) {
+        // Déjà à moi (une autre de mes flottes l'a prise juste avant) : elle s'y pose.
+        f.order = { kind: 'dock', key: pl.key };
+        return this.arrive(p, f);
+      }
+      if (enemy.id !== order.pid) this.addLog(`${enemy.name} a pris ${pl.name}${was ? ` à ${was.name}` : ''} entre-temps : la flotte ${de(p.name)} l'attaque.`);
       // Je calcule le combat avec ce que je sais du défenseur à l'heure de l'arrivée ;
       // son téléphone appliquera ses pertes en lisant mon rapport.
       const def = this.defenseAt(p, enemy, pl, f.arrive);
@@ -2632,6 +2648,7 @@ export class Session {
     colony.stock.energy = Math.floor(fuelAt(f, p.race, now));
     colony.tech = { ...techOf(p) };
     colony.claimAt = f.arrive;
+    colony.captured = true; // prise au combat, sans colonisateur : evacuate n'en rendra pas (D-200)
     colony.ships = { ...res.attLeft };
     p.colonies = { ...(p.colonies || {}), [w.id]: colony };
     const docked = { ...(p.docked || {}) };

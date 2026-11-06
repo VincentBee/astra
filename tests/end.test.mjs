@@ -206,6 +206,161 @@ scenario('un colonisateur ne prend pas une planète habitée, une attaque pille 
   assert.equal(raid.A.ownerAt(raid.cell)?.id, raid.B.me, 'l’ordre « attaquer » ne prend pas la planète');
 });
 
+/** Une flotte de `s` (`ships`) en orbite sur `cell` ; renvoie son identifiant. */
+function inOrbit(s, cell, ships) {
+  me(s).planet.ships = { ...ships };
+  const id = s.takeOff('home', { ...ships }, {}, 0);
+  Object.assign(s.myFleet(id), { from: { ...cell }, to: { ...cell }, fuel: 1000 });
+  return id;
+}
+
+/** Les lettres des trois joueurs, pour les étiquettes. */
+const who3 = (s, cell, A, B, C) => ({ [A.me]: 'A', [B.me]: 'B', [C.me]: 'C' })[s.ownerAt(cell)?.id] || 'personne';
+
+/**
+ * Trois joueurs : A envoie `kind` sur la planète mère de B (un vrai trajet) ; pendant ce trajet, C,
+ * déjà en orbite, la conquiert. A reçoit la fiche de C, pas encore celle de B à jour : B n'a pas lu le rapport de C.
+ */
+function takenOnTheWay(kind, film) {
+  const g = newGame(3, ['human', 'machine', 'alien']);
+  const { players: [A, B, C], clock, sync } = g;
+  const cell = { ...me(B).home };
+  me(A).planet.ships = { fighter: 60, cargo: 10 };
+  const a = A.takeOff('home', { fighter: 60, cargo: 10 }, {}, 0);
+  A.myFleet(a).fuel = 1e6;
+  A.moveFleet(a, cell, kind);
+  const order = { ...A.myFleet(a).order };
+  const c = inOrbit(C, cell, { fighter: 20 });
+  clock.t += 1000;
+  C.moveFleet(c, cell, 'conquer');
+  C.tick();
+  sync(A, C);
+  film.look(A, `A a lancé « ${kind === 'attack' ? 'Attaquer' : 'Conquérir'} » sur la planète de B ; pendant le trajet, C la prend`, [
+    { show: 'cible de l’ordre de A', expected: 'B', got: order.pid === B.me ? 'B' : order.pid },
+    { show: 'à qui, vu par A', at: cell, expected: 'C', got: who3(A, cell, A, B, C) },
+    { show: 'la fiche de B chez A montre encore la planète', expected: true, got: !!A.state.players[B.me].planet },
+  ]);
+  const col = Object.values(me(C).colonies)[0];
+  const stock = game.stateAt(col, A.myFleet(a).arrive).stock; // ce que C a sur place à l'arrivée de A
+  const bBefore = JSON.stringify(A.state.players[B.me].planet);
+  clock.t = A.myFleet(a).arrive + 10;
+  A.tick();
+  return { ...g, A, B, C, cell, a, stock, bBefore };
+}
+
+scenario('D-200 : une planète prise pendant le trajet, « Attaquer » combat son nouveau propriétaire, pas l’ancien', (film) => {
+  const { A, B, C, cell, a, stock, sync, clock } = takenOnTheWay('attack', film);
+  const effects = me(A).effects || [];
+  const toB = effects.filter((e) => e.to === B.me);
+  const toC = effects.filter((e) => e.to === C.me);
+  const take = toC[0]?.take || {};
+  const cargo = A.myFleet(a)?.cargo || {};
+  film.look(A, 'A arrive : il combat C (sa défense, son stock), aucun rapport pour B', [
+    { show: 'rapports de A vers B', expected: 0, got: toB.length },
+    { show: 'rapports de A vers C', expected: 1, got: toC.length },
+    { show: 'minéraux pillés (au plus le stock de C)', at: cell, expected: `au plus ${Math.floor(stock.minerals)}`, got: take.minerals || 0, ok: (take.minerals || 0) <= stock.minerals },
+    { show: 'nourriture pillée (au plus le stock de C)', expected: `au plus ${Math.floor(stock.food)}`, got: take.food || 0, ok: (take.food || 0) <= stock.food },
+    { show: 'soute de A = pillage chez C', at: [A, a], expected: JSON.stringify({ minerals: take.minerals || 0, food: take.food || 0 }), got: JSON.stringify({ minerals: cargo.minerals || 0, food: cargo.food || 0 }) },
+  ]);
+  assert.equal(toB.length, 0, 'aucun rapport vers B, qui n’a plus la planète');
+  assert.equal(toC.length, 1, 'le combat est contre C');
+  assert.ok((take.minerals || 0) <= stock.minerals && (take.food || 0) <= stock.food, 'pillé dans le stock de C');
+  assert.match(A.state.log.map((l) => l.text).join('\n'), /J2 a pris Hadar à J1 entre-temps : la flotte de J0 l'attaque\./);
+  assert.match(A.state.log.map((l) => l.text).join('\n'), /J0 remporte le combat sur Hadar \(J2\)/);
+  // C lit le rapport : ce que A emporte sort bien de son stock (rien n'est créé).
+  sync(C, A);
+  const before = game.stateAt(Object.values(me(C).colonies)[0], clock.t).stock;
+  C.tick();
+  const after = game.stateAt(Object.values(me(C).colonies)[0], clock.t).stock;
+  film.look(C, 'C lit le rapport : il perd exactement ce que A a pillé', [
+    { show: 'minéraux perdus par C', expected: take.minerals || 0, got: Math.round(before.minerals - after.minerals) },
+    { show: 'nourriture perdue par C', expected: take.food || 0, got: Math.round(before.food - after.food) },
+  ]);
+  assert.equal(Math.round(before.minerals - after.minerals), take.minerals || 0);
+  assert.equal(Math.round(before.food - after.food), take.food || 0);
+});
+
+scenario('D-200 : une planète prise pendant le trajet, « Conquérir » la prend au nouveau propriétaire', (film) => {
+  const { A, B, C, cell, a, bBefore, sync, clock } = takenOnTheWay('conquer', film);
+  const effects = me(A).effects || [];
+  const cap = effects.filter((e) => e.capture);
+  const col = Object.values(me(A).colonies || {})[0];
+  film.look(A, 'A arrive : il prend la planète à C ; aucun rapport pour B', [
+    { show: 'à qui', at: cell, expected: 'A', got: who3(A, cell, A, B, C) },
+    { show: 'rapports de prise', expected: 1, got: cap.length },
+    { show: 'pris à', expected: 'C', got: cap[0]?.to === C.me ? 'C' : cap[0]?.to },
+    { show: 'rapports de A vers B', expected: 0, got: effects.filter((e) => e.to === B.me).length },
+    { show: 'colonisateur dans la colonie', expected: 0, got: col?.ships?.colony || 0 },
+  ]);
+  assert.equal(A.ownerAt(cell)?.id, A.me);
+  assert.equal(cap.length, 1);
+  assert.equal(cap[0].to, C.me, 'prise à C, le propriétaire actuel');
+  assert.equal(effects.filter((e) => e.to === B.me).length, 0);
+  assert.equal(JSON.stringify(A.state.players[B.me].planet), bBefore, 'la fiche de B n’a pas bougé chez A');
+  // A ne se fait pas évacuer : sa prise tient, il garde sa colonie.
+  A.checkClaim();
+  assert.equal(Object.keys(me(A).colonies || {}).length, 1, 'A garde sa colonie');
+  assert.equal((me(A).fleets || []).length, 0, 'pas de flotte évacuée');
+  // C lit le rapport : il perd la colonie.
+  sync(C, A);
+  clock.t += 1000;
+  C.tick();
+  film.look(C, 'C lit le rapport : la colonie n’est plus à lui', [{ show: 'colonies de C', expected: 0, got: Object.keys(me(C).colonies || {}).length }]);
+  assert.equal(Object.keys(me(C).colonies || {}).length, 0);
+});
+
+scenario('D-200 : deux flottes « Conquérir » sur la même planète, la 2e se pose sur la prise de la 1re', (film) => {
+  const g = newGame(2, ['human', 'machine']);
+  const { players: [A, B], clock } = g;
+  const cell = { ...me(B).home };
+  const f1 = inOrbit(A, cell, { fighter: 30 });
+  const f2 = inOrbit(A, cell, { fighter: 12 });
+  clock.t += 1000;
+  // Les deux ordres sont donnés avant la première prise (après, moveFleet les refuserait).
+  A.moveFleet(f1, cell, 'conquer');
+  A.moveFleet(f2, cell, 'conquer');
+  film.look(A, 'deux flottes de A en orbite de la planète de B, toutes deux avec l’ordre « Conquérir »');
+  A.tick();
+  const col = Object.values(me(A).colonies || {})[0];
+  const cap = (me(A).effects || []).filter((e) => e.capture);
+  const survivors = 30 - (cap[0]?.lost?.fighter || 0);
+  film.look(A, 'la 1re prend la planète, la 2e s’y pose : la colonie a les survivants des deux', [
+    { show: 'à qui', at: cell, expected: 'A', got: owner(A, cell, A, B) },
+    { show: 'rapports de prise', expected: 1, got: cap.length },
+    { show: 'chasseurs dans la colonie', at: cell, expected: survivors + 12, got: col?.ships?.fighter || 0 },
+    { show: 'flottes restées en vol', expected: 0, got: (me(A).fleets || []).length },
+  ]);
+  assert.equal(cap.length, 1, 'une seule prise');
+  assert.equal(col?.ships?.fighter, survivors + 12, 'survivants de la 1re + la 2e entière');
+  assert.equal((me(A).fleets || []).length, 0);
+  assert.match(A.state.log.map((l) => l.text).join('\n'), /La flotte de J0 se pose sur Hadar\./);
+});
+
+scenario('D-200 : une conquête perdue au profit d’un joueur installé avant rend ses vaisseaux, sans colonisateur en plus', (film) => {
+  const { players: [A, B, C], clock, sync } = newGame(3, ['human', 'machine', 'alien']);
+  const cell = { ...me(B).home };
+  const w = A.planets.find((x) => game.sameCell(x, cell));
+  const id = inOrbit(A, cell, { fighter: 30 });
+  clock.t += 1000;
+  A.moveFleet(id, cell, 'conquer');
+  A.tick();
+  const ships = { ...Object.values(me(A).colonies)[0].ships };
+  // Cas rare : C avait pris la planète juste avant (A n'avait pas encore sa fiche) ; ownerAt la donne à C.
+  me(C).colonies = { [w.id]: { ...game.newPlanet('alien', clock.t - 500, w), claimAt: clock.t - 500 } };
+  C.touch();
+  sync(A, C);
+  clock.t += 1000;
+  A.tick(); // checkClaim : A rend la planète, sa flotte repart en orbite
+  const back = (me(A).fleets || [])[0];
+  film.look(A, 'C était là avant : A rend la planète, sa flotte repart en orbite avec ses seuls vaisseaux', [
+    { show: 'à qui', at: cell, expected: 'C', got: A.ownerAt(cell)?.id === C.me ? 'C' : 'autre' },
+    { show: 'vaisseaux rendus', at: back && [A, back.id], expected: JSON.stringify(ships), got: JSON.stringify(back?.ships) },
+    { show: 'colonisateur en plus', expected: 0, got: back?.ships?.colony || 0 },
+  ]);
+  assert.deepEqual(back?.ships, ships, 'exactement les vaisseaux de la colonie prise');
+  assert.equal(back?.ships.colony, undefined, 'pas de colonisateur offert');
+});
+
 /** A a une flotte en orbite sur la planète mère de B, qui a `docked` posés et `defense` en bâtiments. */
 function facing(ships, docked = {}, defense = {}) {
   const g = newGame(2, ['human', 'machine']);
