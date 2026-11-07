@@ -884,6 +884,11 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
   là, seul `MAX_STEPS` (§4.2) protège : le calcul reste borné. Une heure loin dans le futur
   n'est pas bornée ici (`normalize` ne connaît pas l'heure) : elle ne coûte rien
   (`steps` s'arrête aussitôt).
+- Stock, population et sol d'une planète reçue (D-380, #76) : `planetOk` ramène chaque stock
+  (`RES`) et la population à un nombre fini ≥ 0 (sinon 0), la réserve et la repousse du sol à
+  ≥ 0. L'économie se garde aussi elle-même : `flows` et `advance` lisent un stock non fini
+  comme 0, `extract` ne rend jamais une quantité négative. Rien ne change pour un nombre
+  valide : une partie normale garde exactement ses résultats.
 
 ## 15. Constantes d'équilibrage : où les changer
 
