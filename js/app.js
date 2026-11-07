@@ -4,7 +4,7 @@ import { inviteLink, inviteGid, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
 import {
   RACES, RACE_KEYS, RES_INFO, resIcon, raceIcon, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
-  powerReadyAt, powerCost, liftGain, fmt, UNIVERSE, SOIL, sameCell, sunFor, climateName, kindLabel, usedPlaces, TEMPO, frostLine, planForecast, PLAN_MAX, planAhead, planId,
+  powerReadyAt, powerCost, liftGain, secs, fmt, UNIVERSE, SOIL, sameCell, sunFor, climateName, kindLabel, usedPlaces, TEMPO, frostLine, planForecast, PLAN_MAX, planAhead, planId,
   shipsAffordable, planetAlerts, FROST,
 } from './game.js';
 import { drawSun } from './sky.js';
@@ -1368,8 +1368,11 @@ function renderPlanet(me, now) {
       const cost = powerCost(planet, k, s.pop);
       const wait = Math.max(0, powerReadyAt(planet, k) - now);
       const ok = covers(s.stock, cost);
-      const idle = k === 'lift' && !liftGain({ ...planet, ...s }); // entrepôt plein ou sol vide : rien à gagner
-      setHtml(q(`[data-pcost="${k}"]`), `${costText(cost)} · ↻ ${Math.round(POWERS[k].cooldown / 1000)} s`);
+      const gain = k === 'lift' ? liftGain({ ...planet, ...s }) : 0;
+      const idle = k === 'lift' && !gain; // entrepôt plein ou sol vide : rien à gagner
+      // Arrachement : gain attendu avant de toucher (#75). Durées : depuis POWERS (secs).
+      const win = gain ? ` · <span class="qty">+${fmt(gain)}${resIcon('minerals')}</span>` : '';
+      setHtml(q(`[data-pcost="${k}"]`), `${costText(cost)}${win} · ↻ ${secs(POWERS[k].cooldown)}`);
       q(`[data-pready="${k}"]`).textContent = k === 'trance' && trance ? `transe ${clock(trance)}` : wait ? clock(wait) : 'prêt';
       q(`[data-pcard="${k}"]`).classList.toggle('affordable', ok && !wait && !idle);
       const btn = q(`[data-power="${k}"]`);
