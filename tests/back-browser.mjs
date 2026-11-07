@@ -114,6 +114,9 @@ ok('retour suivant → la question');
 await page.click('#btn-quit-go');
 await page.waitForURL('about:blank', { timeout: 3000 });
 ok(`« Quitter la partie » → page précédente (${page.url()}), sans alerte du navigateur`);
+await page.goForward();
+await page.waitForFunction(() => !!history.state?.astraGuard || (window.astra?.session?.startedAt == null), null, { timeout: 5000 });
+ok(`« avancer » ensuite : la page revient (${await page.evaluate(() => (document.getElementById("screen-home").hidden ? "partie" : "accueil"))}), sans erreur`);
 
 // Partie finie : pas d'alerte (la garde restée est consommée sans rien montrer).
 await page.goto(url);

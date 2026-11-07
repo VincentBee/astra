@@ -3354,6 +3354,7 @@ if (!VIEW) {
     e.returnValue = '';
   });
   addEventListener('pagehide', () => clearTimeout(leaveTimer));
+  addEventListener('pageshow', (e) => e.persisted && (leaving = false)); // revenu par « avancer » : la garde revient
 }
 
 let leaveTimer = null;
