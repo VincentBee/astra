@@ -612,3 +612,41 @@ scenario('jonction : refusée vers une flotte qui n’est pas à moi, ou vers el
   assert.equal(toasts.length, 2);
   assert.equal(A.myFleet(a).order, null);
 });
+
+// #73 : la fenêtre Scinder / Donner garde l'identifiant de sa flotte. Si cette flotte meurt au
+// combat pendant que la fenêtre est ouverte, le bouton ne reste plus muet : la session refuse
+// avec « Flotte introuvable. » (la fermeture de la fenêtre elle-même est dans js/app.js,
+// `refreshMoveSheet`, vérifiée dans le vrai jeu).
+scenario('flotte détruite au combat pendant « Scinder » ou « Donner » : refus « Flotte introuvable. », sans planter', (film) => {
+  const { players: [A, B], sync } = newGame(2, ['human', 'machine']);
+  B.state.players[B.me].planet.ships = { fighter: 18 };
+  B.touch();
+  sync(A, B);
+  const cell = { x: B.state.players[B.me].home.x, y: B.state.players[B.me].home.y };
+  // Deux flottes de A arrêtées ensemble chez B : 3 chasseurs (la fenêtre est ouverte sur elle), 1 chasseur (celle qui reçoit).
+  const tank = fleet.fleetTank('human', { fighter: 1 });
+  const id = park(A, { fighter: 4 }, {}, cell, tank * 2);
+  const other = A.splitFleet(id, { ships: { fighter: 1 }, fuel: Math.floor(tank / 2) });
+  assert.ok(other, 'Scinder marche sur une flotte qui existe');
+  assert.ok(A.transferFleet(id, other, { fuel: 1 }), 'Donner marche sur une flotte qui existe');
+  film.look(A, 'A : deux flottes de chasseurs en orbite chez B (18 drones) ; la fenêtre « Scinder » est ouverte sur la plus grosse');
+
+  const toasts = [];
+  A.ontoast = (t) => toasts.push(t);
+  A.moveFleet(id, cell, 'attack');
+  A.tick();
+  film.look(A, 'après le combat : la flotte de la fenêtre n’existe plus', [{ show: 'flotte', expected: 'détruite', got: A.myFleet(id) ? 'encore là' : 'détruite', ok: !A.myFleet(id) }]);
+  assert.equal(A.myFleet(id), null, 'la flotte a été détruite');
+
+  toasts.length = 0;
+  assert.equal(A.splitFleet(id, { ships: { fighter: 1 } }), false, 'Scinder sur la flotte disparue : refus');
+  assert.deepEqual(toasts, ['Flotte introuvable.'], 'Scinder le dit');
+  toasts.length = 0;
+  const to = A.myFleet(other) ? other : 'x';
+  assert.equal(A.transferFleet(id, to, { fuel: 1 }), false, 'Donner depuis la flotte disparue : refus');
+  assert.deepEqual(toasts, ['Flotte introuvable.'], 'Donner le dit');
+  toasts.length = 0;
+  assert.equal(A.splitFleet(null, { ships: { fighter: 1 } }), false, 'sans flotte du tout : refus');
+  assert.deepEqual(toasts, ['Flotte introuvable.']);
+  film.look(A, 'A touche « Scinder » puis « Donner » : refus « Flotte introuvable. », aucune erreur', [{ show: 'message', expected: 'Flotte introuvable.', got: 'Flotte introuvable.', ok: true }]);
+});
