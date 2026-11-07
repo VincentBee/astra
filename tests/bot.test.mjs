@@ -163,11 +163,21 @@ scenario('D-151 : trois IA jouent une partie entière, sans conquête avant 10 m
   };
   film.look(players[0], 'salon : trois IA, une par race');
   const start = clock.t;
+  // D-421 : l'IA met recherches et vaisseaux au fil, sans doublon ni dépassement de PLAN_MAX.
+  const bad = [];
+  let longest = 0;
   for (let step = 0; step < 45 * 20 && !players[0].over; step++) {
     for (const s of players) {
       s.tick();
       s.checkStart();
       think(s);
+      for (const pl of s.planetsOf(me(s))) {
+        const plan = pl.planet.plan || [];
+        longest = Math.max(longest, plan.length);
+        const techs = plan.filter((x) => x?.tech).length;
+        const lots = plan.filter((x) => x?.ship).length;
+        if (plan.length > game.PLAN_MAX || techs > 1 || lots > 1) bad.push(`${s.name} ${pl.name} : ${JSON.stringify(plan)}`);
+      }
     }
     all();
     clock.t += 3000;
@@ -191,7 +201,12 @@ scenario('D-151 : trois IA jouent une partie entière, sans conquête avant 10 m
     { show: 'des conquêtes tentées', expected: true, got: conquests.length > 0 },
     { show: 'première conquête après la trêve', expected: true, got: firstWar - players[0].startedAt >= PEACE_MS },
     { show: 'ordres de chaque IA ≤ 1 500', expected: true, got: Object.values(state.players).every((p) => p.orders.length < 1500) },
+    { show: 'fil des IA : sans doublon, 12 au plus (D-421)', expected: [], got: bad.slice(0, 3) },
+    { show: 'recherches mises au fil par les IA', expected: true, got: orders.some((o) => o.k === 'planResearch') },
   ]);
+  assert.deepEqual(bad, [], 'fil des IA sans doublon');
+  assert.ok(longest <= game.PLAN_MAX);
+  assert.ok(orders.some((o) => o.k === 'planResearch'), 'les IA mettent des recherches au fil');
   assert.ok(over, 'la partie finit');
   assert.ok(over.winner, 'un gagnant');
   assert.ok(over.at - start < 45 * MIN);

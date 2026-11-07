@@ -320,7 +320,9 @@ Tests : `tests/alerts.test.mjs`. L'affichage est dans [interface.md](interface.m
   journal d'ordres note ce nom-là) : la construction va à la fin du fil, quel que soit son
   chantier. Fil vide : `startBuild`, `startResearch` ou `startShips`, comme avant. Au rejeu
   (`replaying`, posé par `js/replay.js`), pas de redirection : un vieux `build` garde son sens.
-  L'IA ne lance ni recherche ni vaisseaux tant que son fil n'est pas vide (`js/bot.js`).
+  L'IA (`js/bot.js`, D-421) : fil vide, elle lance tout de suite ; sinon elle met au fil une
+  recherche et un lot de vaisseaux au plus (pas de technologie déjà en recherche ou au fil, pas
+  au-delà de `PLAN_MAX`), et un bâtiment dès que le fil n'en tient pas.
 - Limite connue (D-158) : la règle « pas la même technologie sur deux planètes à la fois » n'est
   vérifiée qu'à l'ajout au fil ; `stateAt` ne voit qu'une planète et ne peut pas la revérifier
   au lancement. Non constaté en partie ; sans gravité (les technologies se fusionnent au plus

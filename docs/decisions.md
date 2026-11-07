@@ -3429,7 +3429,8 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
     pas vide : au rejeu (`replaying`, `js/replay.js`), un ordre « tout de suite » garde l'ancien
     sens, la partie se rejoue à l'identique.
   - IA (`js/bot.js`) : elle ne lance ni recherche ni vaisseaux tant que son fil n'est pas vide
-    (sinon ses ordres iraient au fil, en double à chaque passage).
+    (sinon ses ordres iraient au fil, en double à chaque passage). **Remplacé par D-421** : elle
+    les met au fil, sans doublon.
 - Écarté : la règle dans l'interface seulement (un ordre direct, d'une IA ou d'un autre écran,
   doublait encore le fil) ; la règle dans `startBuild` (`js/game.js`), qui aurait changé le sens
   des vieux journaux ; ne regarder que le fil du même chantier (le bug).
@@ -3438,6 +3439,32 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - Vérifié : 4 scénarios (`tests/plan.test.mjs`), 3 échouent sur `main` ; vrai jeu (Chrome,
   390 px) : fil « Propulsion » qui attend, la Ferme passe de ↑ à + et va en 2ᵉ place, Propulsion
   garde son départ.
-- Qui : Vincent (règle), Claude (redirection dans la session, rejeu, IA, par défaut ; pour l'IA,
-  option proposée au router, réponse non confirmée au moment du commit). Source : session `3c9e3331`, issue #194. Statut : en vigueur. Modifie D-158.
+- Qui : Vincent (règle), Claude (redirection dans la session, rejeu, par défaut). Pour l'IA, le
+  router a choisi l'autre option : voir D-421. Source : session `3c9e3331`, issue #194. Statut : en vigueur. Modifie D-158.
   Cache `astra-p2p-v120`.
+
+**D-421 — L'IA met ses recherches et ses vaisseaux au fil, sans doublon**
+- 2026-11-07 22:39 UTC. Contexte : avec D-420, une recherche ou un lot de vaisseaux lancé fil
+  pas vide va au fil. L'IA (D-151) ne mettait que des bâtiments au fil, et son fil n'est presque
+  jamais vide : un bâtiment y attend son stock. Ses `research` / `buildShips` y seraient partis
+  en double à chaque passage. Question posée au router : (A) l'IA attend que son fil soit vide ;
+  (B) elle met au fil, sans doublon.
+- Choix (B, router) : `js/bot.js`.
+  - Fil vide : comme avant (recherche ou lot lancé tout de suite s'il est payable).
+  - Fil pas vide : `planResearch` / `planShips`. Une seule recherche et un seul lot de
+    vaisseaux au fil à la fois par planète ; jamais au-delà de `PLAN_MAX` ; une technologie en
+    recherche ou au fil, ici ou ailleurs, ne se redemande pas (`chooseTech`) ; un colonisateur au
+    fil compte déjà (`colonyCount`) ; le vaisseau doit être ouvert, recherche au fil comprise.
+  - Bâtiments : l'IA en ajoute un dès que le fil n'en tient pas (avant : seulement fil vide),
+    sinon une recherche au fil bloquerait ses bâtiments.
+- Écarté : (A) attendre un fil vide : l'IA ne chercherait presque plus (proposée par défaut
+  dans la 1ʳᵉ version de la PR #195, refusée par le router).
+- Vérifié : parties de 3 IA (`tests/perf-ia.mjs`, graines 1 à 3, 10, 20 et 30 min), `main`
+  contre cette PR : total des meilleurs points à 30 min 761 → 740, 564 → 524, 728 → 674 (−3 à
+  −8 %) ; recherche de l'IA en tête 12 → 14 ; deux IA éliminées sur trois dans chaque partie de
+  `main`, une ou zéro avec la PR. L'IA démarre un peu plus lentement (10 min : recherche 8 → 6
+  pour les machines, elle ne double plus son bâtiment en attente). Le scénario D-151
+  (`tests/bot.test.mjs`) vérifie le fil des IA à chaque passage : sans doublon, 12 au plus,
+  et des recherches mises au fil. 323/323.
+- Qui : router (option B), Claude (détails). Source : session `3c9e3331`, PR #195. Statut : en
+  vigueur. Modifie D-420 (partie IA) et D-151.
