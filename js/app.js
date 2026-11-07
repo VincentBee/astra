@@ -15,6 +15,7 @@ import { TECHS, SHIPS, SHIP_KEYS, techCost, techMissing, researchDuration, shipU
 import { TRADE_RES, TRADE_NAMES } from './trade.js';
 import { explainBattle, sideTable } from './report.js';
 import { finalBoard } from './finish.js';
+import { playing, backAction } from './back.js';
 import { addBot, wakeBots, editableBot, removeBot, renameBot, setBotRace } from './bot.js';
 import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fleetSpeed, slowestShip, fuelAt, moving, aggressive, armed, together } from './fleet.js';
 
@@ -1033,6 +1034,7 @@ function renderLive() {
     $('journal-count').hidden = !fresh;
     $('journal-count').textContent = fresh > 9 ? '9+' : fresh;
   }
+  armBack();
 
   if (me?.planet) {
     if (builtFor !== me.race) buildStatic();
@@ -3312,6 +3314,62 @@ function showMarks(snap) {
     }
   });
 }
+
+// ---------------------------------------------------------------------------
+// « Retour » pendant une partie en cours (D-401) : une entrée d'historique « garde » au-dessus
+// de la page ; un retour la consomme et on demande « Quitter la partie en cours ? ». Une fenêtre
+// ouverte se ferme d'abord. Le lobby et l'écran de fin laissent le retour faire comme avant.
+// ---------------------------------------------------------------------------
+
+let backArmed = !!history.state?.astraGuard; // l'entrée « garde » est au-dessus de la page (rechargée : déjà là)
+let leaving = false; // « Quitter » touché : plus de question, ni la nôtre ni celle du navigateur
+
+const inGame = () =>
+  !VIEW && !!session && playing({ status: session.status, startedAt: session.startedAt, over: session.over, gameShown: !$('screen-game').hidden });
+
+/** Pose la garde dès que la partie est en cours (appelé à chaque rafraîchissement). */
+function armBack() {
+  if (backArmed || leaving || !$('sheet-quit').hidden || !inGame()) return;
+  history.pushState({ astraGuard: true }, '');
+  backArmed = true;
+}
+
+if (!VIEW) {
+  addEventListener('popstate', () => {
+    if (!backArmed) return; // retour hors de notre garde : rien à faire
+    backArmed = false;
+    if (leaving) return;
+    const open = [...document.querySelectorAll('.sheet')].find((s) => !s.hidden);
+    const action = backAction({ status: session?.status, startedAt: session?.startedAt, over: session?.over, gameShown: !$('screen-game').hidden, sheetOpen: !!open });
+    if (action === 'close') {
+      open.querySelector('.close-btn')?.click();
+      armBack();
+    } else if (action === 'ask') {
+      $('sheet-quit').hidden = false; // garde pas reposée : un 2ᵉ retour ici quitte
+    }
+  });
+  addEventListener('beforeunload', (e) => {
+    if (leaving || !$('sheet-quit').hidden || !inGame()) return;
+    e.preventDefault();
+    e.returnValue = '';
+  });
+  addEventListener('pagehide', () => clearTimeout(leaveTimer));
+}
+
+let leaveTimer = null;
+function stayInGame() {
+  $('sheet-quit').hidden = true;
+  armBack(); // un prochain retour redemande
+}
+$('btn-quit-close').onclick = stayInGame;
+$('btn-quit-stay').onclick = stayInGame;
+$('btn-quit-go').onclick = () => {
+  leaving = true;
+  $('sheet-quit').hidden = true;
+  history.back(); // comme le retour d'avant : page précédente, ou l'appli se ferme
+  // Rien avant nous (appli installée, onglet neuf) : retour à l'accueil, la partie reste enregistrée.
+  leaveTimer = setTimeout(() => location.replace(location.pathname), 600);
+};
 
 if (VIEW) {
   document.documentElement.classList.add('view-only');

@@ -423,6 +423,19 @@
     </div>
   </div>
 
+  <!-- « Retour » pendant une partie en cours (D-401) -->
+  <div id="sheet-quit" class="sheet" hidden>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="quit-title">
+      <div class="sheet-head">
+        <h2 id="quit-title">Quitter la partie en cours ?</h2>
+        <button id="btn-quit-close" class="icon-btn close-btn" title="Fermer" aria-label="Fermer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <p class="hint">La partie reste enregistrée sur ce téléphone : tu pourras la reprendre depuis l'accueil.</p>
+      <button id="btn-quit-stay" class="primary"><i data-ic="play"></i>Rester</button>
+      <button id="btn-quit-go" class="secondary danger"><i data-ic="close"></i>Quitter la partie</button>
+    </div>
+  </div>
+
   <!-- Caméra -->
   <div id="scanner" class="scanner" hidden>
     <video id="scanner-video" playsinline muted></video>

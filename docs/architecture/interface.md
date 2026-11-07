@@ -603,3 +603,27 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   Véga prêt · IA Orion prêt »), départ, planètes des IA fondées en moins d'une minute, reprise
   avec les IA reliées. Seules erreurs de la console : les relais Nostr, injoignables dans le
   conteneur de test.
+
+## 20. « Retour » pendant une partie en cours (2026-11-07, D-401)
+
+- Partie **en cours** = `js/back.js` `playing` : `status === 'playing'`, partie partie
+  (`startedAt`), pas finie (`over`), écran `#screen-game` affiché, hors lecture seule (`?view`).
+  Le lobby (avant le départ), le choix de race et l'écran de fin n'en sont pas.
+- `armBack` (`app.js`, appelé à chaque `renderLive`) pose **une** entrée d'historique « garde »
+  (`history.pushState({ astraGuard: true })`) dès que la partie est en cours. Un retour (bouton
+  ou geste d'Android, bouton précédent, geste d'iOS dans l'appli installée) la consomme :
+  `popstate` → `backAction` (`js/back.js`) :
+  - une fenêtre `.sheet` ouverte → elle se ferme (sa croix), la garde est reposée, pas de question ;
+  - sinon → fenêtre `#sheet-quit` « Quitter la partie en cours ? » (style commun des fenêtres,
+    D-302) : **Rester** (ou la croix, le fond, Échap) repose la garde, un retour suivant redemande ;
+    **Quitter la partie** fait `history.back()`, comme le retour d'avant (page précédente, ou
+    l'appli se ferme). Rien avant la page (appli installée, onglet neuf) : au bout de 600 ms,
+    `location.replace` ramène à l'accueil, la partie reste dans l'historique des parties.
+  - Question affichée, la garde n'est pas reposée : un **2ᵉ retour** quitte, sans autre alerte.
+  - Partie finie avec une garde restée : le retour la consomme sans rien montrer, le suivant
+    quitte.
+- `beforeunload` pendant une partie en cours (fermer l'onglet, recharger) : le navigateur pose
+  sa propre question. Pas pendant « Quitter » ni quand `#sheet-quit` est ouverte. iOS ne la
+  montre pas (non confirmé sur un vrai téléphone).
+- Vérifié dans Chrome (390 × 844) par `tests/back-browser.mjs` (Playwright, hors
+  `node --test`) ; la règle seule dans `tests/back.test.mjs`.
