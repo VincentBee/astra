@@ -116,7 +116,7 @@ Découpage convenu avec code-regles : **ici** constructeur, création/arrivée, 
 |---|---|---|
 | `FORMAT = 11` (D-166 ; 10 : D-158 ; 9 : D-120) | 45 | Version du format des fiches (10 : recherches et vaisseaux dans le fil `plan`), écrite dans `p.v` par `touch`. `outdated` (l.1812) est vrai si un autre a un `v` plus grand → `app.js:830` prévient de recharger. |
 | constantes | 54-72 | `MAX_PLAYERS = 8`, `HEARTBEAT_MS = 1500`, `SILENCE_MS = 30000`, `MAX_ORDERS = 1500`. |
-| `normalize(p)` | 90 | Remet une fiche reçue au format actuel et la nettoie (nom ≤ 16, couleur `#rrggbb`, race connue, planètes valides via `planetOk` (heure `at` ramenée au plancher `since` / `claimAt` de la fiche, D-175), quantités bornées via `cleanAmounts` l.158, etc.). Exportée (utilisée par `js/replay.js`). |
+| `normalize(p)` | 90 | Remet une fiche reçue au format actuel et la nettoie (nom ≤ 16, couleur `#rrggbb`, race connue, planètes valides via `planetOk` (heure `at` ramenée au plancher `since` / `claimAt` de la fiche, D-175 ; stock, population, réserve et repousse ramenés à des nombres finis ≥ 0, D-380), quantités bornées via `cleanAmounts` l.158, etc.). Exportée (utilisée par `js/replay.js`). |
 | `pidOk(pid)` | 169 | `[A-Za-z0-9-]{1,24}` : pas de `__proto__`. |
 | `clean(state)` | 187 | Copie + suppression des champs d'anciennes versions (`leader`, `epoch`, `nextRank`) + `normalize` de chaque fiche. |
 | `Session.create(name)` | 214 | Nouvelle partie : `gid` (6), `key` (16), `me` (6), secret (16) dont seul le hash SHA-256 va dans la fiche. |
