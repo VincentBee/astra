@@ -487,6 +487,9 @@ export function newPlanet(race, now, world = null) {
 // Économie
 // ---------------------------------------------------------------------------
 
+/** Nombre fini, sinon 0 (#76). Ne change rien à un stock valide. */
+const num = (v) => (Number.isFinite(v) ? v : 0);
+
 /**
  * Ce qu'on tire vraiment du sol, par heure de jeu : tout ce que demandent les
  * bâtiments tant que le gisement n'est pas vide ; une fois vide, pas plus que
@@ -495,7 +498,8 @@ export function newPlanet(race, now, world = null) {
 function extract(res, want, nature, reserve, h) {
   if (!nature?.[res]) return want; // planète d'avant les gisements : sans limite
   const avail = reserve[res] / h + nature[res].regen;
-  return Math.min(want, avail);
+  // Jamais négatif (#76) : une réserve abîmée ne vide pas l'entrepôt.
+  return Math.max(0, Math.min(want, avail));
 }
 
 /**
@@ -506,6 +510,8 @@ function extract(res, want, nature, reserve, h) {
  */
 export function flows(race, levels, pop, stock, h, boost = 1, nature = null, reserve = null, tech = null, climate = null) {
   const R = RACES[race];
+  // Un stock absent ou non numérique compte pour 0 (#76) : sinon tout devient NaN.
+  stock = { energy: num(stock.energy), food: num(stock.food) };
   const r = R.rates(levels, pop);
   const t = techBonus(race, tech);
   // Le climat de la planète s'ajoute aux technologies (planète d'avant le climat : ×1).
@@ -570,9 +576,10 @@ function advance(race, s, ms, boost) {
   const lost = {}; // ce qui ne rentre pas dans l'entrepôt plein
   for (const r of RES) {
     const cap = capOf(r, f);
-    const v = s.stock[r] + f.net[r] * h;
+    const cur = num(s.stock[r]); // #76 : une clé absente ne rend pas le stock NaN
+    const v = cur + f.net[r] * h;
     // Un entrepôt déjà plein ne déborde pas, mais n'est pas vidé non plus.
-    stock[r] = Math.max(0, f.net[r] > 0 ? Math.max(s.stock[r], Math.min(cap, v)) : v);
+    stock[r] = Math.max(0, f.net[r] > 0 ? Math.max(cur, Math.min(cap, v)) : v);
     lost[r] = Math.max(0, v - stock[r]);
   }
   const R = RACES[race];
@@ -724,16 +731,46 @@ function planNeed(race, places, s, item) {
   return fits(out.cost) ? out : { why: 'Entrepôt trop petit' };
 }
 
+/** Ce qu'on affiche pour un élément qui attend une ressource qui ne rentre plus (D-270). */
+const NO_INCOME = { minerals: 'Pas de minéraux qui rentrent', food: 'Pas de nourriture qui rentre', energy: 'Pas d’énergie qui rentre' };
+
 /**
- * Prochain élément du fil à lancer, dans l'ordre du fil : le premier dont le
+ * Première ressource du prix `cost` qui manque au stock et ne peut plus monter
+ * avec la production actuelle (D-270), ou null. `f()` donne les flux de l'état
+ * (`flows` sur une seconde de jeu), calculés seulement s'il manque quelque
+ * chose. « Ne peut plus monter » : solde ≤ 0, ou demande pas couverte (famine
+ * pour la nourriture, panne pour l'énergie : tout ce qui rentre est mangé).
+ */
+function starved(cost, stock, f) {
+  let fl = null;
+  for (const [r, v] of Object.entries(cost)) {
+    if ((stock[r] || 0) + 1e-9 >= v) continue;
+    fl ||= f();
+    const short = (r === 'food' && fl.effF < 1) || (r === 'energy' && fl.effE < 1);
+    if (short || !(fl.net[r] > 1e-9)) return r;
+  }
+  return null;
+}
+
+/**
+ * Éléments du fil à attendre, dans l'ordre du fil : le premier dont le
  * chantier est libre et qui peut partir. Un élément dont le chantier est
  * occupé, ou à qui il manque un prérequis, garde sa place sans bloquer les
  * autres chantiers (mais bloque ceux de son chantier qui le suivent). Le
  * premier élément prêt a la priorité sur le stock : ceux d'après attendent
  * qu'il soit lancé (on ne double pas dans le fil pour une question de prix).
+ *
+ * Sauf (D-270) un élément prêt qu'on ne pourra pas payer avec la production
+ * actuelle (`starved` : famine, panne, solde nul) : il ne bloque personne, pas
+ * même son propre chantier, mais il reste candidat. On rend la liste de ces
+ * éléments-là, suivie du premier élément prêt payable un jour ; `until` lance
+ * le premier de la liste que le stock couvre. Sans famine ni panne, la liste
+ * n'a qu'un élément : le calcul est celui d'avant. null si rien n'est prêt.
  */
 function planNext(race, places, s, q, plan) {
   const waiting = new Set();
+  const late = [];
+  const f = () => flows(race, s.levels, s.pop, s.stock, 1 / 3600, 1, s.nature, s.reserve, s.tech, s.climate);
   for (let pos = 0; pos < plan.length; pos++) {
     const lane = planLane(plan[pos].item);
     if (q[lane] || waiting.has(lane)) {
@@ -745,30 +782,39 @@ function planNext(race, places, s, q, plan) {
       waiting.add(lane);
       continue;
     }
-    return { pos, lane, ...need };
+    const pick = { pos, lane, ...need };
+    if (starved(need.cost, s.stock, f)) {
+      late.push(pick);
+      continue;
+    }
+    return [...late, pick];
   }
-  return null;
+  return late.length ? late : null;
 }
 
 /** Places libres pour ces niveaux (les planètes d'avant la place n'ont pas de limite). */
 const freePlaces = (places, levels) => (Number.isFinite(places) ? places - usedPlaces(levels) : Infinity);
 
 /**
- * Fait avancer `s` de `from` vers `to` jusqu'à ce que le stock couvre `cost`
- * (vérifié avant de partir, puis après chaque pas). Les pas sont ceux de
- * `steps` (`stepOf` : 2 h de jeu au plus, MAX_STEPS au plus). Renvoie { s, at, ok }.
+ * Fait avancer `s` de `from` vers `to` jusqu'à ce que le stock couvre l'un des
+ * prix `costs` (vérifié avant de partir, puis après chaque pas). Les pas sont
+ * ceux de `steps` (`stepOf` : 2 h de jeu au plus, MAX_STEPS au plus). Renvoie
+ * { s, at, ok, k } : `k` est le premier prix de la liste couvert.
  */
-function until(race, s, from, to, cost, trance) {
-  if (covers(s.stock, cost)) return { s, at: from, ok: true };
+function until(race, s, from, to, costs, trance) {
+  const hit = () => costs.findIndex((c) => covers(s.stock, c));
+  let k = hit();
+  if (k >= 0) return { s, at: from, ok: true, k };
   const dt = stepOf(to - from);
   let t = from;
   while (t < to) {
     const ms = Math.min(dt, to - t);
     s = advance(race, s, ms, trance > t ? 2 : 1);
     t += ms;
-    if (covers(s.stock, cost)) return { s, at: t, ok: true };
+    k = hit();
+    if (k >= 0) return { s, at: t, ok: true, k };
   }
-  return { s, at: to, ok: false };
+  return { s, at: to, ok: false, k: -1 };
 }
 
 /**
@@ -806,13 +852,14 @@ export function stateAt(planet, now) {
       .filter(([, v]) => v && v.end <= now)
       .sort((x, y) => x[1].end - y[1].end || (x[0] < y[0] ? -1 : 1))[0];
     // Un chantier libre : le fil attend que le stock couvre le prix, au plus jusqu'au prochain événement.
-    const pick = planNext(race, planet.places, s, q, plan);
-    if (pick) {
+    const picks = planNext(race, planet.places, s, q, plan);
+    if (picks) {
       const limit = next ? Math.max(at, next[1].end) : now;
-      const r = until(race, s, at, limit, pick.cost, planet.trance || 0);
+      const r = until(race, s, at, limit, picks.map((p) => p.cost), planet.trance || 0);
       s = r.s;
       at = Math.max(at, r.at);
       if (r.ok) {
+        const pick = picks[r.k];
         const stock = { ...s.stock };
         for (const [k, v] of Object.entries(pick.cost)) stock[k] -= v;
         s = { ...s, stock };
@@ -863,6 +910,8 @@ export function planForecast(planet, now) {
     const hit = passes.map((p) => p.find((d) => d.i === i)).find(Boolean) || null;
     const st = { levels: ahead.levels, tech: ahead.tech };
     const need = planNeed(race, planet.places, st, item);
+    // Pas de prérequis manquant : peut-être une ressource qui ne rentre plus (D-270).
+    const dry = need.why ? null : starved(need.cost, s.stock, () => s.prod);
     let out;
     if (typeof item === 'string') {
       out = { key: item, level: (ahead.levels[item] || 0) + 1, cost: upgradeCost(race, item, ahead.levels[item] || 0) };
@@ -871,7 +920,7 @@ export function planForecast(planet, now) {
       out = { key: item.tech, level: (ahead.tech[item.tech] || 0) + 1, cost: techCost(race, item.tech, ahead.tech[item.tech] || 0) };
       ahead.tech[item.tech] = out.level;
     } else out = { key: item.ship, count: item.n, cost: shipsCost(race, item.ship, item.n) };
-    return { item, lane, ...out, start: hit?.start ?? null, end: hit?.end ?? null, why: hit ? null : need.why || null };
+    return { item, lane, ...out, start: hit?.start ?? null, end: hit?.end ?? null, why: hit ? null : need.why || (dry && NO_INCOME[dry]) || null };
   });
 }
 

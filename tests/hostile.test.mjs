@@ -161,3 +161,31 @@ scenario('une colonie datée d’avant sa prise est ramenée à l’heure de sa 
   });
   assert.equal(A.state.players[B.me].colonies.x1.at, clock.t - 1000);
 });
+
+scenario('un stock ou une réserve absents, non numériques ou négatifs sont ramenés à 0 : l’économie reste numérique (#76)', (film) => {
+  const cases = [
+    ['énergie absente', (pl) => delete pl.stock.energy],
+    ['nourriture = "abc"', (pl) => (pl.stock.food = 'abc')],
+    ['stock et réserve négatifs', (pl) => Object.assign(pl, { stock: { ...pl.stock, food: -500, minerals: -1 }, reserve: { ...pl.reserve, minerals: -1000 }, pop: -4 })],
+  ];
+  for (const [label, edit] of cases) {
+    const { players: [A, B], clock } = newGame(2, ['human', 'human']);
+    clock.t += 1000;
+    const before = game.stateAt(B.state.players[B.me].planet, clock.t + 60_000).stock.minerals;
+    forge(A, B, (st) => {
+      edit(st.players[B.me].planet);
+      st.players[B.me].actAt = clock.t;
+    });
+    const pl = A.state.players[B.me].planet;
+    assert.ok(pl, `${label} : planète gardée`);
+    const sane = (s) => [...Object.values(s.stock), s.pop, ...Object.values(s.reserve)].every((v) => Number.isFinite(v) && v >= 0);
+    const at = [0, 60_000, 3_600_000, 86_400_000].map((d) => game.stateAt(pl, clock.t + d));
+    film.look(A, `A reçoit la planète de B avec ${label}`, [
+      { show: 'stocks, population, réserves', at: P(B).home, expected: 'des nombres ≥ 0', got: at.every(sane) ? 'des nombres ≥ 0' : JSON.stringify(at.find((s) => !sane(s)).stock) },
+      { show: 'minéraux dans 1 min', at: P(B).home, expected: `pas moins qu’au départ`, got: at[1].stock.minerals, ok: at[1].stock.minerals >= Math.min(before, pl.stock.minerals) },
+    ]);
+    for (const s of at) assert.ok(sane(s), `${label} : ${JSON.stringify(s.stock)} pop ${s.pop}`);
+    // Une réserve négative ne fait plus perdre de minéraux.
+    assert.ok(at[1].stock.minerals >= pl.stock.minerals, `${label} : minéraux ${pl.stock.minerals} -> ${at[1].stock.minerals}`);
+  }
+});

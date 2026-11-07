@@ -70,7 +70,8 @@ Créée par `addPlayer` (`js/session.js:696-713`), complétée par `normalize`
 | `rank` | heure d'arrivée (ordre d'arrivée) | `js/session.js:704` |
 | `actAt` | heure de la dernière modification (la plus récente gagne) | `js/session.js:712`, `touch` `js/session.js:586` |
 | `v` | version du format (`FORMAT = 7`) | `js/session.js:41`, `js/session.js:587` |
-| `race` | `human`, `machine` ou `alien`, choisie une seule fois | `chooseRace` `js/session.js:722-736` |
+| `race` | `human`, `machine` ou `alien` ; définitive dès que la partie part (avant, une IA peut en changer, D-400) | `chooseRace` |
+| `left` | heure à laquelle le joueur a quitté la partie avant le départ (IA retirée du lobby, D-399) ; absent sinon | `Session.leave` |
 | `ready` | heure à laquelle le joueur s'est dit prêt (D-120) ; absent tant qu'il ne l'est pas | `Session.ready` |
 | `go` | heure du départ, si c'est ce joueur qui l'a donné (tous les présents prêts, D-120) | `Session.begin` |
 | `since` | entrée dans la course : apparition de la flotte de départ (D-120), ou installation dans une partie d'avant | `enterRace`, `claimPlanet` |
@@ -199,7 +200,18 @@ l'intègre par pas (`js/game.js:13-15`).
     le suivent (chaque chantier garde l'ordre du fil) ;
   - le premier élément prêt **a la priorité sur le stock** : `stateAt` avance l'économie pas à
     pas (`until`) jusqu'à ce que le stock couvre son prix, au plus jusqu'au prochain événement ;
-    ceux d'après attendent (on ne double pas dans le fil pour une question de prix).
+    ceux d'après attendent (on ne double pas dans le fil pour une question de prix) ;
+  - **sauf un élément prêt qu'on ne pourra pas payer avec la production actuelle** (D-270,
+    `starved`) : une ressource de son prix manque au stock et ne peut pas monter (solde ≤ 0,
+    ou demande pas couverte : famine pour la nourriture, panne pour l'énergie). Il ne bloque
+    personne, **pas même les éléments de son propre chantier** (le réacteur qui répare la
+    panne part même s'il est derrière un bâtiment qui coûte de l'énergie). Il reste candidat :
+    `planNext` rend la liste de ces éléments-là, suivie du premier élément prêt payable un
+    jour, et `until` lance le premier de la liste que le stock couvre (si la ressource se remet
+    à rentrer, il repasse devant ceux qui le suivent). Sans famine ni panne, la liste n'a qu'un
+    élément : le calcul est celui d'avant. `planForecast` affiche alors sa raison (« Pas de
+    nourriture qui rentre », « Pas d’énergie qui rentre », « Pas de minéraux qui rentrent »)
+    au lieu de « plus de 6 h ».
   Trouvé : il paye, remplit sa file, sort du fil, et note `{ kind: 'start', lane, i, … }`
   dans `done` (`i` : sa place dans le fil de départ). Le fil avance aussi pendant une absence.
   `planForecast(planet, now)` part d'une copie soldée à `now`, refait ce calcul 10 min puis
@@ -605,11 +617,16 @@ pas (`ORDERS[kind]?.name || 'Ordre'`) et n'exécute jamais les ordres des flotte
   `js/session.js:56`, `js/session.js:1650-1655`) : la mémoire `raided` est dans la fiche de
   l'attaquant, avec la clé `pid:planète`. Sans ça, des attaques en chaîne depuis l'orbite
   vidaient tout. Le combat a lieu quand même ; seul le butin est refusé.
-- J'écris un rapport `{ id, to, key, at, ships: pertes, lost: mes pertes, take: butin }` dans mes
+- J'écris un rapport `{ id, to, key, cell, at, ships: pertes, lost: mes pertes, take: butin }` dans mes
   `effects` (`lost` depuis D-110, pour le carnet du défenseur ; absent des anciens rapports ;
   `rep` depuis D-122 : le déroulé du combat, nettoyé à la réception par `cleanReport`).
+  `cell` (depuis D-360) : la case attaquée. C'est elle qui désigne la planète, pas `key`, car la
+  clé `'home'` change de planète quand le défenseur perd sa planète mère (une colonie la
+  remplace, section 19). `cleanEffect` ne garde `cell` que si ce sont deux nombres ; un ancien
+  rapport sans `cell` est lu par sa clé, comme avant. La mémoire `raided` est aussi rangée par
+  case (`pid:x:y`) depuis D-360.
 - **Conquête** (`conquer` gagné, sur une case que le froid n'a pas prise) : le rapport porte en
-  plus `capture: true` et `cell`. `Session.capture` crée tout de suite une colonie neuve de ma
+  plus `capture: true`. `Session.capture` crée tout de suite une colonie neuve de ma
   race sur la case (`newPlanet`, les bâtiments adverses sont perdus), avec les survivants, la
   cargaison, le butin et le carburant ; la flotte s'y pose. La colonie porte `captured: true` :
   elle n'a consommé aucun colonisateur (D-200). `ownerAt` ne compte plus l'ancien
@@ -668,11 +685,25 @@ pas (`ORDERS[kind]?.name || 'Ordre'`) et n'exécute jamais les ordres des flotte
 
 ### 9.4 Appliquer les dégâts reçus (`applyEffects`, `js/session.js:1697-1739`)
 
-- Pour chaque rapport d'un autre qui me vise et que je n'ai pas encore appliqué : je le note
-  dans `applied`, puis je retire vaisseaux et butin, de la flotte visée (`fleetHit`) ou de la
-  planète.
-- Une flotte posée entre-temps : sa planète encaisse (`docked`, `js/session.js:1716`). Une
-  flotte qui vient de fonder une colonie : la colonie encaisse (`js/session.js:1632-1635`).
+- Les rapports de **tous** les autres joueurs qui me visent sont lus **dans l'ordre de leur
+  heure** `at` (à égalité : par identifiant de joueur, puis dans l'ordre de sa fiche), pas dans
+  l'ordre des joueurs de ma copie (D-360). Un pillage à t+5 s est donc lu avant une prise à
+  t+10 s, sur tous les téléphones.
+- Pour chaque rapport que je n'ai pas encore appliqué : je le note dans `applied`, puis je
+  retire vaisseaux et butin, de la flotte visée (`fleetHit`) ou de la planète **sur la case du
+  rapport** (`cell`, D-360 ; par `key` pour un ancien rapport).
+- **Planète perdue avant la lecture** (gelée ou prise) : plus aucune de mes planètes sur cette
+  case, ou celle qui y est a été installée après le combat (`claimAt` plus tard que `at`). Le
+  rapport ne touche rien ; `missedEffect` écrit au journal « Rapport de X sans effet : Hadar
+  n'est plus à B » et au carnet « X attaque Hadar, déjà perdue : sans effet. » (D-360). Une
+  flotte visée qui n'existe plus (ni flotte, ni planète où elle s'est posée) : une ligne au
+  journal seulement.
+- Une flotte posée entre-temps : sa planète encaisse (`docked`, `dockedPlanet`). `docked` garde
+  l'**identifiant de la planète** de l'univers (plus `'home'`, D-360), retrouvé par sa case
+  (`planetRef`) : une colonie devenue planète mère reste trouvée. Une flotte qui vient de fonder
+  une colonie : la colonie encaisse.
+- Le gel passe **avant** la lecture des rapports dans `tick` (inchangé, D-360) : un rapport daté
+  d'avant le gel d'une planète, lu après, la trouve déjà perdue et ne touche rien.
 - Nettoyage : j'oublie mes rapports dès que leur cible les a appliqués ; j'oublie un
   identifiant appliqué quand son auteur a effacé le rapport (`js/session.js:1700-1705`,
   `js/session.js:1729-1737`).
@@ -769,7 +800,14 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
 
 ## 12. Installation et colonies
 
-- **Race** : choisie une fois, définitive (`chooseRace`, `js/session.js:722-736`).
+- **Race** : définitive dès que la partie part, ou dès qu'on a une planète (`chooseRace`). Avant, un
+  second `chooseRace` change de race (« X passe dans le camp des … ») : seul l'hôte d'une IA s'en
+  sert, depuis le lobby (D-400) ; l'écran d'un joueur ne propose le choix qu'une fois.
+- **IA du lobby (D-399, D-400)** : avant le départ, deux ordres de plus, notés au journal
+  (`ORDER_KINDS`) et donc rejoués : `rename(nom)` (nom coupé à 16 caractères, espaces retirés ;
+  vide ou inchangé → refusé, l'ancien reste) et `leave()` (champ `left` = heure ; `ready` et `go`
+  retirés). Après `leave`, `canAct` est faux. Un joueur parti n'est ni montré, ni compté
+  (`Session.roster` : les fiches sans `left`), ni attendu au départ (`notReady`), ni classé.
 - **Départ commun (D-120)** : après sa race, chaque joueur se dit prêt (ordre `ready`, champ
   `ready` = heure ; `ready(false)` le retire tant que la partie n'est pas partie). Un joueur qui
   n'a pas encore choisi sa race n'est pas prêt. `checkStart` (hors ordre, appelé par le minuteur
@@ -892,6 +930,11 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
   là, seul `MAX_STEPS` (§4.2) protège : le calcul reste borné. Une heure loin dans le futur
   n'est pas bornée ici (`normalize` ne connaît pas l'heure) : elle ne coûte rien
   (`steps` s'arrête aussitôt).
+- Stock, population et sol d'une planète reçue (D-380, #76) : `planetOk` ramène chaque stock
+  (`RES`) et la population à un nombre fini ≥ 0 (sinon 0), la réserve et la repousse du sol à
+  ≥ 0. L'économie se garde aussi elle-même : `flows` et `advance` lisent un stock non fini
+  comme 0, `extract` ne rend jamais une quantité négative. Rien ne change pour un nombre
+  valide : une partie normale garde exactement ses résultats.
 
 ## 15. Constantes d'équilibrage : où les changer
 
@@ -1015,6 +1058,7 @@ Résultat : `tests 34, pass 34, fail 0`, environ 5,6 s (le rejeu d'une partie de
 | `tests/rules.test.mjs` | 11 | Déconstruire (moitié du prix rendue, place libérée à la fin) ; heure qui recule puis revient : pas de double production ; longue absence ≈ passages toutes les heures (population à moins de 2 %) ; arrachement refusé sans payer ; clés héritées (`constructor`, `__proto__`) refusées ; effectifs négatifs ou fractionnaires au combat ; soleil au centre et sans planète ; climat et production ; une place par niveau ; places lues sur la carte ; une colonie humaine sur le plus petit corps garde des places |
 | `tests/combat.test.mjs` | 4 | Attaques contre une planète : pas de butin créé avec un défenseur hors ligne ou plusieurs flottes arrivées ensemble ; 70 attaques avant le retour du défenseur ; les vaisseaux perdus emportent leur cargaison |
 | `tests/effects.test.mjs` | 1 | 5 joueurs, 4 attaquants × 70 combats : chaque perte subie une fois, puis rapports oubliés des deux côtés |
+| `tests/rapport-case.test.mjs` | 11 | Rapports visés par leur case (D-360) : attaque avant le gel lue après (et témoin), pillage puis prise à 3 joueurs, attaque de la colonie promue (dans les deux ordres), flotte posée, ancien `docked` « home », échanges refusé, accepté et séquestre perdu, « Conquérir » en vol vers une colonie promue (jeu-solo-01) |
 | `tests/fleet.test.mjs` | 25 | Deux flottes sur la même cible ; poursuite mutuelle ; colonie qui encaisse les pertes ; premier arrivé à la colonisation ; plein en panne tout près ; plusieurs attaquants ne pillent pas plus que le stock ; revanche ; raids sans armes et un pillage par 2 min ; flotte agressive qui combat puis reprend sa route ; flotte passive qui croise sans combattre ; agressive à l'arrêt qui garde sa case ; deux agressives : pertes comptées une fois ; agressive refusée sans armes, vue par les autres, gardée à la fusion (D-100) ; vitesse du vaisseau le plus lent ; rencontres que personne n'a regardées : `firstContact`, agressive et poursuite hors ligne, pas de combat rejoué, pertes comptées une fois (D-109) ; jonction : rejoindre puis fusionner, fusion immédiate, attente, flotte partie, refus (D-159) |
 | `tests/report.test.mjs` | 7 | Rapport de combat détaillé (D-122) : déroulé cohérent avec les pertes (défense comprise) ; explication du vainqueur et du vaincu avec les chiffres ; défense, technologies, cargos sans armes, combat indécis ; vaisseaux sans armes et victoire sans butin ; déroulé trafiqué borné ; même déroulé dans les deux carnets ; seconde attaque trop tôt expliquée |
 | `tests/colony.test.mjs` | 1 | Colonie perdue au recollage : vaisseaux et cargaison restent en orbite |
@@ -1256,7 +1300,10 @@ les mêmes ordres qu'un joueur, notés dans son journal (la partie se rejoue, §
   carburant, qui ne gèlent pas avant l'arrivée + 1 min ; combat calculé par `battle` contre les
   vaisseaux posés et `fortOf` ; gagné en gardant la moitié de la flotte → décollage (carburant
   aller-retour) et `conquer`. Les cibles qui tiendront le plus longtemps d'abord, puis les plus
-  proches. Après le combat, une flotte restée en orbite rentre se poser (`dockNearest`).
+  proches. Une planète déjà visée par une de mes flottes `conquer` n'est jamais visée une 2e
+  fois (D-280) : les vaisseaux posés la rejoignent (`joinFleet`) s'ils ont le carburant et
+  arrivent après elle (`canJoin`), sinon ils visent la cible suivante ou restent posés. Après le
+  combat, une flotte restée en orbite rentre se poser (`dockNearest`).
 - **Froid** (`evacuate`) : à 40 s du gel, les vaisseaux posés partent se poser sur la planète qui
   gèlera le plus tard.
 - **Aliens** (`usePowers`) : arrachement si le gain dépasse 40 minéraux, transe si le sol n'est
