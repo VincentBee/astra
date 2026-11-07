@@ -1102,7 +1102,8 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   de construction dans chaque case ; une case qui sélectionne la planète sans rien ouvrir.
 - Qui : Vincent (la demande), Claude (la forme). Source : session `012yisg4`.
 - Statut : en vigueur. Vérifié dans Chromium (390 × 844) : construire depuis la case, compte à
-  rebours, décollage, flotte en orbite. Sur un vrai téléphone : **non confirmé**.
+  rebours, décollage, flotte en orbite. Sur un vrai téléphone : **non confirmé**. Bord vert des
+  cases de planètes : **modifié par D-301** (plus de bord gauche coloré).
 
 **D-116 — Cache `astra-p2p-v64`**
 - 2026-10-31. Choix de Claude : `index.html`, `style.css`, `js/app.js` (D-115, D-117) et
@@ -2587,6 +2588,73 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
   les fenêtres ; l'« alternative écartée » ci-dessus est retenue). Cache `astra-p2p-v97` pour toute la PR #178 (D-240 à D-246),
   au-dessus de v96 de `main`. Numéros : D-201 à D-207 puis D-221 à D-227 sur la branche,
   renumérotés D-240 à D-246 au rebase sur `main` (qui avait pris D-201 puis D-221).
+
+**D-300 — Jauges de stock sous mes planètes, sur la carte (sans chiffre)**
+- **Modifiée par D-303** : les jauges ne sont plus dessinées sur la carte, mais dans les cases
+  de mes planètes de la grille sous la carte. Le reste (une barre par stock, sans chiffre) tient.
+- 2026-11-07 07:50. Contexte : Vincent : « je voudrais que dans la vue de carte, les planete aient
+  les jauges de ressources stoqué par le joueur visible, sans le montant exacte, pour se rendre
+  compte de quel planete est vide et quel planete est pleine ».
+- Choix (forme : **Claude par défaut**, router « Jauges de stock des planètes sur la carte », puis
+  worker `worker-jauges-carte`) :
+  - Sous chacune de **mes** planètes vivantes (aussi astéroïde ou comète à moi), sous l'anneau
+    blanc (`cy + 0,56 case`), une mini-barre horizontale par ressource de ma race, dans l'ordre
+    de `RACES[race].resources` (minéraux, nourriture, énergie ; 2 barres pour une race sans
+    nourriture), couleurs `--minerals`, `--food`, `--energy`. Partie vide : blanc à 16 % ;
+    l'ensemble posé sur un fond sombre pour rester lisible sur le quadrillage et le froid.
+  - Remplissage = stock / plafond de l'entrepôt (`caps`, `storageCap`), borné à 0..1. Aucun
+    chiffre.
+  - **4e barre, habitants** (`--pop`) : seulement pour une race qui en a (`RACES[race].pop`),
+    car leur plafond est clair (logements, `popCap`). Pas de barre pour une race sans
+    population.
+  - Valeurs prises au même calcul que les alertes (`renderAlerts`, `stateAt` à l'instant, 5 fois
+    par seconde) : pas de `stateAt` de plus, et rien dans la boucle d'image de la carte.
+  - Tailles en `max(pixels, part de case)` : visibles au zoom 1 sur téléphone, plus grandes en
+    zoomant. Le toucher et l'aimant (`js/aim.js`) ne changent pas.
+  - Planètes des autres et libres : jamais de barre (on ne connaît pas leurs stocks).
+- Alternatives écartées : barres dans l'anneau (trop peu de place au zoom 1 : environ 4 px
+  entre le disque et le cercle blanc) ; une seule jauge (le minimum ou la moyenne : cache quelle
+  ressource manque) ; un anneau coloré autour de la planète (moins lisible à petite taille).
+- Limite connue : une 3e flotte à quai sur la même case se pose juste sous la planète et peut
+  chevaucher les barres.
+- Qui : Vincent (le besoin), Claude par défaut (la forme). Source : session router « Jauges de
+  stock des planètes sur la carte », worker `e2d13b65`. Statut : en vigueur (cette PR), cache
+  `astra-p2p-v97`, puis `astra-p2p-v98` au rebase sur `main` (qui avait pris v97), puis `astra-p2p-v100` (v98 et v99 pris par les PR #188 et #189).
+
+**D-301 — Plus de bord gauche coloré sur les cases de mes planètes (grille sous la carte)**
+- 2026-11-07 08:05. Contexte : après D-300, Vincent : « et retire la border-left de ces cards »
+  (transmis par le router « Jauges de stock des planètes sur la carte »). Ce sont les cases des
+  planètes de `#map-fleets` (`.mf.mp`), qui avaient un bord gauche vert de 3 px (D-115).
+- Choix : `.mf.mp` garde le cadre fin normal (`1px solid var(--line)`) sur les quatre côtés.
+  Les cases des flottes ne changent pas : bord gauche bleu, rouge si attaque (`.mf.hot`).
+- Alternative écartée : retirer aussi le bord des flottes (le rouge signale une attaque).
+- Qui : Vincent (la demande), le router (la portée : planètes seulement). Source : session router,
+  worker `e2d13b65`. Statut : en vigueur (PR #186). Modifie D-115.
+
+**D-303 — Les jauges de stock vont dans les cases d'accès rapide, plus sur la carte**
+- 2026-11-07 08:20. Contexte : après D-300, Vincent, avec une capture de la case « Kochab » de la
+  grille sous la carte : « c'est dans les acces rapide que je veux les jauges » (transmis par le
+  router).
+- Choix :
+  - Plus rien sous les planètes du canvas : `drawStockBars`, `stocksNow` et le calcul ajouté à
+    `renderAlerts` sont retirés.
+  - Chaque case de planète `.mf.mp` de `#map-fleets` porte, sous le nom, une barre fine (3 px)
+    par ressource de la race (`RACES[race].resources`) puis les habitants s'il y en a ; couleurs
+    `--minerals`, `--food`, `--energy`, `--pop` ; partie vide blanche à 12 %. Remplissage =
+    stock / plafond (entrepôt, ou logements pour les habitants), **aucun chiffre**. Les cases
+    des flottes n'en ont pas.
+  - Mise à jour en place dans `renderMapFleets` (largeur des barres, comme les comptes à rebours) :
+    le HTML de la case ne change pas avec le stock, donc pas de réécriture ni de clignotement,
+    et le toucher sur + et Décoller n'est pas perdu.
+  - **Choix de Claude par défaut** : accessibilité par un `aria-label` en mots sur le groupe de
+    barres (`role="img"`, « Stocks : minéraux presque plein, nourriture vide… » ; vide, presque
+    vide, à moitié, presque plein, plein), plutôt que `aria-hidden` : un lecteur d'écran
+    retrouve ainsi l'information sans chiffre exact.
+- Alternatives écartées : garder aussi les barres sur la carte (l'utilisateur les veut dans les
+  cases) ; barres sous le statut (le nom puis les barres se lisent d'un coup d'œil, le statut et
+  les boutons restent en bas).
+- Qui : Vincent (l'endroit), Claude (la forme dans la case, l'`aria-label`). Source : router,
+  worker `e2d13b65`. Statut : en vigueur (PR #186). Modifie D-300. (Numérotée D-303 : D-302 est prise par la PR #189.)
 
 **D-310 — La fenêtre Joueurs n'est accessible qu'une fois la partie commencée**
 - 2026-11-07 08:03. Demande de Vincent (via le router), avec une capture de la préparation et de
