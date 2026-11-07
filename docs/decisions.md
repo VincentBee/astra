@@ -2529,7 +2529,7 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
   qu'une fenêtre est ouverte (`body:has(.sheet:not([hidden]))`). Vaut pour toutes les fenêtres.
 - Alternative écartée : ne changer que le Journal (les autres fenêtres ont la même cause).
 - Qui : Vincent (demande), Claude (cause et correctif). Source : session `96b96929`.
-- Statut : en vigueur, modifiée par D-246 pour le Journal (modale presque plein écran). Le décalage n'a pas pu être recréé après le correctif dans l'aperçu (il
+- Statut : en vigueur, modifiée par D-246 pour le Journal (modale presque plein écran), puis par D-302 (toutes les fenêtres prennent toute la hauteur : plus de `max-height` 92 / 85 dvh). Le décalage n'a pas pu être recréé après le correctif dans l'aperçu (il
   n'apparaît pas à chaque fois) : corrigé par construction (`100dvh` = écran visible), **non
   confirmé** sur un vrai téléphone.
 
@@ -2582,6 +2582,29 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
 - Alternatives écartées : toute la largeur sur grand écran (lignes trop longues) ; changer
   toutes les fenêtres (pas demandé).
 - Qui : Vincent (demande), Claude (marge 12 px, largeur 760 px, en-tête collé). Source : session
-  `96b96929`. Statut : en vigueur. Cache `astra-p2p-v97` pour toute la PR #178 (D-240 à D-246),
+  `96b96929`. Statut : en vigueur, modifiée par D-302 (le même style vaut maintenant pour toutes
+  les fenêtres ; l'« alternative écartée » ci-dessus est retenue). Cache `astra-p2p-v97` pour toute la PR #178 (D-240 à D-246),
   au-dessus de v96 de `main`. Numéros : D-201 à D-207 puis D-221 à D-227 sur la branche,
   renumérotés D-240 à D-246 au rebase sur `main` (qui avait pris D-201 puis D-221).
+
+**D-302 — Toutes les fenêtres ont le style du Journal** (modifie D-246, D-243)
+- 2026-11-07 08:05. Demande de Vincent (via le router), avec une capture de la fenêtre Réglages
+  en petit panneau collé en bas : « cette modal doit avoir le meme style que le journal, toutes
+  les modal doivent avoir le meme style ».
+- Choix : le style du Journal (D-246) devient la règle commune de `.sheet`, `.sheet-panel` et
+  `.sheet-head` dans `style.css` : fond assombri, 12 px de marge, panneau centré sur toute la
+  hauteur restante, 760 px de large au plus, bord de 1 px partout, en-tête (titre, croix) collé en
+  haut avec un trait dessous, contenu qui défile dedans. Les variantes qui le contredisaient sont
+  supprimées : `#sheet-journal …` (devenu inutile), `.finish .sheet-panel` (centrage propre à la
+  fin de partie), `.sheet-panel { border-bottom: 0 }`. Vaut pour toutes les fenêtres
+  d'`index.html` : Planète, Joueurs, Fin de partie, Réglages, Journal, Invitation, Décoller,
+  Donner/Scinder, Échange. `replay.html`, `technologies.html` et `tests/ui/` n'ont pas de
+  fenêtre `.sheet`. Contenu, boutons, ouverture et fermeture (croix, Échap, fond) inchangés.
+- Conséquence acceptée : une petite fenêtre (Réglages, Joueurs) est aussi haute que le Journal,
+  avec du vide sous son contenu ; la fiche de planète cache maintenant la carte au lieu d'en
+  laisser voir le haut (on la ferme pour revenir à la carte, comme avant).
+- Alternative écartée : une hauteur ajustée au contenu (panneau centré mais plus court) : ce
+  n'est plus le même style que le Journal, ce que la demande exclut.
+- Qui : Vincent (demande) ; Claude (règle commune, suppression des variantes). Source : session
+  `d9ace210`. Statut : en vigueur. Numéro D-302 et cache `astra-p2p-v99` : la PR #186 (jauges
+  sur la carte, en cours) a déjà pris D-300, D-301 et v98.

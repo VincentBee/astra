@@ -68,7 +68,7 @@ Les tests automatiques (`tests/*.test.mjs`) portent sur les règles et le résea
 
 ## 3. Écrans et fenêtres de `index.html`
 
-Quatre **écrans** (`<section class="screen">`), un seul visible à la fois via `show(nom)` (`js/app.js:54-57`, met `hidden` sur les autres). Par-dessus, des **fenêtres** (`.sheet`, panneau collé en bas, fond sombre) et quelques couches fixes.
+Quatre **écrans** (`<section class="screen">`), un seul visible à la fois via `show(nom)` (`js/app.js:54-57`, met `hidden` sur les autres). Par-dessus, des **fenêtres** (`.sheet` : modale presque plein écran sur fond sombre, toutes au style du Journal, D-302) et quelques couches fixes.
 
 ### 3.1 Écrans
 
@@ -104,7 +104,7 @@ Les panneaux sont filtrés en CSS selon `#view-planet[data-tab]` (`style.css:463
 
 Toutes se ferment par leur croix (`.close-btn`), un toucher sur le fond sombre ou Échap (`js/app.js:689-698` : ces deux gestes cliquent la croix).
 
-Hauteur (D-243) : `.sheet` fait `100dvh` (haut de l'écran visible, pas `inset: 0`) et son panneau `max-height` en `dvh` ; le panneau défile seul (`overscroll-behavior: contain`) et, tant qu'une fenêtre est ouverte, la page derrière ne défile pas (`body:has(.sheet:not([hidden])) { overflow: hidden; }`). Le Journal (`#sheet-journal`) est une modale presque plein écran : panneau centré, 12 px de marge, 760 px de large au plus, en-tête collé en haut (D-246).
+Style commun (D-302, celui du Journal, D-246) : une seule règle dans `style.css` (`.sheet`, `.sheet-panel`, `.sheet-head`) pour **toutes** les fenêtres, sans variante par fenêtre. `.sheet` fait `100dvh` (haut de l'écran visible, pas `inset: 0`, D-243), fond assombri, 12 px de marge ; le panneau est centré, prend toute la hauteur restante (`height: 100%`), 760 px de large au plus, bord de 1 px sur les quatre côtés ; son en-tête (titre, croix) est collé en haut (`position: sticky`) avec un trait dessous ; le contenu défile dans le panneau (`overscroll-behavior: contain`) et, tant qu'une fenêtre est ouverte, la page derrière ne défile pas (`body:has(.sheet:not([hidden])) { overflow: hidden; }`). Seuls l'espacement interne (`gap`) et le contenu changent d'une fenêtre à l'autre.
 
 | Fenêtre | Ouverte par | Contenu / action | Code |
 |---|---|---|---|
@@ -552,8 +552,8 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
 
 ## 18. Écran « Fin de partie » (2026-11-01, D-143)
 
-- `#sheet-finish` (`index.html`, après la fenêtre Joueurs) : fenêtre `.sheet` centrée
-  (`.finish`), titre « Fin de partie » avec l'icône `trophy`, la liste `#finish-board` (pas de ligne
+- `#sheet-finish` (`index.html`, après la fenêtre Joueurs) : fenêtre `.sheet` au style commun
+  (D-302 ; `.finish` ne règle plus que son contenu), titre « Fin de partie » avec l'icône `trophy`, la liste `#finish-board` (pas de ligne
   « X gagne. » : le bandeau `#race` le dit, D-145), le lien **Voir la courbe des points** (`replay.html#points`) et le bouton
   **Revoir la carte**.
 - `showFinish(over, again)` (`js/app.js`) : appelé par `renderRace` quand la partie est finie ;
