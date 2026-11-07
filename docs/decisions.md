@@ -2673,6 +2673,7 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
 - Qui : Vincent (demande), router (cacher le bouton), Claude (fermer la fenêtre et couper le
   clic en préparation). Source : session `a10e3777`. Statut : en vigueur. Modifie D-242. Cache
   `astra-p2p-v98`.
+
 **D-302 — Toutes les fenêtres ont le style du Journal** (modifie D-246, D-243)
 - 2026-11-07 08:05. Demande de Vincent (via le router), avec une capture de la fenêtre Réglages
   en petit panneau collé en bas : « cette modal doit avoir le meme style que le journal, toutes
@@ -2712,3 +2713,24 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
 - Qui : Vincent (demande) ; Claude (suppression du code mort, nom qui prend la place). Source :
   session `d9ace210`. Statut : en vigueur. Cache `astra-p2p-v101` (v99 pour #189, v100 pour #186,
   toutes deux fusionnées dans `main` avant cette PR ; `main` fusionné dans la branche à 08:52).
+
+**D-312 — La fiche de planète de la carte met aussi les vaisseaux au fil**
+- 2026-11-07 08:27. Demande de Vincent (via le router) : « on devrait pouvoir rajouter la
+  construction de vaisseau a la fil de construction ».
+- Constat dans le vrai jeu : l'onglet chantier de la vue planète savait déjà ajouter un lot au
+  fil (D-158) ; la fiche ouverte depuis la carte (bouton **+** de la case sous la carte, ou
+  toucher sa planète) n'appelait que `buildShips` : chantier occupé ou stock trop bas → tous
+  les boutons grisés.
+- Choix : `renderPickYard` reprend la logique de `renderYard`. Chantier libre, pas de vaisseaux
+  déjà au fil et stock suffisant → ×1 / ×5 / ×N construisent tout de suite ; sinon les boutons
+  deviennent +1 / +5 / +N et ajoutent le lot au fil (`planShips`). Le bouton **Max** au fil
+  prend ce que le stock paie au moment du toucher (1 à 50) ; à 0 il reste grisé (« Stock
+  insuffisant »). Fil plein (12) → boutons grisés avec la raison, aussi écrite dans la ligne
+  d'état (pas d'info-bulle sur téléphone). Comme dans l'onglet, la fiche compte le chantier et
+  les recherches au fil (`planAhead`) : un vaisseau dont la recherche est au fil apparaît déjà.
+  Format du fil et règles de la session inchangés.
+- Alternatives écartées : griser Max quand le lot va au fil (on perd le « autant que je peux
+  payer » qui fait l'intérêt de la fiche) ; un bouton « au fil » à part (deux boutons de plus
+  par ligne, et l'onglet ne le fait pas).
+- Qui : Vincent (demande), router (endroit), Claude (Max, ligne d'état, `planAhead`). Source :
+  session `b2e2c598`. Statut : en vigueur. Complète D-106 et D-158. Cache `astra-p2p-v102`.

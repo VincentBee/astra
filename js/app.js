@@ -3038,19 +3038,32 @@ function renderPick(me = session?.state?.players[session.me], now = session?.now
   renderPickYard(me, o?.id === session.me && w.pl ? w.pl : null, s, now);
 }
 
-/** Chantier et décollage dans la fiche d'une de mes planètes, sur la carte. */
+/**
+ * Chantier et décollage dans la fiche d'une de mes planètes, sur la carte. Même logique que
+ * l'onglet de la planète (renderYard, D-312) : chantier libre, pas de vaisseaux au fil et
+ * stock suffisant → le bouton lance le lot ; sinon il l'ajoute au fil (+1, +5, +N).
+ */
 function renderPickYard(me, pl, s, now) {
   $('pi-yard').hidden = !pl || !s;
   if (!pl || !s) return;
   const yard = s.levels.yard || 0;
+  const ahead = planAhead(s); // chantier et recherches au fil compris : le lot peut les y suivre
+  const plan = s.plan || [];
+  const planned = plan.some((x) => x?.ship); // des vaisseaux attendent déjà : on garde l'ordre du fil
+  const canPlanHere = !!ahead.levels.yard && plan.length < PLAN_MAX && session.status === 'playing';
+  const lots = plan.filter((x) => x?.ship).length;
   const busy = s.yard ? `En chantier : ${s.yard.count} × ${SHIPS[me.race][s.yard.type].name} · ${clock(Math.max(0, s.yard.end - now))}` : '';
-  $('pi-yard-hint').textContent = !yard ? `🔒 Il faut un ${RACES[me.race].buildings.yard.name}.` : busy;
+  const queued = [lots ? `${lots} lot${lots > 1 ? 's' : ''} de vaisseaux au fil` : '', plan.length >= PLAN_MAX ? `fil plein (${PLAN_MAX} au plus)` : ''].filter(Boolean).join(' · ');
+  const yardName = RACES[me.race].buildings.yard.name;
+  $('pi-yard-hint').textContent = !yard
+    ? ahead.levels.yard ? `🔒 Il faut un ${yardName} : il est au fil, les vaisseaux peuvent l’y suivre.` : `🔒 Il faut un ${yardName}.`
+    : [busy, queued].filter(Boolean).join(' · ');
   $('pi-yard-hint').hidden = !$('pi-yard-hint').textContent;
-  $('pi-ships').hidden = !yard;
+  $('pi-ships').hidden = !ahead.levels.yard;
   for (const k of SHIP_KEYS) {
     const row = document.querySelector(`[data-piship="${k}"]`);
-    const unlocked = shipUnlocked(me.race, k, s.tech);
-    row.hidden = !unlocked; // seulement ce que cette planète sait construire
+    const unlocked = shipUnlocked(me.race, k, ahead.tech);
+    row.hidden = !unlocked; // seulement ce que cette planète sait construire (recherche au fil comprise)
     if (!unlocked) {
       for (const btn of row.querySelectorAll('[data-pi-ship]')) btn.disabled = true;
       continue;
@@ -3059,13 +3072,26 @@ function renderPickYard(me, pl, s, now) {
     row.classList.toggle('affordable', max >= 1);
     setHtml(document.querySelector(`[data-picost="${k}"]`), `${costText(SHIPS[me.race][k].cost)} · ${clock(shipDuration(me.race, k, 1, Math.max(1, yard)))}/u`);
     document.querySelector(`[data-pinote="${k}"]`).textContent = [s.ships[k] ? `${s.ships[k]} à quai` : '', `jusqu’à ${max}`].filter(Boolean).join(' · ');
+    const name = SHIPS[me.race][k].name;
     for (const btn of row.querySelectorAll('[data-pi-ship]')) {
-      const n = btn.dataset.n === 'max' ? max : Number(btn.dataset.n);
-      btn.disabled = !canBuildShips(me, s, k, n);
-      if (btn.dataset.n === 'max') btn.textContent = max ? `×${max}` : 'Max';
+      const isMax = btn.dataset.n === 'max';
+      const n = isMax ? max : Number(btn.dataset.n);
+      const direct = !planned && canBuildShips(me, s, k, n);
+      const canPlan = canPlanHere && n >= 1; // Max au fil : autant que le stock en paie maintenant, 0 = rien à mettre
+      btn.dataset.mode = direct ? 'now' : 'plan';
+      btn.disabled = !(direct || canPlan);
+      setHtml(btn, isMax && !n ? 'Max' : direct ? `×${n}` : `${ic('plus')}${n}`);
+      btn.title = direct
+        ? `Construire ${n} ${name}`
+        : plan.length >= PLAN_MAX
+          ? `Fil plein (${PLAN_MAX} au plus)`
+          : !n
+            ? `Stock insuffisant pour un ${name}`
+            : `Ajouter ${n} ${name} au fil : le lot partira dès que possible`;
+      btn.setAttribute('aria-label', btn.title);
     }
   }
-  if (yard && !busy && !SHIP_KEYS.some((k) => shipUnlocked(me.race, k, s.tech))) {
+  if (yard && !busy && !SHIP_KEYS.some((k) => shipUnlocked(me.race, k, ahead.tech))) {
     $('pi-yard-hint').textContent = 'Aucun vaisseau recherché pour l’instant : lance une recherche.';
     $('pi-yard-hint').hidden = false;
   }
@@ -3081,7 +3107,10 @@ $('pi-ships').addEventListener('click', (e) => {
   const pl = session.planetOf(me, key);
   if (!pl) return;
   const n = btn.dataset.n === 'max' ? shipsAffordable(me.race, btn.dataset.piShip, stateAt(pl.planet, session.now()).stock) : Number(btn.dataset.n);
-  session.buildShips(btn.dataset.piShip, n, key);
+  if (n < 1) return;
+  // Même choix que l'onglet de la planète (D-312) : tout de suite, ou au fil.
+  if (btn.dataset.mode === 'plan') session.planShips(btn.dataset.piShip, n, key);
+  else session.buildShips(btn.dataset.piShip, n, key);
 });
 $('btn-pi-takeoff').onclick = (e) => {
   const key = e.currentTarget.dataset.key || 'home';
