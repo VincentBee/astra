@@ -16,6 +16,7 @@ import { TECHS, SHIPS, SHIP_KEYS, techCost, techMissing, researchDuration, shipU
 import { TRADE_RES, TRADE_NAMES } from './trade.js';
 import { explainBattle, sideTable } from './report.js';
 import { finalBoard } from './finish.js';
+import { playing, backAction } from './back.js';
 import { addBot, wakeBots, editableBot, removeBot, renameBot, setBotRace } from './bot.js';
 import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fleetSpeed, slowestShip, fuelAt, moving, aggressive, armed, together } from './fleet.js';
 
@@ -776,16 +777,16 @@ const compact = (v) => (v >= 1e5 ? `${fmt(Math.floor(v / 1000))} k` : fmt(v));
 // Toutes les fenêtres se ferment d'un toucher sur le fond sombre ou avec Échap (comme leur croix).
 // Échap ferme seulement celle du dessus (#72) : toutes les fenêtres ont le même z-index (style.css,
 // `.sheet`), donc celle qui se voit devant est la dernière ouverte dans l'ordre du HTML. Un deuxième
-// Échap ferme la suivante.
+// Échap ferme la suivante. Le « retour » en partie (D-417) ferme la même : `topSheet`.
 for (const sheet of document.querySelectorAll('.sheet')) {
   sheet.addEventListener('click', (e) => {
     if (e.target === sheet) sheet.querySelector('.close-btn')?.click();
   });
 }
+const topSheet = () => [...document.querySelectorAll('.sheet')].findLast((s) => !s.hidden);
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  const open = [...document.querySelectorAll('.sheet')].findLast((s) => !s.hidden);
-  open?.querySelector('.close-btn')?.click();
+  topSheet()?.querySelector('.close-btn')?.click();
 });
 
 /** « 1 234 ◆ · 30 ⚡ », en HTML : chaque quantité suivie de l'icône de sa ressource. */
@@ -1045,6 +1046,7 @@ function renderLive() {
     $('journal-count').hidden = !fresh;
     $('journal-count').textContent = fresh > 9 ? '9+' : fresh;
   }
+  armBack();
 
   if (me?.planet) {
     if (builtFor !== me.race) buildStatic();
@@ -3354,6 +3356,63 @@ function showMarks(snap) {
     }
   });
 }
+
+// ---------------------------------------------------------------------------
+// « Retour » pendant une partie en cours (D-417) : une entrée d'historique « garde » au-dessus
+// de la page ; un retour la consomme et on demande « Quitter la partie en cours ? ». Une fenêtre
+// ouverte se ferme d'abord. Le lobby et l'écran de fin laissent le retour faire comme avant.
+// ---------------------------------------------------------------------------
+
+let backArmed = !!history.state?.astraGuard; // l'entrée « garde » est au-dessus de la page (rechargée : déjà là)
+let leaving = false; // « Quitter » touché : plus de question, ni la nôtre ni celle du navigateur
+
+const inGame = () =>
+  !VIEW && !!session && playing({ status: session.status, startedAt: session.startedAt, over: session.over, gameShown: !$('screen-game').hidden });
+
+/** Pose la garde dès que la partie est en cours (appelé à chaque rafraîchissement). */
+function armBack() {
+  if (backArmed || leaving || !$('sheet-quit').hidden || !inGame()) return;
+  history.pushState({ astraGuard: true }, '');
+  backArmed = true;
+}
+
+if (!VIEW) {
+  addEventListener('popstate', () => {
+    if (!backArmed) return; // retour hors de notre garde : rien à faire
+    backArmed = false;
+    if (leaving) return;
+    const open = topSheet(); // la fenêtre du dessus, comme Échap (D-192)
+    const action = backAction({ status: session?.status, startedAt: session?.startedAt, over: session?.over, gameShown: !$('screen-game').hidden, sheetOpen: !!open });
+    if (action === 'close') {
+      open.querySelector('.close-btn')?.click();
+      armBack();
+    } else if (action === 'ask') {
+      $('sheet-quit').hidden = false; // garde pas reposée : un 2ᵉ retour ici quitte
+    }
+  });
+  addEventListener('beforeunload', (e) => {
+    if (leaving || !$('sheet-quit').hidden || !inGame()) return;
+    e.preventDefault();
+    e.returnValue = '';
+  });
+  addEventListener('pagehide', () => clearTimeout(leaveTimer));
+  addEventListener('pageshow', (e) => e.persisted && (leaving = false)); // revenu par « avancer » : la garde revient
+}
+
+let leaveTimer = null;
+function stayInGame() {
+  $('sheet-quit').hidden = true;
+  armBack(); // un prochain retour redemande
+}
+$('btn-quit-close').onclick = stayInGame;
+$('btn-quit-stay').onclick = stayInGame;
+$('btn-quit-go').onclick = () => {
+  leaving = true;
+  $('sheet-quit').hidden = true;
+  history.back(); // comme le retour d'avant : page précédente, ou l'appli se ferme
+  // Rien avant nous (appli installée, onglet neuf) : retour à l'accueil, la partie reste enregistrée.
+  leaveTimer = setTimeout(() => location.replace(location.pathname), 600);
+};
 
 if (VIEW) {
   document.documentElement.classList.add('view-only');

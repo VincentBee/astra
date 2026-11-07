@@ -36,8 +36,10 @@ test('chaque fenêtre a sa croix, que Échap clique', () => {
 test('Échap prend la dernière fenêtre visible, pas la première', () => {
   const handler = app.match(/addEventListener\('keydown', \(e\) => \{\s*if \(e\.key !== 'Escape'\) return;[\s\S]*?\n\}\);/);
   assert.ok(handler, 'gestionnaire d’Échap trouvé dans js/app.js');
-  assert.match(handler[0], /querySelectorAll\('\.sheet'\)\]\.findLast\(\(s\) => !s\.hidden\)/);
+  // La fenêtre du dessus vient de `topSheet`, partagée avec le « retour » en partie (D-417).
+  assert.match(handler[0], /topSheet\(\)\?\.querySelector\('\.close-btn'\)/);
   assert.doesNotMatch(handler[0], /\.find\(/);
+  assert.match(app, /const topSheet = \(\) => \[\.\.\.document\.querySelectorAll\('\.sheet'\)\]\.findLast\(\(s\) => !s\.hidden\);/);
 });
 
 test('fiche de planète puis journal : un Échap ferme le journal, un deuxième la fiche', () => {
