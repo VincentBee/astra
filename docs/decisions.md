@@ -3249,3 +3249,29 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - Choix : `VERSION` passe à `astra-p2p-v95`, pour que les téléphones prennent les nouveaux
   fichiers. À la fusion de `main` (2026-11-07, v114, D-411) : `astra-p2p-v115`.
 - Qui : Claude, par défaut. Source : worker `worker-transe`. Statut : en vigueur.
+**D-416 — Classement : un joueur pris hors ligne garde son heure de mort et ses points d'avant la chute**
+- 2026-11-07. Contexte : issue #77. Un joueur dont la dernière planète est prise pendant qu'il est
+  hors ligne était « mort maintenant » pour les autres (`deadAt` prenait `now`), et ses points de
+  départage (`best`) étaient ceux de sa fiche intacte. Les médailles changeaient quand il rouvrait
+  l'appli. Sur `main`, l'heure était déjà corrigée par D-180 (#34, commit `6a2cbc3`) : `deadAt`
+  lit l'heure du rapport `capture`. Restait `best` : sa fiche, pas encore mise à jour, compte
+  encore les colonies perdues **avant** sa chute ; à son retour, `deathPts` ne les compte plus.
+  Deux joueurs tombés à la même heure pouvaient donc échanger leurs médailles.
+- Choix de Claude :
+  1. `planetLostAt(p, pl, now)` sort de `deadAt` (même calcul) : l'heure de perte d'une planète,
+     gel ou rapport `capture`.
+  2. `pointsAtDeath(p, dead)` donne `best` : `deathPts` s'il existe ; sinon les points des
+     planètes perdues à l'heure `dead` (la dernière vague, comme `losePlanet` les compte) et des
+     flottes encore en vie à cette heure (`fleetDeadAt`). Ancienne fiche avec `out` sans
+     `deathPts`, ou joueur sans planète : `scoreOf`, comme avant.
+  3. Rien ne change pour les morts par le froid et par élimination (`out` posé) : même heure.
+- Alternatives écartées : toujours recalculer les points sans `deathPts` (impossible après le
+  retour : la fiche n'a plus ses planètes ni ses flottes) ; rouvrir l'écran de fin quand le
+  classement change (inutile : il ne change plus) ; compter les flottes gelées avant la chute
+  pour imiter l'ordre du `tick` de la victime (on garde les vrais points à cette heure ; voir la
+  limite dans `regles.md` §19.4).
+- Qui : Claude, par défaut (piste de l'issue). Source : session `1eb0cfdf`, issue #77. Statut :
+  en vigueur. Numéro D-400 au départ (D-163 à D-399 étaient pris ou réservés, consigne du router) ;
+  D-400 étant prise dans `main` (IA du lobby, PR #192), renumérotée D-416 à la fusion de `main`
+  (D-411). Cache `astra-p2p-v96` (`main` à v95), puis `astra-p2p-v116` à cette fusion (v115).
+- Tests : `tests/finish.test.mjs`, deux scénarios #77 (le 2e échoue sans ce changement).

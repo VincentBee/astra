@@ -1228,9 +1228,23 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
   son escorte) ne se voit pas sans la fiche du propriétaire ; seule une flotte détruite en entier
   compte pour les autres. Non confirmé, pas testé.
 - `scoreOf(p)` : ce que le joueur possède **maintenant** ; tout perdu : 0 (hors flottes en vol).
+- `planetLostAt(p, pl)` : l'heure de perte d'une planète, pour `deadAt` : son gel, ou la plus
+  ancienne prise lue dans un rapport `capture` qui la vise (D-180). Un joueur pris hors ligne
+  meurt donc à l'heure du combat, la même sur tous les téléphones, avant et après son retour
+  (issue #77, D-416). Le `now` qui reste (perdue sans rapport connu) ne devrait pas arriver :
+  sans rapport, `ownerAt` la croit encore à lui (non confirmé).
 - `ranking` : `{ id, pts, dead, best }`. `best` départage les joueurs tombés à la même heure :
-  `deathPts` (points juste avant la chute), ou `scoreOf` si la fiche n'a pas encore vu la chute
-  (D-102).
+  `pointsAtDeath(p, dead)`, ses points juste avant la chute (D-102, D-416). `deathPts` si sa
+  fiche a vu sa chute ; sinon (hors ligne, sa fiche a encore tout), calculés comme son
+  téléphone le fera : les planètes perdues à l'heure `dead` (la dernière vague), pas celles
+  perdues avant, et ses flottes encore en vie à cette heure (`fleetDeadAt`). Fiche avec `out`
+  mais sans `deathPts` (ancienne), ou joueur sans planète : `scoreOf`. L'écran de fin
+  (`finalBoard`, `ranking(over.at)`) ne change donc pas quand la victime rouvre l'appli : pas
+  besoin de rouvrir `showFinish`.
+- Limite (D-416) : à son retour, le téléphone de la victime applique les rapports avant de geler
+  ses flottes (`tick`). Une flotte gelée **avant** sa chute, encore dans sa fiche, compte alors
+  dans son `deathPts`, pas dans le calcul des autres. Cas rare (deux joueurs tombés à la même
+  heure, et une flotte gelée juste avant), non traité ici (`tick` hors du ticket), non testé.
 - `checkOver` : à plusieurs, la partie finit quand il reste **un seul** joueur en vie (ou
   aucun : le dernier tombé gagne, puis le meilleur `best`). Seul : quand le froid a tout
   pris, et alors **personne ne gagne** : `winner: null` (D-142). Le téléphone qui le voit
