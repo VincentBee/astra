@@ -2334,3 +2334,55 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
   version de cache pour que les téléphones les récupèrent. Prévu en v84 ; `main` est passé à v86
   (D-176), puis à v90 (#161, #162, #165, #166) avant les fusions, d'où v91.
 - Statut : en vigueur.
+
+## 7 novembre 2026 — rapports visés par leur case (#44)
+
+**D-360 — Un rapport de combat vise une case, pas une clé de planète**
+- 2026-11-07. Contexte (issue #44) : les rapports (`effects`), les flottes posées (`docked`) et les
+  offres d'échange désignaient ma planète par sa clé (`'home'` ou l'id d'une colonie). Quand ma
+  planète mère gèle ou est prise, `losePlanet` fait d'une colonie la nouvelle planète mère, sous la
+  clé `'home'`. Un rapport encore en attente frappait alors cette planète jamais attaquée ; un
+  rapport qui visait la colonie promue était ignoré ; un séquestre parti de la colonie était perdu
+  sans message. Les rapports étaient aussi lus dans l'ordre des joueurs de ma copie, pas dans
+  l'ordre des heures.
+- Choix de Claude :
+  1. **Case dans chaque rapport** : `arrive` écrit `cell` dans tout rapport d'attaque (plus
+     seulement la prise). `applyEffects` retrouve la planète par cette case ; un ancien rapport
+     sans `cell` est lu par sa clé, comme avant. `cleanEffect` ne garde `cell` que si ce sont deux
+     nombres. `defenseAt` (ce que l'attaquant soustrait des rapports pas encore lus) et la mémoire
+     de pillage `raided` comparent aussi la case.
+  2. **Ordre des heures** : tous les rapports en attente, de tous les joueurs, sont triés par `at`,
+     puis par identifiant de joueur, puis par place dans sa fiche. Même résultat sur tous les
+     téléphones, et le rejeu reste déterministe.
+  3. **Rapport écarté, et dit** : plus aucune de mes planètes sur la case, ou celle qui y est a été
+     installée après le combat (`claimAt` > `at`) → le rapport est marqué lu, ne touche rien, et
+     `missedEffect` écrit une ligne au journal et au carnet, en nommant la planète vraiment
+     attaquée. Une flotte visée qui n'existe plus : une ligne au journal seulement.
+  4. **Flottes posées** : `docked` garde l'identifiant de la planète de l'univers (plus `'home'`),
+     retrouvé par sa case (`planetRef`, `dockedPlanet`). Un ancien `'home'` et les offres parties de
+     `'home'` sont réécrits avec l'identifiant de la planète perdue, dans `losePlanet`, quand je
+     perds ma planète mère.
+  5. **Échanges** : `tradeSide` passe par `planetRef` ; une offre partie d'une colonie promue
+     retrouve sa planète, et le séquestre ou ce qui était demandé y arrive. Un séquestre qui ne peut
+     aller nulle part (planète perdue) laisse « séquestre de J… perdu avec Hadar » au journal et un
+     message, au lieu de disparaître en silence.
+  6. **Gel avant la lecture** : on garde l'ordre de `tick` (`freeze`, puis `applyEffects`). Un
+     rapport daté d'avant le gel, lu après, trouve la planète perdue et ne touche rien. Les pertes
+     sur une planète gelée n'ont aucun effet de jeu ; l'attaquant garde son butin, comme pour une
+     prise.
+- Alternatives écartées : appliquer avant le gel les rapports datés d'avant le gel (le carnet
+  montrerait le vrai combat, mais il faut couper la lecture en deux passes, et un rapport d'après
+  le gel pourrait toucher une planète qui devrait déjà être perdue) ; une table « ancienne clé →
+  nouvelle clé » tenue par `losePlanet` (il faut la transmettre et la garder ; la case est déjà
+  dans les données) ; changer la forme des offres (les téléphones d'avant ne les liraient plus).
+- Hors de cette décision : `threats()` compare encore `order.key` pour mes planètes visées
+  (affichage seulement) ; l'ordre « conquérir » d'une flotte en vol est déjà relu par sa case à
+  l'arrivée depuis D-200.
+- Vérifié : `tests/rapport-case.test.mjs` (10 scénarios ; 9 échouent sur `main`, le 10e est un
+  témoin) ; 259/259.
+- Qui : Claude (choix de méthode, demandé par la session de coordination). Source : session
+  `worker-rapport-case`. Statut : en vigueur. Complète D-200 et D-110.
+
+**D-361 — Cache `astra-p2p-v92`**
+- 2026-11-07. Choix de Claude : `js/session.js` change (D-360) ; `main` est en v91 (D-211), d'où
+  v92. Statut : en vigueur.

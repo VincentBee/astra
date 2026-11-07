@@ -440,6 +440,12 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 22:20 | `89918100` | Router : « VÉRIFIÉ — PR #163 acceptée … Merge `origin/main` (pas de rebase), mets VERSION au-dessus de celle de `main` » | Fusion de `main` (#158, #159, #160) : conflits `docs/decisions.md`, journal (les deux côtés gardés) et `sw.js` (v86 → v87, D-211) ; 0 test cassé | (cette PR) | D-211 |
 | 22:45 | `89918100` | Router : « MAIN A BOUGÉ — #161, #162, #166 et #165 sont mergées … combine ta marque `{ pid, fleet }` avec le `live &&` ajouté par #161 » | Deuxième fusion de `main` : ligne `addLog` de `moveFleet` = nom du propriétaire seulement si vu (`live`, D-190) et marque `{ pid, fleet }` (D-210) ; doc des deux côtés ; cache v90 → v91 (D-211) | (cette PR) | D-211 |
 
+## 7 novembre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 04:02 | `worker-rapport-case` | Issue #44, transmise par la session de coordination : un rapport en attente visant « home » frappe la colonie devenue planète mère (gel ou prise), un rapport visant la colonie promue est ignoré, un séquestre d'échange est perdu | Chaque rapport d'attaque porte `cell` ; `applyEffects` lit les rapports de tous les joueurs dans l'ordre de `at` et retrouve la planète par sa case (par `key` pour un ancien rapport) ; rapport sans planète : ligne au journal et au carnet (`missedEffect`) ; `docked` garde l'identifiant de la planète (`planetRef`), un ancien « home » est réécrit par `losePlanet` ; `defenseAt` et `raided` par case ; `settleOffers` dit quand un séquestre est perdu. Gel gardé avant la lecture des rapports. `tests/rapport-case.test.mjs` (10 scénarios, 9 échouent sans la correction) ; 259/259 ; cache v92 | (cette PR, ferme #44) | D-360, D-361 |
+
 ### Travaux en cours au 2026-10-29
 
 - **Rythme des parties** (`26f178b9`) : commité sur `claude/swarm-it-game-pacing-1d4502`
