@@ -78,7 +78,7 @@ pas la différence, sauf `link.viaRoom` (voir §6, `attach`).
 - `buildSdp` l.143 reconstruit un SDP « data channel seul » avec `a=max-message-size:262144` (l.166) — d'où la limite de 256 Ko qui justifie le découpage de `Link`.
 - `unpack` l.120 valide ufrag/pwd et adresses par expressions régulières (pas de retour à la ligne injecté dans le SDP).
 - `decode(input)` l.195 accepte un code brut ou un lien entier (prend ce qui suit `#`). Erreurs lisibles : pas une invitation Astra ; autre version (`VERSION = '2'`, l.16) ; code abîmé.
-- `inviteLink(code)` l.210 : `origin + pathname + '#' + code`. Le `#` n'est jamais envoyé à l'hébergeur.
+- `inviteLink(code, gid)` : `origin + pathname + '?g=' + gid + '#' + code` (D-260). Le `#` n'est jamais envoyé à l'hébergeur. `?g=` dit de quelle partie vient l'invitation ; un ancien téléphone l'ignore (`decode` ne lit que ce qui suit le `#`). `inviteGid(texte)` relit ce `gid` (ou `null` : ancien lien, code seul) ; `boot()` (`app.js`) le passe avec le code à l'écran « rejoindre ».
 
 ### js/rendezvous.js
 - `APP_ID = 'astra-vincentbee-p2p'` l.17, salon `g-<gid>` l.118, `password: state.key` l.114 (Trystero chiffre les offres avec), action `'astra'` l.18.
@@ -100,7 +100,7 @@ Clés `localStorage` (l.13-18, format D-415) :
 
 Autres clés lues ailleurs : `astra.relays` (`js/config.js:18`), `astra.name` (`js/app.js:133`), `astra.sky` (réglage « Fond », `js/galaxy.js`, D-112).
 
-- `saveGame(me, state, journal, intel, bots)` l.182 (renvoie `true` si la partie est sauvée ; `Session.resume` et `onWelcome` reprennent `journal`, même partie et même joueur), `loadGame()` l.206, `listGames()` l.219 (historique + partie en cours, la plus récente d'abord), `selectGame(gid)` l.230 (la remet en cours, avec son identité ; l'ancienne partie en cours rejoint l'historique), `forgetGame(gid)` l.256, `saveIdentity(id)` l.280, `loadIdentity()` l.277, `describeSave(save)`, `onSaveFailed(fn)` l.58.
+- `saveGame(me, state, journal, intel, bots)` l.182 (renvoie `true` si la partie est sauvée ; `Session.resume` et `onWelcome` reprennent `journal`, même partie et même joueur), `loadGame()` l.206, `listGames()` l.219 (historique + partie en cours, la plus récente d'abord), `selectGame(gid)` l.230 (la remet en cours, avec son identité ; l'ancienne partie en cours rejoint l'historique), `forgetGame(gid)` l.256, `saveIdentity(id)`, `loadIdentity()`, `identityFor(gid)` et `savedGame(gid)` (mon identité et ma copie d'**une** partie donnée, en cours dans `astra.save` ou gardée dans `astra.save.<gid>`, D-260), `describeSave(save)`, `onSaveFailed(fn)` l.58.
 - **Mémoire pleine (D-415)** : toute écriture d'une partie passe par `fit()` (l.105). Si le navigateur lève `QuotaExceededError` (`isFull`), on retire la plus ancienne partie de l'historique (jamais la partie en cours, ni celle qu'on range) et on réessaie, jusqu'à ce que ça passe. Si rien n'y fait (partie en cours plus grosse que toute la mémoire, ou stockage bloqué : autre erreur, sans rien retirer), les parties retirées sont remises, `astra.save` garde la dernière sauvegarde réussie, et `onSaveFailed` prévient `app.js`, qui montre un toast (au plus une fois par minute, `RETELL` l.52 ; appli cachée : pas de toast, et le prochain échec préviendra).
 - Reprise d'une partie (`selectGame`) ou partie en cours qui a encore une vieille copie dans l'historique : si la place manque, cette copie (qui ne servira plus) part la première, avant toute autre partie.
 - Changement de partie (`saveGame` avec un autre `gid`, `selectGame`) : la nouvelle partie est écrite d'abord dans `astra.save`, puis l'ancienne est rangée dans `astra.save.<gid>` (`archiveSave`, l.129), en retirant les plus vieilles au-delà de 9. Une action ordinaire n'écrit que `astra.save` (≈ la taille de la partie : règle aussi #91).
@@ -131,7 +131,7 @@ Découpage convenu avec code-regles : **ici** constructeur, création/arrivée, 
 | `onMessage` | 399 | Aiguillage des messages (§5). |
 | `onHello` | 445 | Hôte : accueil d'un nouveau ou retour d'un ancien joueur. |
 | `admit` | 476 | Envoie `welcome`, diffuse la fiche du venu, demande aux autres de l'appeler (`mesh-dial`). |
-| `onWelcome` | 486 | Invité : adopte la copie de l'hôte, fusionnée avec sa copie locale si même partie. |
+| `onWelcome` | 486 | Invité : adopte la copie de l'hôte, fusionnée avec ma copie de **cette** partie (`savedGame(gid)`), et garde mon identité de cette partie (`identityFor(gid)`), pas celle de la dernière ouverte (D-260). |
 | `mergeIn(st, from)` | 510 | Fusion d'une copie complète reçue ; rediffuse les fiches devenues plus récentes. |
 | `recordOk(pid, rec)` | 536 | Garde-fou de réception (§8). |
 | `backdated` | 554 | Planète mère revendiquée avec une date antérieure à la fiche connue (marge 1 min). |
@@ -165,7 +165,7 @@ Au niveau partie (`session.js:399-442`) :
 | `hb-ack` | tous | `t0, w0, w, sy, ep` | `link.rtt` (latence) ; `onClock` : écart d'horloge, prise de l'heure commune, changement d'heure (§6.8). |
 | `clock-changed` | tous | `drift, rec?` | « Ton heure a changé » : un vote, avec la dernière fiche de lui reçue quand son heure était juste (D-166). |
 | `clock-ok` | tous | — | Son heure est revenue : le vote est retiré. |
-| `hello` | invité → hôte | `name, gid?, pid?, secret?, secretHash, copy?` | Demande d'entrée. `gid/pid/secret` = identité gardée (retour d'un joueur) ; `secretHash` = hash d'un nouveau secret ; `copy` = **toute** la copie locale (c'est surtout pour ces gros messages que `part` existe). Renvoyé chaque seconde. |
+| `hello` | invité → hôte | `name, gid?, pid?, secret?, secretHash, copy?` | Demande d'entrée. `gid/pid/secret` = identité gardée (retour d'un joueur) : celle de la partie nommée par le lien (`?g=`), sinon (ancien lien, code seul) celle de la dernière partie ouverte (D-260) ; `secretHash` = hash d'un nouveau secret ; `copy` = **toute** ma copie de cette partie (même règle que l'identité) (c'est surtout pour ces gros messages que `part` existe). Renvoyé chaque seconde. |
 | `hello-ack` | hôte → invité | — | « Demande reçue » ; arrête les renvois. |
 | `welcome` | hôte → invité | `you, from, state` | Entrée acceptée : mon pid, celui de l'hôte, copie complète. |
 | `refused` | hôte → invité | `reason` | Partie complète (8 joueurs). Lien fermé 300 ms après. |
@@ -220,7 +220,7 @@ Après `admit`, l'hôte envoie `mesh-dial {peer}` à ses autres voisins. Chacun 
 Trois chemins :
 1. **Rendez-vous automatique** (`meet`, l.604) : à chaque `start()` et au réveil si seul. Les téléphones de la partie se trouvent dans le salon Trystero `g-<gid>`, se présentent (`rdv-hello`), puis échangent `sync`. Ne marche qu'avec Internet. La clé `state.key` arrive chez un invité dans la copie de `welcome`.
 2. **Maillage** (§6.3), à l'arrivée d'un joueur.
-3. **Rescanner une invitation** : `hello` porte `gid/pid/secret` ; l'hôte vérifie `sha256(secret)` avec le hash qu'il connaissait **avant** de fusionner la copie apportée (l.452), puis `admit` sans nouveau joueur.
+3. **Rescanner une invitation** : `hello` porte `gid/pid/secret` de la partie de l'hôte, lue dans le lien (`?g=`, D-260), quelle que soit la dernière partie ouverte ; jamais le secret ni la copie d'une autre partie. Sans `?g=` (ancien lien), l'identité de la dernière partie ouverte, comme avant ; l'hôte vérifie `sha256(secret)` avec le hash qu'il connaissait **avant** de fusionner la copie apportée (l.452), puis `admit` sans nouveau joueur.
 
 Un pair qui arrive par le rendez-vous et par un lien direct garde le lien rendez-vous (`attach`, l.352).
 
@@ -320,6 +320,11 @@ Pas de `package.json` : on lance Node directement (Node 24.14.1 ici).
 node --test tests/peer.test.mjs
 ```
 Résultat (2026-10-29) : 1 test, 1 réussi — un message de 600 000 caractères arrive entier en morceaux de moins de 64 000.
+
+```bash
+node --test tests/invitation.test.mjs
+```
+Résultat (2026-11-06) : 6 scénarios, 6 réussis — revenir dans A par une invitation après avoir joué ou revu B redonne mon pid de A, sans nouveau joueur, et rien de B (ni secret ni copie) n'est envoyé à l'hôte de A ; un ancien lien marche comme avant (D-260).
 
 ```bash
 node --test tests/*.test.mjs

@@ -9,7 +9,7 @@
 //
 // Format du code : "<o|a>2.<base64url>"  (o = offre de l'hôte, a = réponse de l'invité)
 // Le lien d'invitation met ce code après le "#", qui n'est jamais envoyé au
-// site qui héberge l'appli.
+// site qui héberge l'appli, et la partie de l'hôte avant (`?g=<gid>`, D-260).
 
 import qrcode from '../vendor/qrcode.mjs';
 
@@ -206,9 +206,24 @@ export async function decode(input) {
   }
 }
 
-/** Lien d'invitation : l'appli s'ouvre directement sur l'écran « rejoindre ». */
-export function inviteLink(code) {
-  return `${location.origin}${location.pathname}#${code}`;
+/**
+ * Lien d'invitation : l'appli s'ouvre directement sur l'écran « rejoindre ».
+ * `gid` (D-260) dit de quelle partie vient l'invitation, dans `?g=` avant le "#" :
+ * l'invité n'envoie que son identité de cette partie. Un ancien téléphone l'ignore.
+ */
+export function inviteLink(code, gid) {
+  const g = typeof gid === 'string' && GID_OK.test(gid) ? `?g=${gid}` : '';
+  return `${location.origin}${location.pathname}${g}#${code}`;
+}
+
+const GID_OK = /^[A-Za-z0-9-]{1,24}$/;
+
+/** La partie d'où vient une invitation (`?g=` avant le "#"), ou null : ancien lien, code seul. */
+export function inviteGid(input) {
+  const text = String(input || '').trim();
+  const hash = text.indexOf('#');
+  const m = /[?&]g=([^&#]*)/.exec(hash >= 0 ? text.slice(0, hash) : '');
+  return m && GID_OK.test(m[1]) ? m[1] : null;
 }
 
 /** Dessine `text` en QR code dans un <canvas>, en pixels nets. */

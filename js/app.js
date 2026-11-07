@@ -1,6 +1,6 @@
 import { Session, threatText } from './session.js';
 import { loadGame, listGames, selectGame, forgetGame, describeSave, onSaveFailed } from './save.js';
-import { inviteLink, drawQr, decode } from './invite.js';
+import { inviteLink, inviteGid, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
 import {
   RACES, RACE_KEYS, RES_INFO, resIcon, raceIcon, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
@@ -382,7 +382,7 @@ async function openInviteSheet() {
   // null : fenêtre fermée ou invitation relancée pendant la préparation (#70), rien à dessiner.
   if (!code) return;
   offerCode = code;
-  drawQr($('offer-qr'), inviteLink(offerCode));
+  drawQr($('offer-qr'), inviteLink(offerCode, session.state?.gid));
   $('offer-qr').hidden = false;
   $('offer-wait').hidden = true;
 }
@@ -406,8 +406,8 @@ $('btn-invite-close').onclick = () => {
   session.cancelInvite();
   closeInviteSheet();
 };
-$('btn-copy-offer').onclick = () => copy(inviteLink(offerCode), 'Lien copié. Envoie-le au joueur.');
-$('btn-share-offer').onclick = () => share(inviteLink(offerCode), 'Rejoins ma partie Astra');
+$('btn-copy-offer').onclick = () => copy(inviteLink(offerCode, session.state?.gid), 'Lien copié. Envoie-le au joueur.');
+$('btn-share-offer').onclick = () => share(inviteLink(offerCode, session.state?.gid), 'Rejoins ma partie Astra');
 
 let connecting = false;
 function setInviteBusy(busy) {
@@ -3216,14 +3216,17 @@ $('btn-claim').onclick = () => {
 async function boot() {
   const hash = location.hash.slice(1);
   if (hash) {
+    // La partie de l'hôte (`?g=`, D-260) suit le code jusqu'à session.answer.
+    const gid = inviteGid(location.href);
+    const invite = gid ? `?g=${gid}#${hash}` : hash;
     history.replaceState(null, '', location.pathname);
     try {
       const { kind } = await decode(hash);
       if (kind === 'o') {
-        if ($('name').value.trim()) return startJoin(hash);
+        if ($('name').value.trim()) return startJoin(invite);
         $('home-note').textContent = 'Invitation reçue. Choisis ton nom, puis appuie sur « Rejoindre une partie ».';
         $('home-note').hidden = false;
-        pendingInvite = hash; // consommé au premier appui sur « Rejoindre » (#69)
+        pendingInvite = invite; // consommé au premier appui sur « Rejoindre » (#69) ; garde le `?g=` (D-260)
         return show('home');
       }
       $('home-note').textContent =
