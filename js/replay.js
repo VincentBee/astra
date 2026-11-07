@@ -90,8 +90,9 @@ export function replay(state) {
   const sessions = new Map();
   for (const p of fiches) {
     const s = new Session(p.name);
-    // Un téléphone sans réseau ni sauvegarde, à l'heure de l'entrée rejouée.
-    Object.assign(s, { at: p.rank, now: () => s.at, start() {}, meet() {}, save() {}, scheduleSave() {}, me: p.id, status: 'playing' });
+    // Un téléphone sans réseau ni sauvegarde, à l'heure de l'entrée rejouée. `replaying` : un
+    // ordre « tout de suite » d'un vieux journal garde son sens, même fil non vide (D-420).
+    Object.assign(s, { at: p.rank, now: () => s.at, start() {}, meet() {}, save() {}, scheduleSave() {}, me: p.id, status: 'playing', replaying: true });
     s.state = { gid: state.gid, key: state.key, players: { [p.id]: normalize(firstFiche(p)) }, log: [] };
     const add = s.addLog.bind(s);
     s.addLog = (text) => {

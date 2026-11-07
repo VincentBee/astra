@@ -314,6 +314,13 @@ Tests : `tests/alerts.test.mjs`. L'affichage est dans [interface.md](interface.m
   toucher. Tous font d'abord `settle` (`settlePlan`, qui note au journal ce que le fil a lancé),
   pour que le fil parte de maintenant. Le lancement automatique est décrit en §4.3. Un bâtiment
   sans place bloque les bâtiments du fil jusqu'à ce que le joueur le retire ou déconstruise.
+- **Fil pas vide → à la fin du fil** (D-420) : `Session.build`, `research` et `buildShips`
+  regardent d'abord le fil de la planète à l'heure de l'ordre (`queuedBehind` : `stateAt(…).plan`).
+  S'il n'est pas vide, l'ordre devient `planBuild`, `planResearch` ou `planShips` (`toPlan` ; le
+  journal d'ordres note ce nom-là) : la construction va à la fin du fil, quel que soit son
+  chantier. Fil vide : `startBuild`, `startResearch` ou `startShips`, comme avant. Au rejeu
+  (`replaying`, posé par `js/replay.js`), pas de redirection : un vieux `build` garde son sens.
+  L'IA ne lance ni recherche ni vaisseaux tant que son fil n'est pas vide (`js/bot.js`).
 - Limite connue (D-158) : la règle « pas la même technologie sur deux planètes à la fois » n'est
   vérifiée qu'à l'ajout au fil ; `stateAt` ne voit qu'une planète et ne peut pas la revérifier
   au lancement. Non constaté en partie ; sans gravité (les technologies se fusionnent au plus

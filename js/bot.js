@@ -185,7 +185,8 @@ function chooseTech(ctx, pl, st) {
 }
 
 function planResearch(ctx, pl, st) {
-  if (ctx.left <= 0) return;
+  // Fil pas vide : une recherche lancée irait à sa fin (D-420) ; on attend qu'il se vide.
+  if (ctx.left <= 0 || st.plan.length) return;
   const key = chooseTech(ctx, pl, st);
   if (!key) return;
   // Essai sur une copie : l'ordre ne part que s'il passe (prix couvert).
@@ -203,7 +204,7 @@ function colonyCount(ctx) {
 
 /** Chantier naval libre : un colonisateur s'il manque des planètes, sinon des vaisseaux de guerre. */
 function planShips(ctx, pl, st) {
-  if (ctx.left <= 0 || !(st.levels.yard > 0) || st.yard) return;
+  if (ctx.left <= 0 || !(st.levels.yard > 0) || st.yard || st.plan.length) return; // fil pas vide : on attend (D-420)
   const race = ctx.p.race;
   const tech = st.tech || {};
   const late = ctx.s.frostOf(pl.cell) - ctx.now < 3 * MIN;
