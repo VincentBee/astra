@@ -10,10 +10,10 @@
 // où il a agi le plus récemment (`actAt`). Chacun garde ainsi sa propre
 // progression. Le journal est l'union des deux.
 
-const SAVE_KEY = 'astra.save'; // la partie en cours (elle seule, D-240)
+const SAVE_KEY = 'astra.save'; // la partie en cours (elle seule, D-415)
 const GAME_KEY = 'astra.save.'; // + gid : une partie de l'historique, autre que celle en cours
 const INDEX_KEY = 'astra.games'; // historique : { gid: savedAt }, parties autres que celle en cours
-const OLD_KEY = 'astra.saves'; // ancien historique d'un seul bloc (avant D-240), repris puis effacé
+const OLD_KEY = 'astra.saves'; // ancien historique d'un seul bloc (avant D-415), repris puis effacé
 const ID_KEY = 'astra.identity'; // mon identité dans la partie en cours
 const IDS_KEY = 'astra.identities'; // historique : { gid: identité }
 const KEEP = 10; // nombre de parties gardées, partie en cours comprise
@@ -46,7 +46,7 @@ const valid = (s) => s && s.v === 1 && s.state?.players;
 // Objet simple { clé: valeur } : ni null, ni tableau, ni texte (stockage abîmé, D-170).
 const isMap = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
-// ----- Prévenir le joueur (D-240) : save.js ne connaît pas l'écran, app.js s'abonne.
+// ----- Prévenir le joueur (D-415) : save.js ne connaît pas l'écran, app.js s'abonne.
 let failed = null;
 let told = -Infinity;
 const RETELL = 60_000; // échecs à la suite : on prévient de nouveau au plus une fois par minute
@@ -69,7 +69,7 @@ function report(ok) {
   return ok;
 }
 
-// ----- Historique : une clé par partie, et un petit index (D-240)
+// ----- Historique : une clé par partie, et un petit index (D-415)
 
 /** { gid: savedAt } des parties de l'historique (sans la partie en cours). */
 function index() {
@@ -137,7 +137,7 @@ function archiveSave(save, idx, keep) {
 }
 
 /**
- * Reprise de l'ancien format (avant D-240) : `astra.saves` contenait tout l'historique, partie
+ * Reprise de l'ancien format (avant D-415) : `astra.saves` contenait tout l'historique, partie
  * en cours comprise. On le lit, on l'efface d'abord (sinon la place manque pour recopier), puis
  * chaque partie reçoit sa clé, la plus récente d'abord. Les entrées abîmées sont laissées (D-170).
  */
@@ -180,7 +180,7 @@ function migrate() {
 }
 
 /**
- * Range la partie en cours. Seule `astra.save` est réécrite (D-240) : l'historique ne change
+ * Range la partie en cours. Seule `astra.save` est réécrite (D-415) : l'historique ne change
  * qu'au changement de partie. Mémoire pleine : on retire les plus anciennes parties de
  * l'historique jusqu'à ce que ça passe ; sinon le joueur est prévenu (`onSaveFailed`).
  * `journal` : mon carnet de combats (D-110), propre à ce téléphone.
@@ -326,7 +326,7 @@ export function mergeStates(base, other) {
 
 /** Résumé lisible d'une partie sauvegardée (écran d'accueil). */
 export function describeSave(save) {
-  const players = Object.values(save.state.players);
+  const players = Object.values(save.state.players).filter((p) => !Number.isFinite(p.left)); // sans les IA retirées du lobby (D-399)
   return {
     names: players.sort((a, b) => a.rank - b.rank).map((p) => p.name),
     me: save.state.players[save.me]?.name,

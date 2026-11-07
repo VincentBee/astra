@@ -367,7 +367,7 @@ const BROKEN_SAVES = {
 };
 
 scenario('D-170 : un historique abîmé n’empêche ni l’accueil, ni les ordres, ni la sauvegarde', async (film) => {
-  // Modifié par D-240 : l'historique n'est plus un seul bloc `astra.saves` (repris puis effacé au
+  // Modifié par D-415 : l'historique n'est plus un seul bloc `astra.saves` (repris puis effacé au
   // premier accès), mais un index `astra.games` et une clé `astra.save.<gid>` par partie. Chaque
   // forme abîmée est essayée aux trois endroits : ancien bloc, index, clé d'une partie.
   const rows = [];
@@ -432,7 +432,7 @@ scenario('D-170 : un historique abîmé n’empêche ni l’accueil, ni les ordr
   })));
 });
 
-// ----- D-240 : mémoire pleine (issue #41)
+// ----- D-415 : mémoire pleine (issue #41)
 
 const QUOTA = 5_242_880; // quota de localStorage mesuré dans Chromium (≈ 5 M caractères)
 /** Une partie minimale qui pèse ≈ `n` caractères (le bourrage tient lieu de journaux d'ordres). */
@@ -450,7 +450,7 @@ function copies(m) {
   return out.sort();
 }
 
-scenario('D-240 : 6 parties de 1 M jouées l’une après l’autre : la partie en cours est toujours sauvée, une seule fois', async (film) => {
+scenario('D-415 : 6 parties de 1 M jouées l’une après l’autre : la partie en cours est toujours sauvée, une seule fois', async (film) => {
   const rows = [];
   let A = null;
   await withStore(async (m) => {
@@ -507,7 +507,7 @@ scenario('D-240 : 6 parties de 1 M jouées l’une après l’autre : la partie 
   })));
 });
 
-scenario('D-240 : reprendre une grosse partie à mémoire presque pleine ne fait perdre aucune autre partie', async (film) => {
+scenario('D-415 : reprendre une grosse partie à mémoire presque pleine ne fait perdre aucune autre partie', async (film) => {
   let A = null;
   let rows = [];
   await withStore(async (m) => {
@@ -539,7 +539,7 @@ scenario('D-240 : reprendre une grosse partie à mémoire presque pleine ne fait
   film.look(A, 'une partie lancée après avoir repris une grosse partie : rien n’a été retiré', rows);
 });
 
-scenario('D-240 (#91) : un ordre n’écrit que la partie en cours, pas tout l’historique', async (film) => {
+scenario('D-415 (#91) : un ordre n’écrit que la partie en cours, pas tout l’historique', async (film) => {
   let A = null;
   let row = null;
   await withStore(async (m) => {
@@ -568,7 +568,7 @@ scenario('D-240 (#91) : un ordre n’écrit que la partie en cours, pas tout l�
   ]);
 });
 
-scenario('D-240 : une sauvegarde impossible prévient le joueur, sans planter ni rien perdre', async (film) => {
+scenario('D-415 : une sauvegarde impossible prévient le joueur, sans planter ni rien perdre', async (film) => {
   let A = null;
   const rows = [];
   for (const [why, opts] of [
@@ -615,7 +615,7 @@ scenario('D-240 : une sauvegarde impossible prévient le joueur, sans planter ni
   })));
 });
 
-scenario('D-240 : les sauvegardes de l’ancien format sont reprises sans perte', async (film) => {
+scenario('D-415 : les sauvegardes de l’ancien format sont reprises sans perte', async (film) => {
   let A = null;
   const rows = [];
   // Taille des parties : petites, puis assez grosses pour que l'ancien format remplisse la mémoire.
