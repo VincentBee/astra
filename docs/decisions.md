@@ -2440,3 +2440,24 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
 - Choix : `VERSION` passe à `astra-p2p-v94`, au-dessus de `main`, pour que les téléphones
   prennent le nouveau `sw.js`.
 - Qui : Claude, par défaut. Source : session `7bec2792`. Statut : en vigueur.
+
+**D-290 — Le lien d'invitation reçu sans nom ne sert qu'une fois ; « Autre invitation » à l'étape 2**
+- 2026-11-06. Contexte : issue #69. Un lien d'invitation ouvert sans nom remplaçait le `onclick`
+  de **Rejoindre** pour toute la vie de la page (`boot`) : chaque appui suivant relançait
+  `startJoin(vieux code)`, donc l'étape 2 sur une invitation morte, sans erreur. L'étape 1 ne
+  revenait qu'après l'échec de la connexion (15 à 180 s), ou en rechargeant.
+- Choix de Claude :
+  1. `boot` ne touche plus au bouton : il garde le code dans `pendingInvite`. Le gestionnaire
+     normal de **Rejoindre** le prend une fois, le remet à `null` et cache la note « Invitation
+     reçue… ». Ensuite, **Rejoindre** ouvre l'étape 1, champ vide.
+  2. Un bouton **Autre invitation** (`#btn-other-invite`, sous le statut de l'étape 2) revient à
+     l'étape 1. Il arrête la tentative en cours comme la flèche Retour (`session.end()`,
+     `session = null`) : la vieille réponse ne peut plus se connecter ni afficher plus tard une
+     erreur d'échec sur l'étape 1. `useOffer` refait une session pour la nouvelle invitation.
+- Alternatives écartées : rétablir l'ancien `onclick` après usage (deux endroits qui écrivent le
+  même gestionnaire) ; garder la tentative vivante derrière « Autre invitation » (une vieille
+  réponse pourrait se connecter pendant qu'on scanne une autre invitation).
+- Limite : si l'on crée une partie au lieu de rejoindre, `pendingInvite` reste gardé jusqu'au
+  prochain appui sur **Rejoindre** (une seule fois). Non traité : rare, et sans effet durable.
+- Qui : Claude, par défaut (la piste venait de l'issue). Source : session `07a4ccd7`, issue #69.
+  Statut : en vigueur. Cache `astra-p2p-v87`, puis `astra-p2p-v95` à la fusion de `main` (#167 à v94).

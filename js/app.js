@@ -246,9 +246,16 @@ $('btn-solo').onclick = async () => {
   startGame();
 };
 
+// Lien d'invitation ouvert sans nom (#69, D-290) : le code attend ici le premier appui sur
+// « Rejoindre », qui le consomme. Les appuis suivants ouvrent l'étape 1 normale.
+let pendingInvite = null;
+
 $('btn-join').onclick = () => {
   if (!playerName()) return;
-  startJoin();
+  const invite = pendingInvite;
+  pendingInvite = null;
+  if (invite) $('home-note').hidden = true;
+  startJoin(invite || undefined);
 };
 
 // ---------------------------------------------------------------------------
@@ -277,6 +284,14 @@ $('btn-scan-offer').onclick = async () => {
   }
 };
 $('btn-offer-ok').onclick = () => useOffer($('offer-input').value);
+
+// Étape 2 → étape 1 (#69) : abandonner cette réponse pour scanner ou coller une autre invitation.
+// Comme la flèche Retour, la tentative en cours est arrêtée (session.end) ; useOffer en refera une.
+$('btn-other-invite').onclick = () => {
+  session?.end?.();
+  session = null;
+  startJoin();
+};
 
 let answerCode = '';
 async function useOffer(text) {
@@ -3077,7 +3092,7 @@ async function boot() {
         if ($('name').value.trim()) return startJoin(hash);
         $('home-note').textContent = 'Invitation reçue. Choisis ton nom, puis appuie sur « Rejoindre une partie ».';
         $('home-note').hidden = false;
-        $('btn-join').onclick = () => playerName() && startJoin(hash);
+        pendingInvite = hash; // consommé au premier appui sur « Rejoindre » (#69)
         return show('home');
       }
       $('home-note').textContent =

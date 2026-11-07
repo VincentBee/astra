@@ -75,7 +75,7 @@ Quatre **écrans** (`<section class="screen">`), un seul visible à la fois via 
 | Élément (`index.html`) | Ce qu'on y voit | Fonctions de `js/app.js` |
 |---|---|---|
 | `#screen-home` (19-38) | Titre, historique des parties (`#saved`/`#games`), champ Nom, **Créer**, **Rejoindre**, note `#home-note`, roue crantée des réglages (`.settings-btn`, D-114). | `showSaved` 153-172 (liste), clic sur la liste 174-190 (Reprendre → `Session.resume` ; Revoir → `replay.html` ; Oublier → `forgetGame`), `btn-create` 194-201, `btn-join` 203-206, `playerName` 89-100, `boot` 1935-1957. |
-| `#screen-join` (41-67) | Étape 1 : scanner ou coller l'invitation. Étape 2 : QR de la réponse, copier/partager, statut. `#join-error`. | `startJoin` 212-219, `useOffer` 236-258, `onSessionChange` 263-283, scanner 226-232. |
+| `#screen-join` (41-67) | Étape 1 : scanner ou coller l'invitation. Étape 2 : QR de la réponse, copier/partager, statut, **Autre invitation** (`#btn-other-invite`, D-290 : arrête la tentative comme Retour et revient à l'étape 1). `#join-error`. | `startJoin` 212-219, `useOffer` 236-258, `onSessionChange` 263-283, scanner 226-232. |
 | `#screen-race` (70-80) | 3 boutons de race (radiogroup), fiche de la race choisie, bouton **Choisir cette race** (mène à la carte et au bandeau du départ, D-120), ce qu'ont choisi les autres. | `showRace` 385-395, `updateRacePick` 398-410, `renderRaceOthers` 413-419, `btn-race` 428-432. |
 | `#screen-game` (83-200) | La partie. Deux **vues** : la carte (`#view-universe`) ou une planète (`#view-planet`). | `startGame` 436-447, `stopGame` 449-455, `showView` 1217-1229. |
 
@@ -127,7 +127,7 @@ Toutes se ferment par leur croix (`.close-btn`), un toucher sur le fond sombre o
 
 1. Au chargement du module : `fillIcons()` puis `startGalaxy()` (`js/app.js:16-17`), mise en place du collage des en-têtes (`stackSticky`, 22-36), restauration du nom (`astra.name`, 132-134) ; l'ancienne clé `astra.tab` (onglet retenu) est effacée, plus lue depuis D-156.
 2. `showSaved()` puis `boot()` (1959-1960). `boot` lit `location.hash`, l'efface de l'adresse, et le décode avec `decode` (`js/invite.js`) :
-   - invitation (`kind === 'o'`) : si un nom est déjà connu → `startJoin(hash)` ; sinon note sur l'accueil et **Rejoindre** est rebranché sur ce lien (1941-1947) ;
+   - invitation (`kind === 'o'`) : si un nom est déjà connu → `startJoin(hash)` ; sinon note sur l'accueil et le code est gardé dans `pendingInvite` (D-290, #69). Le premier appui sur **Rejoindre** le consomme (remis à `null`, note cachée) ; les appuis suivants ouvrent l'étape 1 normale, champ vide ;
    - réponse : note qui dit de la coller sur le téléphone qui invite (1948-1950).
 3. Un lien d'invitation ouvert dans l'onglet déjà affiché relance `boot` si aucune session n'est ouverte (`hashchange`, 1962).
 4. Enregistrement du service worker (1964-1966).
