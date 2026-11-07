@@ -251,9 +251,16 @@ $('btn-solo').onclick = async () => {
   startGame();
 };
 
+// Lien d'invitation ouvert sans nom (#69, D-290) : le code attend ici le premier appui sur
+// « Rejoindre », qui le consomme. Les appuis suivants ouvrent l'étape 1 normale.
+let pendingInvite = null;
+
 $('btn-join').onclick = () => {
   if (!playerName()) return;
-  startJoin();
+  const invite = pendingInvite;
+  pendingInvite = null;
+  if (invite) $('home-note').hidden = true;
+  startJoin(invite || undefined);
 };
 
 // ---------------------------------------------------------------------------
@@ -282,6 +289,14 @@ $('btn-scan-offer').onclick = async () => {
   }
 };
 $('btn-offer-ok').onclick = () => useOffer($('offer-input').value);
+
+// Étape 2 → étape 1 (#69) : abandonner cette réponse pour scanner ou coller une autre invitation.
+// Comme la flèche Retour, la tentative en cours est arrêtée (session.end) ; useOffer en refera une.
+$('btn-other-invite').onclick = () => {
+  session?.end?.();
+  session = null;
+  startJoin();
+};
 
 let answerCode = '';
 async function useOffer(text) {
@@ -513,7 +528,7 @@ function buildStatic() {
   builtFor = race;
   const tiles = R.resources.map(
     (r) => `<div class="tile ${r}" title="${RES_INFO[r].name}">${spark(r)}
-      <span class="label">${resIcon(r)}</span>
+      <span class="label">${resIcon(r)}<span class="clim mono" data-clim="${r}" hidden></span></span>
       <span class="amount mono" data-res="${r}">0</span>
       <span class="rate mono" data-rate="${r}"></span>
       <div class="gauge"><div class="gauge-fill" data-gauge="${r}"></div></div>
@@ -774,15 +789,18 @@ function costText(cost) {
     .join(' · ');
 }
 
-/** « Chaud · ×1,2 ⚡ · ×1,1 ◆ · ×0,9 🍃 » : le climat et son effet sur la production, en HTML. */
+/** « ×1,10 » : un coefficient de climat. */
+const climX = (v) => `×${v.toFixed(2).replace('.', ',')}`;
+
+/** « Chaud · production ×1,2 ⚡ · ×1,1 ◆ · ×0,9 🍃 » : le climat et son effet sur la production, en HTML. */
 function climateHtml(c, short = false) {
-  const x = (v) => `×${v.toFixed(2).replace('.', ',')}`;
   const cls = c.heat >= 0.6 ? 'hot' : c.heat < 0.4 ? 'cold' : 'mild';
-  const qty = ['energy', 'minerals', 'food'].map((r) => `<span class="qty">${x(c[r])}${resIcon(r)}</span>`);
-  // Version courte (à côté du nom de la planète) : sans mots ni séparateurs.
-  return short
-    ? `<span class="climate-name ${cls}">${climateName(c.heat)}</span> ${qty.join(' ')}`
-    : `<span class="climate-name ${cls}">${climateName(c.heat)}</span> · production ${qty.join(' · ')}`;
+  const name = `<span class="climate-name ${cls}">${climateName(c.heat)}</span>`;
+  // Version courte (à côté du nom de la planète) : le nom seul ; les coefficients sont dans les
+  // cartes de ressources (D-221).
+  if (short) return name;
+  const qty = ['energy', 'minerals', 'food'].map((r) => `<span class="qty">${climX(c[r])}${resIcon(r)}</span>`);
+  return `${name} · production ${qty.join(' · ')}`;
 }
 
 /** Ligne du climat dans `el` (cachée pour une planète d'avant le climat). */
@@ -951,7 +969,7 @@ function openJournal(away = null) {
         .join('')
     : '<li class="j-empty">Aucun combat pour l’instant.</li>';
   const events = (session.state.log || [])
-    .filter((l) => me && l.text.includes(me.name) && (!away || l.at >= away.since))
+    .filter((l) => me && l.text.includes(me.name) && session.showsLog(l) && (!away || l.at >= away.since))
     .sort((a, b) => b.at - a.at)
     .slice(0, 20);
   $('journal-events').innerHTML = events.length
@@ -968,7 +986,7 @@ function showAbsence(gone) {
   if (!session?.state || gone < AWAY_MS || !j || !j.list.some((e) => e.n > awayFrom)) return;
   const min = Math.round(gone / 60_000);
   const text = min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}`;
-  openJournal({ n: awayFrom, since: Date.now() - gone, text });
+  openJournal({ n: awayFrom, since: session.now() - gone, text });
 }
 
 $('btn-journal').onclick = () => openJournal();
@@ -997,7 +1015,7 @@ function renderLive() {
   const st = session.state;
   const me = st.players[session.me];
   const now = session.now();
-  renderRace(now);
+  renderRace();
   renderThreat(now);
   renderAlerts(me, now);
 
@@ -1077,41 +1095,22 @@ function renderLive() {
   }
 }
 
-/** Le froid : quand il part, ma planète la plus menacée, puis le vainqueur. */
-function renderRace(now) {
+/**
+ * Bandeau de fin (D-201) : visible seulement quand la partie est finie, avec le
+ * vainqueur, le bouton Classement et la courbe des points. Pendant la partie et
+ * quand je suis éliminé, il reste caché (plus de « Ta planète gèle dans… »).
+ */
+function renderRace() {
   const el = $('race');
-  const start = session.startedAt;
-  el.hidden = start == null;
-  if (start == null) return;
+  const over = session.startedAt != null ? session.over : null;
+  el.hidden = !over;
+  if (!over) return;
   const players = session.state.players;
-  const me = players[session.me];
-  const over = session.over;
-  const mmss = (ms) => `${Math.floor(ms / 60_000)}:${String(Math.floor((ms % 60_000) / 1000)).padStart(2, '0')}`;
-  let html;
-  let hot = false;
-  if (over) {
-    const mine = over.winner === session.me;
-    hot = !mine;
-    const what = mine ? 'Victoire !' : over.winner == null ? 'Perdu.' : `${esc(players[over.winner].name)} gagne.`; // seul : personne ne gagne (D-142)
-    html = `<strong>${what}</strong> <span class="hint">· partie finie ·</span> <button type="button" class="race-link" data-finish>Classement</button> <span class="hint">·</span> <a href="replay.html#points" class="race-link">Voir la courbe des points</a>`;
-    showFinish(over);
-  } else if (me?.out) {
-    hot = true;
-    const alive = session.ranking(now).filter((r) => r.dead == null).length;
-    html = `<strong>Éliminé.</strong> <span class="hint">· encore ${alive} en vie</span>`;
-  } else {
-    const alive = session.ranking(now).filter((r) => r.dead == null).length;
-    const mine = session.livePlanets(me, now).map((pl) => session.frostOf(pl.cell));
-    const first = mine.length ? Math.min(...mine) : Infinity;
-    const leave = first - now;
-    hot = leave < 3 * 60_000;
-    const left = Object.keys(players).length > 1 ? ` · ${alive} en vie` : '';
-    html = Number.isFinite(leave)
-      ? `<strong>${mine.length > 1 ? 'Ta planète la plus exposée gèle' : 'Ta planète gèle'} dans <span class="mono">${mmss(Math.max(0, leave))}</span></strong> <span class="hint">· va vers le soleil${left}</span>`
-      : `<strong>Le soleil s’éteint.</strong> <span class="hint">· dernier en vie gagne${left}</span>`;
-  }
-  el.classList.toggle('hot', hot);
-  setHtml($('race-text'), html);
+  const mine = over.winner === session.me;
+  const what = mine ? 'Victoire !' : over.winner == null ? 'Perdu.' : `${esc(players[over.winner].name)} gagne.`; // seul : personne ne gagne (D-142)
+  el.classList.toggle('hot', !mine);
+  setHtml($('race-text'), `<strong>${what}</strong> <span class="hint">· partie finie ·</span> <button type="button" class="race-link" data-finish>Classement</button> <span class="hint">·</span> <a href="replay.html#points" class="race-link">Voir la courbe des points</a>`);
+  showFinish(over);
 }
 
 /**
@@ -1263,6 +1262,17 @@ function renderPlanet(me, now) {
 
   for (const r of R.resources) {
     const cap = f.caps[r];
+    // Coefficient du climat dans la carte (D-221) ; rien pour une planète d'avant le climat.
+    const clim = q(`[data-clim="${r}"]`);
+    const k = planet.climate?.[r];
+    clim.hidden = !Number.isFinite(k);
+    if (Number.isFinite(k)) {
+      clim.textContent = climX(k);
+      const kk = Math.round(k * 100);
+      clim.classList.toggle('up', kk > 100);
+      clim.classList.toggle('down', kk < 100);
+      clim.title = `Climat : production ${climX(k)}`;
+    }
     q(`[data-res="${r}"]`).innerHTML = withCap(s.stock[r], cap);
     q(`[data-res="${r}"]`).firstChild.textContent = compact(s.stock[r]); // tuile étroite : « 118 k »
     const short = r === 'energy' ? f.effE < 1 : r === 'food' ? f.effF < 1 : false;
@@ -3087,7 +3097,7 @@ async function boot() {
         if ($('name').value.trim()) return startJoin(hash);
         $('home-note').textContent = 'Invitation reçue. Choisis ton nom, puis appuie sur « Rejoindre une partie ».';
         $('home-note').hidden = false;
-        $('btn-join').onclick = () => playerName() && startJoin(hash);
+        pendingInvite = hash; // consommé au premier appui sur « Rejoindre » (#69)
         return show('home');
       }
       $('home-note').textContent =

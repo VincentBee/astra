@@ -62,7 +62,7 @@ téléphones ; flottes de départ en [6:15] et [13:4]).
 
 > Le pas à pas de `README.md:16-20` ne correspond plus aux libellés : « Créer une partie » est devenu « Créer », « Copier le lien » / « Copier la réponse » sont des boutons-icônes, « Il est à distance ? Colle la réponse reçue » est devenu « Coller une réponse », et l'invitation passe par le compteur de joueurs, pas par une icône « en haut à droite ».
 
-**Déboguer.** `window.astra.session` donne la session en cours dans la console (`js/app.js:45`). Le journal partagé est aussi copié dans la console, chaque entrée une fois, `[Astra hh:mm:ss] texte` (`printLog`) ; dans le jeu, c'est la fenêtre Journal qui le montre (D-110).
+**Déboguer.** `window.astra.session` donne la session en cours dans la console (`js/app.js:45`). Le journal partagé est aussi copié dans la console, chaque entrée une fois, `[Astra hh:mm:ss] texte` (`printLog`), lignes d'ordre de flotte cachées comprises (D-210 : voulu, pour le débogage) ; dans le jeu, c'est la fenêtre Journal qui le montre (D-110).
 
 Les tests automatiques (`tests/*.test.mjs`) portent sur les règles et le réseau, pas sur l'interface : voir `regles.md` / `reseau.md`.
 
@@ -75,7 +75,7 @@ Quatre **écrans** (`<section class="screen">`), un seul visible à la fois via 
 | Élément (`index.html`) | Ce qu'on y voit | Fonctions de `js/app.js` |
 |---|---|---|
 | `#screen-home` (19-38) | Titre, historique des parties (`#saved`/`#games`), champ Nom, **Créer**, **Rejoindre**, note `#home-note`, roue crantée des réglages (`.settings-btn`, D-114). | `showSaved` 153-172 (liste), clic sur la liste 174-190 (Reprendre → `Session.resume` ; Revoir → `replay.html` ; Oublier → `forgetGame`), `btn-create` 194-201, `btn-join` 203-206, `playerName` 89-100, `boot` 1935-1957. |
-| `#screen-join` (41-67) | Étape 1 : scanner ou coller l'invitation. Étape 2 : QR de la réponse, copier/partager, statut. `#join-error`. | `startJoin` 212-219, `useOffer` 236-258, `onSessionChange` 263-283, scanner 226-232. |
+| `#screen-join` (41-67) | Étape 1 : scanner ou coller l'invitation. Étape 2 : QR de la réponse, copier/partager, statut, **Autre invitation** (`#btn-other-invite`, D-290 : arrête la tentative comme Retour et revient à l'étape 1). `#join-error`. | `startJoin` 212-219, `useOffer` 236-258, `onSessionChange` 263-283, scanner 226-232. |
 | `#screen-race` (70-80) | 3 boutons de race (radiogroup), fiche de la race choisie, bouton **Choisir cette race** (mène à la carte et au bandeau du départ, D-120), ce qu'ont choisi les autres. | `showRace` 385-395, `updateRacePick` 398-410, `renderRaceOthers` 413-419, `btn-race` 428-432. |
 | `#screen-game` (83-200) | La partie. Deux **vues** : la carte (`#view-universe`) ou une planète (`#view-planet`). | `startGame` 436-447, `stopGame` 449-455, `showView` 1217-1229. |
 
@@ -90,7 +90,7 @@ Détail de `#screen-game` :
 | `#sheet-planet` | Fiche de la planète touchée : nom, coordonnées, propriétaire, places, climat, gisements, **Y envoyer mon colonisateur** (`#btn-claim` : planète libre, pas un petit corps, tant que je n'ai pas de planète mère, D-120) ou **Voir la planète** (`#btn-open-planet`, D-138 ; avant : « Bâtiments »). Sur une de mes planètes, partie **Chantier** (`#pi-yard`, D-106) : vaisseaux recherchés, prix, « jusqu'à N », boutons ×1 / ×5 / ×N, et **Décoller**. | `renderPick`, `renderPickYard`, écouteur de `#pi-ships`, `btn-pi-takeoff`, `btn-claim`, `btn-open-planet`, `closePlanetSheet`. |
 | `#map-fleets` (sous `canvas#map`) | Mes planètes puis mes flottes en grille (2 colonnes sur téléphone). **Une case par planète** (D-115, bord vert) : nom, compte à rebours du chantier, une icône par type de vaisseau à quai avec son nombre, statut (« Chantier : +5 Frégate », « 7 à quai », « Aucun vaisseau à quai » ou « 🔒 » sans chantier naval) et deux boutons-icônes : **+** (Construire, si la planète a un chantier naval) ouvre `#sheet-planet` sur sa partie Chantier ; **Décoller** (icône `fleet`, s'il y a des vaisseaux à quai) ouvre directement le formulaire de décollage de cette planète. Toucher ailleurs sur la case ouvre la fiche de la planète. Une case par flotte : nom, compte à rebours, une icône par type de vaisseau avec son nombre, statut ; bord rouge si attaque/conquête/poursuite, grisée si à sec. Toucher = sélectionner la flotte (ouvre `#fleet-info`), retoucher = la relâcher (D-107, D-108). | `renderMapFleets`, appelé par `renderLive` ; le HTML n'est réécrit que si le contenu ou le statut change, les comptes à rebours (flotte, chantier) et `aria-pressed` sont mis à jour en place. Un seul écouteur de clic : `[data-mp-build]`, `[data-mp-go]`, `[data-planet]`, puis `[data-fleet]`. |
 | `#fleet-info` (129-145) | Fiche de la flotte sélectionnée : vaisseaux, statut (avec la vitesse et, si la flotte mêle plusieurs types, le nom du plus lent : `speedText`), carburant, choix d'ordres (`#fi-choice`), mes flottes à côté (`#fi-beside`), joueurs à côté (`#fi-partners`), boutons Arrêter / Rentrer / Se poser / Plein / Passive-Agressive (`#btn-fi-stance`, icône d'attaque, pleine quand la flotte est agressive, cachée pour une flotte sans armes ; D-100) / Scinder / Fermer. Le statut finit par « · agressive » (`fleetStatus`). | `renderFleetInfo` 1643-1687, handlers 1689-1714. |
-| `#view-planet` (150-199) | Vue planète : en-tête (retour, nom, climat), gisements `#soil-zone`, stocks `#resources`, onglets, puis les panneaux `data-pane`. | `renderPlanet` 869-988. |
+| `#view-planet` (150-199) | Vue planète : en-tête (retour, nom, nom du climat `#soil-climate` seul), gisements `#soil-zone`, stocks `#resources` (chaque carte de ressource montre son coefficient de climat « ×1,10 » à côté de l'icône, `[data-clim]`, vert au-dessus de 1, orange en dessous, caché sans climat : D-221), onglets, puis les panneaux `data-pane`. | `renderPlanet` 869-988. |
 | `.tabs` (163-168) | Onglets Bâtiments / Pouvoirs (aliens seulement) / Recherche (toute planète ; « 🔒 Il faut un labo » sans labo, technologie grisée si elle est en recherche sur une autre planète) / Flottes. | `showTab`, flèches clavier. Ouvrir une planète (`showView('planet')`) affiche toujours **Bâtiments** ; l'onglet n'est plus retenu entre deux visites ni dans `localStorage` (D-156). |
 | `[data-pane=power]` `#powers-zone` (170-173) | Pouvoirs aliens. | `buildStatic` 526-540, `renderPlanet` 966-982. |
 | `[data-pane=build]` (175-178) | Bâtiments + compteur de places `#places`. | `buildStatic` 488-498, `renderPlanet` 942-964. |
@@ -117,7 +117,7 @@ Toutes se ferment par leur croix (`.close-btn`), un toucher sur le fond sombre o
 
 - `#scanner` (`index.html:411-416`) : caméra plein écran, `scan()` (`js/app.js:135-150`) appelle `scanQr` de `js/scanner.js` (voir `reseau.md`), **Annuler** abandonne via `AbortController`. Depuis D-250 (#42), Annuler marche à tout moment, même avant que la caméra soit prête : `scanQr` rejette aussitôt avec `AbortError`, le `finally` de `scan()` cache `#scanner`, et un flux de caméra arrivé après coup est éteint dès qu'il arrive. Un nouveau `scan()` annule celui qui serait encore ouvert.
 - `#toast` : messages **à la file** (D-110), `toast(text, ms = 3200)` puis `nextToast()` : un à la fois, dans l'ordre ; 6 en attente au plus (les longs restent) ; un doublon de ce qui est affiché ou attend est ignoré ; d'autres attendent → au moins 2 s chacun. Appli cachée : ignoré. La session y écrit aussi via `session.ontoast` (« tu es éliminé » : 8 s).
-- `#btn-journal` (à gauche de `#net`, déplacé avec lui par `showView`) et `#sheet-journal` (D-110) : `openJournal(away)` montre « Combats et planètes » (le carnet `session.journal`, du plus récent au plus ancien ; bord vert gagné, rouge perdu ; ligne « Tes pertes · Ses pertes · Butin / Pillé » ; fond plus clair = pas encore lu ; depuis D-122, `reportHtml(e)` ajoute la phrase « pourquoi » (`.j-why`) et un `<details class="j-report">` « Détail du combat » : ce qui a pesé (`.j-reasons`), deux tableaux des forces `.j-forces` — « Tes forces » et « Forces de … », avec feu et coque au départ ; colonnes Vaisseau, Nb, ⚔, ◇, Perdus ; défense « tient » ou « abattue » — et les passes (`.j-rounds`), textes de `js/report.js`), puis « Ce qui me concerne » (lignes du journal partagé qui contiennent mon nom, 20 au plus). Ouvrir marque tout lu (`session.markRead`). Pastille `#journal-count` = entrées non lues (mise à jour par `renderLive`).
+- `#btn-journal` (à gauche de `#net`, déplacé avec lui par `showView`) et `#sheet-journal` (D-110) : `openJournal(away)` montre « Combats et planètes » (le carnet `session.journal`, du plus récent au plus ancien ; bord vert gagné, rouge perdu ; ligne « Tes pertes · Ses pertes · Butin / Pillé » ; fond plus clair = pas encore lu ; depuis D-122, `reportHtml(e)` ajoute la phrase « pourquoi » (`.j-why`) et un `<details class="j-report">` « Détail du combat » : ce qui a pesé (`.j-reasons`), deux tableaux des forces `.j-forces` — « Tes forces » et « Forces de … », avec feu et coque au départ ; colonnes Vaisseau, Nb, ⚔, ◇, Perdus ; défense « tient » ou « abattue » — et les passes (`.j-rounds`), textes de `js/report.js`), puis « Ce qui me concerne » (lignes du journal partagé qui contiennent mon nom, 20 au plus ; depuis D-210, une ligne d'ordre de flotte d'un autre joueur, marquée `{ pid, fleet }`, n'y est que tant que je vois sa flotte : `session.showsLog(l)`). Ouvrir marque tout lu (`session.markRead`). Pastille `#journal-count` = entrées non lues (mise à jour par `renderLive`).
 - Résumé « Pendant ton absence » : `showAbsence(gone)` ouvre la même fenêtre limitée au neuf si l'absence dépasse `AWAY_MS` (2 min) et qu'il y a du neuf. Appelé à la reprise d'une partie (absence = depuis `savedAt`, neuf = non lu) et 1 s après le retour au premier plan (`visibilitychange` ; neuf = noté depuis qu'elle a été cachée). Bouton « Tout le journal ».
 - Fond de galaxie : un `div.galaxy` inséré en tête de `<body>` par `startGalaxy()` (§7.4).
 
@@ -127,7 +127,7 @@ Toutes se ferment par leur croix (`.close-btn`), un toucher sur le fond sombre o
 
 1. Au chargement du module : `fillIcons()` puis `startGalaxy()` (`js/app.js:16-17`), mise en place du collage des en-têtes (`stackSticky`, 22-36), restauration du nom (`astra.name`, 132-134) ; l'ancienne clé `astra.tab` (onglet retenu) est effacée, plus lue depuis D-156.
 2. `showSaved()` puis `boot()` (1959-1960). `boot` lit `location.hash`, l'efface de l'adresse, et le décode avec `decode` (`js/invite.js`) :
-   - invitation (`kind === 'o'`) : si un nom est déjà connu → `startJoin(hash)` ; sinon note sur l'accueil et **Rejoindre** est rebranché sur ce lien (1941-1947) ;
+   - invitation (`kind === 'o'`) : si un nom est déjà connu → `startJoin(hash)` ; sinon note sur l'accueil et le code est gardé dans `pendingInvite` (D-290, #69). Le premier appui sur **Rejoindre** le consomme (remis à `null`, note cachée) ; les appuis suivants ouvrent l'étape 1 normale, champ vide ;
    - réponse : note qui dit de la coller sur le téléphone qui invite (1948-1950).
 3. Un lien d'invitation ouvert dans l'onglet déjà affiché relance `boot` si aucune session n'est ouverte (`hashchange`, 1962).
 4. Enregistrement du service worker (1964-1966).
@@ -401,13 +401,13 @@ Les demandes de Vincent derrière l'interface sont datées dans [journal.md](../
 
 Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.md](regles.md) §4.1 et §19.
 
-- **Bandeau de course** `#race` (`index.html`, sous `#lost`), rempli par `renderRace(now)` dans
-  `renderLive` (chaque seconde) : avant le départ du froid « Le soleil s'éteint · dernier en vie
-  gagne · n en vie » ; ensuite « Ta planète la plus exposée gèle dans m:ss · va vers le
-  soleil » ; « Éliminé · encore n en vie » ; « Victoire ! », « X gagne. » ou, seul, « Perdu. » (D-142) · partie finie, suivi du bouton **Classement** (rouvre l'écran de fin, D-143) et du lien **Voir la courbe des points**
-  (`replay.html#points`, D-104). Classe
-  `hot` (bordure orange) à moins de 3 min du gel, quand on est éliminé ou qu'un autre a gagné.
-  Caché pour une partie d'avant la course.
+- **Bandeau de fin** `#race` (`index.html`, sous `#lost`), rempli par `renderRace()` dans
+  `renderLive` : **caché pendant la partie et quand on est éliminé** (D-201 ; il disait avant
+  « Ta planète la plus exposée gèle dans m:ss · va vers le soleil · n en vie », « Le soleil
+  s'éteint… », « Éliminé… »). Il n'apparaît qu'en fin de partie : « Victoire ! », « X gagne. » ou,
+  seul, « Perdu. » (D-142) · partie finie, suivi du bouton **Classement** (rouvre l'écran de fin,
+  D-143, seul moyen de le rouvrir après l'avoir fermé) et du lien **Voir la courbe des points**
+  (`replay.html#points`, D-104). Classe `hot` (bordure orange) quand un autre a gagné.
 - **Carte** : `drawFrost` voile en bleu tout ce qui est hors du cercle de froid (remplissage
   `evenodd`) et trace le cercle en pointillés ; il s'arrête à l'heure de fin. Les planètes
   gelées sont dessinées presque effacées (opacité 0,15). En-tête « éliminé » au lieu de « à
@@ -416,8 +416,10 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   affichés sont `session.scoreOf(p)` (tout l'empire).
 - **Flottes** : sur une planète adverse, deux boutons « Attaquer X (joueur) » et « Conquérir X »,
   suivis tous deux de « · défense ⚔ a ◇ c + N vaisseaux posés · victoire probable » (`ordersAt`,
-  `assaultView`, D-160) : « + ? vaisseaux » hors de ma détection ; issue « victoire probable »,
-  « victoire incertaine » ou « bataille perdue ». Une flotte en conquête est dessinée en rouge comme une attaque.
+  `assaultView`, D-160) ; issue « victoire probable », « victoire incertaine » ou « bataille
+  perdue ». Hors de ma détection (D-190), le menu suit `knownOwner` comme la fiche : planète
+  retenue → « Attaquer X (joueur) · hors de portée : défense inconnue », sans estimation ; jamais
+  vue → les ordres d'une planète libre (« Coloniser », « Juste y aller »). Une flotte en conquête est dessinée en rouge comme une attaque.
 - **Bâtiments** : les bâtiments de défense de la race apparaissent dans la liste comme les autres.
   Carte dépliée (toucher le nom) : bouton « Déconstruire un niveau » (`data-demolish`), caché au
   niveau 0, désactivé pendant un chantier ; une confirmation (`confirm`) rappelle qu'on récupère la
