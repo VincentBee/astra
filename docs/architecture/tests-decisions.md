@@ -195,4 +195,4 @@ que fait le code.
 | D-371 | Cache `astra-p2p-v117` (v98 au départ) | non testable |  | version du service worker |
 | D-412 | Bulle d'aide de la carte calée sur l'en-tête (issue #51) | sans objet | | bulle supprimée par D-245 |
 | D-413 | Largeur de la page sur téléphone, dans un vrai Chrome sans dépendance (issue #51) | nouveau test | `layout.test.mjs` 320, 375, 430 px : `scrollWidth` = largeur de l'écran dans le lobby, en partie, Journal ouvert ; sauté sans Chrome | garde-fou de mise en page |
-| D-414 | Cache `astra-p2p-v118` (v88 au départ) | non testable |  | version du service worker |
+| D-414 | Cache `astra-p2p-v119` (v88 au départ) | non testable |  | version du service worker |

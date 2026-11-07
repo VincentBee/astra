@@ -3329,6 +3329,34 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   `js/bot.js`, `js/session.js` et `js/app.js`. À la fusion de `main` (2026-11-07, v116, D-411) :
   `astra-p2p-v117`.
 - Qui : Claude, par défaut. Source : session `940aeddb`. Statut : en vigueur.
+
+**D-417 — « Retour » pendant une partie en cours : une question avant de quitter**
+- 2026-11-07. Contexte : Vincent : « je veux que quand on fait back, avant de quitter une partie
+  en cours, cela mette une alert pour demander si on est sur de vouloir quiter la partie ».
+  L'appli n'avait aucune entrée d'historique : un retour quittait la page (ou fermait l'appli).
+- Choix :
+  - Une entrée d'historique « garde » posée dès que la partie est en cours (partie partie, pas
+    finie, écran de jeu) ; le retour la consomme (`popstate`) et une fenêtre dans le style des
+    autres (`#sheet-quit`, D-302) demande « Quitter la partie en cours ? » : **Rester** /
+    **Quitter la partie**. Pas `confirm()` : son style tranche avec le jeu.
+  - **Une fenêtre ouverte se ferme d'abord** (comme sa croix), sans question : le retour d'un
+    téléphone ferme d'habitude ce qui est ouvert. Celle du dessus, choisie par `topSheet`, la
+    même fonction qu'Échap (D-192, ajouté à la fusion de #175) : retour et Échap ne se contredisent
+    pas.
+  - « Quitter la partie » = `history.back()`, le retour d'avant. Rien avant la page (appli
+    installée, onglet neuf) : retour à l'accueil, la partie reste enregistrée.
+  - Question affichée : un 2ᵉ retour quitte, sans autre alerte (la garde n'est reposée qu'à
+    « Rester »).
+  - `beforeunload` pendant une partie en cours (fermer l'onglet, recharger) : alerte du
+    navigateur, texte imposé par lui.
+  - Lobby, choix de race, partie finie, lecture seule (`?view`) : pas de garde, pas d'alerte.
+- Alternatives écartées : `confirm()` (style du navigateur) ; reposer la garde avant de
+  demander (« Quitter » devrait alors reculer de deux pas, et le retour d'Android ne pourrait
+  plus fermer l'appli d'un 2ᵉ geste) ; demander même avec une fenêtre ouverte ; une garde dès le
+  lobby (la tâche l'exclut).
+- Qui : Vincent (demande), router (pas d'alerte au lobby ni à la fin, fenêtre `.sheet`
+  préférée), Claude par défaut (fenêtre fermée d'abord, 2ᵉ retour = quitter, accueil quand rien
+  avant). Source : session `3e243082`. Statut : en vigueur. Cache `astra-p2p-v118` (v107, puis un cran à chaque fusion de `main` ; v118 sur `main` à v117). Numérotée D-401 au départ ; D-412 à D-416 étant pris ou réservés par la chaîne de D-411, renumérotée D-417 à la fusion de `main`.
 **D-412 — Bulle d'aide de la carte calée sur l'en-tête** (sans objet depuis D-245)
 - 2026-11-06. Contexte : issue #51. La bulle `#map-help` partait du bord gauche du « ? »
   (D-055), placé vers x ≈ 187 px, et faisait 270 px de large : elle finissait vers x ≈ 443-457.
@@ -3366,9 +3394,10 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   seulement (pas de garde contre un retour du défaut).
 - Qui : Claude, par défaut. Source : session `42405fcd`, issue #51. Statut : en vigueur.
 
-**D-414 — Cache `astra-p2p-v88`, puis `astra-p2p-v118`**
+**D-414 — Cache `astra-p2p-v88`, puis `astra-p2p-v119`**
 - 2026-11-06. Contexte : v86 est dans `main` ; plusieurs PR ouvertes prennent v87.
 - Choix : `VERSION` passe à `astra-p2p-v88` pour que les téléphones prennent le nouveau
-  `style.css`. À la fusion de `main` (2026-11-07, v117, D-411) : `astra-p2p-v118` (seul
+  `style.css`. À la fusion de `main` (2026-11-07, v117, D-411) : `astra-p2p-v118`, puis
+  `astra-p2p-v119` à une seconde fusion (#193 avait pris v118) (seul
   `tests/layout.test.mjs` change alors, la montée garde la règle « une version par mise en ligne »).
 - Qui : Claude, par défaut. Source : session `42405fcd`. Statut : en vigueur.
