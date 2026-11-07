@@ -15,7 +15,7 @@ import { TECHS, SHIPS, SHIP_KEYS, techCost, techMissing, researchDuration, shipU
 import { TRADE_RES, TRADE_NAMES } from './trade.js';
 import { explainBattle, sideTable } from './report.js';
 import { finalBoard } from './finish.js';
-import { addBot, wakeBots } from './bot.js';
+import { addBot, wakeBots, editableBot, removeBot, renameBot, setBotRace } from './bot.js';
 import { ORDERS, countShips, fleetCargo, fleetPos, fleetTank, fleetBurn, fleetSpeed, slowestShip, fuelAt, moving, aggressive, armed, together } from './fleet.js';
 
 fillIcons(); // les icônes du HTML statique, avant tout le reste
@@ -476,7 +476,7 @@ function updateRacePick() {
 /** Ce qu'ont choisi les autres, pour se décider. */
 function renderRaceOthers() {
   if (!session?.state) return;
-  const others = Object.values(session.state.players).filter((p) => p.id !== session.me);
+  const others = session.roster.filter((p) => p.id !== session.me);
   $('race-others').innerHTML = others
     .map((p) => `<span class="other">${p.race ? raceIcon(p.race) : ''}${esc(p.name)}</span>`)
     .join('');
@@ -854,7 +854,7 @@ function renderState() {
   $('lost').hidden = !session.alone;
 
 
-  const players = Object.values(st.players);
+  const players = session.roster;
   $('players').innerHTML = players
     .map(
       (p) => `<div class="player card${p.online ? '' : ' offline'}" data-player="${esc(p.id)}">
@@ -2947,12 +2947,16 @@ function renderLobby(me) {
       ? `${ic('check')} <strong>Prêt</strong> <span class="hint">· ${waiting.length ? `on attend ${waiting.map((p) => esc(p.name)).join(', ')}` : 'départ…'}</span>`
       : `${ic('play')} <strong>Prépare-toi</strong> <span class="hint">· la partie part quand tous les joueurs présents sont prêts ; chacun commence avec un seul colonisateur</span>`;
     btn = ready ? 'unready' : 'ready';
-    who = Object.values(session.state.players)
+    who = session.roster
       .sort((a, b) => a.rank - b.rank)
       .map((p) => {
         const here = p.id === session.me || p.online;
         const state = !here ? 'absent' : Number.isFinite(p.ready) ? 'prêt' : !p.race ? 'choisit sa race' : 'pas prêt';
-        return `<span class="pw${!here ? ' off' : Number.isFinite(p.ready) ? ' ok' : ''}">${p.race ? raceIcon(p.race) : ''}${esc(p.name)} <span class="hint">${state}</span></span>`;
+        const cls = `pw${!here ? ' off' : Number.isFinite(p.ready) ? ' ok' : ''}`;
+        const inner = `${p.race ? raceIcon(p.race) : ''}${esc(p.name)} <span class="hint">${state}</span>`;
+        // Une IA que ce téléphone fait jouer se touche pour la modifier ou la retirer (D-399, D-400).
+        if (editableBot(session, p.id)) return `<button type="button" class="${cls} edit" data-bot="${esc(p.id)}" aria-label="Modifier ${esc(p.name)}">${inner}<span class="pen">✎</span></button>`;
+        return `<span class="${cls}">${inner}</span>`;
       })
       .join('');
   }
@@ -2967,7 +2971,9 @@ function renderLobby(me) {
   $('btn-pick-fleet').hidden = !colonizer;
   $('btn-pick-fleet').dataset.fleet = colonizer?.id || '';
   $('btn-pick-invite').hidden = start != null;
-  $('btn-pick-bot').hidden = start != null || Object.keys(session.state.players).length >= 8;
+  $('btn-pick-bot').hidden = start != null || session.roster.length >= 8;
+  // Partie partie (ou IA disparue) : la fiche de l'IA se ferme.
+  if (!$('sheet-bot').hidden && !editableBot(session, botSheet)) $('sheet-bot').hidden = true;
 }
 $('btn-ready').onclick = (e) => {
   if (!session?.state) return;
@@ -2992,6 +2998,57 @@ $('btn-pick-bot').onclick = () => {
   if (!session?.state) return;
   const bot = addBot(session);
   toast(bot ? `${bot.name} rejoint la partie : elle joue sur ce téléphone.` : 'La partie est complète (8 joueurs).');
+  renderPick();
+};
+
+// IA du lobby (D-399, D-400) : l'hôte qui la fait jouer change son nom, sa race, ou la retire.
+let botSheet = null; // pid de l'IA ouverte
+let botRace = null; // race cochée dans la fiche
+
+function openBotSheet(pid) {
+  if (!editableBot(session, pid)) return;
+  const p = session.state.players[pid];
+  botSheet = pid;
+  botRace = p.race || RACE_KEYS[0];
+  $('bot-title').textContent = p.name;
+  $('bot-name').value = p.name;
+  $('bot-races').innerHTML = RACE_KEYS.map(
+    (k) => `<button type="button" class="race" role="radio" aria-checked="${k === botRace}" data-botrace="${k}" style="--race:${RACES[k].color}">
+      <span class="race-top">${raceIcon(k)}<span class="race-name">${RACES[k].name}</span></span>
+    </button>`,
+  ).join('');
+  $('sheet-bot').hidden = false;
+}
+$('pick-who').addEventListener('click', (e) => {
+  const el = e.target.closest('[data-bot]');
+  if (el) openBotSheet(el.dataset.bot);
+});
+$('bot-races').addEventListener('click', (e) => {
+  const el = e.target.closest('[data-botrace]');
+  if (!el) return;
+  botRace = el.dataset.botrace;
+  for (const b of document.querySelectorAll('[data-botrace]')) b.setAttribute('aria-checked', String(b.dataset.botrace === botRace));
+});
+$('btn-bot-close').onclick = () => ($('sheet-bot').hidden = true);
+$('btn-bot-save').onclick = () => {
+  const pid = botSheet;
+  if (!editableBot(session, pid)) return ($('sheet-bot').hidden = true);
+  const name = $('bot-name').value.trim();
+  if (!name) {
+    // Nom vide : refusé, l'IA garde le sien.
+    $('bot-name').value = session.state.players[pid].name;
+    return toast('Le nom ne peut pas être vide : l’IA garde le sien.');
+  }
+  renameBot(session, pid, name);
+  setBotRace(session, pid, botRace);
+  $('sheet-bot').hidden = true;
+  renderPick();
+};
+$('btn-bot-remove').onclick = () => {
+  const pid = botSheet;
+  const name = session.state.players[pid]?.name;
+  $('sheet-bot').hidden = true;
+  if (removeBot(session, pid)) toast(`${name} quitte la partie.`);
   renderPick();
 };
 

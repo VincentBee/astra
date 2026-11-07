@@ -33,6 +33,7 @@ function load() {
   if (!saved) return note('Aucune partie sur ce téléphone.');
   const st = saved.state;
   $('rp-title').textContent = Object.values(st.players)
+    .filter((p) => !Number.isFinite(p.left)) // sans les IA retirées du lobby (D-399)
     .sort((a, b) => a.rank - b.rank)
     .map((p) => p.name)
     .join(', ');

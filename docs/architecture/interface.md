@@ -586,6 +586,16 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
 - Bandeau du départ (`#pick`) : bouton `#btn-pick-bot` **Ajouter une IA**, à côté d'« Inviter »,
   caché dès que la partie est partie ou à 8 joueurs (`renderLobby`). Un toucher ajoute une IA
   et le dit (« IA Orion rejoint la partie : elle joue sur ce téléphone. »).
+- **Modifier une IA dans le lobby (D-399, D-400)** : chez l'hôte qui la fait jouer, et tant que
+  la partie n'est pas partie, la ligne de l'IA dans `#pick-who` est un bouton (`data-bot`, bord
+  pointillé, crayon ✎). Un toucher ouvre `#sheet-bot` (`openBotSheet`) : champ **Nom**
+  (`#bot-name`, 16 caractères), les trois races en boutons radio (`#bot-races`, même dessin que
+  le choix de race du joueur, sans la fiche détaillée), **Valider** (`renameBot` puis
+  `setBotRace` ; nom vide → message « Le nom ne peut pas être vide : l'IA garde le sien. », rien
+  ne change) et **Retirer de la partie** (`removeBot`, message « X quitte la partie. »). Les autres
+  téléphones voient une ligne simple. Partie partie (ou IA disparue), `renderLobby` ferme la
+  fenêtre. Les listes de joueurs (lobby, fenêtre Joueurs, choix de race, historique, rejeu)
+  passent par `session.roster` : une IA retirée n'y est plus.
 - Reprise depuis l'historique : `wakeBots(session)` juste après `Session.resume` (`app.js`).
 - Fenêtre Joueurs : pour une IA, la ligne dit « IA sur ce téléphone » (`routeLabel('bot')`) au
   lieu de la latence.

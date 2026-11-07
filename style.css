@@ -343,6 +343,11 @@ button.close-btn svg { width: 18px; height: 18px; }
 .pick-who .pw.ok { color: var(--ok, #7cf0b4); }
 .pick-who .pw.off { opacity: 0.5; }
 .pick-who .pw .hint { color: var(--muted); }
+/* IA modifiable par l'hôte (D-399, D-400) : la ligne se touche, un crayon le dit. */
+.pick-who button.pw.edit { min-height: 36px; padding: 2px 10px; font: inherit; font-weight: 400; color: inherit; background: rgba(255, 255, 255, 0.04); border: 1px dashed var(--line); border-radius: 8px; }
+.pick-who button.pw.edit .pen { color: var(--muted); margin-left: 2px; }
+.bot-races .race { padding: 10px 14px; }
+button.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
 .pick-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .pick-actions:not(:has(button:not([hidden]))) { display: none; }
 /* Lobby (D-242) : avant le départ, pas de carte ; l'en-tête en haut, puis le bandeau sur toute
