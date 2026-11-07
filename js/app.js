@@ -1229,15 +1229,21 @@ function drawAlertDot(ctx, w, cx, cy, cell, pulse) {
   ctx.stroke();
 }
 
+let openName = null; // nom de la planète affichée au dernier rafraîchissement (#73)
+
 /** La planète ouverte (mère ou colonie) : ressources, population, chantiers, recherche, flottes. */
 function renderPlanet(me, now) {
   const R = RACES[me.race];
   let pl = session.planetOf(me, openKey);
   if (!pl) {
+    const lost = openKey !== 'home' && currentView === 'planet';
     openKey = 'home';
     pl = session.planetOf(me, 'home');
+    // La colonie affichée n'est plus à moi : on le dit avant de montrer la planète mère (#73).
+    if (lost && pl) toast(`Tu as perdu ta colonie${openName ? ` ${openName}` : ''} : retour à ta planète mère.`);
   }
   if (!pl) return;
+  openName = pl.name;
   const planet = pl.planet;
   const s = stateAt(planet, now);
   const f = s.prod;
@@ -2549,6 +2555,7 @@ function drawRange(ctx, cell, now) {
 /** Fiche de la flotte sélectionnée : son état et ses ordres (les ordres vers une cible : menu au doigt, D-126). */
 function renderFleetInfo(me = session?.state?.players[session.me], now = session?.now()) {
   if (!session?.state) return;
+  refreshMoveSheet();
   let f = selFleet && session.myFleet(selFleet);
   // La flotte choisie s'est fondue dans une autre (jonction, D-159) : on suit celle-ci.
   if (!f && selFleet) f = (me?.fleets || []).find((g) => g.absorbed?.includes(selFleet)) || null;
@@ -2861,7 +2868,7 @@ $('fi-beside').addEventListener('click', (e) => {
   if (into && session.mergeFleets(into, selFleet)) renderFleetInfo();
 });
 
-let moveSheet = null; // { kind: 'give' | 'split', to }
+let moveSheet = null; // { kind: 'give' | 'split', from, to } : `from` est la flotte pour laquelle la fenêtre a été ouverte (#73)
 
 /** Fenêtre « Donner » (vers une autre de mes flottes) ou « Scinder » (vers une nouvelle). */
 function openMoveSheet(kind, to = null) {
@@ -2869,7 +2876,7 @@ function openMoveSheet(kind, to = null) {
   const f = session.myFleet(selFleet);
   const target = to && session.myFleet(to);
   if (!f || (kind === 'give' && !target)) return;
-  moveSheet = { kind, to };
+  moveSheet = { kind, from: f.id, to };
   const now = session.now();
   $('move-title').textContent = kind === 'give' ? `${fleetName(f)} → ${fleetName(target)}` : `Scinder la ${fleetName(f).toLowerCase()}`;
   $('move-hint').textContent =
@@ -2889,15 +2896,32 @@ function openMoveSheet(kind, to = null) {
 }
 
 $('btn-fi-split').onclick = () => openMoveSheet('split');
-$('btn-move-close').onclick = () => ($('sheet-move').hidden = true);
+$('btn-move-close').onclick = () => {
+  $('sheet-move').hidden = true;
+  moveSheet = null;
+};
+
+/**
+ * La fenêtre Scinder / Donner suit l'état (#73) : si sa flotte (ou celle qui reçoit) n'existe
+ * plus, détruite, absorbée ou éliminée, elle se ferme avec un message, au lieu d'un bouton muet.
+ */
+function refreshMoveSheet() {
+  if (!moveSheet || $('sheet-move').hidden) return;
+  const gone = !session.myFleet(moveSheet.from) || (moveSheet.kind === 'give' && !session.myFleet(moveSheet.to));
+  if (!gone) return;
+  $('sheet-move').hidden = true;
+  moveSheet = null;
+  toast('Cette flotte n’existe plus.');
+}
 $('btn-move-go').onclick = () => {
   const part = { ships: {}, cargo: {}, fuel: 0 };
   for (const el of document.querySelectorAll('[data-mship]')) part.ships[el.dataset.mship] = Math.max(0, Math.floor(Number(el.value) || 0));
   for (const el of document.querySelectorAll('[data-mcargo]')) part.cargo[el.dataset.mcargo] = Math.max(0, Math.floor(Number(el.value) || 0));
   part.fuel = Math.max(0, Math.floor(Number(document.querySelector('[data-mfuel]')?.value) || 0));
-  const ok = moveSheet?.kind === 'give' ? session.transferFleet(selFleet, moveSheet.to, part) : session.splitFleet(selFleet, part);
-  if (!ok) return;
+  const ok = moveSheet?.kind === 'give' ? session.transferFleet(moveSheet.from, moveSheet.to, part) : session.splitFleet(moveSheet?.from, part);
+  if (!ok) return refreshMoveSheet();
   $('sheet-move').hidden = true;
+  moveSheet = null;
   renderFleetInfo();
 };
 

@@ -2722,7 +2722,8 @@ export class Session {
     const p = this.state.players[this.me];
     const f = this.myFleet(id);
     const now = this.now();
-    if (!f || this.locked(id)) return false;
+    if (!f) return this.refuse('Flotte introuvable.'); // disparue (combat, fusion, élimination) : on le dit (#73)
+    if (this.locked(id)) return false;
     if (moving(f, now)) return this.refuse('La flotte doit être arrêtée pour se scinder.');
     if (p.fleets.length >= MAX_FLEETS) return this.refuse(`Pas plus de ${MAX_FLEETS} flottes.`);
     const res = split(f, p.race, part, this.newId(6), now);
