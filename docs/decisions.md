@@ -3222,6 +3222,33 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 **D-361 — Cache `astra-p2p-v92`, puis `astra-p2p-v114`**
 - 2026-11-07. Choix de Claude : `js/session.js` change (D-360) ; `main` est en v91 (D-211), d'où
   v92. À la fusion de `main` (2026-11-07, v113, D-411) : `astra-p2p-v114`. Statut : en vigueur.
+**D-390 — Textes des pouvoirs aliens calculés depuis `POWERS` (issue #75)**
+- 2026-11-07. Contexte : depuis TEMPO = 2,5 (D-083), la transe dure `120 000 / TEMPO` = 48 s,
+  mais `usePower` écrivait au journal partagé « extraction doublée 2 min » ; le toast ne disait
+  que « Transe collective ! » ou « Arrachement télékinésique ! », sans durée ni gain.
+- Choix :
+  1. `secs(ms)` (`js/game.js`) écrit une durée en secondes réelles (« 48 s »).
+  2. `usePower` renvoie `{ text, toast }` : journal « entre en transe collective : extraction
+     doublée 48 s » ; toast « Transe collective : extraction doublée 48 s » ; arrachement :
+     « Arrachement télékinésique : +79 minéraux ». Les deux textes de la transe viennent de
+     `POWERS.trance.duration`.
+  3. La description de la transe est un getter sur `duration` ; la carte affiche la recharge
+     par `secs(cooldown)` et, pour l'arrachement, le gain attendu (`+80◆`, `liftGain`) avant le
+     toucher.
+- Alternatives écartées : remplacer seulement « 2 min » par « 48 s » (faux dès que TEMPO
+  change) ; écrire la durée en minutes de jeu (le joueur lit des secondes sur la carte et le
+  compte à rebours) ; construire le toast dans `session.js` (deux endroits à garder d'accord).
+- Qui : **Claude, par défaut** (le ticket donnait la piste ; gain sur la carte et dans le toast
+  demandés par ses critères). Source : worker `worker-transe`, issue #75. Statut : en vigueur.
+- Test : `tests/rules.test.mjs`, scénario « #75 : le journal et le toast des pouvoirs… »
+  (échoue sur `main`).
+
+**D-391 — Cache `astra-p2p-v95`, puis `astra-p2p-v115`**
+- 2026-11-07. Contexte : `main` est à v94 (D-231) ; la PR de #75 change `js/game.js`,
+  `js/session.js` et `js/app.js`.
+- Choix : `VERSION` passe à `astra-p2p-v95`, pour que les téléphones prennent les nouveaux
+  fichiers. À la fusion de `main` (2026-11-07, v114, D-411) : `astra-p2p-v115`.
+- Qui : Claude, par défaut. Source : worker `worker-transe`. Statut : en vigueur.
 
 **D-417 — « Retour » pendant une partie en cours : une question avant de quitter**
 - 2026-11-07. Contexte : Vincent : « je veux que quand on fait back, avant de quitter une partie
@@ -3249,4 +3276,4 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   lobby (la tâche l'exclut).
 - Qui : Vincent (demande), router (pas d'alerte au lobby ni à la fin, fenêtre `.sheet`
   préférée), Claude par défaut (fenêtre fermée d'abord, 2ᵉ retour = quitter, accueil quand rien
-  avant). Source : session `3e243082`. Statut : en vigueur. Cache `astra-p2p-v115` (v107, puis un cran à chaque fusion de `main` ; v115 sur `main` à v114). Numérotée D-401 au départ ; D-412 à D-416 étant pris ou réservés par la chaîne de D-411, renumérotée D-417 à la fusion de `main`.
+  avant). Source : session `3e243082`. Statut : en vigueur. Cache `astra-p2p-v116` (v107, puis un cran à chaque fusion de `main` ; v116 sur `main` à v115). Numérotée D-401 au départ ; D-412 à D-416 étant pris ou réservés par la chaîne de D-411, renumérotée D-417 à la fusion de `main`.

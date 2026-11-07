@@ -189,3 +189,5 @@ que fait le code.
 | D-341 | Cache `astra-p2p-v108` (v89 au départ) | non testable |  | version du service worker |
 | D-350 | La fenêtre Scinder / Donner suit sa flotte (issue #73) | nouveau test | `fleet.test.mjs` flotte détruite au combat pendant « Scinder » ou « Donner » : refus « Flotte introuvable. », sans planter | la fermeture de la fenêtre (`refreshMoveSheet`) et le message de la colonie perdue (`renderPlanet`, `js/app.js`) ne sont pas testables sous Node (pas de DOM) : vérifiée dans le vrai jeu |
 | D-351 | Cache `astra-p2p-v111` (v90 au départ) | non testable |  | version du service worker |
+| D-390 | Textes des pouvoirs aliens calculés depuis `POWERS` (issue #75) | nouveau test | `rules.test.mjs` « #75 : le journal et le toast des pouvoirs donnent la vraie durée et le vrai gain » : vraie `Session`, journal et toast de la transe à 48 s, arrachement avec son gain, description à la même durée, texte qui suit `duration` si elle change | échoue sur `main` ; carte et journal vus dans le vrai jeu contre l'IA |
+| D-391 | Cache `astra-p2p-v115` (v95 au départ) | non testable |  | version du service worker |
