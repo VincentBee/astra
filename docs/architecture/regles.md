@@ -361,13 +361,21 @@ chantier)` d'énergie pour toutes les races (`space`, `js/game.js:92`).
   dépérissement sinon.
 - **Pouvoirs** (`POWERS`, `js/game.js:381-395`), seulement pour les aliens
   (`js/game.js:721`) :
-  - `lift` (arrachement) : recharge 3 min, coûte `30 × ceil(pop)` énergie, ajoute
+  - `lift` (arrachement) : recharge `180 000 / TEMPO` ms (3 min au tempo d'origine, 72 s à
+    TEMPO 2,5), coûte `30 × ceil(pop)` énergie, ajoute
     `40 × pop × amplification` minéraux, sans dépasser ce qui reste au sol ni la place de
-    l'entrepôt (`liftGain`, `js/game.js:711-718`). Le minerai sort du gisement
-    (`js/game.js:738`).
-  - `trance` (transe) : recharge 6 min, dure 2 min, coûte `25 × ceil(pop)` énergie ; double
-    l'extraction télékinésique jusqu'à `planet.trance` (`js/game.js:742`, `js/game.js:534-541`).
-  - `usePower` (`js/game.js:720-744`) **refuse sans rien faire payer** quand le pouvoir ne
+    l'entrepôt (`liftGain`, `js/game.js:1033`). Le minerai sort du gisement.
+  - `trance` (transe) : recharge `360 000 / TEMPO` ms (144 s), dure `120 000 / TEMPO` ms
+    (2 min au tempo d'origine, **48 s** à TEMPO 2,5), coûte `25 × ceil(pop)` énergie ; double
+    l'extraction télékinésique jusqu'à `planet.trance` (`js/game.js:1067`).
+  - **Textes de durée** (D-360, #75) : aucune durée écrite en dur. `secs(ms)`
+    (`js/game.js:437`) donne « 48 s » ; la description de la transe (getter `desc`), la ligne
+    du journal (`usePower` → `text`), le toast (`usePower` → `toast`, affiché par `power()`,
+    `js/session.js:2677`) et la carte (recharge `↻ 72 s`, `js/app.js:1344-1348`) se calculent
+    depuis `POWERS.*.duration` / `cooldown`. L'arrachement donne son gain dans le toast
+    (« Arrachement télékinésique : +80 minéraux ») et sur sa carte (`+80◆`, `liftGain`) avant
+    qu'on le touche.
+  - `usePower` (`js/game.js:1045-1069`) **refuse sans rien faire payer** quand le pouvoir ne
     rapporterait rien. L'arrachement est refusé si le sol est vide ou si l'entrepôt de
     minéraux est plein (`js/game.js:733`) ; la transe, seulement si le sol est vide
     (`js/game.js:732`). Une transe lancée avec un entrepôt plein est payée.

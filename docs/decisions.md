@@ -2420,3 +2420,31 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
 - Choix : `VERSION` passe à `astra-p2p-v94`, au-dessus de `main`, pour que les téléphones
   prennent le nouveau `sw.js`.
 - Qui : Claude, par défaut. Source : session `7bec2792`. Statut : en vigueur.
+
+**D-360 — Textes des pouvoirs aliens calculés depuis `POWERS` (issue #75)**
+- 2026-11-07. Contexte : depuis TEMPO = 2,5 (D-083), la transe dure `120 000 / TEMPO` = 48 s,
+  mais `usePower` écrivait au journal partagé « extraction doublée 2 min » ; le toast ne disait
+  que « Transe collective ! » ou « Arrachement télékinésique ! », sans durée ni gain.
+- Choix :
+  1. `secs(ms)` (`js/game.js`) écrit une durée en secondes réelles (« 48 s »).
+  2. `usePower` renvoie `{ text, toast }` : journal « entre en transe collective : extraction
+     doublée 48 s » ; toast « Transe collective : extraction doublée 48 s » ; arrachement :
+     « Arrachement télékinésique : +79 minéraux ». Les deux textes de la transe viennent de
+     `POWERS.trance.duration`.
+  3. La description de la transe est un getter sur `duration` ; la carte affiche la recharge
+     par `secs(cooldown)` et, pour l'arrachement, le gain attendu (`+80◆`, `liftGain`) avant le
+     toucher.
+- Alternatives écartées : remplacer seulement « 2 min » par « 48 s » (faux dès que TEMPO
+  change) ; écrire la durée en minutes de jeu (le joueur lit des secondes sur la carte et le
+  compte à rebours) ; construire le toast dans `session.js` (deux endroits à garder d'accord).
+- Qui : **Claude, par défaut** (le ticket donnait la piste ; gain sur la carte et dans le toast
+  demandés par ses critères). Source : worker `worker-transe`, issue #75. Statut : en vigueur.
+- Test : `tests/rules.test.mjs`, scénario « #75 : le journal et le toast des pouvoirs… »
+  (échoue sur `main`).
+
+**D-361 — Cache `astra-p2p-v95`**
+- 2026-11-07. Contexte : `main` est à v94 (D-231) ; la PR de #75 change `js/game.js`,
+  `js/session.js` et `js/app.js`.
+- Choix : `VERSION` passe à `astra-p2p-v95`, pour que les téléphones prennent les nouveaux
+  fichiers.
+- Qui : Claude, par défaut. Source : worker `worker-transe`. Statut : en vigueur.
