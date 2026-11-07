@@ -388,9 +388,43 @@ function attack(ctx, mine) {
 
 /**
  * Deux bouts d'un lien en mémoire, avec l'interface d'un lien WebRTC (send, onmessage,
- * onclose, close, route, closed). Les messages passent en texte JSON, comme sur le réseau,
- * et arrivent un peu après (jamais pendant l'ordre qui les envoie).
+ * onclose, close, route, closed). Chaque message est recopié à l'envoi, comme sur le réseau
+ * (JSON), sauf le journal des ordres d'une fiche, dont les entrées sont partagées et gelées
+ * (copyRec, D-370) ; il arrive un peu après (jamais pendant l'ordre qui l'envoie).
  */
+const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
+
+/** Gèle un objet et tout ce qu'il contient (une entrée du journal des ordres). */
+function deepFreeze(x) {
+  if (!x || typeof x !== 'object' || Object.isFrozen(x)) return x;
+  for (const v of Object.values(x)) deepFreeze(v);
+  return Object.freeze(x);
+}
+
+/**
+ * Copie d'une fiche pour une autre Session du même téléphone (D-370) : tout est recopié comme
+ * par le réseau (JSON), sauf les entrées du journal des ordres, partagées. Une entrée ne change
+ * plus une fois l'ordre fini : elle est gelée, et aucune Session ne peut la modifier chez une
+ * autre (une tentative lève une erreur). La dernière entrée peut être celle de l'ordre en cours
+ * de l'expéditeur (encore modifiable) : elle est recopiée. Le journal fait jusqu'à 1 500
+ * entrées, la fiche sans lui quelques Ko : c'était l'essentiel du travail (issue #39).
+ */
+/** `fullCopy` : tout recopier en JSON, comme avant D-370 (tests : la partie doit être la même). */
+export const LINK = { fullCopy: false };
+
+export function copyRec(rec) {
+  const orders = rec.orders;
+  if (!Array.isArray(orders)) return JSON.parse(JSON.stringify(rec));
+  // Le journal reste à sa place parmi les clés : la fiche est la même, au caractère près.
+  const out = JSON.parse(JSON.stringify({ ...rec, orders: [] }));
+  const n = orders.length;
+  const list = new Array(n);
+  for (let i = 0; i < n - 1; i++) list[i] = deepFreeze(orders[i]);
+  if (n) list[n - 1] = deepFreeze(JSON.parse(JSON.stringify(orders[n - 1] ?? null)));
+  out.orders = list;
+  return out;
+}
+
 export function localPair() {
   const a = new LocalLink();
   const b = new LocalLink();
@@ -428,13 +462,17 @@ class LocalLink {
   }
   send(msg) {
     if (this.closed) return;
-    const data = JSON.stringify(msg);
+    // Copie faite à l'envoi : la fiche de l'expéditeur peut encore changer avant la livraison.
+    let data;
+    if (msg?.type === 'rec' && isObj(msg.rec) && !LINK.fullCopy) {
+      const { rec, ...rest } = msg;
+      data = { ...JSON.parse(JSON.stringify(rest)), rec: copyRec(rec) };
+    } else data = JSON.parse(JSON.stringify(msg));
     const peer = this.peer;
     queueMicrotask(() => peer.receive(data));
   }
-  receive(data) {
+  receive(msg) {
     if (this.closed) return;
-    const msg = JSON.parse(data);
     if (this.handler) this.handler(msg);
     else this.queue.push(msg);
   }

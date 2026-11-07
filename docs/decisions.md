@@ -2420,3 +2420,46 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
 - Choix : `VERSION` passe à `astra-p2p-v94`, au-dessus de `main`, pour que les téléphones
   prennent le nouveau `sw.js`.
 - Qui : Claude, par défaut. Source : session `7bec2792`. Statut : en vigueur.
+
+**D-370 — IA du même téléphone : le journal des ordres est partagé, gelé ; rendus groupés par image (issue #39)**
+- 2026-11-07. Contexte : chaque IA est une Session complète. Une fiche d'IA (journal d'ordres
+  compris, jusqu'à 1 500 entrées) était recopiée en JSON à chaque saut : texte à l'envoi, objet à
+  la réception, copie dans `onRecord`, puis la même chose vers chacune des autres IA. Le travail
+  grandissait comme (nombre d'IA)² × taille des journaux, et l'écran de l'hôte se redessinait en
+  entier à chaque fiche reçue (~190 fois par minute avec 7 IA, d'après l'issue).
+- Choix :
+  1. `LocalLink.send` copie une fiche `rec` par `copyRec` (`js/bot.js`) : tout en JSON comme
+     avant, **sauf les entrées du journal des ordres**, partagées par référence et gelées en
+     profondeur (`Object.freeze`). Une entrée ne change plus une fois l'ordre fini ; la dernière
+     (peut-être l'ordre en cours de l'expéditeur, encore modifiable) est recopiée. La copie se
+     fait à l'envoi, comme avant : la fiche de l'expéditeur peut changer avant la livraison. La
+     clé `orders` garde sa place : la fiche est la même au caractère près.
+  2. `onRecord` (`js/session.js`) ne refait pas de copie quand la fiche vient d'un lien `local`
+     (elle est déjà à lui) ; par le réseau, rien ne change.
+  3. `onRecord` appelle `onchange('state', 'record')` ; `app.js` regroupe ces rendus sur la
+     prochaine image (`requestAnimationFrame`) : au plus un rendu complet par image, aucun
+     quand la page est cachée. Les changements venus du joueur redessinent tout de suite.
+- Alternatives écartées : **ne plus relayer le journal des ordres aux IA** (piste de l'issue) :
+  `seenNews` écrit dans chaque entrée la longueur des journaux des autres (`s`), et le rejeu en
+  dépend ; les fiches et le rejeu auraient changé. **Partager toute la fiche gelée** : `normalize`
+  et d'autres règles écrivent dans les fiches reçues, il aurait fallu les revoir toutes (hors de
+  ce ticket) ; le reste de la fiche fait quelques Ko, sa copie coûte peu. **`structuredClone`** :
+  il ne fait pas comme JSON (`Infinity`, `undefined`), la partie aurait pu changer. **Un seul
+  passage de tick pour toutes les IA** : pas nécessaire après les deux premiers points.
+- Mesures (`node tests/perf-ia.mjs 7 25 1`, Mac, temps processeur, minutes 20-25) : messages
+  9,2 → 1,0 ms par seconde de jeu ; JSON écrit pendant la livraison 1 160 → 71 Ko/s ; pire
+  seconde 76 → 36 ms. Même graine : mêmes fiches (empreintes égales chez l'hôte et chez chaque
+  IA), même classement, même rejeu ; partie à 3 IA jouée jusqu'au bout (45 min) : même gagnant,
+  même heure de fin. Test : `tests/bot.test.mjs` « D-370 » (7 IA, 22 min, copie complète contre
+  copie D-370 : partie identique, < 100 Ko/s, au moins 5 fois moins de JSON).
+- Limites : le nombre de messages reste en (nombre d'IA)², mais chacun coûte peu ; la
+  réflexion des IA (`think`, ~5 ms/s à 7 IA) n'est pas touchée. Non confirmé sur un vrai
+  téléphone (mesures : Node, et Chromium ralenti 4×).
+- Qui : **choix de Claude** (le ticket laissait le choix de la méthode). Source : session
+  `940aeddb`, issue #39. Statut : en vigueur.
+
+**D-371 — Cache `astra-p2p-v95`**
+- 2026-11-07. Contexte : `main` est à v94 (D-231).
+- Choix : `VERSION` passe à `astra-p2p-v95`, pour que les téléphones prennent les nouveaux
+  `js/bot.js`, `js/session.js` et `js/app.js`.
+- Qui : Claude, par défaut. Source : session `940aeddb`. Statut : en vigueur.

@@ -882,7 +882,10 @@ export class Session {
     if (ours && (fix < 0 || (fix === 0 && (rec.actAt || 0) <= (ours.actAt || 0)))) return;
     if (!ours && Object.keys(this.state.players).length >= MAX_PLAYERS * 2) return;
     this.beforeRec(rec.id);
-    this.state.players[rec.id] = normalize({ ...JSON.parse(JSON.stringify(rec)), online: this.online(rec.id) });
+    // Lien en mémoire (une IA, même téléphone) : la fiche est déjà une copie à moi, faite à l'envoi
+    // (js/bot.js copyRec, D-370) ; par le réseau, elle est recopiée ici comme avant.
+    const own = link?.local ? rec : JSON.parse(JSON.stringify(rec));
+    this.state.players[rec.id] = normalize({ ...own, online: this.online(rec.id) });
     this.afterRec(rec.id);
     // Une ou plusieurs entrées de journal accompagnent la fiche.
     for (const l of [].concat(log || []).slice(0, 10)) {
@@ -890,7 +893,8 @@ export class Session {
     }
     this.spread(rec, log, link);
     this.scheduleSave();
-    this.onchange?.('state');
+    // 'record' : l'écran peut regrouper ces rendus, un par image (D-370).
+    this.onchange?.('state', 'record');
   }
 
   /** Envoie une fiche à tous mes voisins (sauf celui d'où elle vient). */

@@ -150,6 +150,7 @@ Toutes se ferment par leur croix (`.close-btn`), un toucher sur le fond sombre o
 |---|---|---|
 | Une fois par race | `buildStatic` (460-541) | Construit le HTML qui dépend de la race : tuiles de stocks, gisements, cartes de bâtiments, technologies, vaisseaux, pouvoirs. Refait si la race change (`builtFor`, 458 et 824). |
 | À chaque changement d'état (`session.onchange`) | `renderState` (753-783) | Identité, bandeau « Seul en ligne », liste des joueurs, copie du journal en console, puis `renderLive`. |
+| Fiche reçue d'un autre joueur ou d'une IA (`onchange('state', 'record')`, D-370) | `renderState` sur la prochaine image (`requestAnimationFrame`, `stateFrame`) | Rendus groupés : au plus un par image, rien quand la page est cachée ; un rendu direct annule celui qui attend. `globalThis.astraStats.renders` les compte. |
 | 5 fois par seconde | `renderLive` (805-866) | Réseau, planète ouverte (`renderPlanet`), bandeau de choix (`renderPick`), fiche de flotte, échanges, avertissement de version (`session.outdated`, 830-833), lignes du classement. |
 | Chaque image (`requestAnimationFrame`) | `drawMap` (1349-1538) | La carte, seulement quand la vue carte est affichée (`showView` 1225-1227, `stopMap` 1231-1234). |
 

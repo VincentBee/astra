@@ -306,9 +306,25 @@ async function useOffer(text) {
 $('btn-copy-answer').onclick = () => copy(answerCode, 'Réponse copiée. Envoie-la à la personne qui t’invite.');
 $('btn-share-answer').onclick = () => share(answerCode, 'Ma réponse Astra');
 
-function onSessionChange() {
+// Rendus groupés (D-370) : une fiche reçue (d'une IA ou d'un autre téléphone) ne redessine
+// l'écran qu'une fois par image, quel que soit le nombre de fiches arrivées entre deux images.
+// Un changement venu de moi (un ordre, un écran qui change) redessine tout de suite, comme avant.
+let stateFrame = 0;
+// Compteur de rendus complets, pour la mesure de l'issue #39 (tests/perf-ia-page.mjs).
+globalThis.astraStats = { renders: 0 };
+
+function onSessionChange(what, why) {
   const s = session;
   if (!s) return;
+  if (why === 'record' && s.status === 'playing' && !$('screen-game').hidden) {
+    if (!stateFrame) {
+      stateFrame = requestAnimationFrame(() => {
+        stateFrame = 0;
+        if (session === s && !$('screen-game').hidden) renderState();
+      });
+    }
+    return;
+  }
   if (s.status === 'waiting') {
     $('join-status').textContent = 'Connecté. Arrivée dans la partie…';
   }
@@ -823,6 +839,11 @@ $('buildings').addEventListener('click', (e) => {
 
 /** Rendu des parties qui changent avec l'état (joueurs, journal, demandes). */
 function renderState() {
+  if (stateFrame) {
+    cancelAnimationFrame(stateFrame);
+    stateFrame = 0;
+  }
+  globalThis.astraStats.renders++;
   const st = session.state;
   const me = st.players[session.me];
   if (me) {

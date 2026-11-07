@@ -231,7 +231,7 @@ Il n'y a **pas de message « je pars »**. Un départ = un lien qui se ferme : s
 - `addBot(host)` (`js/bot.js`) : l'hôte fait comme pour un invité (`addPlayer` avec une empreinte
   de secret au hasard, entrée au journal, `spread` de la fiche), puis crée la `Session` de l'IA
   sur une copie de sa partie (`snapshot`), reliée par `localPair()` : deux `LocalLink` qui
-  passent les messages en texte JSON par `queueMicrotask`, `route()` = `'bot'` (« IA sur ce
+  passent les messages par `queueMicrotask`, recopiés à l'envoi (voir « Coût » plus bas), `route()` = `'bot'` (« IA sur ce
   téléphone » dans la fenêtre Joueurs), `viaRoom` faux, `local` vrai : `heartbeat` ne le ferme
   jamais pour silence (D-220, issue #38 : une page figée plus de 30 s, téléphone verrouillé,
   coupait l'IA pour de bon). `host.attach(lien, pid de l'IA)` :
@@ -239,6 +239,19 @@ Il n'y a **pas de message « je pars »**. Un départ = un lien qui se ferme : s
 - La `Session` de l'IA : `save`, `scheduleSave`, `meet`, `dial`, `start` neutralisés ; un
   minuteur d'1 s fait `tick`, `checkStart` et, toutes les 3 s, `think`. Elle répond aux `hb` de
   l'hôte comme un pair. Ses fiches passent par `rec` ; l'hôte les relaie aux autres téléphones.
+- Coût (D-370, issue #39) : une fiche `rec` est recopiée **à l'envoi** par `copyRec` : tout en
+  JSON, comme par le réseau, sauf les entrées du journal `orders` (jusqu'à 1 500), partagées par
+  référence entre les Sessions du téléphone et gelées (`Object.freeze`, en profondeur) : aucune
+  Session ne peut modifier celles d'une autre. La dernière entrée (peut-être celle de l'ordre en
+  cours de l'expéditeur) est recopiée. `onRecord` ne refait pas de copie pour un lien `local` ; par
+  le réseau, il recopie comme avant. Les autres messages (`hb`, `sync`…) passent en JSON. `LINK.fullCopy`
+  (tests) remet l'ancienne copie complète. Le journal des ordres est quand même relayé aux IA :
+  `seenNews` lit sa longueur chez les autres, et le rejeu en dépend. Mesure : `node tests/perf-ia.mjs
+  7 25` (hôte + 7 IA, 25 min de jeu, graine fixe : temps processeur par seconde de jeu, JSON
+  écrit pendant la livraison, empreinte de la partie).
+- Écran : `onRecord` appelle `onchange('state', 'record')` ; `app.js` regroupe ces rendus sur
+  une image (`requestAnimationFrame`), au plus un `renderState` par image ; un changement venu
+  du joueur lui-même redessine tout de suite. `globalThis.astraStats.renders` compte les rendus.
 - Sauvegarde : `host.botIds` → champ `bots` de la sauvegarde (`saveGame(me, state, journal,
   intel, bots)`) ; `Session.resume` le relit (`botIds`, identifiants valides et présents dans
   la partie) ; `app.js` appelle `wakeBots(session)` juste après la reprise. `host.bots` (Map pid
