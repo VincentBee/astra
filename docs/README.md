@@ -16,6 +16,8 @@ parties (tempo, froid, conquête, défenses, déconstruction) ajouté le 2026-10
 |---|---|
 | Comprendre le projet en 2 minutes | [README.md](../README.md) (racine) |
 | Jouer, connaître les races | [GUIDE.md](../GUIDE.md) |
+| Bien jouer chaque race (meilleur départ, investissements, défense, attaque), avec des chiffres mesurés | [guides/](guides/README.md) : [humains](guides/humains.md), [machines](guides/machines.md), [aliens](guides/aliens.md) |
+| Les limites du jeu : durée, froid, place, défense d'une planète, plafonds | [guides/limites.md](guides/limites.md) |
 | Comprendre le réseau, les invitations, la sauvegarde, le service worker | [architecture/reseau.md](architecture/reseau.md) |
 | Comprendre les règles : temps, économie, races, technologies, flottes, combat, échanges, rejeu, tests | [architecture/regles.md](architecture/regles.md) |
 | Comprendre les écrans, `js/app.js`, la carte, le style, les icônes, le fond | [architecture/interface.md](architecture/interface.md) |
@@ -48,6 +50,7 @@ Ordre conseillé pour arriver sur le projet : README racine → `reseau.md` §1-
 | `RAPPORT-RYTHME.md` | Analyse du rythme des parties par 4 agents et des robots (D-077), puis changements faits | — |
 | `CLAUDE.md` | Règles pour Claude : tenir le journal et les décisions | — |
 | `docs/` | Cette documentation | — |
+| `docs/guides/` | Guides de jeu par race et limites du jeu, chiffres mesurés au commit `15ca511` (D-162) : `README.md` (index), `humains.md`, `machines.md`, `aliens.md`, `limites.md`, `questions.md` (24 questions de joueurs) | ici |
 | `icons/` | Icônes de l'application (`icon.svg`, 192 et 512 px) | interface |
 | `vendor/` | Bibliothèques incluses : `qrcode.mjs` (QR), `jsQR.js` (lecture QR), `trystero-nostr.mjs` (rendez-vous Nostr) ; licences dans `vendor/README.txt` | reseau |
 | `js/config.js` | Réglages réseau (serveurs ICE, relais, identifiant d'application) | reseau |
