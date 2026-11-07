@@ -186,4 +186,4 @@ que fait le code.
 | D-230 | Service worker : le cache répond si le réseau se tait 3 s (issue #40) | nouveau test | `sw.test.mjs` serveur qui répond (version du réseau, modification servie et mise en cache), muet (cache en moins de 5 s, fichiers suivants tout de suite), muet sans copie en cache (on attend le réseau), lent (cache puis mise à jour du cache), retour du réseau, coupé | vrai navigateur : `tests/sw-browser.mjs` (Chromium), hors `node --test` |
 | D-231 | Cache `astra-p2p-v94` | non testable |  | version du service worker |
 | D-370 | IA du même téléphone : le journal des ordres passe sans être recopié (entrées partagées et gelées), même partie qu'avant (issue #39) | nouveau test | `bot.test.mjs` « D-370 : 7 IA, même graine : même partie qu’avec la copie complète, cinq fois moins de JSON » (empreintes des fiches chez l'hôte et chez chaque IA, classement, rejeu ; < 100 Ko/s) | `LINK.fullCopy` rejoue l'ancien chemin ; égalité avec `main` vérifiée par `tests/perf-ia.mjs` (graines 1 et 2) |
-| D-371 | Cache `astra-p2p-v95` | non testable |  | version du service worker |
+| D-371 | Cache `astra-p2p-v98` | non testable |  | version du service worker |

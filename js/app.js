@@ -246,9 +246,16 @@ $('btn-solo').onclick = async () => {
   startGame();
 };
 
+// Lien d'invitation ouvert sans nom (#69, D-290) : le code attend ici le premier appui sur
+// « Rejoindre », qui le consomme. Les appuis suivants ouvrent l'étape 1 normale.
+let pendingInvite = null;
+
 $('btn-join').onclick = () => {
   if (!playerName()) return;
-  startJoin();
+  const invite = pendingInvite;
+  pendingInvite = null;
+  if (invite) $('home-note').hidden = true;
+  startJoin(invite || undefined);
 };
 
 // ---------------------------------------------------------------------------
@@ -277,6 +284,14 @@ $('btn-scan-offer').onclick = async () => {
   }
 };
 $('btn-offer-ok').onclick = () => useOffer($('offer-input').value);
+
+// Étape 2 → étape 1 (#69) : abandonner cette réponse pour scanner ou coller une autre invitation.
+// Comme la flèche Retour, la tentative en cours est arrêtée (session.end) ; useOffer en refera une.
+$('btn-other-invite').onclick = () => {
+  session?.end?.();
+  session = null;
+  startJoin();
+};
 
 let answerCode = '';
 async function useOffer(text) {
@@ -524,7 +539,7 @@ function buildStatic() {
   builtFor = race;
   const tiles = R.resources.map(
     (r) => `<div class="tile ${r}" title="${RES_INFO[r].name}">${spark(r)}
-      <span class="label">${resIcon(r)}</span>
+      <span class="label">${resIcon(r)}<span class="clim mono" data-clim="${r}" hidden></span></span>
       <span class="amount mono" data-res="${r}">0</span>
       <span class="rate mono" data-rate="${r}"></span>
       <div class="gauge"><div class="gauge-fill" data-gauge="${r}"></div></div>
@@ -785,15 +800,18 @@ function costText(cost) {
     .join(' · ');
 }
 
-/** « Chaud · ×1,2 ⚡ · ×1,1 ◆ · ×0,9 🍃 » : le climat et son effet sur la production, en HTML. */
+/** « ×1,10 » : un coefficient de climat. */
+const climX = (v) => `×${v.toFixed(2).replace('.', ',')}`;
+
+/** « Chaud · production ×1,2 ⚡ · ×1,1 ◆ · ×0,9 🍃 » : le climat et son effet sur la production, en HTML. */
 function climateHtml(c, short = false) {
-  const x = (v) => `×${v.toFixed(2).replace('.', ',')}`;
   const cls = c.heat >= 0.6 ? 'hot' : c.heat < 0.4 ? 'cold' : 'mild';
-  const qty = ['energy', 'minerals', 'food'].map((r) => `<span class="qty">${x(c[r])}${resIcon(r)}</span>`);
-  // Version courte (à côté du nom de la planète) : sans mots ni séparateurs.
-  return short
-    ? `<span class="climate-name ${cls}">${climateName(c.heat)}</span> ${qty.join(' ')}`
-    : `<span class="climate-name ${cls}">${climateName(c.heat)}</span> · production ${qty.join(' · ')}`;
+  const name = `<span class="climate-name ${cls}">${climateName(c.heat)}</span>`;
+  // Version courte (à côté du nom de la planète) : le nom seul ; les coefficients sont dans les
+  // cartes de ressources (D-221).
+  if (short) return name;
+  const qty = ['energy', 'minerals', 'food'].map((r) => `<span class="qty">${climX(c[r])}${resIcon(r)}</span>`);
+  return `${name} · production ${qty.join(' · ')}`;
 }
 
 /** Ligne du climat dans `el` (cachée pour une planète d'avant le climat). */
@@ -1260,6 +1278,17 @@ function renderPlanet(me, now) {
 
   for (const r of R.resources) {
     const cap = f.caps[r];
+    // Coefficient du climat dans la carte (D-221) ; rien pour une planète d'avant le climat.
+    const clim = q(`[data-clim="${r}"]`);
+    const k = planet.climate?.[r];
+    clim.hidden = !Number.isFinite(k);
+    if (Number.isFinite(k)) {
+      clim.textContent = climX(k);
+      const kk = Math.round(k * 100);
+      clim.classList.toggle('up', kk > 100);
+      clim.classList.toggle('down', kk < 100);
+      clim.title = `Climat : production ${climX(k)}`;
+    }
     q(`[data-res="${r}"]`).innerHTML = withCap(s.stock[r], cap);
     q(`[data-res="${r}"]`).firstChild.textContent = compact(s.stock[r]); // tuile étroite : « 118 k »
     const short = r === 'energy' ? f.effE < 1 : r === 'food' ? f.effF < 1 : false;
@@ -1763,14 +1792,6 @@ document.querySelector('.tabs').addEventListener('keydown', (e) => {
 try {
   localStorage.removeItem('astra.tab'); // onglet retenu d'avant D-156, plus lu
 } catch {}
-// Aide de la carte : une bulle au survol ; au doigt (pas de survol), un toucher l'ouvre ou la ferme.
-$('btn-map-help').onclick = (e) => {
-  const btn = e.currentTarget;
-  btn.setAttribute('aria-expanded', String(btn.getAttribute('aria-expanded') !== 'true'));
-};
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.help-wrap')) $('btn-map-help').setAttribute('aria-expanded', 'false');
-});
 $('alerts-btn').onclick = () => {
   const open = $('alerts-panel').hidden;
   $('alerts-panel').hidden = !open;
@@ -1791,12 +1812,16 @@ $('btn-open-planet').onclick = (e) => {
   showView('planet', e.currentTarget.dataset.key || 'home');
 };
 
+/** Avant le départ (D-240, D-241) : pas de carte du tout, rien ne s'y voit ni ne s'y touche. */
+const mapVeiled = () => session?.startedAt == null;
+
 /**
  * Toutes les planètes à afficher : celles de l'univers, avec leur
  * propriétaire, et les planètes mères des joueurs d'avant le choix de
  * planète (placées hors de la liste).
  */
 function mapPlanets() {
+  if (mapVeiled()) return []; // avant le départ (D-240) : la carte reste une surprise
   // Brouillard (D-124) : hors de ma portée, une planète des autres paraît libre, ou porte le nom
   // de celui qui la tenait la dernière fois que je l'ai vue (`seen` : pas de nouvelles fraîches).
   const now = session.now();
@@ -1940,8 +1965,10 @@ function drawMap() {
     ctx.lineTo(W, i * cell);
   }
   ctx.stroke();
+  const veiled = mapVeiled();
+  $('map-wrap').hidden = veiled;
   const sun = sunFor(session.state.gid);
-  drawSun(ctx, sun, cell);
+  if (!veiled) drawSun(ctx, sun, cell);
   drawFrost(ctx, sun, cell, W);
 
   const me = session.state.players[session.me];
@@ -2110,7 +2137,7 @@ function drawMap() {
   drawAim(ctx, cell, dpr, aim);
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  $('my-coords').textContent = me?.home ? `[${me.home.x}:${me.home.y}]` : me?.out ? 'éliminé' : session.startedAt == null ? 'avant le départ' : 'à fonder';
+  $('my-coords').textContent = me?.home ? `[${me.home.x}:${me.home.y}]` : me?.out ? 'éliminé' : session.startedAt == null ? 'préparation' : 'à fonder';
 }
 
 // ---------------------------------------------------------------------------
@@ -2883,7 +2910,10 @@ function myColonizer(me) {
  * la partie partie, envoyer son colonisateur fonder sa planète mère.
  */
 function renderLobby(me) {
+  $('map-wrap').hidden = mapVeiled(); // avant le départ, pas de carte du tout (D-241)
   const show = !!me?.race && !me.home && !me.out;
+  // Lobby (D-242) : sans carte, le bandeau prend toute la hauteur, boutons en bas.
+  $('screen-game').classList.toggle('lobby', show && mapVeiled());
   $('pick').hidden = !show;
   if (!show) return;
   const start = session.startedAt;
@@ -3084,7 +3114,7 @@ async function boot() {
         if ($('name').value.trim()) return startJoin(hash);
         $('home-note').textContent = 'Invitation reçue. Choisis ton nom, puis appuie sur « Rejoindre une partie ».';
         $('home-note').hidden = false;
-        $('btn-join').onclick = () => playerName() && startJoin(hash);
+        pendingInvite = hash; // consommé au premier appui sur « Rejoindre » (#69)
         return show('home');
       }
       $('home-note').textContent =
