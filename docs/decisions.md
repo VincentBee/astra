@@ -2625,4 +2625,4 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
 - Qui : Vincent (demande) ; Claude (règle commune, suppression des variantes). Source : session
   `d9ace210`. Statut : en vigueur. Numéro D-302 et cache `astra-p2p-v99` : la PR #186 (jauges
   sur la carte, en cours) a déjà pris D-300, D-301 et v98 ; `main` est aussi en v98 depuis #188
-  (D-310), v99 reste au-dessus après le rebase.
+  (D-310), v99 reste au-dessus après la fusion de `main`.
