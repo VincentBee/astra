@@ -376,8 +376,9 @@ function closeInviteSheet() {
   $('sheet-invite').hidden = true;
 }
 
-// Fenêtre des joueurs : qui est en ligne, le classement, et inviter.
+// Fenêtre des joueurs : qui est en ligne, le classement, et inviter. Cachée en préparation (D-310).
 $('net').onclick = () => {
+  if (mapVeiled()) return; // en préparation, le lobby tient ce rôle (D-310)
   $('sheet-players').hidden = false;
   renderLive();
 };
@@ -2890,6 +2891,9 @@ function myColonizer(me) {
  */
 function renderLobby(me) {
   $('map-wrap').hidden = mapVeiled(); // avant le départ, pas de carte du tout (D-241)
+  // Joueurs : seulement une fois la partie partie ; avant, le lobby liste les joueurs et invite (D-310).
+  $('net').hidden = mapVeiled();
+  if (mapVeiled()) $('sheet-players').hidden = true;
   const show = !!me?.race && !me.home && !me.out;
   // Lobby (D-242) : sans carte, le bandeau prend toute la hauteur, boutons en bas.
   $('screen-game').classList.toggle('lobby', show && mapVeiled());
