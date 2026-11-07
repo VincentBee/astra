@@ -2514,7 +2514,8 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
 - Alternative écartée : `min-height` au lieu de `height` (avec beaucoup de joueurs, les boutons
   sortiraient de l'écran).
 - Qui : Vincent (demande), Claude (en-tête en haut, liste qui défile). Source : session
-  `96b96929`. Statut : en vigueur. Cache : voir D-246.
+  `96b96929`. Statut : en vigueur, modifiée par D-310 (le bouton joueurs `#net` n'est plus dans
+  l'en-tête avant le départ). Cache : voir D-246.
 
 **D-243 — Les fenêtres (`.sheet`) font la hauteur de l'écran visible ; la page derrière ne défile plus**
 - 2026-11-07 07:36. Demande de Vincent (via le router), avec une capture du Journal coupé en bas :
@@ -2587,6 +2588,22 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
   au-dessus de v96 de `main`. Numéros : D-201 à D-207 puis D-221 à D-227 sur la branche,
   renumérotés D-240 à D-246 au rebase sur `main` (qui avait pris D-201 puis D-221).
 
+**D-310 — La fenêtre Joueurs n'est accessible qu'une fois la partie commencée**
+- 2026-11-07 08:03. Demande de Vincent (via le router), avec une capture de la préparation et de
+  la fenêtre Joueurs ouverte : « la liste des joueurs ne doit apparaitre que quand la partie est
+  commencé, elle fait doublon avec le lobby ».
+- Choix : tant que la partie n'est pas partie (`mapVeiled()`, c'est-à-dire
+  `session.startedAt == null`), `renderLobby` cache le bouton joueurs `#net` (icône + nombre) de
+  l'en-tête et ferme `#sheet-players` si elle était ouverte ; le clic sur `#net` ne fait rien en
+  préparation. Au départ (`startedAt` posé, bandeau « Envoie ton colonisateur »), le bouton
+  réapparaît au rendu suivant, chez chaque joueur, et après un rechargement. Le lobby garde son
+  bouton **Inviter** et sa liste prêt / pas prêt (D-241). Contenu de la fenêtre Joueurs après le
+  départ inchangé.
+- Alternatives écartées : garder le bouton mais ouvrir le lobby (le lobby est déjà à l'écran,
+  bouton inutile) ; cacher seulement le classement dans la fenêtre (doublon « Inviter » gardé).
+- Qui : Vincent (demande), router (cacher le bouton), Claude (fermer la fenêtre et couper le
+  clic en préparation). Source : session `a10e3777`. Statut : en vigueur. Modifie D-242. Cache
+  `astra-p2p-v98`.
 **D-302 — Toutes les fenêtres ont le style du Journal** (modifie D-246, D-243)
 - 2026-11-07 08:05. Demande de Vincent (via le router), avec une capture de la fenêtre Réglages
   en petit panneau collé en bas : « cette modal doit avoir le meme style que le journal, toutes
@@ -2607,4 +2624,5 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
   n'est plus le même style que le Journal, ce que la demande exclut.
 - Qui : Vincent (demande) ; Claude (règle commune, suppression des variantes). Source : session
   `d9ace210`. Statut : en vigueur. Numéro D-302 et cache `astra-p2p-v99` : la PR #186 (jauges
-  sur la carte, en cours) a déjà pris D-300, D-301 et v98.
+  sur la carte, en cours) a déjà pris D-300, D-301 et v98 ; `main` est aussi en v98 depuis #188
+  (D-310), v99 reste au-dessus après le rebase.
