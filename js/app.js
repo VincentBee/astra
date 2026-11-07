@@ -523,7 +523,7 @@ function buildStatic() {
   builtFor = race;
   const tiles = R.resources.map(
     (r) => `<div class="tile ${r}" title="${RES_INFO[r].name}">${spark(r)}
-      <span class="label">${resIcon(r)}</span>
+      <span class="label">${resIcon(r)}<span class="clim mono" data-clim="${r}" hidden></span></span>
       <span class="amount mono" data-res="${r}">0</span>
       <span class="rate mono" data-rate="${r}"></span>
       <div class="gauge"><div class="gauge-fill" data-gauge="${r}"></div></div>
@@ -784,15 +784,18 @@ function costText(cost) {
     .join(' · ');
 }
 
-/** « Chaud · ×1,2 ⚡ · ×1,1 ◆ · ×0,9 🍃 » : le climat et son effet sur la production, en HTML. */
+/** « ×1,10 » : un coefficient de climat. */
+const climX = (v) => `×${v.toFixed(2).replace('.', ',')}`;
+
+/** « Chaud · production ×1,2 ⚡ · ×1,1 ◆ · ×0,9 🍃 » : le climat et son effet sur la production, en HTML. */
 function climateHtml(c, short = false) {
-  const x = (v) => `×${v.toFixed(2).replace('.', ',')}`;
   const cls = c.heat >= 0.6 ? 'hot' : c.heat < 0.4 ? 'cold' : 'mild';
-  const qty = ['energy', 'minerals', 'food'].map((r) => `<span class="qty">${x(c[r])}${resIcon(r)}</span>`);
-  // Version courte (à côté du nom de la planète) : sans mots ni séparateurs.
-  return short
-    ? `<span class="climate-name ${cls}">${climateName(c.heat)}</span> ${qty.join(' ')}`
-    : `<span class="climate-name ${cls}">${climateName(c.heat)}</span> · production ${qty.join(' · ')}`;
+  const name = `<span class="climate-name ${cls}">${climateName(c.heat)}</span>`;
+  // Version courte (à côté du nom de la planète) : le nom seul ; les coefficients sont dans les
+  // cartes de ressources (D-221).
+  if (short) return name;
+  const qty = ['energy', 'minerals', 'food'].map((r) => `<span class="qty">${climX(c[r])}${resIcon(r)}</span>`);
+  return `${name} · production ${qty.join(' · ')}`;
 }
 
 /** Ligne du climat dans `el` (cachée pour une planète d'avant le climat). */
@@ -1254,6 +1257,17 @@ function renderPlanet(me, now) {
 
   for (const r of R.resources) {
     const cap = f.caps[r];
+    // Coefficient du climat dans la carte (D-221) ; rien pour une planète d'avant le climat.
+    const clim = q(`[data-clim="${r}"]`);
+    const k = planet.climate?.[r];
+    clim.hidden = !Number.isFinite(k);
+    if (Number.isFinite(k)) {
+      clim.textContent = climX(k);
+      const kk = Math.round(k * 100);
+      clim.classList.toggle('up', kk > 100);
+      clim.classList.toggle('down', kk < 100);
+      clim.title = `Climat : production ${climX(k)}`;
+    }
     q(`[data-res="${r}"]`).innerHTML = withCap(s.stock[r], cap);
     q(`[data-res="${r}"]`).firstChild.textContent = compact(s.stock[r]); // tuile étroite : « 118 k »
     const short = r === 'energy' ? f.effE < 1 : r === 'food' ? f.effF < 1 : false;

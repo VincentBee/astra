@@ -2308,6 +2308,26 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
 - Source : capture et messages de Vincent, transmis par la session « Affichage aide ».
 - Statut : en vigueur (cette PR). Change le bandeau de course de la session `26f178b9` (`interface.md` §12) ; D-104 (lien vers la courbe) et D-143 (bouton Classement) restent vrais.
 
+**D-221 — Les coefficients du climat vont dans les cartes de ressources de la planète**
+- 2026-11-06. Contexte : Vincent envoie une capture de la ligne `#soil-climate` (« Chaud ×1,10⚡
+  ×1,05◆ ×0,96🍃 ») : « affiche les info dans les cards de ressource de la planette ».
+- Choix :
+  - **Vincent** : le coefficient de chaque ressource s'affiche dans sa carte (`#resources`).
+  - **Choix de Claude par défaut** (session router « Affichage aide ») : la ligne `#soil-climate`
+    ne garde que le nom du climat (« Brûlant », « Chaud »…, avec sa couleur), à côté du nom de la
+    planète, pour ne pas répéter les chiffres.
+  - **Choix de Claude** : le « ×1,10 » se place juste après l'icône de la ressource, en petit,
+    vert (`--ok`) au-dessus de 1, orange (`--warn`) en dessous, gris à 1 (arrondi au centième) ; un
+    fond de la couleur de la carte le garde lisible au-dessus de la petite courbe. Rien pour une
+    planète d'avant le climat. Une race sans une ressource (pas de nourriture pour les machines)
+    n'a pas sa carte, donc pas son coefficient.
+  - Ne change pas : la formule de production, la fiche d'une planète sur la carte (`#pi-climate`
+    garde « Brûlant · production ×… · ×… · ×… »).
+- Alternatives écartées : le coefficient sur la ligne du débit (« +12 / min ») ; garder aussi les
+  chiffres sur la ligne du climat.
+- Source : capture et message de Vincent, transmis par la session « Affichage aide ».
+- Statut : en vigueur (PR suivante, après #179).
+
 **D-210 — Le Journal ne trahit plus l'ordre d'une flotte que je ne vois pas (issue #37)**
 - 2026-11-06 22:18. Contexte : issue #37. `moveFleet` (attaque, conquête) et `chaseFleet`
   (poursuite) écrivaient au journal partagé « La flotte de A attaque Rigel (B) » ou « … prend en
