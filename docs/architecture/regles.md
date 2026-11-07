@@ -1267,7 +1267,10 @@ les mêmes ordres qu'un joueur, notés dans son journal (la partie se rejoue, §
   carburant, qui ne gèlent pas avant l'arrivée + 1 min ; combat calculé par `battle` contre les
   vaisseaux posés et `fortOf` ; gagné en gardant la moitié de la flotte → décollage (carburant
   aller-retour) et `conquer`. Les cibles qui tiendront le plus longtemps d'abord, puis les plus
-  proches. Après le combat, une flotte restée en orbite rentre se poser (`dockNearest`).
+  proches. Une planète déjà visée par une de mes flottes `conquer` n'est jamais visée une 2e
+  fois (D-280) : les vaisseaux posés la rejoignent (`joinFleet`) s'ils ont le carburant et
+  arrivent après elle (`canJoin`), sinon ils visent la cible suivante ou restent posés. Après le
+  combat, une flotte restée en orbite rentre se poser (`dockNearest`).
 - **Froid** (`evacuate`) : à 40 s du gel, les vaisseaux posés partent se poser sur la planète qui
   gèlera le plus tard.
 - **Aliens** (`usePowers`) : arrachement si le gain dépasse 40 minéraux, transe si le sol n'est
