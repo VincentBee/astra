@@ -2378,8 +2378,9 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
 - Hors de cette décision : `threats()` compare encore `order.key` pour mes planètes visées
   (affichage seulement) ; l'ordre « conquérir » d'une flotte en vol est déjà relu par sa case à
   l'arrivée depuis D-200.
-- Vérifié : `tests/rapport-case.test.mjs` (10 scénarios ; 9 échouent sur `main`, le 10e est un
-  témoin) ; 259/259.
+- Vérifié : `tests/rapport-case.test.mjs` (11 scénarios ; 9 échouent sur `main` ; un
+  témoin ; le dernier vérifie qu'une flotte « Conquérir » en vol vers une colonie devenue
+  planète mère la prend, comportement apporté par D-200) ; 260/260.
 - Qui : Claude (choix de méthode, demandé par la session de coordination). Source : session
   `worker-rapport-case`. Statut : en vigueur. Complète D-200 et D-110.
 

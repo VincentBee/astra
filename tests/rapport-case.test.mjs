@@ -328,3 +328,50 @@ scenario('échange depuis la planète mère qui gèle pendant l’attente, refus
   assert.equal(Math.round(after - before), 0, 'la nouvelle planète mère ne reçoit pas un séquestre qui n’était pas le sien');
   assert.match(logs(B).at(-1), new RegExp(`séquestre .*perdu avec ${name(B, home)}\\.`));
 });
+
+scenario('« Conquérir » en vol vers une colonie devenue planète mère pendant le trajet : la flotte la combat et la prend (jeu-solo-01)', (film) => {
+  const g = newGame(2, ['human', 'machine']);
+  const [B, A] = g.players;
+  const home = { ...me(B).home };
+  const w = warmest(B);
+  colony(B, w, g.clock.t, { fighter: 2 }, 1000);
+  me(B).planet.ships = { fighter: 2 };
+  B.touch();
+  g.sync(A, B);
+  // F2 part vers la colonie (un vrai trajet), F1 est déjà en orbite de la planète mère.
+  me(A).planet.ships = { fighter: 60 };
+  const f2 = A.takeOff('home', { fighter: 60 }, {}, 0);
+  A.myFleet(f2).fuel = 1e6;
+  A.moveFleet(f2, w, 'conquer');
+  const order = { ...A.myFleet(f2).order };
+  const f1 = inOrbit(A, home, { fighter: 60 });
+  g.clock.t += 1000;
+  A.moveFleet(f1, home, 'conquer');
+  A.tick();
+  // B lit la prise : sa colonie devient planète mère ; A reçoit la fiche de B à jour.
+  g.sync(B, A);
+  g.clock.t += 1000;
+  B.tick();
+  g.sync(A, B);
+  film.look(A, `F1 a pris ${name(A, home)} ; ${w.name} est devenue la planète mère de B ; F2 vole encore vers elle`, [
+    { show: 'ordre de F2', expected: `conquer, clé ${w.id}`, got: `${order.kind}, clé ${order.key}` },
+    { show: 'planète mère de B, vue par A', at: w, expected: w.name, got: name(A, A.state.players[B.me].home) },
+  ]);
+  assert.equal(order.key, w.id, 'l’ordre visait la colonie par sa clé');
+  assert.ok(game.sameCell(A.state.players[B.me].home, w));
+  g.clock.t = A.myFleet(f2).arrive + 10;
+  A.tick();
+  const cap = me(A).effects.filter((e) => e.to === B.me && e.capture && game.sameCell(e.cell, w));
+  film.look(A, `F2 arrive : elle combat ${w.name} et la prend`, [
+    { show: 'à qui', at: w, expected: 'A', got: A.ownerAt(w)?.id === A.me ? 'A' : A.ownerAt(w)?.id === B.me ? 'B' : 'personne' },
+    { show: 'rapport de prise', expected: 1, got: cap.length },
+  ]);
+  assert.equal(A.ownerAt(w)?.id, A.me, 'la colonie promue est prise');
+  assert.equal(cap.length, 1);
+  // B lit la prise : par la case, elle tombe sur sa planète mère (clé « home ») ; il n'a plus rien.
+  g.sync(B, A);
+  g.clock.t += 1000;
+  B.tick();
+  film.look(B, `B lit : ${w.name} (sa planète mère) est prise, il est éliminé`, [{ show: 'B éliminé', expected: true, got: Number.isFinite(me(B).out) }]);
+  assert.ok(Number.isFinite(me(B).out), 'B est éliminé');
+});
