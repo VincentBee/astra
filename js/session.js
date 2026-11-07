@@ -253,7 +253,15 @@ function cleanAmounts(o) {
       .map(([k, v]) => [k, Math.min(v, MAX_AMOUNT)]),
   );
 }
-const cleanEffect = (e) => ({ ...e, ships: cleanAmounts(e.ships), take: cleanAmounts(e.take), ack: Array.isArray(e.ack) ? e.ack.filter((x) => typeof x === 'string').slice(0, 20) : [], rep: cleanReport(e.rep) });
+// La case visée (D-360) : deux nombres, sinon le rapport retombe sur sa clé, comme un ancien rapport.
+const cleanCell = (c) => (isObj(c) && Number.isFinite(c.x) && Number.isFinite(c.y) ? { x: c.x, y: c.y } : undefined);
+const cleanEffect = (e) => {
+  const out = { ...e, ships: cleanAmounts(e.ships), take: cleanAmounts(e.take), ack: Array.isArray(e.ack) ? e.ack.filter((x) => typeof x === 'string').slice(0, 20) : [], rep: cleanReport(e.rep) };
+  const cell = cleanCell(e.cell);
+  if (cell) out.cell = cell;
+  else delete out.cell;
+  return out;
+};
 
 /** Identifiant de joueur acceptable (pas de clé spéciale comme __proto__). */
 export const pidOk = (pid) => typeof pid === 'string' && /^[A-Za-z0-9-]{1,24}$/.test(pid);
@@ -1468,6 +1476,13 @@ export class Session {
       this.note(p, { at, kind: 'planet', tone: 'bad', text: `Colonie ${pl.name} perdue (${why}).` });
       return;
     }
+    // Ce qui désignait ma planète mère par « home » (flottes posées, offres d'échange) visait cette
+    // planète-là, pas celle qui la remplace : on le réécrit avec son identifiant (D-360).
+    const wid = this.planets.find((x) => sameCell(x, pl.cell))?.id;
+    if (wid) {
+      if (Object.values(p.docked || {}).includes('home')) p.docked = Object.fromEntries(Object.entries(p.docked).map(([k, v]) => [k, v === 'home' ? wid : v]));
+      if ((p.offers || []).some((o) => o.from?.planet === 'home')) p.offers = p.offers.map((o) => (o.from?.planet === 'home' ? { ...o, from: { ...o.from, planet: wid } } : o));
+    }
     const next = this.livePlanets(p, at)
       .filter((x) => x.key !== 'home')
       .sort((a, b) => (a.planet.claimAt || 0) - (b.planet.claimAt || 0) || (a.key < b.key ? -1 : 1))[0];
@@ -1601,6 +1616,19 @@ export class Session {
 
   planetOf(p, key) {
     return this.planetsOf(p).find((x) => x.key === key) || null;
+  }
+
+  /**
+   * Ma planète désignée par sa clé (« home », id d'une colonie) ou par l'identifiant de sa
+   * planète de l'univers, retrouvée par sa case : une colonie devenue planète mère (clé « home »)
+   * reste trouvée par son identifiant (D-360).
+   */
+  planetRef(p, ref) {
+    if (!ref) return null;
+    const pl = this.planetOf(p, ref);
+    if (pl) return pl;
+    const w = this.planets.find((x) => x.id === ref);
+    return (w && this.planetsOf(p).find((x) => sameCell(x.cell, w))) || null;
   }
 
   /**
@@ -2424,7 +2452,7 @@ export class Session {
       if (!f || moving(f, now)) return null;
       return { side: { fleet: f }, cell: parkedCell(f), name: `une flotte ${de(p.name)}` };
     }
-    const pl = ref?.planet && this.planetOf(p, ref.planet);
+    const pl = ref?.planet && this.planetRef(p, ref.planet);
     if (!pl || this.ownerAt(pl.cell)?.id !== p.id) return null;
     return { side: { planet: pl.planet }, cell: pl.cell, name: `${pl.name} (${p.name})` };
   }
@@ -2564,7 +2592,14 @@ export class Session {
       }
       // Flotte détruite : le séquestre est perdu avec elle, mais ce que l'autre a payé arrive chez moi.
       if (!mine && end === 'accepted') mine = this.tradeSide(p, { planet: 'home' }, now);
-      if (!mine) continue;
+      if (!mine) {
+        // Planète (ou flotte) perdue pendant l'attente : rien ne peut revenir, on le dit (D-360).
+        const who = other?.name || 'l’autre joueur';
+        const gone = o.from.planet ? this.planets.find((x) => x.id === o.from.planet)?.name : null;
+        this.addLog(`Échange avec ${who} sans suite : séquestre ${de(p.name)} perdu avec ${gone || (o.from.fleet ? 'sa flotte' : 'sa planète')}.`);
+        this.ontoast?.(`Échange avec ${who} sans suite : ta part est perdue avec ${gone || (o.from.fleet ? 'ta flotte' : 'ta planète')}.`);
+        continue;
+      }
       put(mine.side, p.race, end === 'accepted' ? amounts(o.want) : amounts(o.give), now);
       // Rendu faute de nouvelles : sa réponse peut encore arriver, datée d'avant l'expiration.
       if (end === 'returned' && !answer) p.dropped = [...(p.dropped || []), { id: o.id, pid: o.to.pid, give: o.give, want: o.want, expires: o.expires, at: now }].slice(-20);
@@ -2895,7 +2930,8 @@ export class Session {
       for (const [r, v] of Object.entries(f.cargo || {})) pl.planet.stock[r] = (pl.planet.stock[r] || 0) + v;
       pl.planet.stock.energy = (pl.planet.stock.energy || 0) + Math.floor(fuelAt(f, p.race, now)); // le carburant restant retourne au stock
       const docked = { ...(p.docked || {}) };
-      for (const id of [f.id, ...(f.absorbed || [])]) docked[id] = pl.key;
+      const wid = this.planets.find((x) => sameCell(x, pl.cell))?.id || pl.key; // l'identifiant de la planète, pas « home » (D-360)
+      for (const id of [f.id, ...(f.absorbed || [])]) docked[id] = wid;
       p.docked = Object.fromEntries(Object.entries(docked).slice(-60));
       drop();
       const loot = lootText(f.cargo || {});
@@ -2981,7 +3017,7 @@ export class Session {
       if (!res.won) this.addLog(`La défense de ${pl.name} (${enemy.name}) repousse ${de(p.name)}.`);
       // Un pillage par planète toutes les 2 min au plus : sinon, des attaques à la chaîne depuis
       // l'orbite (trajet de 0 case) vidaient tout, malgré la règle « la moitié au plus ».
-      const spot = `${enemy.id}:${pl.key}`;
+      const spot = `${enemy.id}:${pl.cell.x}:${pl.cell.y}`; // par case : la clé change quand une colonie devient planète mère (D-360)
       const recent = (p.raided?.[spot] || 0) > f.arrive - RAID_COOLDOWN_MS;
       const take = res.won && !recent ? plunder(p.race, res.attLeft, def.stock, f.cargo) : {};
       if (res.won && !recent) p.raided = Object.fromEntries([...Object.entries(p.raided || {}).filter(([, t]) => t > f.arrive - RAID_COOLDOWN_MS), [spot, f.arrive]]);
@@ -2989,8 +3025,9 @@ export class Session {
       const w = this.planets.find((x) => sameCell(x, pl.cell));
       const capture = order.kind === 'conquer' && res.won && !!w && this.frostOf(w) > f.arrive;
       // Un identifiant par combat : une même flotte peut attaquer plusieurs fois.
-      const effect = { id: this.newId(8), to: enemy.id, key: pl.key, at: f.arrive, ships: res.defLost, lost: res.attLost, take, rep: res.report };
-      if (capture) Object.assign(effect, { capture: true, cell: { ...pl.cell } });
+      // Le rapport vise la case (D-360) : la clé « home » change de planète si l'autre perd sa planète mère avant de le lire.
+      const effect = { id: this.newId(8), to: enemy.id, key: pl.key, cell: { ...pl.cell }, at: f.arrive, ships: res.defLost, lost: res.attLost, take, rep: res.report };
+      if (capture) effect.capture = true;
       p.effects = [...(p.effects || []), effect].slice(-MAX_EFFECTS);
       if (capture) return this.capture(p, f, w, pl, enemy, res, take, now);
       const loot = lootText(take);
@@ -3046,7 +3083,7 @@ export class Session {
     p.since ??= f.arrive;
     p.planet = planet;
     const docked = { ...(p.docked || {}) };
-    for (const id of [f.id, ...(f.absorbed || [])]) docked[id] = 'home';
+    for (const id of [f.id, ...(f.absorbed || [])]) docked[id] = w.id; // l'identifiant de la planète, pas « home » (D-360)
     p.docked = Object.fromEntries(Object.entries(docked).slice(-60));
     p.fleets = p.fleets.filter((x) => x.id !== f.id);
     this.addLog(`${p.name} fonde sa planète mère sur ${w.name}.`);
@@ -3096,7 +3133,8 @@ export class Session {
     // Les combats des autres joueurs contre elle, que je vois et qu'elle n'a pas encore lus, aussi.
     const reports = Object.values(this.state.players).flatMap((o) => (o.id === enemy.id ? [] : o.effects || []));
     for (const e of reports) {
-      if (e.to !== enemy.id || e.key !== pl.key || enemy.applied?.includes(e.id)) continue;
+      if (e.to !== enemy.id || enemy.applied?.includes(e.id)) continue;
+      if (e.cell ? !sameCell(e.cell, pl.cell) : e.key !== pl.key) continue; // par case (D-360), par clé pour un ancien rapport
       for (const [k, n] of Object.entries(e.ships || {})) ships[k] = Math.max(0, (ships[k] || 0) - n);
       for (const [r, v] of Object.entries(e.take || {})) stock[r] = Math.max(0, (stock[r] || 0) - v);
     }
@@ -3117,44 +3155,55 @@ export class Session {
       any = true;
     }
     const live = new Set();
+    // Tous les rapports qui me visent, dans l'ordre de leur heure (D-360) : pas dans l'ordre des
+    // joueurs de ma copie, qui changerait d'un téléphone à l'autre (une prise plus tardive lue
+    // avant un pillage plus ancien). À égalité : par joueur, puis dans l'ordre de sa fiche.
+    const todo = [];
     for (const other of Object.values(this.state.players)) {
       if (other.id === this.me) continue;
-      for (const e of other.effects || []) {
-        if (e.to !== this.me) continue;
+      (other.effects || []).forEach((e, i) => {
+        if (e.to !== this.me) return;
         live.add(e.id);
-        if (p.applied.includes(e.id)) continue;
-        p.applied = [...p.applied, e.id];
-        any = true;
-        if (this.goneBy(other, e.at)) continue; // livré après sa mort : ses flottes n'existaient plus (D-180)
-        if (e.fleet && this.fleetHit(p, other, e, now)) continue;
-        // Une prise vise une case : ma planète mère a pu changer depuis (la clé « home » ne suffit pas).
-        const pl = e.capture
-          ? this.planetsOf(p).find((x) => sameCell(x.cell, e.cell))
-          : this.planetOf(p, e.fleet ? p.docked?.[e.fleet] : e.key); // flotte posée entre-temps : sa planète encaisse
-        if (!pl) continue;
-        if (e.capture) {
-          this.note(p, {
-            at: e.at, kind: 'combat', who: other.name, planet: pl.name, capture: true, mine: countShips(e.ships), theirs: e.lost ? countShips(e.lost) : null,
-            pillaged: lootText(e.take || {}), rep: e.rep, side: 'd', tone: 'bad', text: `${other.name} prend ${pl.name}.`,
-          });
-          this.losePlanet(p, pl.key, e.at, `prise par ${other.name}`);
-          continue;
-        }
-        settle(pl.planet, now);
-        pl.planet.ships ||= {};
-        for (const [k, n] of Object.entries(e.ships || {})) pl.planet.ships[k] = Math.max(0, (pl.planet.ships[k] || 0) - n);
-        for (const [r, v] of Object.entries(e.take || {})) pl.planet.stock[r] = Math.max(0, (pl.planet.stock[r] || 0) - v);
-        const lost = countShips(e.ships);
-        const loot = lootText(e.take || {});
-        const ships = lost ? `${lost} vaisseau${lost > 1 ? 'x' : ''} perdu${lost > 1 ? 's' : ''}` : 'aucun vaisseau perdu';
-        this.addLog(`${pl.name} (${p.name}) est attaquée par ${other.name} : ${ships}${loot ? `, ${loot} pillés` : ''}.`);
-        this.ontoast?.(`${other.name} attaque ${pl.name} !`);
-        const harm = lost > 0 || !!loot;
-        this.note(p, {
-          at: e.at, kind: 'combat', who: other.name, planet: pl.name, mine: lost, theirs: e.lost ? countShips(e.lost) : null, pillaged: loot,
-          rep: e.rep, side: 'd', tone: harm ? 'bad' : 'good', text: harm ? `${other.name} attaque ${pl.name}.` : `${pl.name} repousse ${other.name}.`,
-        });
+        if (!p.applied.includes(e.id)) todo.push({ other, e, i });
+      });
+    }
+    todo.sort((a, b) => (a.e.at || 0) - (b.e.at || 0) || (a.other.id < b.other.id ? -1 : a.other.id > b.other.id ? 1 : 0) || a.i - b.i);
+    for (const { other, e } of todo) {
+      p.applied = [...p.applied, e.id];
+      any = true;
+      if (this.goneBy(other, e.at)) continue; // livré après sa mort : ses flottes n'existaient plus (D-180)
+      if (e.fleet && this.fleetHit(p, other, e, now)) continue;
+      // La planète visée, par sa case (D-360) : la clé « home » a pu changer de planète depuis
+      // (ma planète mère gelée ou prise, une colonie l'a remplacée). Un ancien rapport sans case : par sa clé.
+      const pl = e.fleet ? this.dockedPlanet(p, e.fleet) : e.cell ? this.planetsOf(p).find((x) => sameCell(x.cell, e.cell)) : this.planetOf(p, e.key);
+      // Planète perdue avant que je lise le rapport, ou reprise après le combat : il ne touche rien.
+      const since = pl && (pl.key === 'home' ? p.claimAt || p.rank || 0 : pl.planet.claimAt || 0);
+      if (!pl || since > e.at) {
+        this.missedEffect(p, other, e);
+        continue;
       }
+      if (e.capture) {
+        this.note(p, {
+          at: e.at, kind: 'combat', who: other.name, planet: pl.name, capture: true, mine: countShips(e.ships), theirs: e.lost ? countShips(e.lost) : null,
+          pillaged: lootText(e.take || {}), rep: e.rep, side: 'd', tone: 'bad', text: `${other.name} prend ${pl.name}.`,
+        });
+        this.losePlanet(p, pl.key, e.at, `prise par ${other.name}`);
+        continue;
+      }
+      settle(pl.planet, now);
+      pl.planet.ships ||= {};
+      for (const [k, n] of Object.entries(e.ships || {})) pl.planet.ships[k] = Math.max(0, (pl.planet.ships[k] || 0) - n);
+      for (const [r, v] of Object.entries(e.take || {})) pl.planet.stock[r] = Math.max(0, (pl.planet.stock[r] || 0) - v);
+      const lost = countShips(e.ships);
+      const loot = lootText(e.take || {});
+      const ships = lost ? `${lost} vaisseau${lost > 1 ? 'x' : ''} perdu${lost > 1 ? 's' : ''}` : 'aucun vaisseau perdu';
+      this.addLog(`${pl.name} (${p.name}) est attaquée par ${other.name} : ${ships}${loot ? `, ${loot} pillés` : ''}.`);
+      this.ontoast?.(`${other.name} attaque ${pl.name} !`);
+      const harm = lost > 0 || !!loot;
+      this.note(p, {
+        at: e.at, kind: 'combat', who: other.name, planet: pl.name, mine: lost, theirs: e.lost ? countShips(e.lost) : null, pillaged: loot,
+        rep: e.rep, side: 'd', tone: harm ? 'bad' : 'good', text: harm ? `${other.name} attaque ${pl.name}.` : `${pl.name} repousse ${other.name}.`,
+      });
     }
     // Un rapport que son auteur a effacé ne reviendra pas (sa fiche ne fait
     // qu'avancer) : je n'ai plus besoin de me souvenir que je l'ai appliqué.
@@ -3166,6 +3215,31 @@ export class Session {
       any = true;
     }
     return any;
+  }
+
+  /**
+   * Planète où s'est posée ma flotte `id` (D-360) : `p.docked` garde l'identifiant de la planète
+   * de l'univers, retrouvée par sa case (un ancien « home » est réécrit quand je perds ma planète mère).
+   */
+  dockedPlanet(p, id) {
+    return this.planetRef(p, p.docked?.[id]);
+  }
+
+  /**
+   * Un rapport de combat qui ne trouve plus sa planète (gelée ou prise avant que je le lise) :
+   * il ne touche rien, et mon carnet dit pourquoi, en nommant la planète vraiment attaquée (D-360).
+   */
+  missedEffect(p, other, e) {
+    if (e.fleet && !p.docked?.[e.fleet]) {
+      // Ni la flotte ni une planète où elle se serait posée : déjà détruite (froid, autre combat).
+      this.addLog(`Rapport de ${other.name} sans effet : la flotte ${de(p.name)} visée n’existe plus.`);
+      return;
+    }
+    const w = e.cell ? this.planets.find((x) => sameCell(x, e.cell)) : e.fleet && p.docked?.[e.fleet] && this.planets.find((x) => x.id === p.docked[e.fleet]);
+    const name = w?.name || 'une planète perdue';
+    const what = e.capture ? 'la prise' : 'l’attaque';
+    this.addLog(`Rapport de ${other.name} sans effet : ${name} n’est plus à ${p.name} (${what} ne touche rien).`);
+    this.note(p, { at: e.at, kind: 'planet', tone: 'even', text: `${other.name} attaque ${name}, déjà perdue : sans effet.` });
   }
 
   /**

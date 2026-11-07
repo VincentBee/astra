@@ -609,11 +609,16 @@ pas (`ORDERS[kind]?.name || 'Ordre'`) et n'exécute jamais les ordres des flotte
   `js/session.js:56`, `js/session.js:1650-1655`) : la mémoire `raided` est dans la fiche de
   l'attaquant, avec la clé `pid:planète`. Sans ça, des attaques en chaîne depuis l'orbite
   vidaient tout. Le combat a lieu quand même ; seul le butin est refusé.
-- J'écris un rapport `{ id, to, key, at, ships: pertes, lost: mes pertes, take: butin }` dans mes
+- J'écris un rapport `{ id, to, key, cell, at, ships: pertes, lost: mes pertes, take: butin }` dans mes
   `effects` (`lost` depuis D-110, pour le carnet du défenseur ; absent des anciens rapports ;
   `rep` depuis D-122 : le déroulé du combat, nettoyé à la réception par `cleanReport`).
+  `cell` (depuis D-360) : la case attaquée. C'est elle qui désigne la planète, pas `key`, car la
+  clé `'home'` change de planète quand le défenseur perd sa planète mère (une colonie la
+  remplace, section 19). `cleanEffect` ne garde `cell` que si ce sont deux nombres ; un ancien
+  rapport sans `cell` est lu par sa clé, comme avant. La mémoire `raided` est aussi rangée par
+  case (`pid:x:y`) depuis D-360.
 - **Conquête** (`conquer` gagné, sur une case que le froid n'a pas prise) : le rapport porte en
-  plus `capture: true` et `cell`. `Session.capture` crée tout de suite une colonie neuve de ma
+  plus `capture: true`. `Session.capture` crée tout de suite une colonie neuve de ma
   race sur la case (`newPlanet`, les bâtiments adverses sont perdus), avec les survivants, la
   cargaison, le butin et le carburant ; la flotte s'y pose. La colonie porte `captured: true` :
   elle n'a consommé aucun colonisateur (D-200). `ownerAt` ne compte plus l'ancien
@@ -672,11 +677,25 @@ pas (`ORDERS[kind]?.name || 'Ordre'`) et n'exécute jamais les ordres des flotte
 
 ### 9.4 Appliquer les dégâts reçus (`applyEffects`, `js/session.js:1697-1739`)
 
-- Pour chaque rapport d'un autre qui me vise et que je n'ai pas encore appliqué : je le note
-  dans `applied`, puis je retire vaisseaux et butin, de la flotte visée (`fleetHit`) ou de la
-  planète.
-- Une flotte posée entre-temps : sa planète encaisse (`docked`, `js/session.js:1716`). Une
-  flotte qui vient de fonder une colonie : la colonie encaisse (`js/session.js:1632-1635`).
+- Les rapports de **tous** les autres joueurs qui me visent sont lus **dans l'ordre de leur
+  heure** `at` (à égalité : par identifiant de joueur, puis dans l'ordre de sa fiche), pas dans
+  l'ordre des joueurs de ma copie (D-360). Un pillage à t+5 s est donc lu avant une prise à
+  t+10 s, sur tous les téléphones.
+- Pour chaque rapport que je n'ai pas encore appliqué : je le note dans `applied`, puis je
+  retire vaisseaux et butin, de la flotte visée (`fleetHit`) ou de la planète **sur la case du
+  rapport** (`cell`, D-360 ; par `key` pour un ancien rapport).
+- **Planète perdue avant la lecture** (gelée ou prise) : plus aucune de mes planètes sur cette
+  case, ou celle qui y est a été installée après le combat (`claimAt` plus tard que `at`). Le
+  rapport ne touche rien ; `missedEffect` écrit au journal « Rapport de X sans effet : Hadar
+  n'est plus à B » et au carnet « X attaque Hadar, déjà perdue : sans effet. » (D-360). Une
+  flotte visée qui n'existe plus (ni flotte, ni planète où elle s'est posée) : une ligne au
+  journal seulement.
+- Une flotte posée entre-temps : sa planète encaisse (`docked`, `dockedPlanet`). `docked` garde
+  l'**identifiant de la planète** de l'univers (plus `'home'`, D-360), retrouvé par sa case
+  (`planetRef`) : une colonie devenue planète mère reste trouvée. Une flotte qui vient de fonder
+  une colonie : la colonie encaisse.
+- Le gel passe **avant** la lecture des rapports dans `tick` (inchangé, D-360) : un rapport daté
+  d'avant le gel d'une planète, lu après, la trouve déjà perdue et ne touche rien.
 - Nettoyage : j'oublie mes rapports dès que leur cible les a appliqués ; j'oublie un
   identifiant appliqué quand son auteur a effacé le rapport (`js/session.js:1700-1705`,
   `js/session.js:1729-1737`).
@@ -1031,6 +1050,7 @@ Résultat : `tests 34, pass 34, fail 0`, environ 5,6 s (le rejeu d'une partie de
 | `tests/rules.test.mjs` | 11 | Déconstruire (moitié du prix rendue, place libérée à la fin) ; heure qui recule puis revient : pas de double production ; longue absence ≈ passages toutes les heures (population à moins de 2 %) ; arrachement refusé sans payer ; clés héritées (`constructor`, `__proto__`) refusées ; effectifs négatifs ou fractionnaires au combat ; soleil au centre et sans planète ; climat et production ; une place par niveau ; places lues sur la carte ; une colonie humaine sur le plus petit corps garde des places |
 | `tests/combat.test.mjs` | 4 | Attaques contre une planète : pas de butin créé avec un défenseur hors ligne ou plusieurs flottes arrivées ensemble ; 70 attaques avant le retour du défenseur ; les vaisseaux perdus emportent leur cargaison |
 | `tests/effects.test.mjs` | 1 | 5 joueurs, 4 attaquants × 70 combats : chaque perte subie une fois, puis rapports oubliés des deux côtés |
+| `tests/rapport-case.test.mjs` | 11 | Rapports visés par leur case (D-360) : attaque avant le gel lue après (et témoin), pillage puis prise à 3 joueurs, attaque de la colonie promue (dans les deux ordres), flotte posée, ancien `docked` « home », échanges refusé, accepté et séquestre perdu, « Conquérir » en vol vers une colonie promue (jeu-solo-01) |
 | `tests/fleet.test.mjs` | 25 | Deux flottes sur la même cible ; poursuite mutuelle ; colonie qui encaisse les pertes ; premier arrivé à la colonisation ; plein en panne tout près ; plusieurs attaquants ne pillent pas plus que le stock ; revanche ; raids sans armes et un pillage par 2 min ; flotte agressive qui combat puis reprend sa route ; flotte passive qui croise sans combattre ; agressive à l'arrêt qui garde sa case ; deux agressives : pertes comptées une fois ; agressive refusée sans armes, vue par les autres, gardée à la fusion (D-100) ; vitesse du vaisseau le plus lent ; rencontres que personne n'a regardées : `firstContact`, agressive et poursuite hors ligne, pas de combat rejoué, pertes comptées une fois (D-109) ; jonction : rejoindre puis fusionner, fusion immédiate, attente, flotte partie, refus (D-159) |
 | `tests/report.test.mjs` | 7 | Rapport de combat détaillé (D-122) : déroulé cohérent avec les pertes (défense comprise) ; explication du vainqueur et du vaincu avec les chiffres ; défense, technologies, cargos sans armes, combat indécis ; vaisseaux sans armes et victoire sans butin ; déroulé trafiqué borné ; même déroulé dans les deux carnets ; seconde attaque trop tôt expliquée |
 | `tests/colony.test.mjs` | 1 | Colonie perdue au recollage : vaisseaux et cargaison restent en orbite |
