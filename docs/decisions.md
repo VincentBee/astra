@@ -3027,3 +3027,48 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   (D-192). Si une autre PR prend v89 avant, monter au numéro suivant. À la fusion de `main`
   (2026-11-07, v108, D-411) : `astra-p2p-v109`.
 - Qui : Claude, par défaut. Source : session `a4571475`. Statut : en vigueur.
+**D-270 — Fil : un élément qu'on ne pourra pas payer ne bloque plus les autres (#46)**
+- 2026-11-06. Contexte : issue #46. Le premier élément prêt du fil a la priorité sur le stock
+  (D-158). En famine (nourriture à 0, tout ce qui rentre est mangé) ou en panne d'énergie, un
+  élément dont le prix demande cette ressource ne pouvait jamais partir, et il bloquait pour
+  toujours les éléments des autres chantiers (et ceux du sien), avec « plus de 6 h » et aucune
+  raison. Exemple : Agronomie (40 nourriture) au fil devant une ferme (75 minéraux) ; chez les
+  machines, un nexus (60 énergie) devant le réacteur qui réparerait la panne.
+- Choix : un élément prêt est « sans revenu » (`starved`, `js/game.js`) quand une ressource de
+  son prix manque au stock et ne peut pas monter avec la production actuelle : solde ≤ 0, ou
+  demande pas couverte (`effF < 1` pour la nourriture, `effE < 1` pour l'énergie). Un tel
+  élément ne bloque personne, **pas même son propre chantier**, mais reste candidat : `planNext`
+  rend la liste de ces éléments, suivie du premier élément prêt payable un jour ; `until` avance
+  pas à pas (mêmes pas, `MAX_STEPS` gardé) et lance le premier de la liste que le stock couvre.
+  Si la ressource se remet à rentrer, il repasse donc devant ceux qui le suivent. `planForecast`
+  donne sa raison (« Pas de nourriture qui rentre », « Pas d’énergie qui rentre », « Pas de
+  minéraux qui rentrent »), déjà affichée par `js/app.js`.
+- Sans famine ni panne, la liste n'a qu'un élément : le calcul est exactement celui d'avant.
+  Comparaison sur 3 000 planètes tirées au hasard (ancien et nouveau `game.js`) : 2 923
+  identiques ; les 77 autres ont toutes un élément sans revenu (stock à 0 ou qui baisse), qui
+  bloquait le fil pour toujours avant. Calcul déterministe (même état, mêmes pas) : identique
+  sur tous les téléphones et au rejeu.
+- Alternatives écartées : en faire un prérequis manquant (`why`) qui garde l'ordre de son
+  chantier (le réacteur resterait bloqué derrière le nexus, cas de l'issue) ; l'écarter tout à
+  fait jusqu'au prochain événement (il ne repartirait pas tout seul si la ressource revient
+  pendant une longue attente) ; dans `stateAt`, essayer l'élément suivant quand `until` échoue
+  à l'horizon (l'horizon n'est que le prochain événement : « pas encore » et « jamais » se
+  confondent, et il faudrait refaire avancer le temps deux fois).
+- Limite connue : « sans revenu » se juge sur la production à l'instant de chaque événement.
+  Un élément sans revenu pendant qu'un bâtiment qui la réparera est en chantier laisse passer
+  les suivants, qui peuvent prendre le stock avant lui. Ne règle pas #50 (« Entrepôt trop
+  petit » bloque toujours les suivants de son chantier, sans raison pour eux).
+- Qui : **choix de Claude** (le ticket laissait la méthode libre). Source : session `259a9124`,
+  issue #46. Statut : en vigueur.
+- Tests : `tests/plan.test.mjs` (famine : la ferme part, Agronomie reste au fil ; l'estimation
+  dit « Pas de nourriture qui rentre » ; panne machines : le réacteur part derrière un nexus ;
+  panne aliens : le prisme part derrière un amplificateur ; le nexus repasse devant dès que
+  l'énergie rentre).
+
+**D-271 — Cache `astra-p2p-v87`, puis `astra-p2p-v110`**
+- 2026-11-06. Contexte : v86 est pris (PR #160, dans `main`).
+- Choix : `VERSION` passe à `astra-p2p-v87` pour que les téléphones prennent le nouveau
+  `game.js`. D'autres PR ouvertes en même temps peuvent viser le même numéro (non confirmé) :
+  à la fusion, garder une version plus grande que celle de `main`. À la fusion de `main`
+  (2026-11-07, v109, D-411) : `astra-p2p-v110`.
+- Qui : Claude, par défaut. Source : session `259a9124`. Statut : en vigueur.
