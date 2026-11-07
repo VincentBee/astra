@@ -44,11 +44,38 @@ async function sha256(text) {
   return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** localStorage neuf le temps de `fn` (le banc d'essai en partage un seul). */
-async function withStore(fn) {
+/**
+ * localStorage neuf le temps de `fn` (le banc d'essai en partage un seul). `quota` : nombre de
+ * caractères (clés + valeurs) au-delà duquel `setItem` lève `QuotaExceededError` sans rien écrire,
+ * comme un navigateur. `fail` : `setItem` lève toujours (cette erreur-là). `refuse(k)` : la clé `k`
+ * est refusée (mémoire pleine).
+ */
+async function withStore(fn, { quota = Infinity, fail = null, refuse = () => false } = {}) {
   const old = globalThis.localStorage;
   const m = new Map();
-  globalThis.localStorage = { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) };
+  const size = (k, v) => (v == null ? 0 : k.length + v.length);
+  let used = 0;
+  globalThis.localStorage = {
+    getItem: (k) => m.get(k) ?? null,
+    setItem(k, v) {
+      if (fail) throw fail;
+      if (refuse(k)) throw new DOMException(`${k} refusé`, 'QuotaExceededError');
+      v = String(v);
+      const next = used - size(k, m.get(k)) + size(k, v);
+      if (next > quota) throw new DOMException(`${k} (${v.length} car.)`, 'QuotaExceededError');
+      m.set(k, v);
+      used = next;
+    },
+    removeItem(k) {
+      used -= size(k, m.get(k));
+      m.delete(k);
+    },
+    get length() {
+      return m.size;
+    },
+    key: (i) => [...m.keys()][i] ?? null,
+  };
+  m.used = () => used;
   try {
     return await fn(m);
   } finally {
@@ -340,35 +367,56 @@ const BROKEN_SAVES = {
 };
 
 scenario('D-170 : un historique abîmé n’empêche ni l’accueil, ni les ordres, ni la sauvegarde', async (film) => {
+  // Modifié par D-415 : l'historique n'est plus un seul bloc `astra.saves` (repris puis effacé au
+  // premier accès), mais un index `astra.games` et une clé `astra.save.<gid>` par partie. Chaque
+  // forme abîmée est essayée aux trois endroits : ancien bloc, index, clé d'une partie.
   const rows = [];
+  const places = {
+    'ancien astra.saves': (m, raw) => m.set('astra.saves', raw),
+    'index astra.games': (m, raw) => m.set('astra.games', raw),
+    'clé astra.save.zzz': (m, raw) => {
+      let idx = {};
+      try {
+        idx = JSON.parse(m.get('astra.games')) || {};
+      } catch {}
+      m.set('astra.games', JSON.stringify({ ...idx, zzz: 1 }));
+      m.set('astra.save.zzz', raw);
+    },
+  };
   for (const [name, raw] of Object.entries(BROKEN_SAVES)) {
-    await withStore(async (m) => {
-      const st = (gid) => ({ gid, players: { me: { id: 'me', name: 'Moi', rank: 0 } }, log: [] });
-      save.saveGame('me', st('old'));
-      m.set('astra.saves', raw);
-      // Accueil : la liste se lit sans planter (la partie en cours y figure toujours).
-      const listed = save.listGames().map((x) => x.state.gid);
-      assert.deepEqual(listed, ['old'], `${name} : accueil`);
-      assert.equal(save.selectGame('zzz'), null, `${name} : selectGame ignore l’entrée abîmée`);
-      assert.equal(save.selectGame('old').state.gid, 'old', `${name} : selectGame`);
-      // Un ordre, l'historique de nouveau abîmé juste avant : l'écran est prévenu et la sauvegarde suit.
-      const A = soloNow('gcorrupt');
-      m.set('astra.saves', raw);
-      let told = 0;
-      A.onchange = () => told++;
-      A.build(firstBuilding(A));
-      const saved = JSON.parse(m.get('astra.save'));
-      assert.equal(told, 1, `${name} : écran prévenu`);
-      assert.equal(saved.state.gid, 'gcorrupt', `${name} : ordre sauvé`);
-      assert.equal(saved.state.players.p0.actAt, P(A).actAt, `${name} : chantier sauvé`);
-      // L'historique est réécrit propre, sans l'entrée abîmée.
-      const after = JSON.parse(m.get('astra.saves'));
-      assert.deepEqual(Object.keys(after), ['gcorrupt'], `${name} : historique propre`);
-      m.set('astra.saves', raw);
-      save.forgetGame('gcorrupt');
-      assert.deepEqual(save.listGames(), [], `${name} : forgetGame`);
-      rows.push({ name, A, listed, told, kept: Object.keys(after).sort() });
-    });
+    for (const [where, spoil] of Object.entries(places)) {
+      const what = `${name} (${where})`;
+      await withStore(async (m) => {
+        const st = (gid) => ({ gid, players: { me: { id: 'me', name: 'Moi', rank: 0 } }, log: [] });
+        save.saveGame('me', st('old'));
+        spoil(m, raw);
+        // Accueil : la liste se lit sans planter (la partie en cours y figure toujours).
+        const listed = save.listGames().map((x) => x.state.gid);
+        assert.deepEqual(listed, ['old'], `${what} : accueil`);
+        assert.equal(save.selectGame('zzz'), null, `${what} : selectGame ignore l’entrée abîmée`);
+        assert.equal(save.selectGame('old').state.gid, 'old', `${what} : selectGame`);
+        // Un ordre dans une nouvelle partie, l'historique de nouveau abîmé juste avant : l'écran
+        // est prévenu, la sauvegarde suit, l'ancienne partie rejoint l'historique.
+        spoil(m, raw);
+        const A = soloNow('gcorrupt');
+        spoil(m, raw);
+        let told = 0;
+        A.onchange = () => told++;
+        A.build(firstBuilding(A));
+        const saved = JSON.parse(m.get('astra.save'));
+        assert.equal(told, 1, `${what} : écran prévenu`);
+        assert.equal(saved.state.gid, 'gcorrupt', `${what} : ordre sauvé`);
+        assert.equal(saved.state.players.p0.actAt, P(A).actAt, `${what} : chantier sauvé`);
+        assert.equal(m.has('astra.saves'), false, `${what} : ancien bloc effacé`);
+        const kept = save.listGames().map((x) => x.state.gid).sort(); // même milliseconde : l'ordre ne compte pas
+        assert.deepEqual(kept, ['gcorrupt', 'old'], `${what} : historique lisible`);
+        spoil(m, raw);
+        save.forgetGame('gcorrupt');
+        save.forgetGame('old');
+        assert.deepEqual(save.listGames(), [], `${what} : forgetGame`);
+        rows.push({ name: what, A, listed, told, kept });
+      });
+    }
   }
   // Historique d'identités abîmé (texte) : saveIdentity, selectGame et forgetGame tiennent aussi.
   await withStore((m) => {
@@ -379,8 +427,253 @@ scenario('D-170 : un historique abîmé n’empêche ni l’accueil, ni les ordr
   const last = rows.at(-1);
   film.look(last.A, 'un ordre donné avec un historique abîmé : l’écran suit, la partie est sauvée', rows.map((r) => ({
     show: r.name,
-    expected: 'accueil old · écran 1 · historique gcorrupt',
+    expected: 'accueil old · écran 1 · historique gcorrupt+old',
     got: `accueil ${r.listed.join('+')} · écran ${r.told} · historique ${r.kept.join('+')}`,
+  })));
+});
+
+// ----- D-415 : mémoire pleine (issue #41)
+
+const QUOTA = 5_242_880; // quota de localStorage mesuré dans Chromium (≈ 5 M caractères)
+/** Une partie minimale qui pèse ≈ `n` caractères (le bourrage tient lieu de journaux d'ordres). */
+const heavy = (gid, n, step = 0) => ({ gid, step, pad: 'o'.repeat(n), players: { me: { id: 'me', name: 'Moi', rank: 0 } }, log: [] });
+/** Les gid de chaque clé de partie (la partie en cours et l'historique), pour compter les copies. */
+function copies(m) {
+  const out = [];
+  for (const [k, v] of m) {
+    if (k !== 'astra.save' && !k.startsWith('astra.save.')) continue;
+    try {
+      out.push(JSON.parse(v).state.gid);
+    } catch {}
+  }
+  if (m.has('astra.saves')) for (const s of Object.values(JSON.parse(m.get('astra.saves')))) out.push(s.state.gid);
+  return out.sort();
+}
+
+scenario('D-415 : 6 parties de 1 M jouées l’une après l’autre : la partie en cours est toujours sauvée, une seule fois', async (film) => {
+  const rows = [];
+  let A = null;
+  await withStore(async (m) => {
+    const now = Date.now;
+    let t = 1_000;
+    Date.now = () => (t += 1_000);
+    const fails = [];
+    save.onSaveFailed(() => fails.push(t));
+    try {
+      for (let g = 0; g < 6; g++) {
+        const gid = `g${g}`;
+        // La partie grossit au fil des actions, jusqu'à ≈ 1 M caractères.
+        for (let step = 1; step <= 10; step++) {
+          assert.equal(save.saveGame('me', heavy(gid, step * 100_000, step)), true, `${gid} action ${step} : sauvée`);
+          const cur = JSON.parse(m.get('astra.save'));
+          assert.equal(cur.state.gid, gid, `${gid} : c’est elle, la partie en cours`);
+          assert.equal(cur.state.step, step, `${gid} action ${step} : dernier état sauvé`);
+          const c = copies(m);
+          assert.equal(c.length, new Set(c).size, `${gid} action ${step} : chaque partie stockée une seule fois (${c})`);
+          assert.ok(m.used() <= QUOTA);
+        }
+        const listed = save.listGames().map((x) => x.state.gid);
+        rows.push({ gid, listed, used: m.used(), expected: Array.from({ length: Math.min(g + 1, 5) }, (_, i) => `g${g - i}`).join(' · ') });
+        // Les plus récentes d'abord, sans trou : la plus vieille sort la première.
+        assert.deepEqual(listed, Array.from({ length: listed.length }, (_, i) => `g${g - i}`), `après ${gid} : ${listed}`);
+      }
+      assert.deepEqual(fails, [], 'aucun échec : il y a toujours eu de la place, en retirant les plus vieilles');
+      // Chaque partie listée se reprend, avec son dernier état (10e action, ≈ 1 M).
+      const last = rows.at(-1).listed;
+      assert.deepEqual(last, ['g5', 'g4', 'g3', 'g2', 'g1'], 'cinq parties de 1 M tiennent dans 5 M');
+      for (const gid of last) {
+        const back = save.selectGame(gid);
+        assert.equal(back?.state.gid, gid, `${gid} : reprenable`);
+        assert.equal(back.state.step, 10, `${gid} : dernier état`);
+        assert.equal(save.loadGame().state.gid, gid);
+        const c = copies(m);
+        assert.equal(c.length, new Set(c).size, `${gid} reprise : une seule copie`);
+      }
+      // Une vraie partie lancée par-dessus un historique plein : chaque ordre est sauvé.
+      Date.now = now;
+      A = soloNow('gvraie');
+      A.build(firstBuilding(A));
+      assert.equal(JSON.parse(m.get('astra.save')).state.players.p0.actAt, P(A).actAt, 'vraie partie : ordre sauvé');
+      rows.push({ gid: 'gvraie', listed: save.listGames().map((x) => x.state.gid), used: m.used(), expected: 'gvraie · g5 · g4 · g3 · g2 · g1' });
+    } finally {
+      Date.now = now;
+      save.onSaveFailed(null);
+    }
+  }, { quota: QUOTA });
+  film.look(A, 'une vraie partie lancée après 6 parties de 1 M : l’ordre est sauvé, les plus vieilles parties ont laissé la place', rows.map((r) => ({
+    show: `historique après ${r.gid} (${(r.used / 1e6).toFixed(2)} M car.)`,
+    expected: r.expected,
+    got: r.listed.join(' · '),
+  })));
+});
+
+scenario('D-415 : reprendre une grosse partie à mémoire presque pleine ne fait perdre aucune autre partie', async (film) => {
+  let A = null;
+  let rows = [];
+  await withStore(async (m) => {
+    const now = Date.now;
+    let t = 1_000;
+    Date.now = () => (t += 1_000);
+    try {
+      // 4 parties de 1,2 M, puis une petite partie en cours : ≈ 4,8 M sur 5,24 M.
+      for (let g = 1; g <= 4; g++) save.saveGame('me', heavy(`big${g}`, 1_200_000));
+      save.saveGame('me', heavy('petite', 10_000));
+      // Reprendre la plus vieille : pendant un instant, elle serait là deux fois (6 M).
+      const back = save.selectGame('big1');
+      assert.equal(back?.state.gid, 'big1', 'reprise');
+      assert.equal(save.loadGame().state.gid, 'big1');
+      const listed = save.listGames().map((x) => x.state.gid).sort();
+      assert.deepEqual(listed, ['big1', 'big2', 'big3', 'big4', 'petite'], 'aucune partie perdue');
+      const c = copies(m);
+      assert.equal(c.length, new Set(c).size, `une seule copie de chaque (${c})`);
+      // La partie reprise grossit encore : les plus vieilles laissent la place, jamais elle.
+      assert.equal(save.saveGame('me', heavy('big1', 1_700_000)), true, 'big1 grossit : sauvée');
+      assert.deepEqual(save.listGames().map((x) => x.state.gid), ['big1', 'petite', 'big4', 'big3'], 'big2, la plus vieille, est sortie');
+      Date.now = now;
+      rows = [{ show: 'parties après la reprise de big1', expected: 'big1 · big2 · big3 · big4 · petite', got: listed.join(' · ') }];
+      A = soloNow('gvraie');
+    } finally {
+      Date.now = now;
+    }
+  }, { quota: QUOTA });
+  film.look(A, 'une partie lancée après avoir repris une grosse partie : rien n’a été retiré', rows);
+});
+
+scenario('D-415 (#91) : un ordre n’écrit que la partie en cours, pas tout l’historique', async (film) => {
+  let A = null;
+  let row = null;
+  await withStore(async (m) => {
+    // 9 parties de 450 K (une partie à 8 joueurs de 40 min) en historique, puis une vraie partie.
+    for (let g = 0; g < 9; g++) save.saveGame('me', heavy(`h${g}`, 450_000));
+    A = soloNow('gvraie');
+    assert.equal(save.listGames().length, 10, '10 parties, partie en cours comprise');
+    const set = globalThis.localStorage.setItem;
+    let written = 0;
+    globalThis.localStorage.setItem = (k, v) => {
+      written += k.length + String(v).length;
+      return set(k, v);
+    };
+    try {
+      A.build(firstBuilding(A));
+    } finally {
+      globalThis.localStorage.setItem = set;
+    }
+    const cur = 'astra.save'.length + m.get('astra.save').length;
+    assert.ok(written > 0, 'l’ordre est sauvé');
+    assert.ok(written < 1.2 * cur, `écrit ${written} car. pour une partie de ${cur}`);
+    row = { written, cur, used: m.used() };
+  });
+  film.look(A, 'un ordre avec 10 parties en historique : seule la partie en cours est écrite', [
+    { show: `caractères écrits (partie : ${row.cur}, stockage : ${(row.used / 1e6).toFixed(2)} M)`, expected: `< ${Math.ceil(1.2 * row.cur)}`, got: row.written < 1.2 * row.cur ? `< ${Math.ceil(1.2 * row.cur)}` : row.written },
+  ]);
+});
+
+scenario('D-415 : une sauvegarde impossible prévient le joueur, sans planter ni rien perdre', async (film) => {
+  let A = null;
+  const rows = [];
+  for (const [why, opts] of [
+    ['mémoire pleine même sans historique', { quota: 300_000 }],
+    ['stockage bloqué (autre erreur)', {}],
+  ]) {
+    await withStore(async (m) => {
+      const told = [];
+      save.onSaveFailed(() => told.push(why));
+      try {
+        // Un historique de deux parties, et la partie en cours.
+        save.saveGame('me', heavy('h1', 50_000));
+        save.saveGame('me', heavy('h2', 50_000));
+        save.saveGame('me', heavy('cur', 50_000, 1));
+        const before = new Map(m);
+        if (!opts.quota) globalThis.localStorage.setItem = () => {
+          throw new DOMException('refusé', 'SecurityError');
+        };
+        // La partie en cours devient trop grosse pour la mémoire : l'écriture échoue.
+        let ok;
+        assert.doesNotThrow(() => (ok = save.saveGame('me', heavy('cur', 400_000, 2))));
+        assert.equal(ok, false);
+        assert.deepEqual(told, [why], `${why} : le joueur est prévenu`);
+        assert.equal(save.saveGame('me', heavy('cur', 400_000, 3)), false);
+        assert.deepEqual(told, [why], `${why} : pas un message à chaque action (une fois par minute)`);
+        assert.deepEqual(new Map(m), before, `${why} : rien n'a été retiré pour rien`);
+        assert.equal(save.loadGame().state.step, 1, `${why} : la dernière sauvegarde réussie reste`);
+        // Une vraie partie : l'ordre passe, l'écran suit, rien ne lève.
+        A = soloNow('gpleine');
+        let screen = 0;
+        A.onchange = () => screen++;
+        assert.doesNotThrow(() => A.build(firstBuilding(A)));
+        assert.equal(screen, 1, `${why} : l’écran est prévenu de l’ordre`);
+        rows.push({ why, told: told.length, kept: save.listGames().map((x) => x.state.gid).join('+') });
+      } finally {
+        save.onSaveFailed(null);
+      }
+    }, opts);
+  }
+  film.look(A, 'la sauvegarde échoue : un message, l’ordre est quand même joué', rows.map((r) => ({
+    show: r.why,
+    expected: 'prévenu',
+    got: r.told ? 'prévenu' : 'muet',
+  })));
+});
+
+scenario('D-415 : les sauvegardes de l’ancien format sont reprises sans perte', async (film) => {
+  let A = null;
+  const rows = [];
+  // Taille des parties : petites, puis assez grosses pour que l'ancien format remplisse la mémoire.
+  for (const n of [100, 1_250_000]) { // 1,25 M : 5 M avec la double copie de l’ancien format
+    await withStore(async (m) => {
+      const one = (gid, at) => ({ v: 1, me: 'me', savedAt: at, state: heavy(gid, n, at) });
+      const [a, b, c] = [one('A', 1), one('B', 2), one('C', 3)];
+      // Ce que `main` écrivait : la partie en cours dans astra.save ET dans astra.saves.
+      m.set('astra.save', JSON.stringify(c));
+      m.set('astra.saves', JSON.stringify({ A: a, B: b, C: c }));
+      m.set('astra.identity', JSON.stringify({ gid: 'C', pid: 'pc', secret: 'sc' }));
+      m.set('astra.identities', JSON.stringify({ A: { gid: 'A', pid: 'pa', secret: 'sa' }, B: { gid: 'B', pid: 'pb', secret: 'sb' } }));
+      const listed = save.listGames();
+      assert.deepEqual(listed.map((x) => x.state.gid), ['C', 'B', 'A'], `${n} : toutes listées`);
+      assert.deepEqual(listed, [c, b, a], `${n} : sans perte (contenu identique)`);
+      assert.equal(m.has('astra.saves'), false, `${n} : ancien bloc effacé`);
+      assert.deepEqual(copies(m), ['A', 'B', 'C'], `${n} : une seule copie de chaque`);
+      assert.deepEqual(save.loadGame(), c, `${n} : la partie en cours reste en cours`);
+      assert.deepEqual(save.selectGame('A'), a, `${n} : une ancienne partie se reprend`);
+      assert.deepEqual(save.loadIdentity(), { gid: 'A', pid: 'pa', secret: 'sa' }, `${n} : avec son identité`);
+      assert.deepEqual(save.listGames().map((x) => x.state.gid).sort(), ['A', 'B', 'C'], `${n} : rien perdu en reprenant`);
+      assert.deepEqual(copies(m), ['A', 'B', 'C']);
+      // Une vraie partie reprend dessus : l'ancienne partie en cours rejoint l'historique.
+      A = soloNow('gneuve');
+      A.build(firstBuilding(A));
+      const after = save.listGames().map((x) => x.state.gid);
+      assert.deepEqual(after.slice(1).sort(), ['A', 'B', 'C'], `${n} : historique intact`);
+      assert.equal(after[0], 'gneuve');
+      rows.push({ n, after, used: m.used() });
+    }, { quota: QUOTA });
+  }
+  // L'ancien format avec une copie plus récente dans astra.saves (astra.save avait échoué) : on garde la plus récente.
+  await withStore((m) => {
+    const st = (at) => ({ v: 1, me: 'me', savedAt: at, state: heavy('C', 10, at) });
+    m.set('astra.save', JSON.stringify(st(1)));
+    m.set('astra.saves', JSON.stringify({ C: st(5) }));
+    assert.equal(save.loadGame().savedAt, 5, 'la copie la plus récente gagne');
+    assert.deepEqual(copies(m), ['C']);
+  });
+  // Une partie de l'ancien format ne peut pas être recopiée : le joueur est prévenu, les autres passent.
+  await withStore((m) => {
+    const st = (gid, at) => ({ v: 1, me: 'me', savedAt: at, state: heavy(gid, 10, at) });
+    m.set('astra.save', JSON.stringify(st('C', 3)));
+    m.set('astra.saves', JSON.stringify({ A: st('A', 1), B: st('B', 2), C: st('C', 3) }));
+    const told = [];
+    save.onSaveFailed((kind, n) => told.push(`${kind} ${n}`));
+    try {
+      assert.deepEqual(save.listGames().map((x) => x.state.gid), ['C', 'A'], 'B refusée, A passe quand même');
+      assert.deepEqual(told, ['history 1'], 'le joueur est prévenu de la partie perdue');
+    } finally {
+      save.onSaveFailed(null);
+    }
+    rows.push({ n: 'B refusée', after: ['C', 'A'], used: 0, expected: 'C · A (prévenu)' , got: `C · A (${told.length ? 'prévenu' : 'muet'})` });
+  }, { refuse: (k) => k === 'astra.save.B' });
+  film.look(A, 'une partie lancée après la reprise de l’ancien format : l’historique est intact', rows.map((r) => ({
+    show: r.expected ? r.n : `parties de ${r.n} car. (${(r.used / 1e6).toFixed(2)} M)`,
+    expected: r.expected ?? 'gneuve · C · B · A',
+    got: r.got ?? r.after.join(' · '),
   })));
 });
 
