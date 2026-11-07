@@ -368,7 +368,7 @@ chantier)` d'énergie pour toutes les races (`space`, `js/game.js:92`).
   - `trance` (transe) : recharge `360 000 / TEMPO` ms (144 s), dure `120 000 / TEMPO` ms
     (2 min au tempo d'origine, **48 s** à TEMPO 2,5), coûte `25 × ceil(pop)` énergie ; double
     l'extraction télékinésique jusqu'à `planet.trance` (`js/game.js:1067`).
-  - **Textes de durée** (D-360, #75) : aucune durée écrite en dur. `secs(ms)`
+  - **Textes de durée** (D-390, #75) : aucune durée écrite en dur. `secs(ms)`
     (`js/game.js:437`) donne « 48 s » ; la description de la transe (getter `desc`), la ligne
     du journal (`usePower` → `text`), le toast (`usePower` → `toast`, affiché par `power()`,
     `js/session.js:2677`) et la carte (recharge `↻ 72 s`, `js/app.js:1344-1348`) se calculent

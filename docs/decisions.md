@@ -2421,7 +2421,7 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
   prennent le nouveau `sw.js`.
 - Qui : Claude, par défaut. Source : session `7bec2792`. Statut : en vigueur.
 
-**D-360 — Textes des pouvoirs aliens calculés depuis `POWERS` (issue #75)**
+**D-390 — Textes des pouvoirs aliens calculés depuis `POWERS` (issue #75)**
 - 2026-11-07. Contexte : depuis TEMPO = 2,5 (D-083), la transe dure `120 000 / TEMPO` = 48 s,
   mais `usePower` écrivait au journal partagé « extraction doublée 2 min » ; le toast ne disait
   que « Transe collective ! » ou « Arrachement télékinésique ! », sans durée ni gain.
@@ -2442,7 +2442,7 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
 - Test : `tests/rules.test.mjs`, scénario « #75 : le journal et le toast des pouvoirs… »
   (échoue sur `main`).
 
-**D-361 — Cache `astra-p2p-v95`**
+**D-391 — Cache `astra-p2p-v95`**
 - 2026-11-07. Contexte : `main` est à v94 (D-231) ; la PR de #75 change `js/game.js`,
   `js/session.js` et `js/app.js`.
 - Choix : `VERSION` passe à `astra-p2p-v95`, pour que les téléphones prennent les nouveaux

@@ -450,7 +450,8 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 
 | Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
 |---|---|---|---|---|---|
-| 06:00 | `8d3ef9fb` (worker-transe) | Worker du router (bugs ouverts) : corriger l'issue #75, « la transe alien "doublée 2 min" ne dure que 48 s » | `secs(ms)` et `usePower` → `{ text, toast }` (`js/game.js`) : journal et toast de la transe depuis `POWERS.trance.duration` (48 s), toast de l'arrachement avec son gain ; carte : recharge par `secs`, gain attendu de l'arrachement (`js/app.js`) ; `power()` affiche `res.toast` (`js/session.js`). Scénario dans `tests/rules.test.mjs` (échoue sur `main`) ; vu dans le vrai jeu contre l'IA (aliens) ; cache v95 | (PR fermant #75) | D-360, D-361 |
+| 06:00 | `8d3ef9fb` (worker-transe) | Worker du router (bugs ouverts) : corriger l'issue #75, « la transe alien "doublée 2 min" ne dure que 48 s » | `secs(ms)` et `usePower` → `{ text, toast }` (`js/game.js`) : journal et toast de la transe depuis `POWERS.trance.duration` (48 s), toast de l'arrachement avec son gain ; carte : recharge par `secs`, gain attendu de l'arrachement (`js/app.js`) ; `power()` affiche `res.toast` (`js/session.js`). Scénario dans `tests/rules.test.mjs` (échoue sur `main`) ; vu dans le vrai jeu contre l'IA (aliens) ; cache v95 | (PR fermant #75) | D-390, D-391 |
+| 06:30 | `8d3ef9fb` (worker-transe) | Router : « VÉRIFIÉ, avec 1 correction — … D-360 et D-361 sont déjà pris par la PR #183 (#44). Renumérote les tiennes en D-390 et D-391 » | Décisions renumérotées D-390, D-391 dans `decisions.md`, `tests-decisions.md`, `regles.md`, `interface.md`, le journal et la PR | (PR #184) | D-390, D-391 |
 
 ### Travaux en cours au 2026-10-29
 
