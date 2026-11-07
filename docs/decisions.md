@@ -499,7 +499,7 @@ Aucune conversation ne les prouve.
 - 2026-10-28 21:47. Choix : plus de « appuie encore une fois » ; l'ancienne partie va dans
   l'historique (reprendre, revoir, oublier) ; l'identité du joueur est gardée par partie.
 - Qui : Vincent (demande) ; le nombre 10 et les boutons par Claude.
-- Source : `f4afbcd0` 21:47:41, 21:50:00 ; `1eeb2c1`. Statut : en vigueur (`KEEP = 10`).
+- Source : `f4afbcd0` 21:47:41, 21:50:00 ; `1eeb2c1`. Statut : en vigueur (`KEEP = 10`) ; stockage modifié par D-415 (une clé par partie, les plus vieilles retirées si la mémoire est pleine).
 
 **D-067 — Parallaxe : pas au doigt, mais à l'accéléromètre**
 - 2026-10-28 22:15–22:16. Choix : le glissé du doigt ne bouge pas les étoiles (sinon elles
@@ -2090,7 +2090,9 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
 - Vérifié : scénario « D-170 : un historique abîmé… » (`tests/decisions-reseau.test.mjs`, les 5
   formes de l'issue), qui échoue sans la correction ; vrai jeu avec `{"zzz":null}` puis `"abc"`.
 - Qui : Vincent (demande : corriger #87), Claude (forme de la correction). Source : session
-  `9e675a52`. Statut : en vigueur. Complète D-066.
+  `9e675a52`. Statut : en vigueur, modifiée par D-415 (le bloc `astra.saves` n'existe plus : il est
+  repris puis effacé ; même règle pour l'index `astra.games` et les clés `astra.save.<gid>`, et
+  l'historique n'est plus réécrit à chaque ordre, seulement au changement de partie). Complète D-066.
 
 **D-175 — Le calcul de l'économie est borné à 2 000 pas ; l'heure d'une planète reçue a un plancher**
 - 2026-11-06. Contexte : issue #32. `steps` et `until` intégraient l'économie par pas de 48 s
@@ -2794,8 +2796,143 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
 - Qui : Vincent (demande), router (« un nom vide est refusé », style du lobby), Claude par défaut
   (règle par l'état, fenêtre, 16 caractères). Source : session `f074c23b`. Statut : en vigueur ;
   modifie la règle « race définitive » (regles.md §12). Cache `astra-p2p-v104`.
+## 6 novembre 2026 — Annuler le scanner à tout moment (#42)
 
-**D-401 — « Retour » pendant une partie en cours : une question avant de quitter**
+**D-250 — L'annulation du scan fait la course avec chaque attente**
+- 2026-11-06 22:27. Contexte : issue #42. `scanQr` ne posait son écouteur `abort` qu'après le
+  chargement de jsQR, `getUserMedia` et `play()`. Un « Annuler » arrivé avant était perdu : la
+  promesse ne finissait jamais, `#scanner` restait affiché, la caméra restait allumée, et un
+  second « Annuler » ne faisait rien. Numéro : D-163 à D-249 étant pris ou réservés, D-250.
+- Choix de Claude, par défaut :
+  1. Signal déjà annulé à l'appel → `AbortError` tout de suite, rien ne démarre.
+  2. L'écouteur `abort` est posé dès l'entrée ; il crée une promesse `aborted` qui rejette.
+     Chaque attente (`loadJsQR`, `getUserMedia`, `video.play`, boucle de lecture) passe par
+     `Promise.race([attente, aborted])` : le rejet arrive en quelques ms, à n'importe quelle étape.
+  3. Un flux donné par `getUserMedia` après l'annulation est éteint à son arrivée et n'est jamais
+     branché sur la vidéo.
+  4. `stop()` arrête toutes les pistes et débranche aussi la vidéo (`srcObject = null`), à
+     l'annulation comme après un QR lu ; l'écouteur est retiré à la fin.
+  5. `scan()` (`js/app.js`) annule un scan encore ouvert avant d'en ouvrir un autre, et seul le
+     scan courant cache `#scanner` dans son `finally`.
+- Alternatives écartées : vérifier `signal.aborted` après chaque `await` sans course (le rejet
+  attendrait la fin de la boîte d'autorisation, qui peut durer longtemps sur téléphone) ;
+  annuler la demande `getUserMedia` elle-même (impossible : l'API n'a pas de signal).
+- Sans effet sur #86 (chargement de jsQR raté qui reste raté) : `loadJsQR` n'est pas touché ; une
+  annulation pendant le chargement laisse ce chargement finir et servir au scan suivant.
+- Cache `sw.js` : `astra-p2p-v87`, puis `astra-p2p-v97` au rebase sur la PR #169 (v96), puis
+  `astra-p2p-v105` à la fusion de `main` (#169 et #192 mergées, v104 ; voir D-411).
+- Vérifié : `tests/scanner.test.mjs` (caméra simulée, annulation à 100 ms, 1 s, au démarrage de la
+  vidéo et pendant la lecture ; 4 tests sur 7 restent bloqués sans la correction ; tests simples et
+  non scénarios filmés, car il n'y a ni partie ni carte à montrer) ; vrai Chrome sur
+  la vraie appli (Rejoindre → Scanner → Annuler à 100 ms, 1 s, 3 s ; scan normal d'un QR filmé).
+- Qui : Vincent (demande : corriger #42), Claude (forme de la correction). Source : session
+  `b919ce58`. Statut : en vigueur.
+
+## 7 novembre 2026 — Mise à jour des PR en conflit
+
+**D-410 — Une PR en conflit se met à jour par rebase, pas par merge de `main`** (remplacée par D-411)
+- 2026-11-07 07:50. Contexte : plusieurs PR ouvertes en même temps touchent les mêmes fichiers de
+  doc et `sw.js` ; jusqu'ici, chaque worker fusionnait `main` dans sa branche (merge, sans
+  force-push).
+- Choix : mise à jour des PR en conflit : rebase sur `main` (ou sur la branche de la PR qui sera
+  mergée juste avant), puis `git push --force-with-lease`, à la place du merge de `main`.
+- Alternative écartée : merge de `main` dans la branche (historique chargé de commits de fusion).
+- Qui : Vincent, tranché le 2026-11-07 (« rebase les PR systematiquement quand elle ont des
+  conflits »), transmis par la session de coordination. Source : session `b919ce58`, PR #170.
+  Statut : remplacée par D-411 (le force-push après rebase est bloqué par les permissions).
+  Remplaçait, pour les PR en conflit, la consigne de merge donnée aux workers.
+
+**D-411 — Retour au merge de `main` quand le force-push après rebase est bloqué ; 14 PR mises en chaîne**
+- 2026-11-07 21:38. Contexte : 14 PR de l'audit du 2026-11-05 (#170 à #187) sont toutes en
+  conflit avec `main` (v104) : elles changent toutes `VERSION` de `sw.js` et la doc. Vincent :
+  « prend les PR encore ouvert une par une, rebase et merge les toutes ». Le mode auto refuse
+  `git push --force-with-lease` (motif « Git Destructive »), essayé encore une fois ici sur
+  `claude/scanner-annuler-42` : refusé. Le rebase de D-410 ne peut donc pas être poussé.
+- Choix : retour au merge de `main` (`git merge`, puis `git push` normal, refspec explicite).
+  Les 14 PR sont mises en **chaîne**, dans l'ordre #170, #171, #172, #173, #174, #175, #176,
+  #177, #180, #182, #183, #184, #185, #187 : chaque branche fusionne la branche à jour de la
+  précédente (#170 fusionne `origin/main`). Ainsi, chaque PR reste sans conflit après le merge
+  de la précédente. Conflits : les deux côtés gardés ; `VERSION` = celle de la tête de la
+  chaîne + 1 (v105 pour #170, puis un cran par PR) ; un numéro D-xxx déjà pris est renuméroté
+  (D-240 à D-242 de #171 → D-412 à D-414 ; D-240 de #172 → D-415 ; D-400 de #185 → D-416).
+  La D-300 de #170 était la décision de #169, déjà dans `main` sous le numéro D-398 : enlevée.
+- Alternatives écartées : rebase avec force-push (refusé par les permissions, pas contourné) ;
+  fusionner `main` dans chaque PR séparément (les PR resteraient en conflit entre elles).
+- Qui : Vincent, tranché le 2026-11-07 (retour au merge quand le force-push est bloqué) ; chaîne
+  et ordre décidés par la session de coordination. Source : worker `worker-merger`
+  (session `996daf2e`), PR #170. Statut : en vigueur. Remplace D-410.
+## 6 novembre 2026 — mémoire pleine (#41)
+
+Numérotée D-240 au départ (D-163 à D-239 pris ou réservés par les autres PR en cours) ; D-240 étant
+prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fusion de `main` (D-411).
+
+**D-415 — Une clé par partie ; mémoire pleine : les plus vieilles parties laissent la place**
+- 2026-11-06 22:28 UTC. Contexte : issue #41. `saveGame` écrivait `astra.save` (partie en cours)
+  puis `astra.saves` (tout l'historique, partie en cours comprise : stockée deux fois), et
+  `write()` avalait `QuotaExceededError`. Quand l'historique remplissait les ≈ 5 M caractères du
+  `localStorage`, la partie en cours n'était plus sauvée, sans message, et chaque nouvelle partie
+  faisait disparaître la précédente. La demande (router) : la partie en cours n'est jamais perdue ;
+  manque de place → retirer les plus anciennes jusqu'à ce que l'écriture passe ; la partie en
+  cours stockée une fois ; un message si la sauvegarde échoue malgré tout.
+- Choix de Claude :
+  1. **Format** : `astra.save` garde la partie en cours, elle seule (même forme qu'avant : rien ne
+     change pour `loadGame`, `replay.html`) ; chaque partie de l'historique a sa clé
+     `astra.save.<gid>` ; un petit index `astra.games` `{ gid: savedAt }` donne l'ordre sans lire
+     les parties (le faux `localStorage` des tests ne sait pas énumérer ses clés). 10 parties au
+     plus, partie en cours comprise (D-066 inchangé).
+  2. **Écritures** : une action n'écrit que `astra.save`. L'historique ne change qu'au changement
+     de partie (nouvelle partie, partie rejointe, reprise depuis l'accueil) : la nouvelle partie
+     est écrite d'abord, puis l'ancienne est rangée dans sa clé.
+  3. **Mémoire pleine** : sur `QuotaExceededError` (ou ses variantes Safari, ancien Firefox), on
+     retire la plus ancienne partie de l'historique, jamais la partie en cours, et on réessaie,
+     jusqu'à ce que ça passe. En reprenant une partie de l'historique, sa propre copie là-bas part
+     la première (sinon, pendant un instant, la partie serait comptée deux fois et une autre
+     partie serait retirée pour rien). Si même l'historique vide ne suffit pas, les parties retirées sont
+     remises (elles tenaient avant) : on ne perd rien pour rien. Une autre erreur (stockage bloqué)
+     ne retire rien.
+  4. **Message** : si la partie en cours n'a pas pu être sauvée, toast « Sauvegarde impossible : la
+     mémoire du téléphone est pleine. La partie continue, mais elle ne sera pas gardée si tu
+     fermes l'appli. » (8 s), au plus une fois par minute tant que ça dure. `save.js` ne connaît
+     pas l'écran : `app.js` s'abonne par `onSaveFailed` (rien à changer dans `session.js`). Une
+     partie retirée de l'historique pour faire de la place ne donne pas de message (c'est le
+     comportement demandé). Appli cachée (sauvegarde à `pagehide`) : pas de toast possible, la
+     minute n'est pas comptée, le prochain échec préviendra.
+  5. **Reprise de l'ancien format** (`migrate`, au premier accès) : `astra.saves` est lu en
+     mémoire, effacé d'abord, puis chaque partie valide reçoit sa clé, la plus récente d'abord ;
+     la copie de la partie en cours n'est pas recopiée (gardée si elle est plus récente que
+     `astra.save`). Effacer d'abord : recopier 5 M à côté de 5 M ne tiendrait pas. Le risque
+     (fermeture entre l'effacement et la recopie) est nul en pratique : c'est du JS synchrone.
+- Alternatives écartées : garder `astra.saves` sans la partie en cours (simple, mais chaque
+  retrait réécrit tout le bloc, et un seul bloc abîmé touche toutes les parties) ; compresser
+  les parties (repousse la limite sans la supprimer) ; IndexedDB (asynchrone, change tout le
+  code qui sauvegarde) ; un message à chaque partie retirée (bruit, alors que c'est voulu).
+- Effet de bord : règle aussi #91 (« chaque action réécrit tout l'historique ») : avec 9 parties
+  de 450 K en historique, une action écrit 450 140 car. au lieu de 4 951 504 (Node) ;
+  `saveGame` prend 0,5 à 0,9 ms au lieu de 8,6 à 10,9 ms (Chromium, Mac, 10 parties de 451 K).
+  Scénario « D-415 (#91) » : un vrai ordre écrit moins de 1,2 × la taille de la partie en cours.
+  Non mesuré sur téléphone. La PR ferme donc aussi #91.
+- Reprise de l'ancien format qui échoue (une partie ne peut pas être recopiée, alors que
+  `astra.saves` est déjà effacé) : on essaie quand même les suivantes, et le joueur est prévenu
+  (`onSaveFailed('history', n)`, toast « Mémoire du téléphone pleine : n ancienne(s) partie(s)
+  n'a/ont pas pu être gardée(s). »). Demandé par le router à la vérification.
+- Limites : les identités des parties retirées restent dans `astra.identities` (quelques dizaines
+  de caractères chacune) ; une partie en cours plus grosse que toute la mémoire n'est pas sauvée
+  (message).
+- Cache : `sw.js` passe à `astra-p2p-v87` (v86 est dans `main`), puis `astra-p2p-v106` à la fusion
+  de `main` (v105, D-411).
+- Vérifié : 5 scénarios D-415 (`tests/decisions-reseau.test.mjs`, quota simulé de 5 242 880
+  car. qui lève `QuotaExceededError`) : 6 parties de 1 M jouées l'une après l'autre ; échec forcé
+  (mémoire et stockage bloqué) ; reprise d'une partie de 1,2 M à mémoire presque pleine (aucune
+  autre partie perdue ; échoue sans la correction) ; reprise de l'ancien format (petites parties, et 3 parties de 1,25 M
+  qui remplissent la mémoire, et une partie refusée : prévenu) ; un ordre avec 10 parties en historique
+  n'écrit que la partie en cours (#91). Scénario D-170 adapté. Vrai jeu dans Chromium : reprise de
+  l'ancien format (4 parties de 1,2 M), retrait de la plus vieille en reprenant une partie
+  (quota simulé dans la page : ce navigateur accepte ≈ 26 M), toast quand l'écriture est refusée.
+- Qui : Vincent (demande, par le router : corriger #41), Claude (méthode). Source : session
+  `ae22884b`. Statut : en vigueur. Modifie D-066 et D-170.
+
+
+**D-417 — « Retour » pendant une partie en cours : une question avant de quitter**
 - 2026-11-07. Contexte : Vincent : « je veux que quand on fait back, avant de quitter une partie
   en cours, cela mette une alert pour demander si on est sur de vouloir quiter la partie ».
   L'appli n'avait aucune entrée d'historique : un retour quittait la page (ou fermait l'appli).
@@ -2819,4 +2956,4 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
   lobby (la tâche l'exclut).
 - Qui : Vincent (demande), router (pas d'alerte au lobby ni à la fin, fenêtre `.sheet`
   préférée), Claude par défaut (fenêtre fermée d'abord, 2ᵉ retour = quitter, accueil quand rien
-  avant). Source : session `3e243082`. Statut : en vigueur. Cache `astra-p2p-v105`.
+  avant). Source : session `3e243082`. Statut : en vigueur. Cache `astra-p2p-v107`. Numérotée D-401 au départ ; D-412 à D-416 étant pris ou réservés par la chaîne de D-411, renumérotée D-417 à la fusion de `main`.

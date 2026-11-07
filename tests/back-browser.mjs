@@ -1,4 +1,4 @@
-// « Retour » pendant une partie en cours (D-401), dans un vrai navigateur (Chromium via
+// « Retour » pendant une partie en cours (D-417), dans un vrai navigateur (Chromium via
 // Playwright). Pas dans `node --test tests/*.test.mjs` : le dépôt n'a pas de dépendance.
 //
 //   ASTRA_PLAYWRIGHT=/chemin/vers/node_modules/playwright/index.mjs node tests/back-browser.mjs [dossier-captures]

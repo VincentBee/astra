@@ -1,4 +1,4 @@
-// « Retour » pendant une partie en cours (D-401) : js/back.js dit quoi faire du retour.
+// « Retour » pendant une partie en cours (D-417) : js/back.js dit quoi faire du retour.
 // Le parcours dans un vrai navigateur (historique, fenêtre, « Quitter ») : tests/back-browser.mjs.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

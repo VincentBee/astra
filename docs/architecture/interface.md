@@ -117,7 +117,7 @@ Style commun (D-302, celui du Journal, D-246) : une seule règle dans `style.css
 
 ### 3.3 Couches fixes
 
-- `#scanner` (318-323) : caméra plein écran, `scan()` (`js/app.js:116-126`) appelle `scanQr` de `js/scanner.js` (voir `reseau.md`), **Annuler** abandonne via `AbortController`.
+- `#scanner` (`index.html:412-417`) : caméra plein écran, `scan()` (`js/app.js:135-150`) appelle `scanQr` de `js/scanner.js` (voir `reseau.md`), **Annuler** abandonne via `AbortController`. Depuis D-250 (#42), Annuler marche à tout moment, même avant que la caméra soit prête : `scanQr` rejette aussitôt avec `AbortError`, le `finally` de `scan()` cache `#scanner`, et un flux de caméra arrivé après coup est éteint dès qu'il arrive. Un nouveau `scan()` annule celui qui serait encore ouvert.
 - `#toast` : messages **à la file** (D-110), `toast(text, ms = 3200)` puis `nextToast()` : un à la fois, dans l'ordre ; 6 en attente au plus (les longs restent) ; un doublon de ce qui est affiché ou attend est ignoré ; d'autres attendent → au moins 2 s chacun. Appli cachée : ignoré. La session y écrit aussi via `session.ontoast` (« tu es éliminé » : 8 s).
 - `#btn-journal` (à gauche de `#net`, déplacé avec lui par `showView`) et `#sheet-journal` (D-110) : `openJournal(away)` montre « Combats et planètes » (le carnet `session.journal`, du plus récent au plus ancien ; bord vert gagné, rouge perdu ; ligne « Tes pertes · Ses pertes · Butin / Pillé » ; fond plus clair = pas encore lu ; depuis D-122, `reportHtml(e)` ajoute la phrase « pourquoi » (`.j-why`) et un `<details class="j-report">` « Détail du combat » : ce qui a pesé (`.j-reasons`), deux tableaux des forces `.j-forces` — « Tes forces » et « Forces de … », avec feu et coque au départ ; colonnes Vaisseau, Nb, ⚔, ◇, Perdus ; défense « tient » ou « abattue » — et les passes (`.j-rounds`), textes de `js/report.js`), puis « Ce qui me concerne » (lignes du journal partagé qui contiennent mon nom, 20 au plus ; depuis D-210, une ligne d'ordre de flotte d'un autre joueur, marquée `{ pid, fleet }`, n'y est que tant que je vois sa flotte : `session.showsLog(l)`). Ouvrir marque tout lu (`session.markRead`). Pastille `#journal-count` = entrées non lues (mise à jour par `renderLive`).
 - Résumé « Pendant ton absence » : `showAbsence(gone)` ouvre la même fenêtre limitée au neuf si l'absence dépasse `AWAY_MS` (2 min) et qu'il y a du neuf. Appelé à la reprise d'une partie (absence = depuis `savedAt`, neuf = non lu) et 1 s après le retour au premier plan (`visibilitychange` ; neuf = noté depuis qu'elle a été cachée). Bouton « Tout le journal ».
@@ -604,7 +604,7 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   avec les IA reliées. Seules erreurs de la console : les relais Nostr, injoignables dans le
   conteneur de test.
 
-## 20. « Retour » pendant une partie en cours (2026-11-07, D-401)
+## 20. « Retour » pendant une partie en cours (2026-11-07, D-417)
 
 - Partie **en cours** = `js/back.js` `playing` : `status === 'playing'`, partie partie
   (`startedAt`), pas finie (`over`), écran `#screen-game` affiché, hors lecture seule (`?view`).
