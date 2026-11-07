@@ -3000,6 +3000,79 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   D-411) : `astra-p2p-v108`.
 - Qui : Claude, par défaut. Source : session `4fc11ee6`. Statut : en vigueur.
 
+**D-192 — Échap ferme la fenêtre du dessus : la dernière visible dans l'ordre du HTML**
+- 2026-11-06. Contexte : issue #72. Échap prenait la première fenêtre visible du HTML
+  (`find`) ; la fiche de planète est la première de la page, donc avec le journal ouvert par-dessus,
+  Échap fermait la fiche cachée dessous et laissait le journal.
+- Choix : prendre la dernière visible (`findLast`). Toutes les fenêtres ont le même `z-index` (20)
+  et aucun parent ne crée de contexte d'empilement : celle qui se voit devant est donc toujours la
+  dernière du HTML. Un deuxième Échap ferme la suivante.
+- Alternatives écartées : une pile dans l'ordre d'ouverture. Elle peut contredire l'écran : une
+  fenêtre plus haut dans le HTML, ouverte après une autre (par exemple « Fin de partie » ouverte
+  pendant que le journal est affiché), s'affiche **sous** elle ; la pile fermerait alors celle
+  qu'on ne voit pas. Remettre chaque fenêtre devant à son ouverture (`z-index` croissant) changerait
+  l'affichage, hors du sujet de #72.
+- Hors sujet, noté : le menu d'ordres de la carte a son propre Échap (`closeMenu`) ; s'il est
+  ouvert en même temps qu'une fenêtre, un seul Échap ferme les deux (comme avant). Le focus qui
+  reste derrière les fenêtres (#148) n'est pas touché.
+- Qui : Claude, par défaut (worker de la session « Regarde les issues du projet »). Source :
+  session `a4571475`. Statut : en vigueur. Tests : `tests/escape.test.mjs` ; vu dans le vrai jeu.
+- Fusion de `main` (2026-11-07, D-411) : D-302 a donné un `z-index` à `.sheet-head` (en-tête collé
+  dans la fenêtre) ; le test ne compte plus que la règle `.sheet` elle-même (`.sheet(?![\w-])`), la
+  règle tient toujours (un seul `z-index` pour les fenêtres).
+
+**D-193 — Cache `astra-p2p-v89`, puis `astra-p2p-v109`**
+- 2026-11-06. Contexte : `main` est à v88 (D-165, D-166).
+- Choix : `VERSION` passe à `astra-p2p-v89` pour que les téléphones prennent le nouveau `app.js`
+  (D-192). Si une autre PR prend v89 avant, monter au numéro suivant. À la fusion de `main`
+  (2026-11-07, v108, D-411) : `astra-p2p-v109`.
+- Qui : Claude, par défaut. Source : session `a4571475`. Statut : en vigueur.
+**D-270 — Fil : un élément qu'on ne pourra pas payer ne bloque plus les autres (#46)**
+- 2026-11-06. Contexte : issue #46. Le premier élément prêt du fil a la priorité sur le stock
+  (D-158). En famine (nourriture à 0, tout ce qui rentre est mangé) ou en panne d'énergie, un
+  élément dont le prix demande cette ressource ne pouvait jamais partir, et il bloquait pour
+  toujours les éléments des autres chantiers (et ceux du sien), avec « plus de 6 h » et aucune
+  raison. Exemple : Agronomie (40 nourriture) au fil devant une ferme (75 minéraux) ; chez les
+  machines, un nexus (60 énergie) devant le réacteur qui réparerait la panne.
+- Choix : un élément prêt est « sans revenu » (`starved`, `js/game.js`) quand une ressource de
+  son prix manque au stock et ne peut pas monter avec la production actuelle : solde ≤ 0, ou
+  demande pas couverte (`effF < 1` pour la nourriture, `effE < 1` pour l'énergie). Un tel
+  élément ne bloque personne, **pas même son propre chantier**, mais reste candidat : `planNext`
+  rend la liste de ces éléments, suivie du premier élément prêt payable un jour ; `until` avance
+  pas à pas (mêmes pas, `MAX_STEPS` gardé) et lance le premier de la liste que le stock couvre.
+  Si la ressource se remet à rentrer, il repasse donc devant ceux qui le suivent. `planForecast`
+  donne sa raison (« Pas de nourriture qui rentre », « Pas d’énergie qui rentre », « Pas de
+  minéraux qui rentrent »), déjà affichée par `js/app.js`.
+- Sans famine ni panne, la liste n'a qu'un élément : le calcul est exactement celui d'avant.
+  Comparaison sur 3 000 planètes tirées au hasard (ancien et nouveau `game.js`) : 2 923
+  identiques ; les 77 autres ont toutes un élément sans revenu (stock à 0 ou qui baisse), qui
+  bloquait le fil pour toujours avant. Calcul déterministe (même état, mêmes pas) : identique
+  sur tous les téléphones et au rejeu.
+- Alternatives écartées : en faire un prérequis manquant (`why`) qui garde l'ordre de son
+  chantier (le réacteur resterait bloqué derrière le nexus, cas de l'issue) ; l'écarter tout à
+  fait jusqu'au prochain événement (il ne repartirait pas tout seul si la ressource revient
+  pendant une longue attente) ; dans `stateAt`, essayer l'élément suivant quand `until` échoue
+  à l'horizon (l'horizon n'est que le prochain événement : « pas encore » et « jamais » se
+  confondent, et il faudrait refaire avancer le temps deux fois).
+- Limite connue : « sans revenu » se juge sur la production à l'instant de chaque événement.
+  Un élément sans revenu pendant qu'un bâtiment qui la réparera est en chantier laisse passer
+  les suivants, qui peuvent prendre le stock avant lui. Ne règle pas #50 (« Entrepôt trop
+  petit » bloque toujours les suivants de son chantier, sans raison pour eux).
+- Qui : **choix de Claude** (le ticket laissait la méthode libre). Source : session `259a9124`,
+  issue #46. Statut : en vigueur.
+- Tests : `tests/plan.test.mjs` (famine : la ferme part, Agronomie reste au fil ; l'estimation
+  dit « Pas de nourriture qui rentre » ; panne machines : le réacteur part derrière un nexus ;
+  panne aliens : le prisme part derrière un amplificateur ; le nexus repasse devant dès que
+  l'énergie rentre).
+
+**D-271 — Cache `astra-p2p-v87`, puis `astra-p2p-v110`**
+- 2026-11-06. Contexte : v86 est pris (PR #160, dans `main`).
+- Choix : `VERSION` passe à `astra-p2p-v87` pour que les téléphones prennent le nouveau
+  `game.js`. D'autres PR ouvertes en même temps peuvent viser le même numéro (non confirmé) :
+  à la fusion, garder une version plus grande que celle de `main`. À la fusion de `main`
+  (2026-11-07, v109, D-411) : `astra-p2p-v110`.
+- Qui : Claude, par défaut. Source : session `259a9124`. Statut : en vigueur.
+
 
 
 **D-417 — « Retour » pendant une partie en cours : une question avant de quitter**
@@ -3012,7 +3085,9 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
     autres (`#sheet-quit`, D-302) demande « Quitter la partie en cours ? » : **Rester** /
     **Quitter la partie**. Pas `confirm()` : son style tranche avec le jeu.
   - **Une fenêtre ouverte se ferme d'abord** (comme sa croix), sans question : le retour d'un
-    téléphone ferme d'habitude ce qui est ouvert.
+    téléphone ferme d'habitude ce qui est ouvert. Celle du dessus, choisie par `topSheet`, la
+    même fonction qu'Échap (D-192, ajouté à la fusion de #175) : retour et Échap ne se contredisent
+    pas.
   - « Quitter la partie » = `history.back()`, le retour d'avant. Rien avant la page (appli
     installée, onglet neuf) : retour à l'accueil, la partie reste enregistrée.
   - Question affichée : un 2ᵉ retour quitte, sans autre alerte (la garde n'est reposée qu'à
@@ -3026,4 +3101,4 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   lobby (la tâche l'exclut).
 - Qui : Vincent (demande), router (pas d'alerte au lobby ni à la fin, fenêtre `.sheet`
   préférée), Claude par défaut (fenêtre fermée d'abord, 2ᵉ retour = quitter, accueil quand rien
-  avant). Source : session `3e243082`. Statut : en vigueur. Cache `astra-p2p-v109` (v107, puis v109 à la 2ᵉ fusion de `main`, v108). Numérotée D-401 au départ ; D-412 à D-416 étant pris ou réservés par la chaîne de D-411, renumérotée D-417 à la fusion de `main`.
+  avant). Source : session `3e243082`. Statut : en vigueur. Cache `astra-p2p-v111` (v107, v109, puis v111 à la 3ᵉ fusion de `main`, v110). Numérotée D-401 au départ ; D-412 à D-416 étant pris ou réservés par la chaîne de D-411, renumérotée D-417 à la fusion de `main`.

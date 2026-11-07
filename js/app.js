@@ -759,15 +759,18 @@ const withCap = (v, cap) => `${fmt(v)}<span class="cap"> / ${fmt(cap)}</span>`;
 const compact = (v) => (v >= 1e5 ? `${fmt(Math.floor(v / 1000))} k` : fmt(v));
 
 // Toutes les fenêtres se ferment d'un toucher sur le fond sombre ou avec Échap (comme leur croix).
+// Échap ferme seulement celle du dessus (#72) : toutes les fenêtres ont le même z-index (style.css,
+// `.sheet`), donc celle qui se voit devant est la dernière ouverte dans l'ordre du HTML. Un deuxième
+// Échap ferme la suivante. Le « retour » en partie (D-417) ferme la même : `topSheet`.
 for (const sheet of document.querySelectorAll('.sheet')) {
   sheet.addEventListener('click', (e) => {
     if (e.target === sheet) sheet.querySelector('.close-btn')?.click();
   });
 }
+const topSheet = () => [...document.querySelectorAll('.sheet')].findLast((s) => !s.hidden);
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  const open = [...document.querySelectorAll('.sheet')].find((s) => !s.hidden);
-  open?.querySelector('.close-btn')?.click();
+  topSheet()?.querySelector('.close-btn')?.click();
 });
 
 /** « 1 234 ◆ · 30 ⚡ », en HTML : chaque quantité suivie de l'icône de sa ressource. */
@@ -3330,7 +3333,7 @@ if (!VIEW) {
     if (!backArmed) return; // retour hors de notre garde : rien à faire
     backArmed = false;
     if (leaving) return;
-    const open = [...document.querySelectorAll('.sheet')].find((s) => !s.hidden);
+    const open = topSheet(); // la fenêtre du dessus, comme Échap (D-192)
     const action = backAction({ status: session?.status, startedAt: session?.startedAt, over: session?.over, gameShown: !$('screen-game').hidden, sheetOpen: !!open });
     if (action === 'close') {
       open.querySelector('.close-btn')?.click();

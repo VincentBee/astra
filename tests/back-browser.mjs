@@ -107,6 +107,18 @@ await back();
 const afterSheet = await page.evaluate(() => ({ settings: !document.getElementById('sheet-settings').hidden, quit: !document.getElementById('sheet-quit').hidden, guard: !!history.state?.astraGuard }));
 assert.deepEqual(afterSheet, { settings: false, quit: false, guard: true });
 ok('fenêtre ouverte + retour → la fenêtre se ferme, pas de question, garde reposée');
+// Deux fenêtres l'une sur l'autre : le retour ferme celle du dessus, comme Échap (D-192).
+await page.evaluate(() => {
+  document.getElementById('sheet-settings').hidden = false;
+  document.getElementById('sheet-journal').hidden = false;
+});
+await back();
+const twoBack = await page.evaluate(() => ({ settings: !document.getElementById('sheet-settings').hidden, journal: !document.getElementById('sheet-journal').hidden }));
+await page.keyboard.press('Escape');
+const twoEsc = await page.evaluate(() => ({ settings: !document.getElementById('sheet-settings').hidden, quit: !document.getElementById('sheet-quit').hidden }));
+assert.deepEqual(twoBack, { settings: true, journal: false });
+assert.deepEqual(twoEsc, { settings: false, quit: false });
+ok('Réglages puis Journal : le retour ferme le Journal (dessus), Échap ensuite les Réglages — même fenêtre que Échap');
 await back();
 assert.equal(await quitShown(), true);
 ok('retour suivant → la question');
