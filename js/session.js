@@ -19,7 +19,8 @@
 
 import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Rendezvous } from './rendezvous.js';
-import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity } from './save.js';
+import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity, identityFor, savedGame } from './save.js';
+import { inviteGid } from './invite.js';
 import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, PLAN_MAX, planItem, planId, planAhead, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, FROST, sunFor, fortOf, seeded, RES } from './game.js';
 import { TECHS, SHIPS, sightRange, TEMPO, techMissing, shipUnlocked } from './tech.js';
 import { cleanReport } from './report.js';
@@ -200,7 +201,8 @@ export function normalize(p) {
   if (!Array.isArray(p.orders)) p.orders = [];
   if (p.deathPts !== undefined && !Number.isFinite(p.deathPts)) delete p.deathPts;
   // Prêt (heure) et départ de la partie vu par ce joueur (heure) : des nombres, ou rien.
-  for (const k of ['ready', 'go', 'clockFix']) if (p[k] !== undefined && !Number.isFinite(p[k])) delete p[k];
+  // Parti avant le départ (IA retirée du lobby, D-399) : une heure, ou rien.
+  for (const k of ['ready', 'go', 'clockFix', 'left']) if (p[k] !== undefined && !Number.isFinite(p[k])) delete p[k];
   return p;
 }
 
@@ -356,7 +358,7 @@ export class Session {
     s.loadClock();
     s.intel = saved.intel || {}; // brouillard (D-124) : ce que j'ai vu des planètes des autres
     s.journal = saved.journal || null; // avant le rattrapage : les combats de l'absence s'y inscrivent
-    s.botIds = Array.isArray(saved.bots) ? saved.bots.filter((pid) => pidOk(pid) && s.state.players[pid]) : []; // IA jouées par ce téléphone (D-151), réveillées par js/bot.js
+    s.botIds = Array.isArray(saved.bots) ? saved.bots.filter((pid) => pidOk(pid) && s.state.players[pid] && !Number.isFinite(s.state.players[pid].left)) : []; // IA jouées par ce téléphone (D-151), réveillées par js/bot.js
     s.refreshOnline();
     s.start();
     s.tick();
@@ -368,6 +370,7 @@ export class Session {
   async answer(offer) {
     this.pendingAnswer?.cancel();
     const ans = await answerInvite(offer);
+    this.inviteGid = inviteGid(offer); // la partie de l'hôte, si le lien la dit (D-260)
     this.pendingAnswer = ans;
     this.status = 'answering';
     ans.link.then(
@@ -388,7 +391,11 @@ export class Session {
     this.status = 'waiting';
     this.attach(link, null);
     this.firstLink = link;
-    const id = loadIdentity();
+    // D-260 : si l'invitation dit de quelle partie elle vient, je n'envoie que mon identité
+    // et ma copie de celle-là, jamais le secret d'une autre. Ancien lien ou code seul : comme
+    // avant, l'identité de la dernière partie ouverte.
+    const gid = this.inviteGid;
+    const id = gid ? identityFor(gid) : loadIdentity();
     this.newSecret = rid(16);
     const hello = {
       type: 'hello',
@@ -399,7 +406,7 @@ export class Session {
       secretHash: await sha256(this.newSecret),
       // Ma copie de la partie, si j'en ai une : ma progression faite hors
       // ligne est gardée.
-      copy: loadGame()?.state,
+      copy: (gid ? savedGame(gid) : loadGame())?.state,
     };
     // Le tout premier message d'un canal qui vient de s'ouvrir se perd
     // parfois : on le renvoie chaque seconde jusqu'à l'accusé de réception.
@@ -770,7 +777,7 @@ export class Session {
     link.send({ type: 'hello-ack' });
     // Pas de validation : l'hôte a lui-même scanné (ou collé) la réponse, et
     // une invitation ne sert qu'une fois. C'est déjà son accord.
-    if (Object.keys(st.players).length >= MAX_PLAYERS) {
+    if (this.roster.length >= MAX_PLAYERS) {
       link.send({ type: 'refused', reason: 'La partie est complète (8 joueurs).' });
       return setTimeout(() => link.close(), 300);
     }
@@ -795,7 +802,7 @@ export class Session {
     if (link !== this.firstLink || !msg.state || typeof msg.from !== 'string') return;
     // On adopte la copie de l'hôte, complétée par la nôtre s'il s'agit de la
     // même partie (progression faite hors ligne).
-    const mine = loadGame();
+    const mine = savedGame(msg.state.gid); // ma copie de CETTE partie, pas forcément la dernière ouverte (D-260)
     let st = clean(msg.state);
     if (mine && mine.state.gid === st.gid) st = mergeStates(st, clean(mine.state));
     // Mon carnet de combats de cette partie, s'il est sur ce téléphone (même joueur).
@@ -806,8 +813,8 @@ export class Session {
     this.me = msg.you;
     this.state = st;
     this.loadClock(); // nouveau venu : pas d'heure commune, il la prend de son hôte au premier battement (D-165)
-    const id = loadIdentity();
-    const secret = id?.gid === st.gid && id?.pid === msg.you ? id.secret : this.newSecret;
+    const id = identityFor(st.gid);
+    const secret = id?.pid === msg.you ? id.secret : this.newSecret;
     saveIdentity({ gid: st.gid, pid: msg.you, secret });
     this.firstLink = null;
     this.status = 'playing';
@@ -1005,10 +1012,27 @@ export class Session {
 
   // ----- invitations (tout le monde peut inviter) ---------------------------
 
+  /**
+   * Prépare une invitation et renvoie son code, ou null si elle a été abandonnée pendant sa
+   * préparation (#70) : chaque appel prend un jeton numéroté ; si cancelInvite ou un autre
+   * openInvite passe pendant l'attente, le jeton change et l'invitation obtenue est fermée
+   * au lieu d'être rangée. Ouvrir une invitation ferme la précédente.
+   */
   async openInvite() {
-    this.invite?.cancel();
-    this.invite = await createInvite();
-    return this.invite.code;
+    const ticket = this.cancelInvite();
+    let invite;
+    try {
+      invite = await createInvite();
+    } catch (e) {
+      if (ticket !== this.inviteTicket) return null;
+      throw e;
+    }
+    if (ticket !== this.inviteTicket) {
+      invite.cancel();
+      return null;
+    }
+    this.invite = invite;
+    return invite.code;
   }
 
   async acceptAnswer(answer) {
@@ -1020,9 +1044,12 @@ export class Session {
     return link;
   }
 
+  /** Ferme l'invitation ouverte et abandonne celle en préparation ; renvoie le nouveau jeton. */
   cancelInvite() {
     this.invite?.cancel();
     this.invite = null;
+    this.inviteTicket = (this.inviteTicket ?? 0) + 1;
+    return this.inviteTicket;
   }
 
   // ----- jeu ---------------------------------------------------------------------
@@ -1049,7 +1076,17 @@ export class Session {
 
   /** On peut jouer : partie en cours, pas finie, et je ne suis pas éliminé. */
   get canAct() {
-    return this.status === 'playing' && !this.over && !this.state?.players[this.me]?.out;
+    const p = this.state?.players[this.me];
+    return this.status === 'playing' && !this.over && !p?.out && !Number.isFinite(p?.left);
+  }
+
+  /**
+   * Joueurs de la partie, sans ceux partis avant le départ (`left`, IA retirée du lobby,
+   * D-399). Leur fiche reste dans `state.players` (sinon la copie d'un autre la ferait
+   * revenir), mais on ne la montre ni ne la compte plus.
+   */
+  get roster() {
+    return Object.values(this.state?.players || {}).filter((p) => !Number.isFinite(p.left));
   }
 
   /** Points de l'empire d'un joueur (toutes ses planètes, ses recherches, ses vaisseaux). */
@@ -1082,7 +1119,7 @@ export class Session {
   /** Joueurs présents (moi, et ceux en ligne avec moi) pas encore prêts ni déjà dans la course. */
   get notReady() {
     return Object.values(this.state?.players || {}).filter(
-      (p) => (p.id === this.me || p.online) && !p.out && !p.home && !Number.isFinite(p.ready) && !Number.isFinite(p.since),
+      (p) => (p.id === this.me || p.online) && !p.out && !Number.isFinite(p.left) && !p.home && !Number.isFinite(p.ready) && !Number.isFinite(p.since),
     );
   }
 
@@ -1473,19 +1510,64 @@ export class Session {
     return this.state?.players[this.me]?.race || null;
   }
 
-  /** Choix de race : une seule fois, il ne se défait pas. */
+  /**
+   * Choix de race. Il devient définitif quand la partie part (ou dès qu'on a une planète) ;
+   * avant, on peut en changer (D-400 : l'hôte change la race d'une IA dans le lobby ;
+   * l'écran du joueur, lui, ne propose le choix qu'une fois).
+   */
   chooseRace(race) {
     if (!this.canAct || !RACES[race]) return false;
     const p = this.state.players[this.me];
     if (!p) return false;
-    if (p.race) {
+    const was = p.race;
+    if (was && (this.startedAt != null || p.home || Number.isFinite(p.since))) {
       this.ontoast?.(`Tu as déjà choisi : ${RACES[p.race].name}. Ce choix est définitif.`);
       return false;
     }
+    if (was === race) return false;
     p.race = race;
     // Joueur d'avant le choix de planète : il garde la sienne.
     if (p.home) p.planet = newPlanet(race, this.now());
-    this.touch(this.addLog(`${p.name} rejoint le camp des ${RACES[race].name}.`));
+    this.touch(this.addLog(was ? `${p.name} passe dans le camp des ${RACES[race].name}.` : `${p.name} rejoint le camp des ${RACES[race].name}.`));
+    this.changed();
+    return true;
+  }
+
+  /** Avant le départ, la partie pas encore partie et sans planète : sinon null. */
+  get beforeStart() {
+    const p = this.state?.players[this.me];
+    return !!p && this.startedAt == null && !p.home && !Number.isFinite(p.since);
+  }
+
+  /**
+   * Changer de nom, avant le départ seulement (D-400 : l'hôte renomme une IA dans le lobby).
+   * Un nom vide est refusé : on garde l'ancien. 16 caractères au plus, comme à l'arrivée.
+   */
+  rename(name) {
+    if (!this.canAct || !this.beforeStart) return false;
+    const p = this.state.players[this.me];
+    const next = String(name ?? '').trim().slice(0, 16);
+    if (!next || next === p.name) return false;
+    const old = p.name;
+    p.name = next;
+    this.name = next;
+    this.touch(this.addLog(`${old} s’appelle maintenant ${next}.`));
+    this.changed();
+    return true;
+  }
+
+  /**
+   * Quitter la partie avant le départ (D-399 : l'hôte retire une IA du lobby). La fiche
+   * reste, marquée `left` : la plus récente, elle l'emporte sur toutes les copies, et le
+   * joueur n'est plus ni montré, ni compté, ni attendu au départ.
+   */
+  leave() {
+    if (!this.canAct || !this.beforeStart) return false;
+    const p = this.state.players[this.me];
+    p.left = this.now();
+    delete p.ready;
+    delete p.go;
+    this.touch(this.addLog(`${p.name} quitte la partie.`));
     this.changed();
     return true;
   }
@@ -2653,7 +2735,8 @@ export class Session {
     const p = this.state.players[this.me];
     const f = this.myFleet(id);
     const now = this.now();
-    if (!f || this.locked(id)) return false;
+    if (!f) return this.refuse('Flotte introuvable.'); // disparue (combat, fusion, élimination) : on le dit (#73)
+    if (this.locked(id)) return false;
     if (moving(f, now)) return this.refuse('La flotte doit être arrêtée pour se scinder.');
     if (p.fleets.length >= MAX_FLEETS) return this.refuse(`Pas plus de ${MAX_FLEETS} flottes.`);
     const res = split(f, p.race, part, this.newId(6), now);
@@ -3276,7 +3359,7 @@ function maxTech(a, b) {
   return out;
 }
 
-export const ORDER_KINDS = ['chooseRace', 'ready', 'begin', 'claimPlanet', 'build', 'planBuild', 'planResearch', 'planShips', 'unplan', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'setFleetStance', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'joinFleet', 'splitFleet', 'returnFleet', 'power'];
+export const ORDER_KINDS = ['chooseRace', 'rename', 'leave', 'ready', 'begin', 'claimPlanet', 'build', 'planBuild', 'planResearch', 'planShips', 'unplan', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'setFleetStance', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'joinFleet', 'splitFleet', 'returnFleet', 'power'];
 for (const k of [...ORDER_KINDS, 'tick']) {
   const act = Session.prototype[k];
   Session.prototype[k] = function (...a) {

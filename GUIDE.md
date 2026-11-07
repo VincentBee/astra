@@ -2,6 +2,8 @@
 
 Principes, ordres de construction et pièges pour chaque race, puis les flottes et le voyage spatial (en fin de guide).
 
+> **Nouveaux guides, avec des chiffres mesurés sur le code du 2026-11-04** (commit `15ca511`) : [humains](docs/guides/humains.md), [machines](docs/guides/machines.md), [aliens](docs/guides/aliens.md) et [limites du jeu](docs/guides/limites.md) (froid, place, défense, plafonds). Ils remplacent les ordres de construction ci-dessous, qui datent d’avant le tempo 2,5, la recherche, la place et les vaisseaux (D-162).
+
 ## Comment se joue une partie (depuis le 29 octobre 2026)
 
 - **Une partie dure environ 30 à 35 minutes.** Le jeu va 2,5 fois plus vite qu’avant : les heures de jeu des ordres ci-dessous passent 2,5 fois plus vite. Ces ordres datent d’avant ce changement (**à refaire**).
