@@ -1771,14 +1771,6 @@ document.querySelector('.tabs').addEventListener('keydown', (e) => {
 try {
   localStorage.removeItem('astra.tab'); // onglet retenu d'avant D-156, plus lu
 } catch {}
-// Aide de la carte : une bulle au survol ; au doigt (pas de survol), un toucher l'ouvre ou la ferme.
-$('btn-map-help').onclick = (e) => {
-  const btn = e.currentTarget;
-  btn.setAttribute('aria-expanded', String(btn.getAttribute('aria-expanded') !== 'true'));
-};
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.help-wrap')) $('btn-map-help').setAttribute('aria-expanded', 'false');
-});
 $('alerts-btn').onclick = () => {
   const open = $('alerts-panel').hidden;
   $('alerts-panel').hidden = !open;
@@ -1799,12 +1791,16 @@ $('btn-open-planet').onclick = (e) => {
   showView('planet', e.currentTarget.dataset.key || 'home');
 };
 
+/** Avant le départ (D-240, D-241) : pas de carte du tout, rien ne s'y voit ni ne s'y touche. */
+const mapVeiled = () => session?.startedAt == null;
+
 /**
  * Toutes les planètes à afficher : celles de l'univers, avec leur
  * propriétaire, et les planètes mères des joueurs d'avant le choix de
  * planète (placées hors de la liste).
  */
 function mapPlanets() {
+  if (mapVeiled()) return []; // avant le départ (D-240) : la carte reste une surprise
   // Brouillard (D-124) : hors de ma portée, une planète des autres paraît libre, ou porte le nom
   // de celui qui la tenait la dernière fois que je l'ai vue (`seen` : pas de nouvelles fraîches).
   const now = session.now();
@@ -1948,8 +1944,10 @@ function drawMap() {
     ctx.lineTo(W, i * cell);
   }
   ctx.stroke();
+  const veiled = mapVeiled();
+  $('map-wrap').hidden = veiled;
   const sun = sunFor(session.state.gid);
-  drawSun(ctx, sun, cell);
+  if (!veiled) drawSun(ctx, sun, cell);
   drawFrost(ctx, sun, cell, W);
 
   const me = session.state.players[session.me];
@@ -2118,7 +2116,7 @@ function drawMap() {
   drawAim(ctx, cell, dpr, aim);
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  $('my-coords').textContent = me?.home ? `[${me.home.x}:${me.home.y}]` : me?.out ? 'éliminé' : session.startedAt == null ? 'avant le départ' : 'à fonder';
+  $('my-coords').textContent = me?.home ? `[${me.home.x}:${me.home.y}]` : me?.out ? 'éliminé' : session.startedAt == null ? 'préparation' : 'à fonder';
 }
 
 // ---------------------------------------------------------------------------
@@ -2891,7 +2889,10 @@ function myColonizer(me) {
  * la partie partie, envoyer son colonisateur fonder sa planète mère.
  */
 function renderLobby(me) {
+  $('map-wrap').hidden = mapVeiled(); // avant le départ, pas de carte du tout (D-241)
   const show = !!me?.race && !me.home && !me.out;
+  // Lobby (D-242) : sans carte, le bandeau prend toute la hauteur, boutons en bas.
+  $('screen-game').classList.toggle('lobby', show && mapVeiled());
   $('pick').hidden = !show;
   if (!show) return;
   const start = session.startedAt;
