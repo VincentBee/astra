@@ -3072,3 +3072,34 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   à la fusion, garder une version plus grande que celle de `main`. À la fusion de `main`
   (2026-11-07, v109, D-411) : `astra-p2p-v110`.
 - Qui : Claude, par défaut. Source : session `259a9124`. Statut : en vigueur.
+**D-350 — La fenêtre Scinder / Donner suit sa flotte**
+- 2026-11-06 22:45. Contexte : issue #73. La fenêtre « Scinder » / « Donner » était remplie une
+  fois, à l'ouverture. Si la flotte disparaissait pendant qu'elle était ouverte (combat, fusion,
+  élimination), la fenêtre restait, et son bouton ne faisait rien, sans message (`splitFleet`
+  renvoyait `false` avant tout `refuse`). Après une jonction (D-159), `selFleet` passait à la
+  flotte absorbante : le bouton aurait agi sur une autre flotte que celle affichée.
+- Choix : la fenêtre garde l'identifiant de la flotte pour laquelle elle a été ouverte
+  (`moveSheet.from`, `js/app.js`) et n'agit que sur elle, jamais sur `selFleet`. À chaque
+  rafraîchissement (`refreshMoveSheet`, appelé par `renderFleetInfo`, 5 fois par seconde), si
+  cette flotte, ou celle qui reçoit pour « Donner », n'existe plus, la fenêtre se ferme avec le
+  message « Cette flotte n'existe plus. ». `splitFleet` refuse une flotte inconnue avec
+  « Flotte introuvable. » (`transferFleet` le faisait déjà, par `pairOf`).
+- Même idée pour la vue d'une colonie (4e critère de #73, demandé par le router) : si la colonie
+  affichée n'est plus à moi, `renderPlanet` revient sur la planète mère, comme avant, mais dit
+  d'abord « Tu as perdu ta colonie X : retour à ta planète mère. » (X : le nom affiché au
+  rafraîchissement d'avant, `openName`). Seulement si la vue planète est à l'écran : depuis la
+  carte, le retour reste silencieux (rien ne change à l'écran).
+- Alternatives écartées : garder la fenêtre ouverte avec un message dedans (un bouton qui ne
+  peut plus rien faire reste à l'écran) ; suivre la flotte absorbante comme la fiche de flotte
+  (la fenêtre parlerait d'une flotte, et agirait sur une autre).
+- Qui : Claude, par défaut (textes des messages, fermeture plutôt que message dans la fenêtre) ;
+  router (colonie perdue incluse dans la PR). Source : session `c88abd15`, issue #73. Statut : en vigueur.
+- Tests : `tests/fleet.test.mjs`, scénario « flotte détruite au combat pendant « Scinder » ou
+  « Donner » … ». Fermeture de la fenêtre et message de la colonie : vérifiés dans le vrai jeu
+  (pas de DOM sous Node).
+
+**D-351 — Cache `astra-p2p-v90`, puis `astra-p2p-v111`**
+- 2026-11-06. Contexte : v89 (PR #166) est dans `main`.
+- Choix : `VERSION` passe à `astra-p2p-v90` pour que les téléphones prennent les nouveaux
+  `app.js` et `session.js`. À la fusion de `main` (2026-11-07, v110, D-411) : `astra-p2p-v111`.
+- Qui : Claude, par défaut. Source : session `c88abd15`. Statut : en vigueur.
