@@ -499,7 +499,7 @@ Aucune conversation ne les prouve.
 - 2026-10-28 21:47. Choix : plus de « appuie encore une fois » ; l'ancienne partie va dans
   l'historique (reprendre, revoir, oublier) ; l'identité du joueur est gardée par partie.
 - Qui : Vincent (demande) ; le nombre 10 et les boutons par Claude.
-- Source : `f4afbcd0` 21:47:41, 21:50:00 ; `1eeb2c1`. Statut : en vigueur (`KEEP = 10`).
+- Source : `f4afbcd0` 21:47:41, 21:50:00 ; `1eeb2c1`. Statut : en vigueur (`KEEP = 10`) ; stockage modifié par D-415 (une clé par partie, les plus vieilles retirées si la mémoire est pleine).
 
 **D-067 — Parallaxe : pas au doigt, mais à l'accéléromètre**
 - 2026-10-28 22:15–22:16. Choix : le glissé du doigt ne bouge pas les étoiles (sinon elles
@@ -2090,7 +2090,9 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
 - Vérifié : scénario « D-170 : un historique abîmé… » (`tests/decisions-reseau.test.mjs`, les 5
   formes de l'issue), qui échoue sans la correction ; vrai jeu avec `{"zzz":null}` puis `"abc"`.
 - Qui : Vincent (demande : corriger #87), Claude (forme de la correction). Source : session
-  `9e675a52`. Statut : en vigueur. Complète D-066.
+  `9e675a52`. Statut : en vigueur, modifiée par D-415 (le bloc `astra.saves` n'existe plus : il est
+  repris puis effacé ; même règle pour l'index `astra.games` et les clés `astra.save.<gid>`, et
+  l'historique n'est plus réécrit à chaque ordre, seulement au changement de partie). Complète D-066.
 
 **D-175 — Le calcul de l'économie est borné à 2 000 pas ; l'heure d'une planète reçue a un plancher**
 - 2026-11-06. Contexte : issue #32. `steps` et `until` intégraient l'économie par pas de 48 s
@@ -2859,3 +2861,72 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
 - Qui : Vincent, tranché le 2026-11-07 (retour au merge quand le force-push est bloqué) ; chaîne
   et ordre décidés par la session de coordination. Source : worker `worker-merger`
   (session `996daf2e`), PR #170. Statut : en vigueur. Remplace D-410.
+## 6 novembre 2026 — mémoire pleine (#41)
+
+Numérotée D-240 au départ (D-163 à D-239 pris ou réservés par les autres PR en cours) ; D-240 étant
+prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fusion de `main` (D-411).
+
+**D-415 — Une clé par partie ; mémoire pleine : les plus vieilles parties laissent la place**
+- 2026-11-06 22:28 UTC. Contexte : issue #41. `saveGame` écrivait `astra.save` (partie en cours)
+  puis `astra.saves` (tout l'historique, partie en cours comprise : stockée deux fois), et
+  `write()` avalait `QuotaExceededError`. Quand l'historique remplissait les ≈ 5 M caractères du
+  `localStorage`, la partie en cours n'était plus sauvée, sans message, et chaque nouvelle partie
+  faisait disparaître la précédente. La demande (router) : la partie en cours n'est jamais perdue ;
+  manque de place → retirer les plus anciennes jusqu'à ce que l'écriture passe ; la partie en
+  cours stockée une fois ; un message si la sauvegarde échoue malgré tout.
+- Choix de Claude :
+  1. **Format** : `astra.save` garde la partie en cours, elle seule (même forme qu'avant : rien ne
+     change pour `loadGame`, `replay.html`) ; chaque partie de l'historique a sa clé
+     `astra.save.<gid>` ; un petit index `astra.games` `{ gid: savedAt }` donne l'ordre sans lire
+     les parties (le faux `localStorage` des tests ne sait pas énumérer ses clés). 10 parties au
+     plus, partie en cours comprise (D-066 inchangé).
+  2. **Écritures** : une action n'écrit que `astra.save`. L'historique ne change qu'au changement
+     de partie (nouvelle partie, partie rejointe, reprise depuis l'accueil) : la nouvelle partie
+     est écrite d'abord, puis l'ancienne est rangée dans sa clé.
+  3. **Mémoire pleine** : sur `QuotaExceededError` (ou ses variantes Safari, ancien Firefox), on
+     retire la plus ancienne partie de l'historique, jamais la partie en cours, et on réessaie,
+     jusqu'à ce que ça passe. En reprenant une partie de l'historique, sa propre copie là-bas part
+     la première (sinon, pendant un instant, la partie serait comptée deux fois et une autre
+     partie serait retirée pour rien). Si même l'historique vide ne suffit pas, les parties retirées sont
+     remises (elles tenaient avant) : on ne perd rien pour rien. Une autre erreur (stockage bloqué)
+     ne retire rien.
+  4. **Message** : si la partie en cours n'a pas pu être sauvée, toast « Sauvegarde impossible : la
+     mémoire du téléphone est pleine. La partie continue, mais elle ne sera pas gardée si tu
+     fermes l'appli. » (8 s), au plus une fois par minute tant que ça dure. `save.js` ne connaît
+     pas l'écran : `app.js` s'abonne par `onSaveFailed` (rien à changer dans `session.js`). Une
+     partie retirée de l'historique pour faire de la place ne donne pas de message (c'est le
+     comportement demandé). Appli cachée (sauvegarde à `pagehide`) : pas de toast possible, la
+     minute n'est pas comptée, le prochain échec préviendra.
+  5. **Reprise de l'ancien format** (`migrate`, au premier accès) : `astra.saves` est lu en
+     mémoire, effacé d'abord, puis chaque partie valide reçoit sa clé, la plus récente d'abord ;
+     la copie de la partie en cours n'est pas recopiée (gardée si elle est plus récente que
+     `astra.save`). Effacer d'abord : recopier 5 M à côté de 5 M ne tiendrait pas. Le risque
+     (fermeture entre l'effacement et la recopie) est nul en pratique : c'est du JS synchrone.
+- Alternatives écartées : garder `astra.saves` sans la partie en cours (simple, mais chaque
+  retrait réécrit tout le bloc, et un seul bloc abîmé touche toutes les parties) ; compresser
+  les parties (repousse la limite sans la supprimer) ; IndexedDB (asynchrone, change tout le
+  code qui sauvegarde) ; un message à chaque partie retirée (bruit, alors que c'est voulu).
+- Effet de bord : règle aussi #91 (« chaque action réécrit tout l'historique ») : avec 9 parties
+  de 450 K en historique, une action écrit 450 140 car. au lieu de 4 951 504 (Node) ;
+  `saveGame` prend 0,5 à 0,9 ms au lieu de 8,6 à 10,9 ms (Chromium, Mac, 10 parties de 451 K).
+  Scénario « D-415 (#91) » : un vrai ordre écrit moins de 1,2 × la taille de la partie en cours.
+  Non mesuré sur téléphone. La PR ferme donc aussi #91.
+- Reprise de l'ancien format qui échoue (une partie ne peut pas être recopiée, alors que
+  `astra.saves` est déjà effacé) : on essaie quand même les suivantes, et le joueur est prévenu
+  (`onSaveFailed('history', n)`, toast « Mémoire du téléphone pleine : n ancienne(s) partie(s)
+  n'a/ont pas pu être gardée(s). »). Demandé par le router à la vérification.
+- Limites : les identités des parties retirées restent dans `astra.identities` (quelques dizaines
+  de caractères chacune) ; une partie en cours plus grosse que toute la mémoire n'est pas sauvée
+  (message).
+- Cache : `sw.js` passe à `astra-p2p-v87` (v86 est dans `main`), puis `astra-p2p-v106` à la fusion
+  de `main` (v105, D-411).
+- Vérifié : 5 scénarios D-415 (`tests/decisions-reseau.test.mjs`, quota simulé de 5 242 880
+  car. qui lève `QuotaExceededError`) : 6 parties de 1 M jouées l'une après l'autre ; échec forcé
+  (mémoire et stockage bloqué) ; reprise d'une partie de 1,2 M à mémoire presque pleine (aucune
+  autre partie perdue ; échoue sans la correction) ; reprise de l'ancien format (petites parties, et 3 parties de 1,25 M
+  qui remplissent la mémoire, et une partie refusée : prévenu) ; un ordre avec 10 parties en historique
+  n'écrit que la partie en cours (#91). Scénario D-170 adapté. Vrai jeu dans Chromium : reprise de
+  l'ancien format (4 parties de 1,2 M), retrait de la plus vieille en reprenant une partie
+  (quota simulé dans la page : ce navigateur accepte ≈ 26 M), toast quand l'écriture est refusée.
+- Qui : Vincent (demande, par le router : corriger #41), Claude (méthode). Source : session
+  `ae22884b`. Statut : en vigueur. Modifie D-066 et D-170.
