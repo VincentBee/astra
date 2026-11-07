@@ -133,13 +133,18 @@ document.addEventListener('visibilitychange', () => {
 
 let scanAbort = null;
 async function scan() {
+  scanAbort?.abort(); // un scan déjà ouvert s'arrête avant le nouveau
+  const ctl = new AbortController();
+  scanAbort = ctl;
   $('scanner').hidden = false;
-  scanAbort = new AbortController();
   try {
-    return await scanQr($('scanner-video'), { signal: scanAbort.signal });
+    // scanQr rejette avec AbortError dès « Annuler », même avant que la caméra soit prête (#42).
+    return await scanQr($('scanner-video'), { signal: ctl.signal });
   } finally {
-    $('scanner').hidden = true;
-    scanAbort = null;
+    if (scanAbort === ctl) {
+      $('scanner').hidden = true;
+      scanAbort = null;
+    }
   }
 }
 $('btn-scan-cancel').onclick = () => scanAbort?.abort();
@@ -361,12 +366,16 @@ async function openInviteSheet() {
   $('answer-input').value = '';
   $('offer-qr').hidden = true;
   $('offer-wait').hidden = false;
+  let code;
   try {
-    offerCode = await session.openInvite();
+    code = await session.openInvite();
   } catch (e) {
     $('offer-wait').textContent = e.message;
     return;
   }
+  // null : fenêtre fermée ou invitation relancée pendant la préparation (#70), rien à dessiner.
+  if (!code) return;
+  offerCode = code;
   drawQr($('offer-qr'), inviteLink(offerCode));
   $('offer-qr').hidden = false;
   $('offer-wait').hidden = true;

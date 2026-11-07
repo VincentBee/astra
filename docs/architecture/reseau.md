@@ -46,7 +46,7 @@ pas la différence, sauf `link.viaRoom` (voir §6, `attach`).
 | `js/config.js` | `ICE_SERVERS` (STUN Cloudflare seul, TURN en commentaire) l.9 ; `relayUrls()` l.16 lit `localStorage['astra.relays']` (relais Nostr perso, sinon `null` = relais publics de Trystero) ; `ICE_GATHER_TIMEOUT_MS = 3500` l.26. |
 | `js/peer.js` | WebRTC brut sans serveur de signalisation. `Link` (enveloppe d'un data channel, JSON, découpage en morceaux). Invitations par QR : `createInvite` l.153 / `answerInvite` l.217. Connexions relayées : `makeOffer` l.251 / `makeAnswer` l.269. |
 | `js/invite.js` | Compresse un SDP en code court `o2.<base64url>` (offre) ou `a2.<base64url>` (réponse), ~150 caractères, et le reconstruit. `encode` l.187, `decode` l.195, `inviteLink` l.210, `drawQr` l.215. |
-| `js/scanner.js` | `scanQr(video, {signal})` l.22 : caméra arrière + jsQR chargé à la demande (`loadJsQR` l.6). |
+| `js/scanner.js` | `scanQr(video, {signal})` l.25 : caméra arrière + jsQR chargé à la demande (`loadJsQR` l.6). Chaque attente (jsQR, `getUserMedia`, `play`, lecture) fait la course avec l'annulation : rejet `AbortError` immédiat, pistes arrêtées, flux tardif éteint à son arrivée (D-250, #42). |
 | `js/rendezvous.js` | Reconnexion automatique sans rescanner : salon Trystero/Nostr propre à la partie, chiffré par la clé de la partie. Classe `Rendezvous` l.82. |
 | `js/session.js` | Classe `Session` l.197 : création/arrivée, messages, fusion des copies, maillage, sauvegarde. Contient aussi toutes les règles (l.696-1771, voir `regles.md`). |
 | `js/save.js` | Copie locale de la partie et identité dans `localStorage` ; historique de 10 parties ; `mergeStates` (fusion de deux copies). |
@@ -134,7 +134,7 @@ Découpage convenu avec code-regles : **ici** constructeur, création/arrivée, 
 | `touch(log)` | 584 | J'ai changé ma fiche : `actAt = max(now, actAt+1)`, `v = FORMAT`, ajout de l'ordre en cours au journal `orders`, diffusion. |
 | `gameKey` / `meet()` / `onRoomLink` | 599 / 604 / 619 | Rendez-vous automatique. Parties sans `key` : clé `k-<gid>`. |
 | `dial` / `onSignal` | 628 / 643 | Maillage : un joueur déjà connecté relaie l'offre et la réponse. |
-| `openInvite` / `acceptAnswer` / `cancelInvite` | 674 / 680 / 689 | Invitations (tout joueur peut inviter). |
+| `openInvite` / `acceptAnswer` / `cancelInvite` | 752 / 769 / 779 | Invitations (tout joueur peut inviter). Jeton numéroté (`inviteTicket`, D-300) : une invitation fermée ou remplacée pendant sa préparation est fermée dès qu'elle est prête, et `openInvite` renvoie `null`. |
 | `addLog` / `pushLog` | 1772 / 1779 | Journal de partie : 120 caractères par entrée, 40 entrées gardées. |
 | `snapshot()` | 1787 | Copie envoyée : journal limité aux 20 dernières entrées, champ `online` retiré. |
 | `changed()` / `scheduleSave()` / `save()` | 1793 / 1799 / 1807 | Sauvegarde immédiate après action ; différée de 500 ms à la réception d'une fiche. On ne sauve que si `status === 'playing'`. |

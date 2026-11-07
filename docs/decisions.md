@@ -2461,3 +2461,55 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
   prochain appui sur **Rejoindre** (une seule fois). Non traité : rare, et sans effet durable.
 - Qui : Claude, par défaut (la piste venait de l'issue). Source : session `07a4ccd7`, issue #69.
   Statut : en vigueur. Cache `astra-p2p-v87`, puis `astra-p2p-v95` à la fusion de `main` (#167 à v94).
+
+**D-300 — Une invitation abandonnée pendant sa préparation est fermée (jeton numéroté)**
+- 2026-11-06. Contexte : issue #70. `openInvite` attendait `createInvite()` (collecte des
+  adresses, jusqu'à 3,5 s) avant de ranger l'invitation : fermer « Inviter » pendant cette
+  attente n'annulait rien, et plusieurs ouvertures rapides laissaient des `RTCPeerConnection`
+  orphelines, même après `session.end()`.
+- Choix : chaque `openInvite` prend un jeton numéroté (`inviteTicket`), que `cancelInvite`
+  change. Si le jeton a changé à la fin de l'attente (fenêtre fermée, ou nouvelle invitation),
+  l'invitation obtenue est fermée et `openInvite` renvoie `null` ; une erreur de
+  `createInvite` survenue pendant une préparation abandonnée est ignorée (personne n'attend
+  plus ce message). `openInviteSheet` ne dessine rien quand il reçoit `null`. Une invitation
+  acceptée n'est plus dans `session.invite` : la fermer ou rouvrir ne touche pas sa connexion.
+  Cache `astra-p2p-v96` (v87 au départ, relevée au-dessus de v95 de `main` à la fusion).
+- Alternatives écartées : désactiver « Fermer » tant que le QR n'est pas prêt (attente subie,
+  et rouvrir vite fuirait toujours) ; ranger la promesse en cours dans `session.invite`
+  (change le type que lit `acceptAnswer`).
+- Qui : Claude, par défaut (piste de l'issue). Source : session `6ca7574f`, issue #70.
+  Statut : en vigueur.
+- Tests : `tests/invite-open.test.mjs` (fausse `RTCPeerConnection` qui compte les connexions
+  ouvertes : 1 et 5 ouvertures/fermetures → 0 ouverte ; 3 ouvertures d'affilée → 1 ; une
+  invitation acceptée reste ouverte).
+
+## 6 novembre 2026 — Annuler le scanner à tout moment (#42)
+
+**D-250 — L'annulation du scan fait la course avec chaque attente**
+- 2026-11-06 22:27. Contexte : issue #42. `scanQr` ne posait son écouteur `abort` qu'après le
+  chargement de jsQR, `getUserMedia` et `play()`. Un « Annuler » arrivé avant était perdu : la
+  promesse ne finissait jamais, `#scanner` restait affiché, la caméra restait allumée, et un
+  second « Annuler » ne faisait rien. Numéro : D-163 à D-249 étant pris ou réservés, D-250.
+- Choix de Claude, par défaut :
+  1. Signal déjà annulé à l'appel → `AbortError` tout de suite, rien ne démarre.
+  2. L'écouteur `abort` est posé dès l'entrée ; il crée une promesse `aborted` qui rejette.
+     Chaque attente (`loadJsQR`, `getUserMedia`, `video.play`, boucle de lecture) passe par
+     `Promise.race([attente, aborted])` : le rejet arrive en quelques ms, à n'importe quelle étape.
+  3. Un flux donné par `getUserMedia` après l'annulation est éteint à son arrivée et n'est jamais
+     branché sur la vidéo.
+  4. `stop()` arrête toutes les pistes et débranche aussi la vidéo (`srcObject = null`), à
+     l'annulation comme après un QR lu ; l'écouteur est retiré à la fin.
+  5. `scan()` (`js/app.js`) annule un scan encore ouvert avant d'en ouvrir un autre, et seul le
+     scan courant cache `#scanner` dans son `finally`.
+- Alternatives écartées : vérifier `signal.aborted` après chaque `await` sans course (le rejet
+  attendrait la fin de la boîte d'autorisation, qui peut durer longtemps sur téléphone) ;
+  annuler la demande `getUserMedia` elle-même (impossible : l'API n'a pas de signal).
+- Sans effet sur #86 (chargement de jsQR raté qui reste raté) : `loadJsQR` n'est pas touché ; une
+  annulation pendant le chargement laisse ce chargement finir et servir au scan suivant.
+- Cache `sw.js` : `astra-p2p-v87`, puis `astra-p2p-v97` à la fusion de `main` et de la PR #169 (v96).
+- Vérifié : `tests/scanner.test.mjs` (caméra simulée, annulation à 100 ms, 1 s, au démarrage de la
+  vidéo et pendant la lecture ; 4 tests sur 7 restent bloqués sans la correction ; tests simples et
+  non scénarios filmés, car il n'y a ni partie ni carte à montrer) ; vrai Chrome sur
+  la vraie appli (Rejoindre → Scanner → Annuler à 100 ms, 1 s, 3 s ; scan normal d'un QR filmé).
+- Qui : Vincent (demande : corriger #42), Claude (forme de la correction). Source : session
+  `b919ce58`. Statut : en vigueur.
