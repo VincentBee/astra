@@ -216,6 +216,10 @@ button.close-btn svg { width: 18px; height: 18px; }
 .tile .amount .cap { font-size: 0.8rem; font-weight: 500; color: var(--muted); }
 .tile .rate { font-size: 0.78rem; color: var(--muted); }
 .tile .rate.neg { color: var(--warn); }
+/* Coefficient du climat dans la carte d'une ressource (D-221) : vert au-dessus de 1, orange en dessous. */
+.tile .label .clim { position: relative; z-index: 1; padding: 0 0.2em; background: var(--panel); margin-left: 0.1em; font-size: 0.68rem; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--muted); vertical-align: 0.05em; }
+.tile .label .clim.up { color: var(--ok); }
+.tile .label .clim.down { color: var(--warn); }
 /* Mini-graphe de l'historique : derrière le texte, en haut à droite, très discret. */
 .spark { position: absolute; top: 10px; right: 12px; width: 48%; height: 34px; pointer-events: none; overflow: visible; }
 .spark-line { fill: none; stroke: var(--c); stroke-width: 1.5; vector-effect: non-scaling-stroke; opacity: 0.45; }
@@ -318,7 +322,6 @@ button.close-btn svg { width: 18px; height: 18px; }
 .race-link { color: var(--accent); font-weight: 600; }
 .race .race-link { background: none; border: 0; padding: 0; min-height: 0; font: inherit; text-decoration: underline; cursor: pointer; }
 /* Fin de partie (D-143) : classement final, médailles carrées */
-.finish .sheet-panel { align-self: center; border-bottom: 1px solid var(--line); }
 .finish h2 { display: inline-flex; align-items: center; gap: 8px; }
 .finish-board { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .finish-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); background: var(--panel); }
@@ -335,13 +338,28 @@ button.close-btn svg { width: 18px; height: 18px; }
 .f-pts { font: 0.9rem var(--mono); color: var(--energy); white-space: nowrap; }
 .finish-points { display: inline-flex; align-items: center; gap: 6px; justify-self: start; }
 /* Bandeau du départ (D-120) : joueurs présents, prêts ou non */
-.pick-who { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.pick-who { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; } /* un joueur par ligne (D-241) */
 .pick-who .pw { display: inline-flex; align-items: center; gap: 4px; }
 .pick-who .pw.ok { color: var(--ok, #7cf0b4); }
 .pick-who .pw.off { opacity: 0.5; }
 .pick-who .pw .hint { color: var(--muted); }
+/* IA modifiable par l'hôte (D-399, D-400) : la ligne se touche, un crayon le dit. */
+.pick-who button.pw.edit { min-height: 36px; padding: 2px 10px; font: inherit; font-weight: 400; color: inherit; background: rgba(255, 255, 255, 0.04); border: 1px dashed var(--line); border-radius: 8px; }
+.pick-who button.pw.edit .pen { color: var(--muted); margin-left: 2px; }
+button.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
 .pick-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .pick-actions:not(:has(button:not([hidden]))) { display: none; }
+/* Lobby (D-242) : avant le départ, pas de carte ; l'en-tête en haut, puis le bandeau sur toute
+   la hauteur de l'écran, la liste des joueurs défile si besoin, les boutons collés en bas. */
+#screen-game.lobby {
+  height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column;
+}
+#screen-game.lobby > #view-universe { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+#screen-game.lobby .map-head { order: -1; }
+#screen-game.lobby #pick { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+#screen-game.lobby #pick-who { flex: 0 1 auto; min-height: 0; overflow-y: auto; }
+#screen-game.lobby .pick-actions { margin-top: auto; }
 .banner.race.hot { border-color: rgba(255, 179, 107, 0.8); }
 .banner.threat {
   width: 100%;
@@ -381,7 +399,6 @@ button.close-btn svg { width: 18px; height: 18px; }
 .climate-name.hot { color: #ff9a4d; }
 .climate-name.mild { color: var(--food); }
 .climate-name.cold { color: #7fc8ff; }
-#soil-zone .climate { margin-bottom: 10px; }
 .pi-head-right { display: flex; align-items: center; gap: 12px; }
 .fi-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .fi-fuel { display: grid; gap: 4px; }
@@ -412,10 +429,14 @@ button.close-btn svg { width: 18px; height: 18px; }
 .mf.hot { border-left-color: #ff7a93; }
 .mf.dry { opacity: 0.55; }
 .mf[aria-pressed='true'] { border-color: var(--text); background: var(--panel-2); }
-/* Case d'une de mes planètes (D-115) : bord vert, boutons Construire et Décoller en bas. */
-.mf.mp { border-left-color: var(--ok); }
+/* Case d'une de mes planètes (D-115) : boutons Construire et Décoller en bas ; cadre fin partout, sans bord gauche coloré (D-301). */
+.mf.mp { border-left: 1px solid var(--line); }
 .mf-top strong { display: inline-flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mf-top .ic { width: 14px; height: 14px; color: var(--accent); }
+/* Jauges de stock d'une case de planète (D-303) : barres fines, sans chiffre. */
+.mp-gauges { display: grid; gap: 2px; }
+.mp-g { display: block; height: 3px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+.mp-g b { display: block; height: 100%; width: 0; background: var(--c); }
 .mp-actions { display: flex; justify-content: flex-end; gap: 4px; }
 .mp-actions:empty { display: none; }
 .mp-actions button { min-height: 32px; padding: 0 10px; }
@@ -435,6 +456,7 @@ button.close-btn svg { width: 18px; height: 18px; }
 .map-wrap canvas { display: block; width: 100%; height: auto; aspect-ratio: 1; border-radius: 0; touch-action: none; }
 /* Zoom de la carte (D-117) : boutons en colonne, en haut à droite, par-dessus le canvas. */
 .map-wrap { position: relative; }
+.map-wrap[hidden] { display: none; } /* avant le départ, pas de carte du tout (D-241) */
 .map-zoom { position: absolute; top: 12px; right: 12px; display: grid; gap: 4px; }
 .map-zoom button { width: 36px; min-height: 36px; padding: 0; background: rgba(10, 14, 28, 0.82); }
 .map-zoom button:disabled { opacity: 0.35; }
@@ -454,27 +476,42 @@ button.close-btn svg { width: 18px; height: 18px; }
 
 .sheet {
   position: fixed;
-  inset: 0;
+  /* Hauteur de l'écran visible (D-243) : avec inset: 0, le bas suivait la fenêtre, plus haute que
+     l'écran visible (barre du navigateur, aperçu réduit) : le bas du panneau sortait de l'écran. */
+  top: 0; left: 0; right: 0;
+  height: 100dvh;
   z-index: 20;
   background: rgba(3, 5, 12, 0.7);
   display: flex;
-  align-items: flex-end;
+  /* Toutes les fenêtres ont le style du Journal (D-302, D-246) : panneau centré, 12 px de
+     marge autour, fond assombri derrière. */
+  align-items: center;
   justify-content: center;
+  padding: 12px;
 }
 .sheet-panel {
   width: 100%;
-  max-width: 560px;
-  max-height: 92vh;
+  max-width: 760px;
+  /* Toute la hauteur restante (D-302) ; le contenu défile dedans, sous l'en-tête collé. */
+  height: 100%;
   overflow-y: auto;
+  overscroll-behavior: contain; /* le défilement reste dans le panneau (D-243) */
   background: var(--bg);
   border: 1px solid var(--line);
-  border-bottom: 0;
   border-radius: 0;
-  padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  padding: 0 max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
   display: grid;
+  align-content: start;
   gap: 18px;
 }
-.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+/* Panneau ouvert : la page derrière ne défile plus (D-243). */
+body:has(.sheet:not([hidden])) { overflow: hidden; }
+.sheet-head {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  /* En-tête collé en haut du panneau, comme le Journal (D-246, D-302). */
+  position: sticky; top: 0; z-index: 1; background: var(--bg);
+  padding-top: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--line);
+}
 .sheet-head h2 { font-size: 1.2rem; }
 
 /* ----- Caméra ----- */
@@ -664,19 +701,6 @@ button.close-btn svg { width: 18px; height: 18px; }
 .p-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .map-head { align-items: center; }
-.help-btn { width: 28px; min-height: 28px; padding: 0; border-radius: 0; font-size: 0.85rem; color: var(--muted); }
-/* Bulle d'aide : au survol, au clavier, ou ouverte d'un toucher (aria-expanded). */
-.help-wrap { position: relative; display: inline-flex; }
-.tooltip {
-  position: absolute; right: 0; top: calc(100% + 8px); z-index: 6;
-  width: min(270px, 80vw); padding: 10px 12px;
-  background: var(--panel-2); border: 1px solid var(--line); border-radius: 0;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-  font-size: 0.8rem; line-height: 1.4; color: var(--text); text-align: left;
-  opacity: 0; visibility: hidden; transition: opacity 0.15s;
-}
-@media (hover: hover) { .help-wrap:hover .tooltip { opacity: 1; visibility: visible; } }
-.help-btn:focus-visible + .tooltip, .help-btn[aria-expanded="true"] + .tooltip { opacity: 1; visibility: visible; }
 .fi-actions button { min-height: 34px; padding: 0 10px; }
 
 /* ----- Design épuré -----
@@ -690,8 +714,7 @@ button:not(:disabled):hover { border-color: var(--accent); }
 .topbar { background: var(--bg); border-bottom: 1px solid var(--line); }
 .card, .tile, .banner, .map-wrap { box-shadow: none; }
 .tile { border-top-width: 1px; }
-.toast, .tooltip { box-shadow: none; }
-.sheet-panel { border-bottom: 0; }
+.toast { box-shadow: none; }
 .scanner-frame { border-width: 2px; }
 
 /* Icônes de l'interface : trait fin, couleur du texte. */
@@ -705,6 +728,8 @@ button.icon-only, .building > button, .ship-actions button, .fi-actions button, 
 .section-title .ic { width: 14px; height: 14px; }
 .section-title .places { margin-left: auto; }
 .map-head .ic, .banner .ic { color: var(--accent); }
+/* Sur un bouton plein (« Je suis prêt », D-240), l'icône prend la couleur du texte, pas celle du fond. */
+.banner button.primary .ic { color: inherit; }
 .back.icon-only { justify-self: start; width: 40px; }
 .back .ic { width: 22px; height: 22px; }
 .saved .row > .primary { flex: 1 1 auto; }
@@ -790,11 +815,10 @@ html.view-only .screen { pointer-events: none; }
 .badge .rci, .race-tag .rci { color: var(--race, var(--accent)); }
 #race-others .rci { width: 18px; height: 18px; }
 
-/* Nom de la planète, son climat sur la même ligne, ses gisements juste dessous. */
+/* Nom de la planète (sans son climat, D-311) : il prend la place libre, les boutons restent à
+   droite. */
 .planet-head { gap: 10px; flex-wrap: wrap; }
-.planet-head h2 { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.planet-head .climate { margin-left: auto; white-space: nowrap; font-size: 0.75rem; }
-.planet-head .climate .qty .ri { margin-left: 0.1em; }
+.planet-head h2 { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Compteur de joueurs en ligne (barre du haut) : ouvre la fenêtre des joueurs. */
 button.net-btn {
@@ -828,7 +852,6 @@ button#btn-journal { color: var(--text); }
 .journal .j-forces th:first-child, .journal .j-forces td:first-child { text-align: left; }
 .journal .j-forces th { color: var(--muted); font-weight: normal; }
 #sheet-journal section { margin-top: 12px; }
-#sheet-journal .sheet-panel { max-height: 85vh; overflow-y: auto; }
 #sheet-players .sheet-panel { gap: 14px; }
 #net-detail { margin: 0; }
 
@@ -864,18 +887,10 @@ button#btn-journal { color: var(--text); }
 .topbar { display: none; }
 .map-head, .planet-head { min-height: 48px; }
 .planet-head #net { margin-left: 8px; }
-/* Climat centré entre le nom de la planète et le compteur de joueurs. */
-.planet-head .climate { flex: 1; margin-left: 0; text-align: center; }
 /* L'icône du compteur garde la couleur du bouton (vert, orange si lent), partout. */
 #net .ic { color: inherit; }
 /* Aide de la carte à gauche, à côté des coordonnées : sa bulle s'ouvre vers la droite. */
 .map-head > span:first-child { display: flex; align-items: center; gap: 8px; }
-/* La bulle se place depuis l'en-tête entier, pas depuis le « ? » (#51) : partie du « ? » (x≈187),
-   elle finissait à x≈443 et, même fermée (visibility:hidden garde sa place), élargissait la page
-   sur les téléphones de 320 à 430 px. Calée sur les bords de l'en-tête, elle ne peut plus sortir. */
-.map-head { position: relative; }
-.map-head .help-wrap { position: static; }
-.map-head .help-wrap .tooltip { left: 0; right: 0; width: auto; }
 
 /* Fil de construction (D-101) : ce qui attend le chantier, avec l'heure estimée.
    Nom en haut, heure dessous, × à droite sur les deux lignes (D-157) : sur une seule ligne,

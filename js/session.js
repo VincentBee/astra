@@ -19,8 +19,9 @@
 
 import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Rendezvous } from './rendezvous.js';
-import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity } from './save.js';
-import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, PLAN_MAX, planItem, planId, planAhead, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, FROST, sunFor, fortOf, seeded } from './game.js';
+import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity, identityFor, savedGame } from './save.js';
+import { inviteGid } from './invite.js';
+import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, PLAN_MAX, planItem, planId, planAhead, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, FROST, sunFor, fortOf, seeded, RES } from './game.js';
 import { TECHS, SHIPS, sightRange, TEMPO, techMissing, shipUnlocked } from './tech.js';
 import { cleanReport } from './report.js';
 import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, firstContact, salvage, applyLosses, parkedCell, fleetPos, fleetCargo, fleetTank, ORDERS, MAX_FLEETS, STANCES, aggressive, armed } from './fleet.js';
@@ -42,8 +43,9 @@ const de = (name) => (/^[aeiouyhàâéèêëîïôöûü]/i.test(name) ? `d’${
  * 9 : départ quand tous les joueurs présents sont prêts (`ready`, `go`), flotte de départ
  *     avec un seul colonisateur qui fonde la planète mère.
  * 10 : recherches et lots de vaisseaux dans le fil d'attente (`plan`, D-158).
+ * 11 : heure commune et resynchronisation d'une fiche (`clockFix`, D-165, D-166).
  */
-export const FORMAT = 10;
+export const FORMAT = 11;
 
 const shipsText = (n) => `${n} vaisseau${n > 1 ? 'x' : ''}`;
 
@@ -88,6 +90,41 @@ const JOURNAL_MAX = 100;
 /** Pas (ms) auquel on regarde si le froid atteint une flotte en vol (D-163). */
 const FROST_STEP = 1000;
 const HEARTBEAT_MS = 1500;
+/**
+ * Changement d'heure (D-166, choix de Claude) : si l'heure commune d'un joueur s'écarte de plus de
+ * 10 s de la mienne (ou de l'écart de référence, s'il n'a pas encore l'heure commune), son heure a
+ * changé. La mesure (battement de cœur) est juste à 1 s près.
+ */
+export const CLOCK_DRIFT_MS = 10_000;
+/** Battements gardés pour mesurer l'écart d'horloge d'un lien (la médiane écarte un message lent). */
+const SKEW_SAMPLES = 5;
+/** Heure commune de chaque partie sur ce téléphone : astra.clocks = { gid: { off, synced, at } } (D-165). */
+const CLOCKS_KEY = 'astra.clocks';
+function loadClock(gid) {
+  try {
+    const c = JSON.parse(localStorage.getItem(CLOCKS_KEY) || '{}')?.[gid];
+    return c && Number.isFinite(c.off) ? c : null;
+  } catch {
+    return null;
+  }
+}
+function storeClock(gid, c) {
+  try {
+    let all = JSON.parse(localStorage.getItem(CLOCKS_KEY) || '{}');
+    if (!isObj(all)) all = {};
+    all[gid] = c;
+    all = Object.fromEntries(Object.entries(all).filter(([, v]) => isObj(v)).sort((a, b) => (b[1].at || 0) - (a[1].at || 0)).slice(0, 10));
+    localStorage.setItem(CLOCKS_KEY, JSON.stringify(all));
+  } catch {
+    // stockage plein ou interdit : l'heure commune sera reprise des autres au prochain contact
+  }
+}
+/** « 40 s », « 10 min », « 3 h » : un écart d'horloge, pour un joueur. */
+const gapText = (ms) => {
+  const sec = Math.round(Math.abs(ms) / 1000);
+  return sec < 120 ? `${sec} s` : sec < 7200 ? `${Math.round(sec / 60)} min` : `${Math.round(sec / 3600)} h`;
+};
+const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
 // Sans nouvelles depuis ce délai, la connexion est considérée perdue (un
 // écran verrouillé quelques secondes ne doit pas faire sortir de la partie).
 const SILENCE_MS = 30000;
@@ -164,12 +201,15 @@ export function normalize(p) {
   if (!Array.isArray(p.orders)) p.orders = [];
   if (p.deathPts !== undefined && !Number.isFinite(p.deathPts)) delete p.deathPts;
   // Prêt (heure) et départ de la partie vu par ce joueur (heure) : des nombres, ou rien.
-  for (const k of ['ready', 'go']) if (p[k] !== undefined && !Number.isFinite(p[k])) delete p[k];
+  // Parti avant le départ (IA retirée du lobby, D-399) : une heure, ou rien.
+  for (const k of ['ready', 'go', 'clockFix', 'left']) if (p[k] !== undefined && !Number.isFinite(p[k])) delete p[k];
   return p;
 }
 
 const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
 const isCell = (c) => isObj(c) && Number.isFinite(c.x) && Number.isFinite(c.y);
+/** Quantité reçue : un nombre fini et au moins 0, sinon 0. */
+const amount = (v) => (Number.isFinite(v) ? Math.max(0, v) : 0);
 /**
  * Planète utilisable : stock, niveaux, et un chantier en cours sur un vrai bâtiment de sa race.
  * Une heure `at` d'avant `floor` (la planète n'existait pas encore) est ramenée à `floor` (D-175).
@@ -177,11 +217,22 @@ const isCell = (c) => isObj(c) && Number.isFinite(c.x) && Number.isFinite(c.y);
 function planetOk(race, pl, floor = -Infinity) {
   if (!isObj(pl) || !isObj(pl.stock) || !isObj(pl.levels) || !Number.isFinite(pl.at)) return false;
   if (pl.at < floor) pl.at = floor;
+  // Stock et population (#76) : un nombre fini et au moins 0, sinon 0. Une clé absente ou une
+  // chaîne rendait toute l'économie NaN pour toujours ; un stock négatif, une famine immédiate.
+  for (const r of RES) pl.stock[r] = amount(pl.stock[r]);
+  if (pl.pop !== undefined) pl.pop = amount(pl.pop);
   // Gisements : pour chaque ressource du sol, un maximum et une repousse, et ce qu'il en reste.
   const soilOk = isObj(pl.nature) && isObj(pl.reserve) && SOIL.every((r) => !pl.nature[r] || (isObj(pl.nature[r]) && Number.isFinite(pl.nature[r].max) && Number.isFinite(pl.nature[r].regen) && Number.isFinite(pl.reserve[r])));
   if (!soilOk) {
     delete pl.nature;
     delete pl.reserve;
+  } else {
+    // Une réserve ou une repousse négative faisait perdre des minéraux à la planète (#76).
+    for (const r of SOIL) {
+      if (!pl.nature[r]) continue;
+      pl.nature[r].regen = Math.max(0, pl.nature[r].regen);
+      pl.reserve[r] = Math.max(0, pl.reserve[r]);
+    }
   }
   if (pl.climate !== undefined && !(isObj(pl.climate) && ['heat', 'energy', 'minerals', 'food'].every((k) => Number.isFinite(pl.climate[k])))) delete pl.climate;
   if (pl.places !== undefined && !(Number.isInteger(pl.places) && pl.places > 0)) delete pl.places;
@@ -202,7 +253,15 @@ function cleanAmounts(o) {
       .map(([k, v]) => [k, Math.min(v, MAX_AMOUNT)]),
   );
 }
-const cleanEffect = (e) => ({ ...e, ships: cleanAmounts(e.ships), take: cleanAmounts(e.take), ack: Array.isArray(e.ack) ? e.ack.filter((x) => typeof x === 'string').slice(0, 20) : [], rep: cleanReport(e.rep) });
+// La case visée (D-360) : deux nombres, sinon le rapport retombe sur sa clé, comme un ancien rapport.
+const cleanCell = (c) => (isObj(c) && Number.isFinite(c.x) && Number.isFinite(c.y) ? { x: c.x, y: c.y } : undefined);
+const cleanEffect = (e) => {
+  const out = { ...e, ships: cleanAmounts(e.ships), take: cleanAmounts(e.take), ack: Array.isArray(e.ack) ? e.ack.filter((x) => typeof x === 'string').slice(0, 20) : [], rep: cleanReport(e.rep) };
+  const cell = cleanCell(e.cell);
+  if (cell) out.cell = cell;
+  else delete out.cell;
+  return out;
+};
 
 /** Identifiant de joueur acceptable (pas de clé spéciale comme __proto__). */
 export const pidOk = (pid) => typeof pid === 'string' && /^[A-Za-z0-9-]{1,24}$/.test(pid);
@@ -257,6 +316,16 @@ export class Session {
     this.me = null;
     this.state = null; // { gid, key, players: {}, log: [] }
     this.links = new Map(); // pid -> Link
+    // Heure commune (D-165) : clockOff = heure commune − heure du téléphone au moment de l'ancrage ;
+    // clockSynced : j'ai l'heure commune (créateur de la partie, ou reprise d'un joueur qui l'a) ;
+    // clockEpoch : change à chaque correction, pour que les autres recommencent leurs mesures.
+    this.clockOff = 0;
+    this.clockSynced = false;
+    this.clockEpoch = 0;
+    this.clockRef = {}; // pid -> écart de référence de son horloge sur la mienne (joueur sans heure commune)
+    this.clockVotes = {}; // pid -> { drift, rec } : ce joueur me dit que mon heure a changé (D-166)
+    this.clockTrust = {}; // pid -> sa dernière fiche reçue quand son heure était juste (D-166)
+    this.clockPending = {}; // pid -> fiche reçue avant que son heure soit mesurée
     this.status = 'idle'; // idle | answering | waiting | playing | failed | refused
     this.invite = null;
     this.dialing = new Map(); // pid -> offre en cours vers ce joueur
@@ -275,6 +344,7 @@ export class Session {
     // key : clé de la partie, qui protège le rendez-vous automatique.
     s.state = { gid: rid(6), key: rid(16), players: {}, log: [] };
     s.addPlayer(s.me, name, await sha256(secret));
+    s.clockSynced = true; // le créateur donne l'heure commune (D-165)
     s.addLog(`${name} ouvre la partie.`);
     saveIdentity({ gid: s.state.gid, pid: s.me, secret });
     s.status = 'playing';
@@ -293,9 +363,10 @@ export class Session {
     s.me = saved.me;
     s.state = clean(saved.state);
     s.status = 'playing';
+    s.loadClock();
     s.intel = saved.intel || {}; // brouillard (D-124) : ce que j'ai vu des planètes des autres
     s.journal = saved.journal || null; // avant le rattrapage : les combats de l'absence s'y inscrivent
-    s.botIds = Array.isArray(saved.bots) ? saved.bots.filter((pid) => pidOk(pid) && s.state.players[pid]) : []; // IA jouées par ce téléphone (D-151), réveillées par js/bot.js
+    s.botIds = Array.isArray(saved.bots) ? saved.bots.filter((pid) => pidOk(pid) && s.state.players[pid] && !Number.isFinite(s.state.players[pid].left)) : []; // IA jouées par ce téléphone (D-151), réveillées par js/bot.js
     s.refreshOnline();
     s.start();
     s.tick();
@@ -307,6 +378,7 @@ export class Session {
   async answer(offer) {
     this.pendingAnswer?.cancel();
     const ans = await answerInvite(offer);
+    this.inviteGid = inviteGid(offer); // la partie de l'hôte, si le lien la dit (D-260)
     this.pendingAnswer = ans;
     this.status = 'answering';
     ans.link.then(
@@ -327,7 +399,11 @@ export class Session {
     this.status = 'waiting';
     this.attach(link, null);
     this.firstLink = link;
-    const id = loadIdentity();
+    // D-260 : si l'invitation dit de quelle partie elle vient, je n'envoie que mon identité
+    // et ma copie de celle-là, jamais le secret d'une autre. Ancien lien ou code seul : comme
+    // avant, l'identité de la dernière partie ouverte.
+    const gid = this.inviteGid;
+    const id = gid ? identityFor(gid) : loadIdentity();
     this.newSecret = rid(16);
     const hello = {
       type: 'hello',
@@ -338,7 +414,7 @@ export class Session {
       secretHash: await sha256(this.newSecret),
       // Ma copie de la partie, si j'en ai une : ma progression faite hors
       // ligne est gardée.
-      copy: loadGame()?.state,
+      copy: (gid ? savedGame(gid) : loadGame())?.state,
     };
     // Le tout premier message d'un canal qui vient de s'ouvrir se perd
     // parfois : on le renvoie chaque seconde jusqu'à l'accusé de réception.
@@ -376,11 +452,57 @@ export class Session {
   // ----- état ------------------------------------------------------------------
 
   /**
-   * Heure de la partie : celle du téléphone (réglée automatiquement par le
-   * réseau). Figée le temps d'un ordre, pour qu'il se rejoue à l'identique.
+   * Heure de la partie : l'heure commune (D-165). Figée le temps d'un ordre, pour qu'il se rejoue
+   * à l'identique.
    */
   now() {
-    return this.entry?.t ?? Date.now();
+    return this.entry?.t ?? this.clock();
+  }
+
+  /** Heure du téléphone et horloge interne du navigateur (que les réglages ne changent pas) ; remplacées en test. */
+  wall() {
+    return Date.now();
+  }
+  mono() {
+    return performance.now();
+  }
+
+  /**
+   * Heure commune (D-165) : heure du téléphone + clockOff, prise une fois (ancrage), puis avancée
+   * par l'horloge interne. Changer l'heure du téléphone page ouverte ne change donc rien.
+   */
+  clock() {
+    const m = this.mono();
+    if (!this.clockAnchor) this.clockAnchor = { wall: this.wall(), mono: m };
+    return Math.round(this.clockAnchor.wall + (m - this.clockAnchor.mono) + this.clockOff);
+  }
+
+  /** Décale l'heure commune de `ms` ; les mesures des autres sur moi et les miennes repartent de zéro. */
+  shiftClock(ms) {
+    this.clockOff += ms;
+    this.clockEpoch++;
+    this.clockRef = {};
+    this.clockVotes = {};
+    for (const l of this.links.values()) Object.assign(l, { skews: [], skew: undefined, driftSent: false });
+    this.storeClock();
+  }
+
+  /** Reprend l'heure commune gardée pour cette partie (sinon : le créateur l'a, les autres la reprendront). */
+  loadClock() {
+    const c = loadClock(this.state.gid);
+    if (c) Object.assign(this, { clockOff: c.off, clockSynced: !!c.synced });
+    else this.clockSynced = this.isCreator(this.me);
+  }
+
+  /** Garde l'heure commune : l'écart avec l'heure du téléphone maintenant (juste même si elle a sauté page ouverte). */
+  storeClock() {
+    if (this.state?.gid && !this.isBot) storeClock(this.state.gid, { off: this.clock() - this.wall(), synced: this.clockSynced, at: this.wall() });
+  }
+
+  /** Le créateur de la partie : le premier arrivé (`rank`), à égalité le plus petit identifiant. */
+  isCreator(pid) {
+    const first = Object.values(this.state?.players || {}).sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity) || (a.id < b.id ? -1 : 1))[0];
+    return !!first && first.id === pid;
   }
 
   /**
@@ -428,19 +550,148 @@ export class Session {
       this.links.set(pid, link);
       if (prev && prev !== link) prev.close();
       this.refreshOnline();
+      // Premier battement tout de suite : l'écart d'horloge est connu sans attendre 1,5 s (D-165).
+      link.send(this.beatMsg('hb', performance.now()));
     }
+  }
+
+  /** Battement de cœur : mon heure commune, si je l'ai, et mon nombre de corrections (D-165). */
+  beatMsg(type, t0, extra) {
+    return { type, t0, ...extra, w: this.clock(), sy: this.clockSynced, ep: this.clockEpoch };
+  }
+
+  /**
+   * Réponse à un battement (D-165, D-166) : écart entre l'heure de ce joueur et la mienne, comme
+   * NTP (son heure à la réponse, moins le milieu de l'aller-retour à mon heure), médiane des 5
+   * derniers. Toute heure est acceptée :
+   * - je n'ai pas l'heure commune et lui l'a : je la prends (clockOff += écart) ;
+   * - tous deux l'avons : l'écart attendu est 0 ; sinon, le premier écart mesuré est la référence ;
+   * - au-delà de CLOCK_DRIFT_MS de l'attendu, son heure a changé : je le lui dis (`clock-changed`,
+   *   avec ce que je sais de lui), une fois, et `clock-ok` quand c'est revenu.
+   * Un téléphone d'avant ne renvoie pas son heure (`noClock`) : rien à comparer.
+   */
+  onClock(link, msg) {
+    if (!Number.isFinite(msg.w) || !Number.isFinite(msg.w0)) {
+      link.noClock = true;
+      return;
+    }
+    const pid = link.pid;
+    if (!pid || link.local) return; // une IA a l'horloge de ce téléphone
+    if (msg.ep !== link.ep) {
+      // Il a corrigé son heure : on recommence à le mesurer.
+      Object.assign(link, { ep: msg.ep, skews: [], skew: undefined, driftSent: false });
+      delete this.clockRef[pid];
+      delete this.clockVotes[pid]; // ses votes dataient d'avant sa correction
+    }
+    link.sy = !!msg.sy;
+    const sample = msg.w - (msg.w0 + this.clock()) / 2;
+    if (!this.clockSynced && link.sy) {
+      this.clockSynced = true;
+      return this.shiftClock(Math.round(sample));
+    }
+    link.skews = [...(link.skews || []), sample].slice(-SKEW_SAMPLES);
+    link.skew = Math.round(median(link.skews));
+    if (link.skews.length < 3) return; // 3 mesures avant de juger
+    if (!(this.clockSynced && link.sy) && !Number.isFinite(this.clockRef[pid])) this.clockRef[pid] = link.skew;
+    const changed = this.clockState(link) === 'drift';
+    if (!changed && this.clockPending[pid]) this.clockTrust[pid] = this.clockPending[pid];
+    if (!changed) delete this.clockPending[pid];
+    if (changed && !link.driftSent) {
+      const rec = this.clockTrust[pid];
+      const { online, ...data } = rec || {};
+      link.send({ type: 'clock-changed', drift: this.clockDrift(link), ...(rec ? { rec: data } : {}) });
+    } else if (!changed && link.driftSent) link.send({ type: 'clock-ok' });
+    link.driftSent = changed;
+  }
+
+  /** Écart entre l'heure de ce joueur et celle attendue (0 si nous avons l'heure commune, sinon la référence). */
+  clockDrift(link) {
+    return link.skew - (this.clockSynced && link.sy ? 0 : this.clockRef[link.pid] ?? link.skew);
+  }
+
+  /** Heure d'un joueur relié : 'ok', 'wait' (pas encore mesurée) ou 'drift' (elle a changé). */
+  clockState(link) {
+    if (!link || link.local || link.noClock) return 'ok';
+    if (!Number.isFinite(link.skew) || (link.skews?.length || 0) < 3) return 'wait';
+    return Math.abs(this.clockDrift(link)) > CLOCK_DRIFT_MS ? 'drift' : 'ok';
+  }
+
+  /** Avant d'adopter une fiche de `pid` : ce que je savais de lui, si je n'en ai rien gardé (D-166). */
+  beforeRec(pid) {
+    if (!Object.hasOwn(this.clockTrust, pid) && this.state.players[pid]) this.clockTrust[pid] = this.state.players[pid];
+  }
+
+  /**
+   * Fiche de `pid` adoptée : gardée comme sûre si son heure est juste, en attente si pas encore
+   * mesurée. Sans lien direct avec lui (fiche relayée, ou reçue avant que son lien soit branché) :
+   * sûre seulement si elle n'est pas datée de mon futur.
+   */
+  afterRec(pid) {
+    const link = this.links.get(pid);
+    const p = this.state.players[pid];
+    const st = link ? this.clockState(link) : (p?.actAt || 0) <= this.now() + CLOCK_DRIFT_MS ? 'ok' : 'wait';
+    if (st === 'ok') this.clockTrust[pid] = this.state.players[pid];
+    else if (st === 'wait') this.clockPending[pid] = this.state.players[pid];
+  }
+
+  /**
+   * Consensus (D-166) : si tous les joueurs humains en ligne avec moi, qui ont mesuré mon heure,
+   * me disent qu'elle a changé, je me resynchronise. À deux, le créateur de la partie l'emporte
+   * (sinon le plus ancien joueur) : il ne se corrige pas sur la parole de l'autre.
+   */
+  checkClock() {
+    const voters = [...this.links.values()].filter((l) => l.pid && !l.closed && !l.local && !l.noClock && (l.skews?.length || 0) >= 3);
+    if (!voters.length || !voters.every((l) => this.clockVotes[l.pid])) return false;
+    if (voters.length === 1 && this.outranks(this.me, voters[0].pid)) return false;
+    return this.resyncClock(voters.map((l) => this.clockVotes[l.pid]));
+  }
+
+  /** `a` l'emporte sur `b` dans un duel d'horloges : le créateur, sinon le premier arrivé. */
+  outranks(a, b) {
+    if (this.isCreator(a)) return true;
+    if (this.isCreator(b)) return false;
+    const [pa, pb] = [this.state.players[a], this.state.players[b]];
+    return (pa?.rank ?? Infinity) < (pb?.rank ?? Infinity) || ((pa?.rank ?? Infinity) === (pb?.rank ?? Infinity) && a < b);
+  }
+
+  /**
+   * Resynchronisation (D-166) : je reprends l'heure du groupe (médiane des écarts qu'ils voient),
+   * et ce que j'ai fait avec ma mauvaise heure est remplacé par ce que les autres savent de moi
+   * (la plus récente des fiches qu'ils m'envoient). `clockFix` augmente : les autres adoptent
+   * cette fiche même si elle paraît plus vieille que celle datée avec ma mauvaise heure.
+   */
+  resyncClock(votes) {
+    const drift = median(votes.map((v) => v.drift));
+    const mine = this.state.players[this.me];
+    const known = votes.map((v) => v.rec).filter((r) => isObj(r) && r.id === this.me && r.secretHash === mine.secretHash).sort((a, b) => (b.actAt || 0) - (a.actAt || 0))[0];
+    this.clockSynced = true;
+    this.shiftClock(-drift);
+    if (known) {
+      const p = normalize(JSON.parse(JSON.stringify(known)));
+      p.online = true;
+      p.clockFix = Math.max(mine.clockFix || 0, p.clockFix || 0) + 1;
+      this.state.players[this.me] = p;
+    } else mine.clockFix = (mine.clockFix || 0) + 1;
+    const p = this.state.players[this.me];
+    const ahead = drift > 0;
+    this.touch(this.addLog(`L’heure du téléphone ${de(p.name)} avait changé : ${p.name} reprend l’heure des autres joueurs.`));
+    this.ontoast?.(`L’heure de ton téléphone ${ahead ? 'avançait' : 'retardait'} de ${gapText(drift)} sur celle des autres joueurs : la partie a repris leur heure${known ? ', et ce que tu as fait pendant ce temps est remplacé par ce qu’ils savaient de toi' : ''}.`, 10000);
+    this.changed();
+    return true;
   }
 
   heartbeat() {
     const now = performance.now();
     for (const link of [...this.links.values()]) {
-      if (now - link.lastSeen > SILENCE_MS) link.close();
+      // Le lien d'une IA de ce téléphone (`local`) ne se coupe jamais pour silence (D-220).
+      if (!link.local && now - link.lastSeen > SILENCE_MS) link.close();
       else {
-        link.send({ type: 'hb', t0: now });
+        link.send(this.beatMsg('hb', now));
         link.route?.().then((r) => r && (link.routeType = r));
       }
     }
     if (this.firstLink && !this.firstLink.closed && now - this.firstLink.lastSeen > SILENCE_MS) this.firstLink.close();
+    if (this.status === 'playing' && this.state) this.checkClock(); // un votant parti : le consensus a pu changer
   }
 
   onLinkClosed(link) {
@@ -462,9 +713,18 @@ export class Session {
   async onMessage(link, msg) {
     switch (msg.type) {
       case 'hb':
-        return link.send({ type: 'hb-ack', t0: msg.t0 });
+        // w0 : son heure à l'envoi ; w : la mienne à la réponse (D-165).
+        return link.send(Number.isFinite(msg.w) ? this.beatMsg('hb-ack', msg.t0, { w0: msg.w }) : { type: 'hb-ack', t0: msg.t0 });
       case 'hb-ack':
         if (Number.isFinite(msg.t0)) link.rtt = Math.round(performance.now() - msg.t0);
+        return this.onClock(link, msg);
+      case 'clock-changed':
+        // Un joueur me dit que mon heure a changé (D-166) : son vote, et ce qu'il sait de moi.
+        if (!link.pid || !Number.isFinite(msg.drift) || !this.state) return;
+        this.clockVotes[link.pid] = { drift: msg.drift, rec: isObj(msg.rec) ? msg.rec : null };
+        return this.checkClock();
+      case 'clock-ok':
+        if (link.pid) delete this.clockVotes[link.pid];
         return;
 
       // --- côté hôte (celui qui a invité) ---
@@ -525,7 +785,7 @@ export class Session {
     link.send({ type: 'hello-ack' });
     // Pas de validation : l'hôte a lui-même scanné (ou collé) la réponse, et
     // une invitation ne sert qu'une fois. C'est déjà son accord.
-    if (Object.keys(st.players).length >= MAX_PLAYERS) {
+    if (this.roster.length >= MAX_PLAYERS) {
       link.send({ type: 'refused', reason: 'La partie est complète (8 joueurs).' });
       return setTimeout(() => link.close(), 300);
     }
@@ -550,7 +810,7 @@ export class Session {
     if (link !== this.firstLink || !msg.state || typeof msg.from !== 'string') return;
     // On adopte la copie de l'hôte, complétée par la nôtre s'il s'agit de la
     // même partie (progression faite hors ligne).
-    const mine = loadGame();
+    const mine = savedGame(msg.state.gid); // ma copie de CETTE partie, pas forcément la dernière ouverte (D-260)
     let st = clean(msg.state);
     if (mine && mine.state.gid === st.gid) st = mergeStates(st, clean(mine.state));
     // Mon carnet de combats de cette partie, s'il est sur ce téléphone (même joueur).
@@ -560,8 +820,9 @@ export class Session {
     }
     this.me = msg.you;
     this.state = st;
-    const id = loadIdentity();
-    const secret = id?.gid === st.gid && id?.pid === msg.you ? id.secret : this.newSecret;
+    this.loadClock(); // nouveau venu : pas d'heure commune, il la prend de son hôte au premier battement (D-165)
+    const id = identityFor(st.gid);
+    const secret = id?.pid === msg.you ? id.secret : this.newSecret;
     saveIdentity({ gid: st.gid, pid: msg.you, secret });
     this.firstLink = null;
     this.status = 'playing';
@@ -586,12 +847,23 @@ export class Session {
       incoming.players[pid] = normalize(JSON.parse(JSON.stringify(rec)));
     }
     const merged = mergeStates(before, incoming);
+    // Resynchronisation d'horloge (D-166) : le plus grand clockFix l'emporte, avant l'heure de la fiche.
+    const took = [];
+    for (const [pid, rec] of Object.entries(incoming.players)) {
+      const old = before.players[pid];
+      const fix = (rec.clockFix || 0) - (old?.clockFix || 0);
+      if (old && fix > 0) merged.players[pid] = { ...JSON.parse(JSON.stringify(rec)), online: old.online };
+      else if (old && fix < 0) merged.players[pid] = JSON.parse(JSON.stringify(old));
+      if (!old || fix > 0 || (fix === 0 && (rec.actAt || 0) > (old.actAt || 0))) took.push(pid);
+    }
+    for (const pid of took) this.beforeRec(pid);
     delete merged.epoch;
     delete merged.nextRank;
     this.state = merged;
     this.refreshOnline();
-    for (const [pid, p] of Object.entries(merged.players)) {
-      if ((p.actAt || 0) > (before.players[pid]?.actAt || 0)) this.spread(p, null, from);
+    for (const pid of took) {
+      this.afterRec(pid);
+      this.spread(merged.players[pid], null, from);
     }
     this.changed();
   }
@@ -632,16 +904,25 @@ export class Session {
   onRecord(link, rec, log) {
     if (!rec || typeof rec.id !== 'string' || !this.state || !this.recordOk(rec.id, rec)) return;
     const ours = this.state.players[rec.id];
-    if (ours && (rec.actAt || 0) <= (ours.actAt || 0)) return; // déjà vue
+    // Déjà vue (plus vieille). Une fiche resynchronisée (D-166, clockFix plus grand) passe quand même ;
+    // une fiche d'avant sa resynchronisation, jamais.
+    const fix = (rec.clockFix || 0) - (ours?.clockFix || 0);
+    if (ours && (fix < 0 || (fix === 0 && (rec.actAt || 0) <= (ours.actAt || 0)))) return;
     if (!ours && Object.keys(this.state.players).length >= MAX_PLAYERS * 2) return;
-    this.state.players[rec.id] = normalize({ ...JSON.parse(JSON.stringify(rec)), online: this.online(rec.id) });
+    this.beforeRec(rec.id);
+    // Lien en mémoire (une IA, même téléphone) : la fiche est déjà une copie à moi, faite à l'envoi
+    // (js/bot.js copyRec, D-370) ; par le réseau, elle est recopiée ici comme avant.
+    const own = link?.copied ? rec : JSON.parse(JSON.stringify(rec));
+    this.state.players[rec.id] = normalize({ ...own, online: this.online(rec.id) });
+    this.afterRec(rec.id);
     // Une ou plusieurs entrées de journal accompagnent la fiche.
     for (const l of [].concat(log || []).slice(0, 10)) {
       if (l && typeof l.text === 'string' && Number.isFinite(l.at)) this.pushLog(l);
     }
     this.spread(rec, log, link);
     this.scheduleSave();
-    this.onchange?.('state');
+    // 'record' : l'écran peut regrouper ces rendus, un par image (D-370).
+    this.onchange?.('state', 'record');
   }
 
   /** Envoie une fiche à tous mes voisins (sauf celui d'où elle vient). */
@@ -743,10 +1024,27 @@ export class Session {
 
   // ----- invitations (tout le monde peut inviter) ---------------------------
 
+  /**
+   * Prépare une invitation et renvoie son code, ou null si elle a été abandonnée pendant sa
+   * préparation (#70) : chaque appel prend un jeton numéroté ; si cancelInvite ou un autre
+   * openInvite passe pendant l'attente, le jeton change et l'invitation obtenue est fermée
+   * au lieu d'être rangée. Ouvrir une invitation ferme la précédente.
+   */
   async openInvite() {
-    this.invite?.cancel();
-    this.invite = await createInvite();
-    return this.invite.code;
+    const ticket = this.cancelInvite();
+    let invite;
+    try {
+      invite = await createInvite();
+    } catch (e) {
+      if (ticket !== this.inviteTicket) return null;
+      throw e;
+    }
+    if (ticket !== this.inviteTicket) {
+      invite.cancel();
+      return null;
+    }
+    this.invite = invite;
+    return invite.code;
   }
 
   async acceptAnswer(answer) {
@@ -758,9 +1056,12 @@ export class Session {
     return link;
   }
 
+  /** Ferme l'invitation ouverte et abandonne celle en préparation ; renvoie le nouveau jeton. */
   cancelInvite() {
     this.invite?.cancel();
     this.invite = null;
+    this.inviteTicket = (this.inviteTicket ?? 0) + 1;
+    return this.inviteTicket;
   }
 
   // ----- jeu ---------------------------------------------------------------------
@@ -787,7 +1088,17 @@ export class Session {
 
   /** On peut jouer : partie en cours, pas finie, et je ne suis pas éliminé. */
   get canAct() {
-    return this.status === 'playing' && !this.over && !this.state?.players[this.me]?.out;
+    const p = this.state?.players[this.me];
+    return this.status === 'playing' && !this.over && !p?.out && !Number.isFinite(p?.left);
+  }
+
+  /**
+   * Joueurs de la partie, sans ceux partis avant le départ (`left`, IA retirée du lobby,
+   * D-399). Leur fiche reste dans `state.players` (sinon la copie d'un autre la ferait
+   * revenir), mais on ne la montre ni ne la compte plus.
+   */
+  get roster() {
+    return Object.values(this.state?.players || {}).filter((p) => !Number.isFinite(p.left));
   }
 
   /** Points de l'empire d'un joueur (toutes ses planètes, ses recherches, ses vaisseaux). */
@@ -820,7 +1131,7 @@ export class Session {
   /** Joueurs présents (moi, et ceux en ligne avec moi) pas encore prêts ni déjà dans la course. */
   get notReady() {
     return Object.values(this.state?.players || {}).filter(
-      (p) => (p.id === this.me || p.online) && !p.out && !p.home && !Number.isFinite(p.ready) && !Number.isFinite(p.since),
+      (p) => (p.id === this.me || p.online) && !p.out && !Number.isFinite(p.left) && !p.home && !Number.isFinite(p.ready) && !Number.isFinite(p.since),
     );
   }
 
@@ -975,12 +1286,26 @@ export class Session {
   noColonizer(p, now) {
     if (!Number.isFinite(p.ready) || !Number.isFinite(p.since) || p.home || p.out != null) return false;
     if ((p.fleets || []).some((f) => f.ships?.colony > 0)) return false;
-    p.deathPts = this.scoreOf(p);
-    p.out = now;
     this.addLog(`${p.name} n’a plus de colonisateur pour fonder sa planète : ${p.name} est éliminé.`);
+    this.eliminate(p, now, this.scoreOf(p));
     this.ontoast?.('Plus de colonisateur pour fonder ta planète : tu es éliminé.', 8000);
     this.note(p, { at: now, kind: 'planet', tone: 'bad', text: 'Plus de colonisateur pour fonder ta planète : tu es éliminé.' });
     return true;
+  }
+
+  /**
+   * Le joueur `p` est éliminé à l'heure `at` (D-180), quelle qu'en soit la cause (planète prise,
+   * planète gelée, plus de colonisateur) : `pts` départage le classement (ses points d'avant la
+   * chute). Toutes ses flottes, à quai ou en vol, disparaissent à cette heure : plus de combat,
+   * de pillage ni de prise après sa mort. Les autres téléphones ne les voient plus dès qu'ils
+   * savent qu'il est mort (`sees`, par `deadAt`), même s'il est hors ligne.
+   */
+  eliminate(p, at, pts) {
+    p.out = at;
+    p.deathPts = pts;
+    const n = (p.fleets || []).length;
+    p.fleets = [];
+    if (n) this.addLog(`Les flottes ${de(p.name)} disparaissent avec lui (${n} flotte${n > 1 ? 's' : ''}).`);
   }
 
   /** Heure à laquelle le froid prend la case `cell` (Infinity : partie sans froid). */
@@ -1028,6 +1353,7 @@ export class Session {
     if (!dead.length) return false;
     const pts = this.scoreOf(p); // points d'avant le gel : ce qui départage s'il est éliminé
     for (const { f, at } of dead) {
+      if (!p.fleets.includes(f)) continue; // disparue avec son joueur, éliminé plus tôt dans ce passage (D-180)
       p.fleets = p.fleets.filter((x) => x !== f);
       const pos = fleetPos(f, at);
       const where = `[${Math.round(pos.x)}:${Math.round(pos.y)}]`;
@@ -1037,9 +1363,8 @@ export class Session {
       this.note(p, { at, kind: 'fleet', tone: 'bad', text: `Le froid a détruit ta flotte en ${where} (${shipsText(n)}).` });
       const stuck = !p.home && p.out == null && Number.isFinite(p.since) && !(p.fleets || []).some((g) => g.ships?.colony > 0);
       if (stuck && f.ships?.colony > 0) {
-        p.out = at;
-        p.deathPts = pts;
         this.addLog(`${p.name} n’a plus de colonisateur pour fonder sa planète : ${p.name} est éliminé.`);
+        this.eliminate(p, at, pts);
         this.ontoast?.('Le froid a pris ton dernier colonisateur : tu es éliminé.', 8000);
         this.note(p, { at, kind: 'planet', tone: 'bad', text: 'Le froid a pris ton dernier colonisateur : tu es éliminé.' });
       }
@@ -1074,8 +1399,39 @@ export class Session {
     const all = this.planetsOf(p);
     if (!all.length) return this.colonizerDeadAt(p, now);
     if (this.livePlanets(p, now).length) return null;
-    const frozen = all.map((pl) => this.frostOf(pl.cell)).filter((t) => t <= now);
-    return frozen.length === all.length ? Math.max(...frozen) : now;
+    const t = Math.max(...all.map((pl) => this.planetLostAt(p, pl, now)));
+    return t <= now ? t : null; // demandé pour une heure d'avant la prise : encore en vie
+  }
+
+  /**
+   * Heure à laquelle le joueur `p` a perdu sa planète `pl` (un élément de planetsOf), vue par
+   * tous : l'heure du gel, ou de la prise lue dans le rapport `capture` de l'attaquant (D-180,
+   * D-416) : la mort d'un joueur hors ligne tombe à sa vraie heure, pas quand on s'en aperçoit.
+   * `now` si elle est perdue sans rapport connu (cas rare, non confirmé).
+   */
+  planetLostAt(p, pl, now) {
+    const frost = this.frostOf(pl.cell);
+    if (frost <= now) return frost;
+    const since = pl.key === 'home' ? p.claimAt || p.rank || 0 : pl.planet.claimAt || 0;
+    const players = Object.values(this.state?.players || {});
+    const caps = players.flatMap((o) => (o.effects || []).filter((e) => e.capture && e.to === p.id && sameCell(e.cell, pl.cell) && e.at >= since && !this.goneBy(o, e.at)).map((e) => e.at));
+    return caps.length ? Math.min(...caps) : now;
+  }
+
+  /**
+   * Points du joueur `p`, tombé à l'heure `dead`, juste avant sa chute (D-416). Sa fiche le dit
+   * (`deathPts`) quand son téléphone a vu sa chute. Sinon (hors ligne, sa fiche a encore tout),
+   * on les calcule comme lui le fera : les planètes perdues à cette heure-là (la dernière vague),
+   * pas celles perdues avant, et ses flottes encore en vie à cette heure. Ainsi le classement
+   * ne change pas quand il revient.
+   */
+  pointsAtDeath(p, dead) {
+    if (p.deathPts !== undefined) return p.deathPts;
+    const all = this.planetsOf(p);
+    if (Number.isFinite(p.out) || !all.length) return this.scoreOf(p);
+    const wave = all.filter((pl) => this.planetLostAt(p, pl, dead) >= dead);
+    const fleets = (p.fleets || []).filter((f) => this.fleetDeadAt(p, f, dead) > dead);
+    return empireScore(p.race, wave.map((x) => x.planet), fleets);
   }
 
   /** Fin de la partie, ou null : { at, winner }, la plus ancienne qu'un joueur a vue. */
@@ -1093,8 +1449,8 @@ export class Session {
   /**
    * Classement : [{ id, pts, dead, best }], les vivants d'abord, puis les derniers tombés, puis
    * les points. `pts` : ce que le joueur a maintenant (0 s'il a tout perdu). `best` départage :
-   * pour un joueur tombé, ses points juste avant sa chute (`deathPts`) ; une fiche qui n'a pas
-   * encore vu sa chute a encore ses planètes, donc ces mêmes points.
+   * pour un joueur tombé, ses points juste avant sa chute (pointsAtDeath, D-416), les mêmes
+   * avant et après qu'il a vu sa chute.
    */
   ranking(now = this.now()) {
     return Object.values(this.state?.players || {})
@@ -1102,7 +1458,7 @@ export class Session {
       .map((p) => {
         const pts = this.scoreOf(p);
         const dead = this.deadAt(p, now);
-        return { id: p.id, pts, dead, best: dead != null ? (p.deathPts ?? pts) : pts };
+        return { id: p.id, pts, dead, best: dead != null ? this.pointsAtDeath(p, dead) : pts };
       })
       .sort((a, b) => (a.dead ?? Infinity) !== (b.dead ?? Infinity) ? (b.dead ?? Infinity) - (a.dead ?? Infinity) : b.best - a.best || (a.id < b.id ? -1 : 1));
   }
@@ -1145,14 +1501,20 @@ export class Session {
       this.note(p, { at, kind: 'planet', tone: 'bad', text: `Colonie ${pl.name} perdue (${why}).` });
       return;
     }
+    // Ce qui désignait ma planète mère par « home » (flottes posées, offres d'échange) visait cette
+    // planète-là, pas celle qui la remplace : on le réécrit avec son identifiant (D-360).
+    const wid = this.planets.find((x) => sameCell(x, pl.cell))?.id;
+    if (wid) {
+      if (Object.values(p.docked || {}).includes('home')) p.docked = Object.fromEntries(Object.entries(p.docked).map(([k, v]) => [k, v === 'home' ? wid : v]));
+      if ((p.offers || []).some((o) => o.from?.planet === 'home')) p.offers = p.offers.map((o) => (o.from?.planet === 'home' ? { ...o, from: { ...o.from, planet: wid } } : o));
+    }
     const next = this.livePlanets(p, at)
       .filter((x) => x.key !== 'home')
       .sort((a, b) => (a.planet.claimAt || 0) - (b.planet.claimAt || 0) || (a.key < b.key ? -1 : 1))[0];
     if (!next) {
       p.home = null;
-      p.out = at;
-      p.deathPts = this.wave.pts;
       this.addLog(`${p.name} perd ${pl.name} (${why}) : plus aucune planète, ${p.name} est éliminé.`);
+      this.eliminate(p, at, this.wave.pts);
       this.ontoast?.(`${pl.name} perdue (${why}) : tu es éliminé.`, 8000);
       this.note(p, { at, kind: 'planet', tone: 'bad', text: `${pl.name} perdue (${why}) : tu es éliminé.` });
       return;
@@ -1188,19 +1550,64 @@ export class Session {
     return this.state?.players[this.me]?.race || null;
   }
 
-  /** Choix de race : une seule fois, il ne se défait pas. */
+  /**
+   * Choix de race. Il devient définitif quand la partie part (ou dès qu'on a une planète) ;
+   * avant, on peut en changer (D-400 : l'hôte change la race d'une IA dans le lobby ;
+   * l'écran du joueur, lui, ne propose le choix qu'une fois).
+   */
   chooseRace(race) {
     if (!this.canAct || !RACES[race]) return false;
     const p = this.state.players[this.me];
     if (!p) return false;
-    if (p.race) {
+    const was = p.race;
+    if (was && (this.startedAt != null || p.home || Number.isFinite(p.since))) {
       this.ontoast?.(`Tu as déjà choisi : ${RACES[p.race].name}. Ce choix est définitif.`);
       return false;
     }
+    if (was === race) return false;
     p.race = race;
     // Joueur d'avant le choix de planète : il garde la sienne.
     if (p.home) p.planet = newPlanet(race, this.now());
-    this.touch(this.addLog(`${p.name} rejoint le camp des ${RACES[race].name}.`));
+    this.touch(this.addLog(was ? `${p.name} passe dans le camp des ${RACES[race].name}.` : `${p.name} rejoint le camp des ${RACES[race].name}.`));
+    this.changed();
+    return true;
+  }
+
+  /** Avant le départ, la partie pas encore partie et sans planète : sinon null. */
+  get beforeStart() {
+    const p = this.state?.players[this.me];
+    return !!p && this.startedAt == null && !p.home && !Number.isFinite(p.since);
+  }
+
+  /**
+   * Changer de nom, avant le départ seulement (D-400 : l'hôte renomme une IA dans le lobby).
+   * Un nom vide est refusé : on garde l'ancien. 16 caractères au plus, comme à l'arrivée.
+   */
+  rename(name) {
+    if (!this.canAct || !this.beforeStart) return false;
+    const p = this.state.players[this.me];
+    const next = String(name ?? '').trim().slice(0, 16);
+    if (!next || next === p.name) return false;
+    const old = p.name;
+    p.name = next;
+    this.name = next;
+    this.touch(this.addLog(`${old} s’appelle maintenant ${next}.`));
+    this.changed();
+    return true;
+  }
+
+  /**
+   * Quitter la partie avant le départ (D-399 : l'hôte retire une IA du lobby). La fiche
+   * reste, marquée `left` : la plus récente, elle l'emporte sur toutes les copies, et le
+   * joueur n'est plus ni montré, ni compté, ni attendu au départ.
+   */
+  leave() {
+    if (!this.canAct || !this.beforeStart) return false;
+    const p = this.state.players[this.me];
+    p.left = this.now();
+    delete p.ready;
+    delete p.go;
+    this.touch(this.addLog(`${p.name} quitte la partie.`));
     this.changed();
     return true;
   }
@@ -1237,11 +1644,29 @@ export class Session {
   }
 
   /**
+   * Ma planète désignée par sa clé (« home », id d'une colonie) ou par l'identifiant de sa
+   * planète de l'univers, retrouvée par sa case : une colonie devenue planète mère (clé « home »)
+   * reste trouvée par son identifiant (D-360).
+   */
+  planetRef(p, ref) {
+    if (!ref) return null;
+    const pl = this.planetOf(p, ref);
+    if (pl) return pl;
+    const w = this.planets.find((x) => x.id === ref);
+    return (w && this.planetsOf(p).find((x) => sameCell(x.cell, w))) || null;
+  }
+
+  /**
    * Propriétaire d'une case : le premier à s'y être installé (planète mère
    * ou colonie). Deux joueurs peuvent s'installer au même endroit au même
    * moment (ou coupés l'un de l'autre) ; c'est le plus ancien qui compte,
    * partout pareil.
    */
+  /** `o` s'est-il déclaré éliminé à l'heure `at` ou avant ? Ses actes d'après ne comptent pas (D-180). */
+  goneBy(o, at) {
+    return Number.isFinite(o?.out) && at >= o.out;
+  }
+
   ownerAt(cell) {
     let best = null;
     const consider = (p, t) => {
@@ -1251,9 +1676,11 @@ export class Session {
     const w = this.planets.find((x) => sameCell(x, cell));
     const players = Object.values(this.state?.players || {});
     // Prise par un attaquant dont le rapport n'est pas encore lu : elle n'est déjà plus à son ancien propriétaire.
-    const taken = players.flatMap((o) => (o.effects || []).filter((e) => e.capture && sameCell(e.cell, cell)));
+    // Une prise après la mort de l'attaquant ne compte pas (D-180).
+    const taken = players.flatMap((o) => (o.effects || []).filter((e) => e.capture && sameCell(e.cell, cell) && !this.goneBy(o, e.at)));
     const lost = (p, t) => taken.some((e) => e.to === p.id && e.at >= t);
     for (const p of players) {
+      if (Number.isFinite(p.out)) continue; // un joueur éliminé ne possède rien (D-180)
       const t = p.claimAt || p.rank || 0;
       if (sameCell(p.home, cell) && !lost(p, t)) consider(p, t);
       const col = w && p.colonies?.[w.id];
@@ -1364,7 +1791,9 @@ export class Session {
     p.fleets ||= [];
     if (!colony || p.fleets.length >= MAX_FLEETS) return null;
     settle(colony, now);
-    colony.ships = { ...(colony.ships || {}), colony: (colony.ships?.colony || 0) + 1 };
+    // Le colonisateur qui l'a fondée repart avec la flotte ; une colonie prise au combat n'en a pas consommé (D-200).
+    colony.ships = { ...(colony.ships || {}) };
+    if (!colony.captured) colony.ships.colony = (colony.ships.colony || 0) + 1;
     let room = fleetCargo(p.race, colony.ships);
     const cargo = {};
     for (const r of SOIL) {
@@ -1604,10 +2033,18 @@ export class Session {
     if (!f) return [];
     const w = this.planets.find((x) => sameCell(x, cell));
     const here = this.planetsAt(cell)[0];
+    // Brouillard (D-124, D-190) : hors de ma portée, le menu ne sait que ce que je sais.
+    const known = this.knownOwner(cell);
     const me0 = this.state.players[this.me];
     const out = [];
     if (here?.owner.id === this.me) out.push({ kind: 'dock', label: `Se poser sur ${here.name}` });
-    else if (here) {
+    else if (!known.live && known.owner) {
+      // Vue autrefois : son propriétaire retenu, pas son état (ni défense, ni estimation).
+      const name = w?.name || 'la planète';
+      const tail = ' · hors de portée : défense inconnue';
+      out.push({ kind: 'attack', label: `Attaquer ${name} (${known.owner.name})${tail}` });
+      out.push({ kind: 'conquer', label: `Conquérir ${name}${tail}` });
+    } else if (here && known.live) {
       // Les deux ordres livrent le même combat : défense de la planète et vaisseaux posés.
       const a = this.assaultView(id, here.owner, here.key);
       const ships = a.ships === null ? '? vaisseaux' : `${shipsText(countShips(a.ships))} posé${countShips(a.ships) > 1 ? 's' : ''}`;
@@ -1619,7 +2056,7 @@ export class Session {
     else if (w && f.ships.colony && !me0.home) {
       if (!w.kind || w.kind === 'planet') out.push({ kind: 'colonize', label: `Fonder ta planète mère sur ${w.name}` });
     } else if (w && f.ships.colony) out.push({ kind: 'colonize', label: `Coloniser ${w.name}` });
-    out.push({ kind: 'move', label: w || here ? 'Juste y aller (orbite)' : 'Y aller' });
+    out.push({ kind: 'move', label: w || (here && known.live) ? 'Juste y aller (orbite)' : 'Y aller' });
     const me = this.state.players[this.me];
     const now = this.now();
     const short = fuelNeed(f, me.race, cell, now) > fuelAt(f, me.race, now) + 1e-9;
@@ -1663,16 +2100,21 @@ export class Session {
     if (cell.x < 0 || cell.y < 0 || cell.x >= UNIVERSE.w || cell.y >= UNIVERSE.h) return false;
     const here = this.planetsAt(cell)[0];
     const w = this.planets.find((x) => sameCell(x, cell));
+    // Brouillard (D-190) : un refus ne doit pas dire ce que je ne vois pas. Hors de portée,
+    // l'ordre part et l'arrivée tranche (« déjà prise », ou personne à attaquer). La décision
+    // ne lit que la partie (`seesCell`), pas mes souvenirs (`intel`) : le replay la refait pareil.
+    const live = this.over || this.seesCell(cell, this.now());
     let order = null;
     if (kind === 'dock') {
       if (here?.owner.id !== this.me) return this.refuse('Ce n’est pas une de tes planètes.');
       order = { kind, key: here.key };
     } else if (kind === 'attack' || kind === 'conquer') {
-      if (!here || here.owner.id === this.me) return this.refuse('Aucune planète adverse ici.');
+      if (here ? here.owner.id === this.me : !w || live) return this.refuse('Aucune planète adverse ici.');
       if (!armed(p.race, f.ships, techOf(p))) return this.refuse('Cette flotte n’a pas d’armes : elle ne peut pas attaquer.');
-      order = { kind, pid: here.owner.id, key: here.key };
+      // Libre en vrai, mais hors de ma vue : personne à viser, la flotte restera en orbite.
+      order = here ? { kind, pid: here.owner.id, key: here.key } : { kind, pid: null, key: null };
     } else if (kind === 'colonize') {
-      if (!w || here) return this.refuse('Cette planète n’est pas libre.');
+      if (!w || (here && live)) return this.refuse('Cette planète n’est pas libre.');
       if (!f.ships.colony) return this.refuse(`Il faut un vaisseau colonisateur (${SHIPS[p.race].colony.name}) pour coloniser.`);
       if (!p.home && w.kind && w.kind !== 'planet') return this.refuse(`${w.name} est trop petit pour une planète mère : vise une planète.`);
       order = { kind, world: w.id };
@@ -1681,8 +2123,9 @@ export class Session {
     if (err) return this.refuse(err);
     if (f.stranded) this.ontoast?.('Pas assez de carburant : la flotte tombera en panne en route.');
     // Au journal, seulement les ordres qui comptent : les simples déplacements le noieraient.
-    const who = here && here.owner.id !== this.me ? ` (${here.owner.name})` : '';
-    this.touch(order ? this.addLog(`La flotte ${de(p.name)} ${ORDERS[order.kind].verb} ${here ? here.name : w.name}${who}.`) : null);
+    const who = here && live && here.owner.id !== this.me ? ` (${here.owner.name})` : ''; // hors de vue, pas de nom (D-190)
+    // Marquée de la flotte : la cible ne la lit que si elle voit la flotte (D-210, `showsLog`).
+    this.touch(order ? this.addLog(`La flotte ${de(p.name)} ${ORDERS[order.kind].verb} ${here ? here.name : w.name}${who}.`, { pid: this.me, fleet: f.id }) : null);
     this.changed();
     return true;
   }
@@ -1739,7 +2182,24 @@ export class Session {
   sees(owner, f, now, eyes = this.eyes(now)) {
     if (owner?.id === this.me) return true;
     if (this.fleetDeadAt(owner, f, now) <= now) return false; // détruite par le froid ou au combat (D-163), même si sa fiche ne le dit pas encore
+    // Joueur éliminé : ses flottes ont disparu avec lui (D-180), même si sa fiche, hors ligne, en montre encore.
+    const dead = this.deadAt(owner, now);
+    if (dead != null && dead <= now) return false;
     return this.seesCell(fleetPos(f, now), now, eyes);
+  }
+
+  /**
+   * Une ligne du journal partagé, montrée dans mon Journal (D-210) ? Une ligne marquée d'une
+   * flotte (ordre d'attaque, de conquête, de poursuite…) ne l'est que pour son auteur, ou tant
+   * que je vois cette flotte : sinon l'ordre trahirait une flotte que la carte me cache (D-128).
+   * Flotte disparue (posée, détruite, fusionnée hors de vue) : la ligne reste cachée ; le combat,
+   * lui, a ses propres lignes.
+   */
+  showsLog(l, now = this.now()) {
+    if (!l?.fleet || l.pid === this.me) return true;
+    const owner = this.state.players[l.pid];
+    const f = owner && this.fleetOf(owner, l.fleet);
+    return !!f && this.sees(owner, f, now);
   }
 
   /** Un point de la carte est-il dans ma détection ? */
@@ -1858,7 +2318,7 @@ export class Session {
     f.order = { kind: 'chase', pid, fleet: target.id, seen: null };
     this.tickLogs = []; // un combat immédiat écrit au journal : ses entrées partent avec ma fiche
     this.pursue(p, f, this.now());
-    if (f.order) this.addLog(`La flotte ${de(p.name)} prend en chasse une flotte ${de(enemy.name)}.`);
+    if (f.order) this.addLog(`La flotte ${de(p.name)} prend en chasse une flotte ${de(enemy.name)}.`, { pid: this.me, fleet: f.id }); // D-210
     const logs = this.tickLogs;
     this.tickLogs = null;
     this.touch(logs.length ? logs : null);
@@ -2017,7 +2477,7 @@ export class Session {
       if (!f || moving(f, now)) return null;
       return { side: { fleet: f }, cell: parkedCell(f), name: `une flotte ${de(p.name)}` };
     }
-    const pl = ref?.planet && this.planetOf(p, ref.planet);
+    const pl = ref?.planet && this.planetRef(p, ref.planet);
     if (!pl || this.ownerAt(pl.cell)?.id !== p.id) return null;
     return { side: { planet: pl.planet }, cell: pl.cell, name: `${pl.name} (${p.name})` };
   }
@@ -2157,7 +2617,14 @@ export class Session {
       }
       // Flotte détruite : le séquestre est perdu avec elle, mais ce que l'autre a payé arrive chez moi.
       if (!mine && end === 'accepted') mine = this.tradeSide(p, { planet: 'home' }, now);
-      if (!mine) continue;
+      if (!mine) {
+        // Planète (ou flotte) perdue pendant l'attente : rien ne peut revenir, on le dit (D-360).
+        const who = other?.name || 'l’autre joueur';
+        const gone = o.from.planet ? this.planets.find((x) => x.id === o.from.planet)?.name : null;
+        this.addLog(`Échange avec ${who} sans suite : séquestre ${de(p.name)} perdu avec ${gone || (o.from.fleet ? 'sa flotte' : 'sa planète')}.`);
+        this.ontoast?.(`Échange avec ${who} sans suite : ta part est perdue avec ${gone || (o.from.fleet ? 'ta flotte' : 'ta planète')}.`);
+        continue;
+      }
       put(mine.side, p.race, end === 'accepted' ? amounts(o.want) : amounts(o.give), now);
       // Rendu faute de nouvelles : sa réponse peut encore arriver, datée d'avant l'expiration.
       if (end === 'returned' && !answer) p.dropped = [...(p.dropped || []), { id: o.id, pid: o.to.pid, give: o.give, want: o.want, expires: o.expires, at: now }].slice(-20);
@@ -2328,7 +2795,8 @@ export class Session {
     const p = this.state.players[this.me];
     const f = this.myFleet(id);
     const now = this.now();
-    if (!f || this.locked(id)) return false;
+    if (!f) return this.refuse('Flotte introuvable.'); // disparue (combat, fusion, élimination) : on le dit (#73)
+    if (this.locked(id)) return false;
     if (moving(f, now)) return this.refuse('La flotte doit être arrêtée pour se scinder.');
     if (p.fleets.length >= MAX_FLEETS) return this.refuse(`Pas plus de ${MAX_FLEETS} flottes.`);
     const res = split(f, p.race, part, this.newId(6), now);
@@ -2362,7 +2830,7 @@ export class Session {
     const res = usePower(pl.planet, key, this.now());
     if (res.error) return this.ontoast?.(res.error);
     this.touch(this.addLog(`${p.name} ${res.text}.`));
-    this.ontoast?.(`${POWERS[key].name} !`);
+    this.ontoast?.(res.toast || `${POWERS[key].name} !`);
     this.changed();
   }
 
@@ -2441,6 +2909,11 @@ export class Session {
     if (colonyTech) for (const pl of mine) shareTech(pl);
     // Les combats des autres d'abord : mes flottes agissent ensuite avec leurs vraies pertes.
     if (this.applyEffects(p, now)) changed = true;
+    // Filet (D-180) : éliminé par un chemin qui n'est pas passé par eliminate() (vieille fiche…), ses flottes disparaissent aussi.
+    if (Number.isFinite(p.out) && p.fleets?.length) {
+      p.fleets = [];
+      changed = true;
+    }
     for (const f of [...(p.fleets || [])]) {
       if (f.order?.kind === 'chase') {
         if (this.pursue(p, f, now, from)) changed = true;
@@ -2482,7 +2955,8 @@ export class Session {
       for (const [r, v] of Object.entries(f.cargo || {})) pl.planet.stock[r] = (pl.planet.stock[r] || 0) + v;
       pl.planet.stock.energy = (pl.planet.stock.energy || 0) + Math.floor(fuelAt(f, p.race, now)); // le carburant restant retourne au stock
       const docked = { ...(p.docked || {}) };
-      for (const id of [f.id, ...(f.absorbed || [])]) docked[id] = pl.key;
+      const wid = this.planets.find((x) => sameCell(x, pl.cell))?.id || pl.key; // l'identifiant de la planète, pas « home » (D-360)
+      for (const id of [f.id, ...(f.absorbed || [])]) docked[id] = wid;
       p.docked = Object.fromEntries(Object.entries(docked).slice(-60));
       drop();
       const loot = lootText(f.cargo || {});
@@ -2541,9 +3015,24 @@ export class Session {
     }
 
     if (order.kind === 'attack' || order.kind === 'conquer') {
-      const enemy = this.state.players[order.pid];
-      const pl = enemy && this.planetOf(enemy, order.key);
-      if (!pl || !sameCell(pl.cell, f.to)) return true;
+      // La planète a pu changer de main pendant le trajet (D-200) : on vise son propriétaire
+      // d'aujourd'hui, pas celui de l'ordre, dont la fiche la montre encore tant qu'il n'a pas lu le rapport de prise.
+      const enemy = this.ownerAt(f.to);
+      const pl = enemy && this.planetsOf(enemy).find((x) => sameCell(x.cell, f.to));
+      const was = this.state.players[order.pid];
+      const gone = was && this.planetOf(was, order.key);
+      const here = this.planets.find((x) => sameCell(x, f.to))?.name || gone?.name || `[${f.to.x}:${f.to.y}]`;
+      if (!pl) {
+        this.addLog(`Plus personne n'habite ${here} : la flotte ${de(p.name)} reste en orbite.`);
+        return true;
+      }
+      if (enemy.id === this.me) {
+        // Déjà à moi (une autre de mes flottes l'a prise juste avant) : elle s'y pose.
+        f.order = { kind: 'dock', key: pl.key };
+        return this.arrive(p, f);
+      }
+      // Un ordre sans cible (pid null : planète vue libre, D-190) n'a pas d'ancien propriétaire à citer.
+      if (order.pid && enemy.id !== order.pid) this.addLog(`${enemy.name} a pris ${pl.name}${was ? ` à ${was.name}` : ''} entre-temps : la flotte ${de(p.name)} l'attaque.`);
       // Je calcule le combat avec ce que je sais du défenseur à l'heure de l'arrivée ;
       // son téléphone appliquera ses pertes en lisant mon rapport.
       const def = this.defenseAt(p, enemy, pl, f.arrive);
@@ -2553,7 +3042,7 @@ export class Session {
       if (!res.won) this.addLog(`La défense de ${pl.name} (${enemy.name}) repousse ${de(p.name)}.`);
       // Un pillage par planète toutes les 2 min au plus : sinon, des attaques à la chaîne depuis
       // l'orbite (trajet de 0 case) vidaient tout, malgré la règle « la moitié au plus ».
-      const spot = `${enemy.id}:${pl.key}`;
+      const spot = `${enemy.id}:${pl.cell.x}:${pl.cell.y}`; // par case : la clé change quand une colonie devient planète mère (D-360)
       const recent = (p.raided?.[spot] || 0) > f.arrive - RAID_COOLDOWN_MS;
       const take = res.won && !recent ? plunder(p.race, res.attLeft, def.stock, f.cargo) : {};
       if (res.won && !recent) p.raided = Object.fromEntries([...Object.entries(p.raided || {}).filter(([, t]) => t > f.arrive - RAID_COOLDOWN_MS), [spot, f.arrive]]);
@@ -2561,8 +3050,9 @@ export class Session {
       const w = this.planets.find((x) => sameCell(x, pl.cell));
       const capture = order.kind === 'conquer' && res.won && !!w && this.frostOf(w) > f.arrive;
       // Un identifiant par combat : une même flotte peut attaquer plusieurs fois.
-      const effect = { id: this.newId(8), to: enemy.id, key: pl.key, at: f.arrive, ships: res.defLost, lost: res.attLost, take, rep: res.report };
-      if (capture) Object.assign(effect, { capture: true, cell: { ...pl.cell } });
+      // Le rapport vise la case (D-360) : la clé « home » change de planète si l'autre perd sa planète mère avant de le lire.
+      const effect = { id: this.newId(8), to: enemy.id, key: pl.key, cell: { ...pl.cell }, at: f.arrive, ships: res.defLost, lost: res.attLost, take, rep: res.report };
+      if (capture) effect.capture = true;
       p.effects = [...(p.effects || []), effect].slice(-MAX_EFFECTS);
       if (capture) return this.capture(p, f, w, pl, enemy, res, take, now);
       const loot = lootText(take);
@@ -2618,7 +3108,7 @@ export class Session {
     p.since ??= f.arrive;
     p.planet = planet;
     const docked = { ...(p.docked || {}) };
-    for (const id of [f.id, ...(f.absorbed || [])]) docked[id] = 'home';
+    for (const id of [f.id, ...(f.absorbed || [])]) docked[id] = w.id; // l'identifiant de la planète, pas « home » (D-360)
     p.docked = Object.fromEntries(Object.entries(docked).slice(-60));
     p.fleets = p.fleets.filter((x) => x.id !== f.id);
     this.addLog(`${p.name} fonde sa planète mère sur ${w.name}.`);
@@ -2639,6 +3129,7 @@ export class Session {
     colony.stock.energy = Math.floor(fuelAt(f, p.race, now));
     colony.tech = { ...techOf(p) };
     colony.claimAt = f.arrive;
+    colony.captured = true; // prise au combat, sans colonisateur : evacuate n'en rendra pas (D-200)
     colony.ships = { ...res.attLeft };
     p.colonies = { ...(p.colonies || {}), [w.id]: colony };
     const docked = { ...(p.docked || {}) };
@@ -2667,7 +3158,8 @@ export class Session {
     // Les combats des autres joueurs contre elle, que je vois et qu'elle n'a pas encore lus, aussi.
     const reports = Object.values(this.state.players).flatMap((o) => (o.id === enemy.id ? [] : o.effects || []));
     for (const e of reports) {
-      if (e.to !== enemy.id || e.key !== pl.key || enemy.applied?.includes(e.id)) continue;
+      if (e.to !== enemy.id || enemy.applied?.includes(e.id)) continue;
+      if (e.cell ? !sameCell(e.cell, pl.cell) : e.key !== pl.key) continue; // par case (D-360), par clé pour un ancien rapport
       for (const [k, n] of Object.entries(e.ships || {})) ships[k] = Math.max(0, (ships[k] || 0) - n);
       for (const [r, v] of Object.entries(e.take || {})) stock[r] = Math.max(0, (stock[r] || 0) - v);
     }
@@ -2688,43 +3180,55 @@ export class Session {
       any = true;
     }
     const live = new Set();
+    // Tous les rapports qui me visent, dans l'ordre de leur heure (D-360) : pas dans l'ordre des
+    // joueurs de ma copie, qui changerait d'un téléphone à l'autre (une prise plus tardive lue
+    // avant un pillage plus ancien). À égalité : par joueur, puis dans l'ordre de sa fiche.
+    const todo = [];
     for (const other of Object.values(this.state.players)) {
       if (other.id === this.me) continue;
-      for (const e of other.effects || []) {
-        if (e.to !== this.me) continue;
+      (other.effects || []).forEach((e, i) => {
+        if (e.to !== this.me) return;
         live.add(e.id);
-        if (p.applied.includes(e.id)) continue;
-        p.applied = [...p.applied, e.id];
-        any = true;
-        if (e.fleet && this.fleetHit(p, other, e, now)) continue;
-        // Une prise vise une case : ma planète mère a pu changer depuis (la clé « home » ne suffit pas).
-        const pl = e.capture
-          ? this.planetsOf(p).find((x) => sameCell(x.cell, e.cell))
-          : this.planetOf(p, e.fleet ? p.docked?.[e.fleet] : e.key); // flotte posée entre-temps : sa planète encaisse
-        if (!pl) continue;
-        if (e.capture) {
-          this.note(p, {
-            at: e.at, kind: 'combat', who: other.name, planet: pl.name, capture: true, mine: countShips(e.ships), theirs: e.lost ? countShips(e.lost) : null,
-            pillaged: lootText(e.take || {}), rep: e.rep, side: 'd', tone: 'bad', text: `${other.name} prend ${pl.name}.`,
-          });
-          this.losePlanet(p, pl.key, e.at, `prise par ${other.name}`);
-          continue;
-        }
-        settle(pl.planet, now);
-        pl.planet.ships ||= {};
-        for (const [k, n] of Object.entries(e.ships || {})) pl.planet.ships[k] = Math.max(0, (pl.planet.ships[k] || 0) - n);
-        for (const [r, v] of Object.entries(e.take || {})) pl.planet.stock[r] = Math.max(0, (pl.planet.stock[r] || 0) - v);
-        const lost = countShips(e.ships);
-        const loot = lootText(e.take || {});
-        const ships = lost ? `${lost} vaisseau${lost > 1 ? 'x' : ''} perdu${lost > 1 ? 's' : ''}` : 'aucun vaisseau perdu';
-        this.addLog(`${pl.name} (${p.name}) est attaquée par ${other.name} : ${ships}${loot ? `, ${loot} pillés` : ''}.`);
-        this.ontoast?.(`${other.name} attaque ${pl.name} !`);
-        const harm = lost > 0 || !!loot;
-        this.note(p, {
-          at: e.at, kind: 'combat', who: other.name, planet: pl.name, mine: lost, theirs: e.lost ? countShips(e.lost) : null, pillaged: loot,
-          rep: e.rep, side: 'd', tone: harm ? 'bad' : 'good', text: harm ? `${other.name} attaque ${pl.name}.` : `${pl.name} repousse ${other.name}.`,
-        });
+        if (!p.applied.includes(e.id)) todo.push({ other, e, i });
+      });
+    }
+    todo.sort((a, b) => (a.e.at || 0) - (b.e.at || 0) || (a.other.id < b.other.id ? -1 : a.other.id > b.other.id ? 1 : 0) || a.i - b.i);
+    for (const { other, e } of todo) {
+      p.applied = [...p.applied, e.id];
+      any = true;
+      if (this.goneBy(other, e.at)) continue; // livré après sa mort : ses flottes n'existaient plus (D-180)
+      if (e.fleet && this.fleetHit(p, other, e, now)) continue;
+      // La planète visée, par sa case (D-360) : la clé « home » a pu changer de planète depuis
+      // (ma planète mère gelée ou prise, une colonie l'a remplacée). Un ancien rapport sans case : par sa clé.
+      const pl = e.fleet ? this.dockedPlanet(p, e.fleet) : e.cell ? this.planetsOf(p).find((x) => sameCell(x.cell, e.cell)) : this.planetOf(p, e.key);
+      // Planète perdue avant que je lise le rapport, ou reprise après le combat : il ne touche rien.
+      const since = pl && (pl.key === 'home' ? p.claimAt || p.rank || 0 : pl.planet.claimAt || 0);
+      if (!pl || since > e.at) {
+        this.missedEffect(p, other, e);
+        continue;
       }
+      if (e.capture) {
+        this.note(p, {
+          at: e.at, kind: 'combat', who: other.name, planet: pl.name, capture: true, mine: countShips(e.ships), theirs: e.lost ? countShips(e.lost) : null,
+          pillaged: lootText(e.take || {}), rep: e.rep, side: 'd', tone: 'bad', text: `${other.name} prend ${pl.name}.`,
+        });
+        this.losePlanet(p, pl.key, e.at, `prise par ${other.name}`);
+        continue;
+      }
+      settle(pl.planet, now);
+      pl.planet.ships ||= {};
+      for (const [k, n] of Object.entries(e.ships || {})) pl.planet.ships[k] = Math.max(0, (pl.planet.ships[k] || 0) - n);
+      for (const [r, v] of Object.entries(e.take || {})) pl.planet.stock[r] = Math.max(0, (pl.planet.stock[r] || 0) - v);
+      const lost = countShips(e.ships);
+      const loot = lootText(e.take || {});
+      const ships = lost ? `${lost} vaisseau${lost > 1 ? 'x' : ''} perdu${lost > 1 ? 's' : ''}` : 'aucun vaisseau perdu';
+      this.addLog(`${pl.name} (${p.name}) est attaquée par ${other.name} : ${ships}${loot ? `, ${loot} pillés` : ''}.`);
+      this.ontoast?.(`${other.name} attaque ${pl.name} !`);
+      const harm = lost > 0 || !!loot;
+      this.note(p, {
+        at: e.at, kind: 'combat', who: other.name, planet: pl.name, mine: lost, theirs: e.lost ? countShips(e.lost) : null, pillaged: loot,
+        rep: e.rep, side: 'd', tone: harm ? 'bad' : 'good', text: harm ? `${other.name} attaque ${pl.name}.` : `${pl.name} repousse ${other.name}.`,
+      });
     }
     // Un rapport que son auteur a effacé ne reviendra pas (sa fiche ne fait
     // qu'avancer) : je n'ai plus besoin de me souvenir que je l'ai appliqué.
@@ -2736,6 +3240,31 @@ export class Session {
       any = true;
     }
     return any;
+  }
+
+  /**
+   * Planète où s'est posée ma flotte `id` (D-360) : `p.docked` garde l'identifiant de la planète
+   * de l'univers, retrouvée par sa case (un ancien « home » est réécrit quand je perds ma planète mère).
+   */
+  dockedPlanet(p, id) {
+    return this.planetRef(p, p.docked?.[id]);
+  }
+
+  /**
+   * Un rapport de combat qui ne trouve plus sa planète (gelée ou prise avant que je le lise) :
+   * il ne touche rien, et mon carnet dit pourquoi, en nommant la planète vraiment attaquée (D-360).
+   */
+  missedEffect(p, other, e) {
+    if (e.fleet && !p.docked?.[e.fleet]) {
+      // Ni la flotte ni une planète où elle se serait posée : déjà détruite (froid, autre combat).
+      this.addLog(`Rapport de ${other.name} sans effet : la flotte ${de(p.name)} visée n’existe plus.`);
+      return;
+    }
+    const w = e.cell ? this.planets.find((x) => sameCell(x, e.cell)) : e.fleet && p.docked?.[e.fleet] && this.planets.find((x) => x.id === p.docked[e.fleet]);
+    const name = w?.name || 'une planète perdue';
+    const what = e.capture ? 'la prise' : 'l’attaque';
+    this.addLog(`Rapport de ${other.name} sans effet : ${name} n’est plus à ${p.name} (${what} ne touche rien).`);
+    this.note(p, { at: e.at, kind: 'planet', tone: 'even', text: `${other.name} attaque ${name}, déjà perdue : sans effet.` });
   }
 
   /**
@@ -2775,9 +3304,8 @@ export class Session {
       // autres téléphones ont calculée sans moi (deadAt, D-163), pas à l'heure où je lis le rapport.
       const stuck = !p.home && p.out == null && Number.isFinite(p.since) && !(p.fleets || []).some((g) => g.ships?.colony > 0);
       if (stuck && f.ships?.colony > 0) {
-        p.out = e.at;
-        p.deathPts = pts;
         this.addLog(`${p.name} n’a plus de colonisateur pour fonder sa planète : ${p.name} est éliminé.`);
+        this.eliminate(p, e.at, pts);
         this.ontoast?.(`${other.name} a détruit ton dernier colonisateur : tu es éliminé.`, 8000);
         this.note(p, { at: e.at, kind: 'planet', tone: 'bad', text: `${other.name} a détruit ton dernier colonisateur : tu es éliminé.` });
       }
@@ -2812,8 +3340,9 @@ export class Session {
     this.save();
   }
 
-  addLog(text) {
-    const entry = { at: this.now(), text };
+  /** `mark` : { pid, fleet } pour un ordre de flotte, que les autres ne lisent que s'ils voient la flotte (D-210). */
+  addLog(text, mark = null) {
+    const entry = { at: this.now(), text, ...(mark ? { pid: mark.pid, fleet: mark.fleet } : {}) };
     this.pushLog(entry);
     this.tickLogs?.push(entry);
     return entry;
@@ -2822,7 +3351,8 @@ export class Session {
   pushLog(entry) {
     const log = this.state.log;
     if (log.some((l) => l.at === entry.at && l.text === entry.text)) return;
-    log.push({ at: entry.at, text: String(entry.text).slice(0, 120) });
+    const mark = typeof entry.pid === 'string' && typeof entry.fleet === 'string' ? { pid: entry.pid.slice(0, 64), fleet: entry.fleet.slice(0, 64) } : {};
+    log.push({ at: entry.at, text: String(entry.text).slice(0, 120), ...mark });
     log.sort((a, b) => a.at - b.at);
     if (log.length > 40) log.splice(0, log.length - 40);
   }
@@ -2848,6 +3378,7 @@ export class Session {
   }
 
   save() {
+    if (this.state && this.me && this.status === 'playing') this.storeClock();
     if (this.state && this.me && this.status === 'playing') saveGame(this.me, this.state, this.journal, this.intel, this.botIds?.length ? this.botIds : null);
   }
 
@@ -2927,7 +3458,7 @@ function maxTech(a, b) {
   return out;
 }
 
-export const ORDER_KINDS = ['chooseRace', 'ready', 'begin', 'claimPlanet', 'build', 'planBuild', 'planResearch', 'planShips', 'unplan', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'setFleetStance', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'joinFleet', 'splitFleet', 'returnFleet', 'power'];
+export const ORDER_KINDS = ['chooseRace', 'rename', 'leave', 'ready', 'begin', 'claimPlanet', 'build', 'planBuild', 'planResearch', 'planShips', 'unplan', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'setFleetStance', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'joinFleet', 'splitFleet', 'returnFleet', 'power'];
 for (const k of [...ORDER_KINDS, 'tick']) {
   const act = Session.prototype[k];
   Session.prototype[k] = function (...a) {

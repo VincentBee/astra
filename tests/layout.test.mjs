@@ -1,9 +1,10 @@
-// Largeur de la page sur téléphone (#51) : rien ne doit élargir la page, ni au
-// départ ni en partie, bulle d'aide de la carte fermée ou ouverte.
+// Largeur de la page sur téléphone (#51) : rien ne doit élargir la page, ni dans
+// le lobby, ni en partie, ni Journal ouvert. La bulle d'aide de la carte, cause de
+// #51, a disparu avec D-245 ; ce test reste comme garde-fou (D-412, D-413).
 //
 // Node n'a pas de mise en page : ce test lance un vrai Chrome sans fenêtre et le
 // pilote par son protocole de débogage (CDP), avec le WebSocket intégré à Node.
-// Pas de dépendance (D-241). Sans Chrome sur la machine, le test est sauté ; on
+// Pas de dépendance (D-413). Sans Chrome sur la machine, le test est sauté ; on
 // peut donner le chemin du navigateur par la variable CHROME.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -109,21 +110,10 @@ const HELPERS = `
     throw new Error('attente : ' + what + ' (boutons visibles : ' + seen + ')');
   };
   const $ = (id) => document.getElementById(id);
-  const measure = () => {
-    const t = $('map-help').getBoundingClientRect();
-    return { scrollWidth: document.documentElement.scrollWidth, bodyWidth: document.body.scrollWidth, left: t.left, right: t.right,
-      open: getComputedStyle($('map-help')).visibility === 'visible' };
-  };
-  const both = async () => {
-    const closed = measure();
-    $('btn-map-help').click(); await sleep(250);
-    const open = measure();
-    $('btn-map-help').click(); await sleep(250);
-    return { closed, open };
-  };
+  const width = () => document.documentElement.scrollWidth;
 `;
 
-test('la page garde la largeur du téléphone (320, 375, 430 px), bulle d’aide fermée ou ouverte, au départ et en partie', { skip: chrome ? false : 'pas de Chrome sur cette machine (variable CHROME)', timeout: 120000 }, async () => {
+test('la page garde la largeur du téléphone (320, 375, 430 px) : lobby, partie, Journal ouvert', { skip: chrome ? false : 'pas de Chrome sur cette machine (variable CHROME)', timeout: 120000 }, async () => {
   const server = await serve();
   const cdp = await launch();
   try {
@@ -137,26 +127,20 @@ test('la page garde la largeur du téléphone (320, 375, 430 px), bulle d’aide
         $('btn-solo').click();
         await until(() => $('btn-race') && $('btn-race').offsetParent, 'choix de la race');
         $('btn-race').click();
-        await until(() => $('btn-map-help').offsetParent, 'carte');
+        await until(() => $('btn-ready') && !$('btn-ready').hidden, 'lobby');
         await sleep(300);
-        return both();`);
+        return width();`);
       const game = await page.js(`${HELPERS}
-        await until(() => !$('btn-ready').hidden, 'bouton prêt');
         $('btn-ready').click();
         await until(() => $('btn-ready').hidden, 'départ');
         await sleep(500);
-        const r = await both();
+        const r = { partie: width() };
         $('btn-journal').click(); await sleep(300);
-        r.journal = document.documentElement.scrollWidth;
+        r.journal = width();
         return r;`);
-      for (const [where, m] of [['départ', lobby], ['partie', game]]) {
-        assert.equal(m.closed.open, false, `${w} px, ${where} : bulle fermée`);
-        assert.equal(m.open.open, true, `${w} px, ${where} : bulle ouverte`);
-        assert.equal(m.closed.scrollWidth, w, `${w} px, ${where}, bulle fermée : largeur de la page`);
-        assert.equal(m.open.scrollWidth, w, `${w} px, ${where}, bulle ouverte : largeur de la page`);
-        assert.ok(m.open.left >= 0 && m.open.right <= w - 8, `${w} px, ${where} : bulle ouverte entière à l’écran (${m.open.left}–${m.open.right})`);
-      }
-      assert.equal(game.journal, w, `${w} px : journal ouvert, largeur de la page`);
+      assert.equal(lobby, w, `${w} px : lobby, largeur de la page`);
+      assert.equal(game.partie, w, `${w} px : en partie, largeur de la page`);
+      assert.equal(game.journal, w, `${w} px : Journal ouvert, largeur de la page`);
     }
   } finally {
     cdp.close();

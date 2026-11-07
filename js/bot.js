@@ -106,7 +106,7 @@ export function think(s, budget = BUDGET) {
 
 /** Race la moins prise par les autres (au hasard entre les ex æquo). */
 function pickRace(s) {
-  const taken = Object.values(s.state.players).map((o) => o.race);
+  const taken = s.roster.filter((o) => o.id !== s.me).map((o) => o.race);
   const keys = Object.keys(RACES);
   const fewest = Math.min(...keys.map((k) => taken.filter((r) => r === k).length));
   const pool = keys.filter((k) => taken.filter((r) => r === k).length === fewest);
@@ -334,7 +334,9 @@ function dockNearest(ctx, f) {
 /**
  * Attaque : quand les vaisseaux de guerre posés sur une de mes planètes battent à coup sûr la
  * défense d'une planète adverse (calcul du combat avec ce que le jeu en montre), ils décollent
- * et partent la conquérir. Sans cible à leur portée, ils restent posés et défendent.
+ * et partent la conquérir. Sans cible à leur portée, ils restent posés et défendent. Une
+ * planète déjà visée par une de mes flottes de conquête ne l'est pas une 2e fois : les
+ * vaisseaux partent la rejoindre (`joinFleet`), ou visent une autre planète (D-280).
  */
 function attack(ctx, mine) {
   const { s, p, now } = ctx;
@@ -348,6 +350,7 @@ function attack(ctx, mine) {
     }
   }
   if (!targets.length) return;
+  const aimed = aimedTargets(p);
   for (const base of mine) {
     if (ctx.left < 2) return;
     const st = stateAt(base.planet, now);
@@ -373,24 +376,86 @@ function attack(ctx, mine) {
       .filter((t) => t.won)
       // Les planètes qui tiendront le plus longtemps d'abord, puis les plus proches.
       .sort((a, b) => s.frostOf(b.pl.cell) - s.frostOf(a.pl.cell) - (b.d - a.d) * 20_000);
-    const t = options[0];
-    if (!t) continue;
-    const fuel = Math.min(tank, Math.floor(st.stock.energy || 0), Math.ceil(burn * t.d * 2) + 2);
-    let id = null;
-    ctx.order(() => (id = s.takeOff(base.key, ships, {}, fuel)));
-    if (!id) continue;
-    ctx.order(() => s.moveFleet(id, { ...t.pl.cell }, 'conquer'));
-    return;
+    for (const t of options) {
+      // Déjà visée par une de mes flottes de conquête (D-280) : jamais une 2e conquête, ces
+      // vaisseaux la rejoignent en renfort, ou bien visent la cible suivante.
+      const g = aimed.get(`${t.o.id}:${t.pl.key}`);
+      if (g && !canJoin(ctx, base, g, { speed, tank, burn, energy: st.stock.energy })) continue;
+      const d = g ? distance(base.cell, g.to) : t.d;
+      const fuel = Math.min(tank, Math.floor(st.stock.energy || 0), Math.ceil(burn * d * 2) + 2);
+      let id = null;
+      ctx.order(() => (id = s.takeOff(base.key, ships, {}, fuel)));
+      if (!id) break;
+      if (g) ctx.order(() => s.joinFleet(id, g.id));
+      else ctx.order(() => s.moveFleet(id, { ...t.pl.cell }, 'conquer'));
+      return;
+    }
   }
+}
+
+/** Mes flottes de conquête en route, par cible (« pid:clé »). */
+function aimedTargets(p) {
+  const aimed = new Map();
+  for (const f of p.fleets || []) if (f.order?.kind === 'conquer') aimed.set(`${f.order.pid}:${f.order.key}`, f);
+  return aimed;
+}
+
+/**
+ * Des vaisseaux partis de `base` peuvent rejoindre la flotte de conquête `g` : assez de
+ * carburant, et ils arrivent après elle. Arrivés avant, la fusion effacerait son ordre de
+ * conquête (merge) : la planète ne serait plus attaquée.
+ */
+function canJoin(ctx, base, g, { speed, tank, burn, energy }) {
+  if (ctx.s.locked(g.id)) return false;
+  const d = distance(base.cell, g.to);
+  return burn * d <= Math.min(tank, Math.floor(energy || 0)) && ctx.now + tripMs(base.cell, g.to, speed) >= g.arrive;
 }
 
 // ----- l'IA sur le téléphone de l'hôte ---------------------------------------------------
 
 /**
  * Deux bouts d'un lien en mémoire, avec l'interface d'un lien WebRTC (send, onmessage,
- * onclose, close, route, closed). Les messages passent en texte JSON, comme sur le réseau,
- * et arrivent un peu après (jamais pendant l'ordre qui les envoie).
+ * onclose, close, route, closed). Chaque message est recopié à l'envoi, comme sur le réseau
+ * (JSON), sauf le journal des ordres d'une fiche, dont les entrées sont partagées et gelées
+ * (copyRec, D-370) ; il arrive un peu après (jamais pendant l'ordre qui l'envoie).
  */
+const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
+
+/** Gèle un objet et tout ce qu'il contient (une entrée du journal des ordres). */
+function deepFreeze(x) {
+  if (!x || typeof x !== 'object' || Object.isFrozen(x)) return x;
+  for (const v of Object.values(x)) deepFreeze(v);
+  return Object.freeze(x);
+}
+
+/**
+ * Copie d'une fiche pour une autre Session du même téléphone (D-370) : tout est recopié comme
+ * par le réseau (JSON), sauf les entrées du journal des ordres, partagées. Une entrée ne change
+ * plus une fois l'ordre fini : elle est gelée, et aucune Session ne peut la modifier chez une
+ * autre (une tentative lève une erreur). La dernière entrée peut être celle de l'ordre en cours
+ * de l'expéditeur (encore modifiable) : elle est recopiée. Le journal fait jusqu'à 1 500
+ * entrées, la fiche sans lui quelques Ko : c'était l'essentiel du travail (issue #39).
+ * Règle dont dépend le gel : l'entrée de l'ordre en cours (`entry`, la seule qu'on modifie) est
+ * toujours la dernière du journal de son joueur (touch l'ajoute une fois, à la fin). Si cela
+ * change, une écriture dans une entrée gelée lèvera une erreur (modules en mode strict) : on le
+ * verra tout de suite, rien ne sera corrompu en silence.
+ */
+/** `fullCopy` : tout recopier en JSON, comme avant D-370 (tests : la partie doit être la même). */
+export const LINK = { fullCopy: false };
+
+export function copyRec(rec) {
+  const orders = rec.orders;
+  if (!Array.isArray(orders)) return JSON.parse(JSON.stringify(rec));
+  // Le journal reste à sa place parmi les clés : la fiche est la même, au caractère près.
+  const out = JSON.parse(JSON.stringify({ ...rec, orders: [] }));
+  const n = orders.length;
+  const list = new Array(n);
+  for (let i = 0; i < n - 1; i++) list[i] = deepFreeze(orders[i]);
+  if (n) list[n - 1] = deepFreeze(JSON.parse(JSON.stringify(orders[n - 1] ?? null)));
+  out.orders = list;
+  return out;
+}
+
 export function localPair() {
   const a = new LocalLink();
   const b = new LocalLink();
@@ -404,6 +469,9 @@ class LocalLink {
     this.peer = null;
     this.closed = false;
     this.viaRoom = false;
+    // Même téléphone : même horloge (D-165), et le silence ne veut rien dire, la page était
+    // seulement en pause (D-220).
+    this.local = true;
     this.queue = [];
     this.handler = null;
     this.closer = null;
@@ -417,6 +485,10 @@ class LocalLink {
   get onmessage() {
     return this.handler;
   }
+  /** La fiche livrée est déjà une copie à moi (copyRec) : `onRecord` ne la recopie pas (D-370). */
+  get copied() {
+    return !LINK.fullCopy;
+  }
   set onclose(fn) {
     this.closer = fn;
   }
@@ -425,13 +497,17 @@ class LocalLink {
   }
   send(msg) {
     if (this.closed) return;
-    const data = JSON.stringify(msg);
+    // Copie faite à l'envoi : la fiche de l'expéditeur peut encore changer avant la livraison.
+    let data;
+    if (msg?.type === 'rec' && isObj(msg.rec) && !LINK.fullCopy) {
+      const { rec, ...rest } = msg;
+      data = { ...JSON.parse(JSON.stringify(rest)), rec: copyRec(rec) };
+    } else data = JSON.parse(JSON.stringify(msg));
     const peer = this.peer;
     queueMicrotask(() => peer.receive(data));
   }
-  receive(data) {
+  receive(msg) {
     if (this.closed) return;
-    const msg = JSON.parse(data);
     if (this.handler) this.handler(msg);
     else this.queue.push(msg);
   }
@@ -473,6 +549,8 @@ function botSession(host, pid, timers, clock) {
     start() {},
   });
   bot.state.log = [...host.state.log];
+  // Même téléphone : l'heure commune de l'hôte (D-165).
+  Object.assign(bot, { clock: () => host.clock(), clockSynced: true });
   // Horloge de test : l'heure reste figée pendant un ordre, comme Session.now.
   if (clock) bot.now = () => bot.entry?.t ?? clock();
   const [h, b] = localPair();
@@ -508,7 +586,7 @@ function botSession(host, pid, timers, clock) {
  */
 export function addBot(host, { race = null, name = null, timers = true, clock = null } = {}) {
   const st = host.state;
-  if (!st || Object.keys(st.players).length >= 8) return null;
+  if (!st || host.roster.length >= 8) return null;
   const used = new Set(Object.values(st.players).map((o) => o.name));
   name ||= NAMES.find((n) => !used.has(n)) || `IA ${Object.keys(st.players).length + 1}`;
   const pid = newPid();
@@ -523,6 +601,47 @@ export function addBot(host, { race = null, name = null, timers = true, clock = 
   think(bot);
   host.changed();
   return bot;
+}
+
+/**
+ * L'IA `pid` que ce téléphone fait jouer, si l'hôte peut encore la modifier : seulement avant
+ * le départ (D-399, D-400). Sinon null.
+ */
+export function editableBot(host, pid) {
+  const bot = host.bots?.get(pid);
+  if (!bot || host.startedAt != null || !host.state?.players[pid] || Number.isFinite(host.state.players[pid].left)) return null;
+  return bot;
+}
+
+/**
+ * Retire du lobby l'IA `pid` (D-399) : elle quitte la partie (sa fiche, marquée `left`,
+ * part chez tous comme ses autres changements), puis s'arrête. Renvoie true si c'est fait.
+ */
+export function removeBot(host, pid) {
+  const bot = editableBot(host, pid);
+  if (!bot || !bot.leave()) return false;
+  // Sa fiche rejoint l'hôte tout de suite, par le même chemin qu'un message (le lien en
+  // mémoire se ferme juste après, le message en route serait perdu).
+  const link = host.links.get(pid);
+  const log = bot.state.log.at(-1);
+  if (link) host.onRecord(link, copy(bot.state.players[pid]), log);
+  bot.end();
+  host.bots.delete(pid);
+  host.botIds = (host.botIds || []).filter((x) => x !== pid);
+  host.changed();
+  return true;
+}
+
+/** Renomme l'IA `pid` (D-400). Un nom vide est refusé (elle garde l'ancien). */
+export function renameBot(host, pid, name) {
+  const bot = editableBot(host, pid);
+  return !!bot && bot.rename(name);
+}
+
+/** Change la race de l'IA `pid` (D-400), avant le départ. */
+export function setBotRace(host, pid, race) {
+  const bot = editableBot(host, pid);
+  return !!bot && bot.chooseRace(race);
 }
 
 /** Reprise d'une partie : les IA que ce téléphone faisait jouer se remettent à jouer. */
