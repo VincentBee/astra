@@ -361,12 +361,16 @@ async function openInviteSheet() {
   $('answer-input').value = '';
   $('offer-qr').hidden = true;
   $('offer-wait').hidden = false;
+  let code;
   try {
-    offerCode = await session.openInvite();
+    code = await session.openInvite();
   } catch (e) {
     $('offer-wait').textContent = e.message;
     return;
   }
+  // null : fenêtre fermée ou invitation relancée pendant la préparation (#70), rien à dessiner.
+  if (!code) return;
+  offerCode = code;
   drawQr($('offer-qr'), inviteLink(offerCode));
   $('offer-qr').hidden = false;
   $('offer-wait').hidden = true;
