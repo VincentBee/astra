@@ -2420,3 +2420,27 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
 - Choix : `VERSION` passe à `astra-p2p-v94`, au-dessus de `main`, pour que les téléphones
   prennent le nouveau `sw.js`.
 - Qui : Claude, par défaut. Source : session `7bec2792`. Statut : en vigueur.
+
+## 7 novembre 2026 — stock NaN dans une fiche reçue (#76)
+
+**D-380 — Stock, population et réserve abîmés : ramenés à 0, la planète est gardée**
+- 2026-11-07. Contexte : issue #76. Une fiche reçue sans `stock.energy` (ou avec une chaîne)
+  rendait minéraux, nourriture et énergie NaN pour toujours ; un stock, une population, une
+  réserve ou une repousse négatifs passaient `planetOk` (famine immédiate, planète qui perd des
+  minéraux).
+- Choix : `planetOk` ramène chaque stock (`RES`) et la population à un nombre fini ≥ 0 (sinon
+  0), la réserve et la repousse du sol à ≥ 0 ; la planète est gardée. Gardes dans l'économie
+  (`js/game.js`) : `flows` et `advance` lisent un stock non fini comme 0, `extract` ne rend
+  jamais une quantité négative. Ces gardes ne changent rien à un nombre valide : une partie
+  normale donne exactement les mêmes nombres (vérifié, 108 états identiques à `main`).
+- Alternatives écartées : refuser toute la planète (le joueur disparaîtrait de la carte des
+  autres pour une seule valeur abîmée) ; lire les chaînes numériques (`"12"` → 12) avec
+  `Number()` (plus large que nécessaire : une fiche honnête n'en contient pas).
+- Qui : **Claude, par défaut** (la piste de l'issue). Source : session `5d227a6f`, issue #76.
+  Statut : en vigueur.
+
+**D-381 — Cache `astra-p2p-v95`**
+- 2026-11-07. Contexte : `main` est à v94 (D-231).
+- Choix : `VERSION` passe à `astra-p2p-v95`, pour que les téléphones prennent les nouveaux
+  `js/game.js` et `js/session.js`.
+- Qui : Claude, par défaut. Source : session `5d227a6f`. Statut : en vigueur.

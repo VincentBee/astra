@@ -446,6 +446,12 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 22:53 | `7bec2792` | Router : « VÉRIFIÉ » puis « MAIN A BOUGÉ — #161, #162, #166, #165, #163 et #164 sont mergées… VERSION de `sw.js` au-dessus de celle de `main` (v92) » | Fusion de `main` (sans rebase) : conflits `sw.js`, `decisions.md`, `tests-decisions.md`, `docs/README.md`, journal (les deux côtés gardés) ; cache v93 (D-231 mise à jour) ; 256/256 ; Chromium, serveur muet : accueil en 3048 ms | (PR #167) | D-230, D-231 |
 | 23:00 | `7bec2792` | Router : « MAIN A BOUGÉ (encore) — une autre PR, #179, a été mergée… Merge `origin/main`… VERSION au-dessus de celle de `main` » | Deuxième fusion de `main` (#179, D-201, qui prend aussi v93) : conflit du journal (les deux côtés gardés) ; cache v94 (D-231 mise à jour) ; tests et Chromium relancés | (PR #167) | D-231 |
 
+## 7 novembre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 07:30 | `5d227a6f` | Router (worker-nan) : corriger l'issue #76 (« Un stock non numérique (énergie absente) rend l'économie NaN pour toujours ») | `planetOk` ramène stock, population, réserve et repousse à des nombres finis ≥ 0 ; gardes dans `flows`, `advance`, `extract` ; scénario dans `tests/hostile.test.mjs` ; cache v95 | (PR à venir) | D-380, D-381 |
+
 ### Travaux en cours au 2026-10-29
 
 - **Rythme des parties** (`26f178b9`) : commité sur `claude/swarm-it-game-pacing-1d4502`

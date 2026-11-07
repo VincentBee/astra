@@ -479,6 +479,9 @@ export function newPlanet(race, now, world = null) {
 // Économie
 // ---------------------------------------------------------------------------
 
+/** Nombre fini, sinon 0 (#76). Ne change rien à un stock valide. */
+const num = (v) => (Number.isFinite(v) ? v : 0);
+
 /**
  * Ce qu'on tire vraiment du sol, par heure de jeu : tout ce que demandent les
  * bâtiments tant que le gisement n'est pas vide ; une fois vide, pas plus que
@@ -487,7 +490,8 @@ export function newPlanet(race, now, world = null) {
 function extract(res, want, nature, reserve, h) {
   if (!nature?.[res]) return want; // planète d'avant les gisements : sans limite
   const avail = reserve[res] / h + nature[res].regen;
-  return Math.min(want, avail);
+  // Jamais négatif (#76) : une réserve abîmée ne vide pas l'entrepôt.
+  return Math.max(0, Math.min(want, avail));
 }
 
 /**
@@ -498,6 +502,8 @@ function extract(res, want, nature, reserve, h) {
  */
 export function flows(race, levels, pop, stock, h, boost = 1, nature = null, reserve = null, tech = null, climate = null) {
   const R = RACES[race];
+  // Un stock absent ou non numérique compte pour 0 (#76) : sinon tout devient NaN.
+  stock = { energy: num(stock.energy), food: num(stock.food) };
   const r = R.rates(levels, pop);
   const t = techBonus(race, tech);
   // Le climat de la planète s'ajoute aux technologies (planète d'avant le climat : ×1).
@@ -562,9 +568,10 @@ function advance(race, s, ms, boost) {
   const lost = {}; // ce qui ne rentre pas dans l'entrepôt plein
   for (const r of RES) {
     const cap = capOf(r, f);
-    const v = s.stock[r] + f.net[r] * h;
+    const cur = num(s.stock[r]); // #76 : une clé absente ne rend pas le stock NaN
+    const v = cur + f.net[r] * h;
     // Un entrepôt déjà plein ne déborde pas, mais n'est pas vidé non plus.
-    stock[r] = Math.max(0, f.net[r] > 0 ? Math.max(s.stock[r], Math.min(cap, v)) : v);
+    stock[r] = Math.max(0, f.net[r] > 0 ? Math.max(cur, Math.min(cap, v)) : v);
     lost[r] = Math.max(0, v - stock[r]);
   }
   const R = RACES[race];
