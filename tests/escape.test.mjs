@@ -24,7 +24,8 @@ const sheets = ids.map((s, i) => ({ id: s.id, src: html.slice(s.at, ids[i + 1]?.
 
 test('toutes les fenêtres ont le même z-index : la dernière ouverte dans le HTML est devant', () => {
   assert.ok(sheets.length >= 9, `fenêtres trouvées : ${sheets.length}`);
-  const rules = [...css.matchAll(/([^{}]*\.sheet\b[^{}]*)\{([^}]*)\}/g)].filter((m) => /z-index/.test(m[2]));
+  // `.sheet` seule, pas `.sheet-head` ni `.sheet-panel` (leur z-index joue à l'intérieur de la fenêtre, D-302).
+  const rules = [...css.matchAll(/([^{}]*\.sheet(?![\w-])[^{}]*)\{([^}]*)\}/g)].filter((m) => /z-index/.test(m[2]));
   assert.deepEqual(rules.map((m) => m[1].trim()), ['.sheet'], 'un seul z-index pour les fenêtres, sur `.sheet`');
 });
 
