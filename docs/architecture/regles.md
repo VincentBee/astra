@@ -70,7 +70,8 @@ Créée par `addPlayer` (`js/session.js:696-713`), complétée par `normalize`
 | `rank` | heure d'arrivée (ordre d'arrivée) | `js/session.js:704` |
 | `actAt` | heure de la dernière modification (la plus récente gagne) | `js/session.js:712`, `touch` `js/session.js:586` |
 | `v` | version du format (`FORMAT = 7`) | `js/session.js:41`, `js/session.js:587` |
-| `race` | `human`, `machine` ou `alien`, choisie une seule fois | `chooseRace` `js/session.js:722-736` |
+| `race` | `human`, `machine` ou `alien` ; définitive dès que la partie part (avant, une IA peut en changer, D-400) | `chooseRace` |
+| `left` | heure à laquelle le joueur a quitté la partie avant le départ (IA retirée du lobby, D-399) ; absent sinon | `Session.leave` |
 | `ready` | heure à laquelle le joueur s'est dit prêt (D-120) ; absent tant qu'il ne l'est pas | `Session.ready` |
 | `go` | heure du départ, si c'est ce joueur qui l'a donné (tous les présents prêts, D-120) | `Session.begin` |
 | `since` | entrée dans la course : apparition de la flotte de départ (D-120), ou installation dans une partie d'avant | `enterRace`, `claimPlanet` |
@@ -199,7 +200,18 @@ l'intègre par pas (`js/game.js:13-15`).
     le suivent (chaque chantier garde l'ordre du fil) ;
   - le premier élément prêt **a la priorité sur le stock** : `stateAt` avance l'économie pas à
     pas (`until`) jusqu'à ce que le stock couvre son prix, au plus jusqu'au prochain événement ;
-    ceux d'après attendent (on ne double pas dans le fil pour une question de prix).
+    ceux d'après attendent (on ne double pas dans le fil pour une question de prix) ;
+  - **sauf un élément prêt qu'on ne pourra pas payer avec la production actuelle** (D-270,
+    `starved`) : une ressource de son prix manque au stock et ne peut pas monter (solde ≤ 0,
+    ou demande pas couverte : famine pour la nourriture, panne pour l'énergie). Il ne bloque
+    personne, **pas même les éléments de son propre chantier** (le réacteur qui répare la
+    panne part même s'il est derrière un bâtiment qui coûte de l'énergie). Il reste candidat :
+    `planNext` rend la liste de ces éléments-là, suivie du premier élément prêt payable un
+    jour, et `until` lance le premier de la liste que le stock couvre (si la ressource se remet
+    à rentrer, il repasse devant ceux qui le suivent). Sans famine ni panne, la liste n'a qu'un
+    élément : le calcul est celui d'avant. `planForecast` affiche alors sa raison (« Pas de
+    nourriture qui rentre », « Pas d’énergie qui rentre », « Pas de minéraux qui rentrent »)
+    au lieu de « plus de 6 h ».
   Trouvé : il paye, remplit sa file, sort du fil, et note `{ kind: 'start', lane, i, … }`
   dans `done` (`i` : sa place dans le fil de départ). Le fil avance aussi pendant une absence.
   `planForecast(planet, now)` part d'une copie soldée à `now`, refait ce calcul 10 min puis
@@ -780,7 +792,14 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
 
 ## 12. Installation et colonies
 
-- **Race** : choisie une fois, définitive (`chooseRace`, `js/session.js:722-736`).
+- **Race** : définitive dès que la partie part, ou dès qu'on a une planète (`chooseRace`). Avant, un
+  second `chooseRace` change de race (« X passe dans le camp des … ») : seul l'hôte d'une IA s'en
+  sert, depuis le lobby (D-400) ; l'écran d'un joueur ne propose le choix qu'une fois.
+- **IA du lobby (D-399, D-400)** : avant le départ, deux ordres de plus, notés au journal
+  (`ORDER_KINDS`) et donc rejoués : `rename(nom)` (nom coupé à 16 caractères, espaces retirés ;
+  vide ou inchangé → refusé, l'ancien reste) et `leave()` (champ `left` = heure ; `ready` et `go`
+  retirés). Après `leave`, `canAct` est faux. Un joueur parti n'est ni montré, ni compté
+  (`Session.roster` : les fiches sans `left`), ni attendu au départ (`notReady`), ni classé.
 - **Départ commun (D-120)** : après sa race, chaque joueur se dit prêt (ordre `ready`, champ
   `ready` = heure ; `ready(false)` le retire tant que la partie n'est pas partie). Un joueur qui
   n'a pas encore choisi sa race n'est pas prêt. `checkStart` (hors ordre, appelé par le minuteur
@@ -903,6 +922,11 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
   là, seul `MAX_STEPS` (§4.2) protège : le calcul reste borné. Une heure loin dans le futur
   n'est pas bornée ici (`normalize` ne connaît pas l'heure) : elle ne coûte rien
   (`steps` s'arrête aussitôt).
+- Stock, population et sol d'une planète reçue (D-380, #76) : `planetOk` ramène chaque stock
+  (`RES`) et la population à un nombre fini ≥ 0 (sinon 0), la réserve et la repousse du sol à
+  ≥ 0. L'économie se garde aussi elle-même : `flows` et `advance` lisent un stock non fini
+  comme 0, `extract` ne rend jamais une quantité négative. Rien ne change pour un nombre
+  valide : une partie normale garde exactement ses résultats.
 
 ## 15. Constantes d'équilibrage : où les changer
 
@@ -1268,7 +1292,10 @@ les mêmes ordres qu'un joueur, notés dans son journal (la partie se rejoue, §
   carburant, qui ne gèlent pas avant l'arrivée + 1 min ; combat calculé par `battle` contre les
   vaisseaux posés et `fortOf` ; gagné en gardant la moitié de la flotte → décollage (carburant
   aller-retour) et `conquer`. Les cibles qui tiendront le plus longtemps d'abord, puis les plus
-  proches. Après le combat, une flotte restée en orbite rentre se poser (`dockNearest`).
+  proches. Une planète déjà visée par une de mes flottes `conquer` n'est jamais visée une 2e
+  fois (D-280) : les vaisseaux posés la rejoignent (`joinFleet`) s'ils ont le carburant et
+  arrivent après elle (`canJoin`), sinon ils visent la cible suivante ou restent posés. Après le
+  combat, une flotte restée en orbite rentre se poser (`dockNearest`).
 - **Froid** (`evacuate`) : à 40 s du gel, les vaisseaux posés partent se poser sur la planète qui
   gèlera le plus tard.
 - **Aliens** (`usePowers`) : arrachement si le gain dépasse 40 minéraux, transe si le sol n'est

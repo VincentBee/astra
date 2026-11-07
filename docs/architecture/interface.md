@@ -28,6 +28,7 @@ Fichiers d'interface partagés :
 | `js/icons.js` | Icônes d'interface (`ic`, `fillIcons`). |
 | `js/game.js:31-52` | Icônes des ressources (`resIcon`) et des races (`raceIcon`), à côté des données qu'elles illustrent. |
 | `js/sky.js` | `drawSun` : le soleil, dessiné par la carte du jeu et celle du replay. |
+| `js/spark.js` | Historique des mini-graphes des tuiles, une série par planète (D-340) : `ownHistory`, `addSample`, `sparkPath`. Fonctions pures, testées par `tests/spark.test.mjs`. |
 | `js/galaxy.js` | `startGalaxy` : fond étoilé immobile, derrière toutes les vues du jeu (D-137). |
 | `icons/` | `icon.svg` (favicon), `icon-192.png`, `icon-512.png` (icônes PWA, `manifest.json`). |
 
@@ -68,14 +69,14 @@ Les tests automatiques (`tests/*.test.mjs`) portent sur les règles et le résea
 
 ## 3. Écrans et fenêtres de `index.html`
 
-Quatre **écrans** (`<section class="screen">`), un seul visible à la fois via `show(nom)` (`js/app.js:54-57`, met `hidden` sur les autres). Par-dessus, des **fenêtres** (`.sheet`, panneau collé en bas, fond sombre) et quelques couches fixes.
+Quatre **écrans** (`<section class="screen">`), un seul visible à la fois via `show(nom)` (`js/app.js:54-57`, met `hidden` sur les autres). Par-dessus, des **fenêtres** (`.sheet` : modale presque plein écran sur fond sombre, toutes au style du Journal, D-302) et quelques couches fixes.
 
 ### 3.1 Écrans
 
 | Élément (`index.html`) | Ce qu'on y voit | Fonctions de `js/app.js` |
 |---|---|---|
 | `#screen-home` (19-38) | Titre, historique des parties (`#saved`/`#games`), champ Nom, **Créer**, **Rejoindre**, note `#home-note`, roue crantée des réglages (`.settings-btn`, D-114). | `showSaved` 153-172 (liste), clic sur la liste 174-190 (Reprendre → `Session.resume` ; Revoir → `replay.html` ; Oublier → `forgetGame`), `btn-create` 194-201, `btn-join` 203-206, `playerName` 89-100, `boot` 1935-1957. |
-| `#screen-join` (41-67) | Étape 1 : scanner ou coller l'invitation. Étape 2 : QR de la réponse, copier/partager, statut. `#join-error`. | `startJoin` 212-219, `useOffer` 236-258, `onSessionChange` 263-283, scanner 226-232. |
+| `#screen-join` (41-67) | Étape 1 : scanner ou coller l'invitation. Étape 2 : QR de la réponse, copier/partager, statut, **Autre invitation** (`#btn-other-invite`, D-290 : arrête la tentative comme Retour et revient à l'étape 1). `#join-error`. | `startJoin` 212-219, `useOffer` 236-258, `onSessionChange` 263-283, scanner 226-232. |
 | `#screen-race` (70-80) | 3 boutons de race (radiogroup), fiche de la race choisie, bouton **Choisir cette race** (mène à la carte et au bandeau du départ, D-120), ce qu'ont choisi les autres. | `showRace` 385-395, `updateRacePick` 398-410, `renderRaceOthers` 413-419, `btn-race` 428-432. |
 | `#screen-game` (83-200) | La partie. Deux **vues** : la carte (`#view-universe`) ou une planète (`#view-planet`). | `startGame` 436-447, `stopGame` 449-455, `showView` 1217-1229. |
 
@@ -84,13 +85,13 @@ Détail de `#screen-game` :
 | Élément | Rôle | Rendu |
 |---|---|---|
 | `.topbar` (84-95) | Ancienne barre du haut (nom, race). **Masquée** par `style.css:671` (`display: none`) ; ses champs sont encore remplis par `renderState` 753-762. | — |
-| `#net` (91-93) | Compteur de joueurs en ligne (vert, orange si un lien > 250 ms). `showView` le **déplace** dans la première ligne de la vue affichée (`js/app.js:1223`). Ouvre `#sheet-players`. | `renderLive` 811-821, clic 319-322. |
+| `#net` (91-93) | Compteur de joueurs en ligne (vert, orange si un lien > 250 ms). `showView` le **déplace** dans la première ligne de la vue affichée (`js/app.js:1223`). Ouvre `#sheet-players`. **Caché avant le départ** (`renderLobby` : `$('net').hidden = mapVeiled()`, D-310) : en préparation, le lobby liste les joueurs et invite. | `renderLive` 811-821, clic 319-322. |
 | `#lost` (97-100) | Bandeau « Seul en ligne » + **Rejoindre** (rejoindre les autres par une nouvelle invitation). | `renderState` 762 (`session.alone`), `btn-rejoin` 286-289. |
-| `#view-universe` (102-148) | Vue carte : `#pick` (bandeau du départ, D-120 : « Prépare-toi » / « Prêt · on attend … » avec les joueurs, prêts en vert, absents grisés, et les boutons **Je suis prêt** / **Plus prêt** / **Inviter** ; après le départ « Envoie ton colonisateur » et **Ma flotte** ; caché dès la planète mère fondée), `#trades` (offres d'échange), `.map-head` (coordonnées, aide `?`), `canvas#map`. | `drawMap` 1349-1538, `renderPick` 1876-1913, `renderTrades` 1777-1800. |
-| `#sheet-planet` | Fiche de la planète touchée : nom, coordonnées, propriétaire, places, climat, gisements, **Y envoyer mon colonisateur** (`#btn-claim` : planète libre, pas un petit corps, tant que je n'ai pas de planète mère, D-120) ou **Voir la planète** (`#btn-open-planet`, D-138 ; avant : « Bâtiments »). Sur une de mes planètes, partie **Chantier** (`#pi-yard`, D-106) : vaisseaux recherchés, prix, « jusqu'à N », boutons ×1 / ×5 / ×N, et **Décoller**. | `renderPick`, `renderPickYard`, écouteur de `#pi-ships`, `btn-pi-takeoff`, `btn-claim`, `btn-open-planet`, `closePlanetSheet`. |
-| `#map-fleets` (sous `canvas#map`) | Mes planètes puis mes flottes en grille (2 colonnes sur téléphone). **Une case par planète** (D-115, bord vert) : nom, compte à rebours du chantier, une icône par type de vaisseau à quai avec son nombre, statut (« Chantier : +5 Frégate », « 7 à quai », « Aucun vaisseau à quai » ou « 🔒 » sans chantier naval) et deux boutons-icônes : **+** (Construire, si la planète a un chantier naval) ouvre `#sheet-planet` sur sa partie Chantier ; **Décoller** (icône `fleet`, s'il y a des vaisseaux à quai) ouvre directement le formulaire de décollage de cette planète. Toucher ailleurs sur la case ouvre la fiche de la planète. Une case par flotte : nom, compte à rebours, une icône par type de vaisseau avec son nombre, statut ; bord rouge si attaque/conquête/poursuite, grisée si à sec. Toucher = sélectionner la flotte (ouvre `#fleet-info`), retoucher = la relâcher (D-107, D-108). | `renderMapFleets`, appelé par `renderLive` ; le HTML n'est réécrit que si le contenu ou le statut change, les comptes à rebours (flotte, chantier) et `aria-pressed` sont mis à jour en place. Un seul écouteur de clic : `[data-mp-build]`, `[data-mp-go]`, `[data-planet]`, puis `[data-fleet]`. |
+| `#view-universe` (102-148) | Vue carte : `#pick` (bandeau du départ, D-120 : « Prépare-toi » / « Prêt · on attend … » avec les joueurs, prêts en vert, absents grisés, et les boutons **Je suis prêt** / **Plus prêt** / **Inviter** ; après le départ « Envoie ton colonisateur » et **Ma flotte** ; caché dès la planète mère fondée), `#trades` (offres d'échange), `.map-head` (coordonnées ; plus de bouton d'aide `?` depuis D-245), `canvas#map`, `#map-wrap` caché avant le départ (D-240, D-241 : tant que `session.startedAt` est nul, `mapVeiled()` cache la carte entière dans `renderLobby` et `drawMap`, et vide `mapPlanets()`). Les joueurs du bandeau (`#pick-who`) sont en liste, un par ligne (D-241). Pendant le lobby, `renderLobby` met la classe `lobby` sur `#screen-game` : l'en-tête passe en haut, `#pick` prend toute la hauteur de l'écran, la liste défile si besoin et les boutons sont en bas (D-242). Dans le bandeau, l'icône d'un bouton plein (**Je suis prêt**, **Ma flotte**) prend la couleur du texte (`.banner button.primary .ic`, D-240). | `drawMap` 1349-1538, `renderPick` 1876-1913, `renderTrades` 1777-1800. |
+| `#sheet-planet` | Fiche de la planète touchée : nom, coordonnées, propriétaire, places, climat, gisements, **Y envoyer mon colonisateur** (`#btn-claim` : planète libre, pas un petit corps, tant que je n'ai pas de planète mère, D-120) ou **Voir la planète** (`#btn-open-planet`, D-138 ; avant : « Bâtiments »). Sur une de mes planètes, partie **Chantier** (`#pi-yard`, D-106) : vaisseaux recherchés (recherche au fil comprise), prix, « jusqu'à N », boutons ×1 / ×5 / ×N, et **Décoller**. Même logique que l'onglet de la planète (D-312) : chantier libre, pas de vaisseaux au fil et stock suffisant → ×1 / ×5 / ×N lancent le lot ; sinon ils deviennent +1 / +5 / +N et l'ajoutent au fil (`data-mode="plan"`). Max à 0 (stock vide) reste grisé. Fil plein (12) : boutons grisés, titre « Fil plein (12 au plus) » ; la ligne d'état dit « N lots de vaisseaux au fil · fil plein (12 au plus) ». | `renderPick`, `renderPickYard`, écouteur de `#pi-ships`, `btn-pi-takeoff`, `btn-claim`, `btn-open-planet`, `closePlanetSheet`. |
+| `#map-fleets` (sous `canvas#map`) | Mes planètes puis mes flottes en grille (2 colonnes sur téléphone). **Une case par planète** (D-115 ; cadre fin, sans bord gauche coloré depuis D-301) : nom, compte à rebours du chantier, sous le nom des **jauges de stock** sans chiffre (D-303 : une barre fine par ressource de la race puis les habitants, stock / plafond de l'entrepôt ou des logements ; `aria-label` en mots, « minéraux presque plein… »), une icône par type de vaisseau à quai avec son nombre, statut (« Chantier : +5 Frégate », « 7 à quai », « Aucun vaisseau à quai » ou « 🔒 » sans chantier naval) et deux boutons-icônes : **+** (Construire, si la planète a un chantier naval) ouvre `#sheet-planet` sur sa partie Chantier ; **Décoller** (icône `fleet`, s'il y a des vaisseaux à quai) ouvre directement le formulaire de décollage de cette planète. Toucher ailleurs sur la case ouvre la fiche de la planète. Une case par flotte : nom, compte à rebours, une icône par type de vaisseau avec son nombre, statut ; bord rouge si attaque/conquête/poursuite, grisée si à sec. Toucher = sélectionner la flotte (ouvre `#fleet-info`), retoucher = la relâcher (D-107, D-108). | `renderMapFleets`, appelé par `renderLive` ; le HTML n'est réécrit que si le contenu ou le statut change, les comptes à rebours (flotte, chantier), la largeur des jauges et leur `aria-label` (D-303) et `aria-pressed` sont mis à jour en place. Un seul écouteur de clic : `[data-mp-build]`, `[data-mp-go]`, `[data-planet]`, puis `[data-fleet]`. |
 | `#fleet-info` (129-145) | Fiche de la flotte sélectionnée : vaisseaux, statut (avec la vitesse et, si la flotte mêle plusieurs types, le nom du plus lent : `speedText`), carburant, choix d'ordres (`#fi-choice`), mes flottes à côté (`#fi-beside`), joueurs à côté (`#fi-partners`), boutons Arrêter / Rentrer / Se poser / Plein / Passive-Agressive (`#btn-fi-stance`, icône d'attaque, pleine quand la flotte est agressive, cachée pour une flotte sans armes ; D-100) / Scinder / Fermer. Le statut finit par « · agressive » (`fleetStatus`). | `renderFleetInfo` 1643-1687, handlers 1689-1714. |
-| `#view-planet` (150-199) | Vue planète : en-tête (retour, nom, climat), gisements `#soil-zone`, stocks `#resources`, onglets, puis les panneaux `data-pane`. | `renderPlanet` 869-988. |
+| `#view-planet` (150-199) | Vue planète : en-tête (retour, nom ; plus de climat depuis D-311), gisements `#soil-zone`, stocks `#resources` (chaque carte de ressource montre son coefficient de climat « ×1,10 » à côté de l'icône, `[data-clim]`, vert au-dessus de 1, orange en dessous, caché sans climat : D-221), onglets, puis les panneaux `data-pane`. Si la colonie affichée n'est plus à moi, la vue revient sur la planète mère avec le message « Tu as perdu ta colonie X : retour à ta planète mère. » (seulement si la vue planète est à l'écran ; D-350). | `renderPlanet` 869-988. |
 | `.tabs` (163-168) | Onglets Bâtiments / Pouvoirs (aliens seulement) / Recherche (toute planète ; « 🔒 Il faut un labo » sans labo, technologie grisée si elle est en recherche sur une autre planète) / Flottes. | `showTab`, flèches clavier. Ouvrir une planète (`showView('planet')`) affiche toujours **Bâtiments** ; l'onglet n'est plus retenu entre deux visites ni dans `localStorage` (D-156). |
 | `[data-pane=power]` `#powers-zone` (170-173) | Pouvoirs aliens. | `buildStatic` 526-540, `renderPlanet` 966-982. |
 | `[data-pane=build]` (175-178) | Bâtiments + compteur de places `#places`. | `buildStatic` 488-498, `renderPlanet` 942-964. |
@@ -104,18 +105,28 @@ Les panneaux sont filtrés en CSS selon `#view-planet[data-tab]` (`style.css:463
 
 Toutes se ferment par leur croix (`.close-btn`), un toucher sur le fond sombre ou Échap (`js/app.js:689-698` : ces deux gestes cliquent la croix).
 
+Style commun (D-302, celui du Journal, D-246) : une seule règle dans `style.css` (`.sheet`, `.sheet-panel`, `.sheet-head`) pour **toutes** les fenêtres, sans variante par fenêtre. `.sheet` fait `100dvh` (haut de l'écran visible, pas `inset: 0`, D-243), fond assombri, 12 px de marge ; le panneau est centré, prend toute la hauteur restante (`height: 100%`), 760 px de large au plus, bord de 1 px sur les quatre côtés ; son en-tête (titre, croix) est collé en haut (`position: sticky`) avec un trait dessous ; le contenu défile dans le panneau (`overscroll-behavior: contain`) et, tant qu'une fenêtre est ouverte, la page derrière ne défile pas (`body:has(.sheet:not([hidden])) { overflow: hidden; }`). Seuls l'espacement interne (`gap`) et le contenu changent d'une fenêtre à l'autre.
+
+Échap ne ferme que la fenêtre du dessus (D-192, issue #72) : toutes les fenêtres ont le même
+`z-index` (20, `.sheet` dans `style.css`), donc celle qui se voit devant est la **dernière visible
+dans l'ordre du HTML** ; le gestionnaire la prend avec `findLast` (`js/app.js`, « Toutes les
+fenêtres se ferment… »). Un deuxième Échap ferme la suivante. `tests/escape.test.mjs` vérifie ce
+dont la règle a besoin : un seul `z-index` pour les fenêtres, une croix dans chacune, `findLast`
+dans le gestionnaire. Si un jour une fenêtre reçoit son propre `z-index`, ou sort de l'ordre du
+HTML, cette règle ne tient plus : il faudra une pile d'ouverture.
+
 | Fenêtre | Ouverte par | Contenu / action | Code |
 |---|---|---|---|
-| `#sheet-players` (`index.html:203-216`) | `#net` | Détail réseau, **Inviter un joueur**, classement (`#players`). | 319-327 ; liste `renderState` 765-779 ; lignes `renderLive` 835-865 (score, `style.order` pour trier sans redessiner, 864). |
+| `#sheet-players` (`index.html:203-216`) | `#net` (seulement après le départ, D-310 ; fermée par `renderLobby` tant que `mapVeiled()`) | Détail réseau, **Inviter un joueur**, classement (`#players`). | 319-327 ; liste `renderState` 765-779 ; lignes `renderLive` 835-865 (score, `style.order` pour trier sans redessiner, 864). |
 | `#sheet-settings` | roue crantée (`[data-settings]` : accueil et `#btn-settings` dans la rangée du jeu) | Réglages de l'appareil : liste **Fond** (`#sky`, D-112). | branchement près de l'accueil dans `app.js` (D-114). |
 | `#sheet-invite` (219-248) | **Inviter un joueur** | QR de l'invitation + copier/partager ; scanner ou coller la réponse. | `openInviteSheet` 297-312, `useAnswer` 341-363, fermeture → `session.cancelInvite()` 328-331. |
 | `#sheet-fleet` (251-275) | **Décoller** (onglet Flottes) | Nombre de vaisseaux, cargaison, carburant ; calcule soutes, vitesse (et le vaisseau le plus lent, qui la fixe), réservoir, portée. | `openFleetSheet` 1147-1165, `updateFleetSheet` 1167-1180, `btn-fleet-go` 1185-1196. |
-| `#sheet-move` (278-295) | « Donner » (`#fi-beside`) ou **Scinder** | Vaisseaux, cargaison, carburant à passer à une autre flotte ou à une nouvelle. | `openMoveSheet` 1838-1860, `btn-move-go` 1864-1873. |
+| `#sheet-move` (278-295) | « Donner » (`#fi-beside`) ou **Scinder** | Vaisseaux, cargaison, carburant à passer à une autre flotte ou à une nouvelle. La fenêtre garde l'identifiant de sa flotte (`moveSheet.from`) et n'agit que sur elle ; si cette flotte (ou celle qui reçoit) disparaît, elle se ferme avec « Cette flotte n'existe plus. » (`refreshMoveSheet`, appelé par `renderFleetInfo` ; D-350). | `openMoveSheet`, `refreshMoveSheet`, `btn-move-go` (~2836-2890). |
 | `#sheet-trade` (298-315) | Bouton échange d'un joueur sur la même case | « Je donne » / « Je demande ». | `openTradeSheet` 1746-1757, `btn-trade-go` 1768-1774. |
 
 ### 3.3 Couches fixes
 
-- `#scanner` (318-323) : caméra plein écran, `scan()` (`js/app.js:116-126`) appelle `scanQr` de `js/scanner.js` (voir `reseau.md`), **Annuler** abandonne via `AbortController`.
+- `#scanner` (`index.html:412-417`) : caméra plein écran, `scan()` (`js/app.js:135-150`) appelle `scanQr` de `js/scanner.js` (voir `reseau.md`), **Annuler** abandonne via `AbortController`. Depuis D-250 (#42), Annuler marche à tout moment, même avant que la caméra soit prête : `scanQr` rejette aussitôt avec `AbortError`, le `finally` de `scan()` cache `#scanner`, et un flux de caméra arrivé après coup est éteint dès qu'il arrive. Un nouveau `scan()` annule celui qui serait encore ouvert.
 - `#toast` : messages **à la file** (D-110), `toast(text, ms = 3200)` puis `nextToast()` : un à la fois, dans l'ordre ; 6 en attente au plus (les longs restent) ; un doublon de ce qui est affiché ou attend est ignoré ; d'autres attendent → au moins 2 s chacun. Appli cachée : ignoré. La session y écrit aussi via `session.ontoast` (« tu es éliminé » : 8 s).
 - `#btn-journal` (à gauche de `#net`, déplacé avec lui par `showView`) et `#sheet-journal` (D-110) : `openJournal(away)` montre « Combats et planètes » (le carnet `session.journal`, du plus récent au plus ancien ; bord vert gagné, rouge perdu ; ligne « Tes pertes · Ses pertes · Butin / Pillé » ; fond plus clair = pas encore lu ; depuis D-122, `reportHtml(e)` ajoute la phrase « pourquoi » (`.j-why`) et un `<details class="j-report">` « Détail du combat » : ce qui a pesé (`.j-reasons`), deux tableaux des forces `.j-forces` — « Tes forces » et « Forces de … », avec feu et coque au départ ; colonnes Vaisseau, Nb, ⚔, ◇, Perdus ; défense « tient » ou « abattue » — et les passes (`.j-rounds`), textes de `js/report.js`), puis « Ce qui me concerne » (lignes du journal partagé qui contiennent mon nom, 20 au plus ; depuis D-210, une ligne d'ordre de flotte d'un autre joueur, marquée `{ pid, fleet }`, n'y est que tant que je vois sa flotte : `session.showsLog(l)`). Ouvrir marque tout lu (`session.markRead`). Pastille `#journal-count` = entrées non lues (mise à jour par `renderLive`).
 - Résumé « Pendant ton absence » : `showAbsence(gone)` ouvre la même fenêtre limitée au neuf si l'absence dépasse `AWAY_MS` (2 min) et qu'il y a du neuf. Appelé à la reprise d'une partie (absence = depuis `savedAt`, neuf = non lu) et 1 s après le retour au premier plan (`visibilitychange` ; neuf = noté depuis qu'elle a été cachée). Bouton « Tout le journal ».
@@ -127,7 +138,7 @@ Toutes se ferment par leur croix (`.close-btn`), un toucher sur le fond sombre o
 
 1. Au chargement du module : `fillIcons()` puis `startGalaxy()` (`js/app.js:16-17`), mise en place du collage des en-têtes (`stackSticky`, 22-36), restauration du nom (`astra.name`, 132-134) ; l'ancienne clé `astra.tab` (onglet retenu) est effacée, plus lue depuis D-156.
 2. `showSaved()` puis `boot()` (1959-1960). `boot` lit `location.hash`, l'efface de l'adresse, et le décode avec `decode` (`js/invite.js`) :
-   - invitation (`kind === 'o'`) : si un nom est déjà connu → `startJoin(hash)` ; sinon note sur l'accueil et **Rejoindre** est rebranché sur ce lien (1941-1947) ;
+   - invitation (`kind === 'o'`) : si un nom est déjà connu → `startJoin(hash)` ; sinon note sur l'accueil et le code est gardé dans `pendingInvite` (D-290, #69). Le premier appui sur **Rejoindre** le consomme (remis à `null`, note cachée) ; les appuis suivants ouvrent l'étape 1 normale, champ vide ;
    - réponse : note qui dit de la coller sur le téléphone qui invite (1948-1950).
 3. Un lien d'invitation ouvert dans l'onglet déjà affiché relance `boot` si aucune session n'est ouverte (`hashchange`, 1962).
 4. Enregistrement du service worker (1964-1966).
@@ -158,7 +169,7 @@ Conventions de rendu, à respecter pour ne pas casser le toucher :
 - **Éléments repérés par `data-*`** (`data-res`, `data-cost`, `data-build`, `data-tlevel`…), créés par `buildStatic` et mis à jour par les `render*`.
 - **Délégation d'événements** : un seul écouteur par conteneur (`#buildings` 747-750, `#techs`, `#ships`, `#powers` 604-615, `#games`, `#races`, `#trades`, `#fi-choice`, `#fi-beside`…), qui lit le `data-*` du bouton touché.
 - Carte de bâtiment : le nom est un bouton qui déplie la description (`cardHead` 547-548, écouteur global 551-556, CSS `.building.open` `style.css:512`). Barre de progression en bas de la carte pendant un chantier (`cardProgress` 991-997).
-- Mini-graphes (« sparklines ») dans les tuiles : un relevé toutes les 5 s, 10 min gardées dans `localStorage['astra.hist']`, par partie, joueur et planète (`sampleHistory` 632-655, `drawSparks` 658-680).
+- Mini-graphes (« sparklines ») dans les tuiles : un relevé toutes les 5 s de la planète ouverte, 10 min gardées **par planète** dans `localStorage['astra.hist']` (`{ id: 'partie|joueur', p: { clé: { t, v } } }`, D-340). Logique pure dans `js/spark.js` (`ownHistory`, `addSample`, `sparkPath`) ; `sampleHistory` et `drawSparks` (`js/app.js`) lisent/écrivent localStorage et le SVG. Moins de 2 relevés pour la planète affichée : tracé vide (jamais la courbe d'une autre planète).
 
 ### 4.4 Formats d'affichage (helpers)
 
@@ -187,7 +198,7 @@ Table des appels de l'interface vers la session :
 | Envoyer le colonisateur de départ (D-120) | `btn-claim` (fiche de la planète), ou carte une fois la flotte choisie (`btn-pick-fleet`) | `moveFleet(id, case, 'colonize')` |
 | Bâtiment / recherche / vaisseaux / pouvoir | 749, 610, 614, 606 | `build` (ou `planBuild`, voir §13), `research`, `buildShips`, `power` |
 | Retirer un élément du fil de construction | `#plan` (× d'un élément) | `unplan` |
-| Vaisseaux depuis la carte (D-106, D-115) | écouteur de `#pi-ships` (fiche ouverte en touchant la planète, ou par le bouton **+** de sa case sous la carte) | `buildShips(type, n, clé de la planète touchée)` ; ×N = `shipsAffordable` |
+| Vaisseaux depuis la carte (D-106, D-115) | écouteur de `#pi-ships` (fiche ouverte en touchant la planète, ou par le bouton **+** de sa case sous la carte) | `buildShips(type, n, clé de la planète touchée)`, ou `planShips(type, n, clé)` quand le bouton est en mode « plan » (D-312) ; ×N / +N = `shipsAffordable` au moment du toucher |
 | Décoller (onglet Flottes, fiche de la carte, ou case de la planète sous la carte, D-115) | `openFleetSheet(clé)`, `btn-fleet-go` | `takeOff(fleetKey, …)` (renvoie l'id de la flotte, sélectionnée ensuite) |
 | Envoyer une flotte sur une case (toucher ou glisser, D-126) | `orderAt`, `actionsFor`, menu `#map-menu` | `ordersAt` (ordres possibles) puis `moveFleet` |
 | Poursuivre une flotte ennemie | menu au doigt « Attaquer la flotte de … » (`actionsFor`) | `chaseFleet` |
@@ -401,13 +412,13 @@ Les demandes de Vincent derrière l'interface sont datées dans [journal.md](../
 
 Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.md](regles.md) §4.1 et §19.
 
-- **Bandeau de course** `#race` (`index.html`, sous `#lost`), rempli par `renderRace(now)` dans
-  `renderLive` (chaque seconde) : avant le départ du froid « Le soleil s'éteint · dernier en vie
-  gagne · n en vie » ; ensuite « Ta planète la plus exposée gèle dans m:ss · va vers le
-  soleil » ; « Éliminé · encore n en vie » ; « Victoire ! », « X gagne. » ou, seul, « Perdu. » (D-142) · partie finie, suivi du bouton **Classement** (rouvre l'écran de fin, D-143) et du lien **Voir la courbe des points**
-  (`replay.html#points`, D-104). Classe
-  `hot` (bordure orange) à moins de 3 min du gel, quand on est éliminé ou qu'un autre a gagné.
-  Caché pour une partie d'avant la course.
+- **Bandeau de fin** `#race` (`index.html`, sous `#lost`), rempli par `renderRace()` dans
+  `renderLive` : **caché pendant la partie et quand on est éliminé** (D-201 ; il disait avant
+  « Ta planète la plus exposée gèle dans m:ss · va vers le soleil · n en vie », « Le soleil
+  s'éteint… », « Éliminé… »). Il n'apparaît qu'en fin de partie : « Victoire ! », « X gagne. » ou,
+  seul, « Perdu. » (D-142) · partie finie, suivi du bouton **Classement** (rouvre l'écran de fin,
+  D-143, seul moyen de le rouvrir après l'avoir fermé) et du lien **Voir la courbe des points**
+  (`replay.html#points`, D-104). Classe `hot` (bordure orange) quand un autre a gagné.
 - **Carte** : `drawFrost` voile en bleu tout ce qui est hors du cercle de froid (remplissage
   `evenodd`) et trace le cercle en pointillés ; il s'arrête à l'heure de fin. Les planètes
   gelées sont dessinées presque effacées (opacité 0,15). En-tête « éliminé » au lieu de « à
@@ -510,7 +521,7 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
 - `myColonizer(me)` : ma flotte avec un colonisateur tant que je n'ai pas de planète mère. Les
   planètes libres clignotent sur la carte seulement dans ce cas.
 - Dans la fenêtre Joueurs, un joueur sans planète est « pas encore prêt », « prêt », « en route
-  vers sa planète… » ou « éliminé » ; l'en-tête de la carte dit « avant le départ » puis
+  vers sa planète… » ou « éliminé » ; l'en-tête de la carte dit « préparation » (D-244 ; avant : « avant le départ ») puis
   « à fonder » à la place des coordonnées.
 - Le bouton de l'écran de race dit **Choisir cette race** (avant : « Commencer la partie » ou
   « Rejoindre la partie »).
@@ -550,8 +561,8 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
 
 ## 18. Écran « Fin de partie » (2026-11-01, D-143)
 
-- `#sheet-finish` (`index.html`, après la fenêtre Joueurs) : fenêtre `.sheet` centrée
-  (`.finish`), titre « Fin de partie » avec l'icône `trophy`, la liste `#finish-board` (pas de ligne
+- `#sheet-finish` (`index.html`, après la fenêtre Joueurs) : fenêtre `.sheet` au style commun
+  (D-302 ; `.finish` ne règle plus que son contenu), titre « Fin de partie » avec l'icône `trophy`, la liste `#finish-board` (pas de ligne
   « X gagne. » : le bandeau `#race` le dit, D-145), le lien **Voir la courbe des points** (`replay.html#points`) et le bouton
   **Revoir la carte**.
 - `showFinish(over, again)` (`js/app.js`) : appelé par `renderRace` quand la partie est finie ;
@@ -584,6 +595,16 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
 - Bandeau du départ (`#pick`) : bouton `#btn-pick-bot` **Ajouter une IA**, à côté d'« Inviter »,
   caché dès que la partie est partie ou à 8 joueurs (`renderLobby`). Un toucher ajoute une IA
   et le dit (« IA Orion rejoint la partie : elle joue sur ce téléphone. »).
+- **Modifier une IA dans le lobby (D-399, D-400)** : chez l'hôte qui la fait jouer, et tant que
+  la partie n'est pas partie, la ligne de l'IA dans `#pick-who` est un bouton (`data-bot`, bord
+  pointillé, crayon ✎). Un toucher ouvre `#sheet-bot` (`openBotSheet`) : champ **Nom**
+  (`#bot-name`, 16 caractères), les trois races en boutons radio (`#bot-races`, même dessin que
+  le choix de race du joueur, sans la fiche détaillée), **Valider** (`renameBot` puis
+  `setBotRace` ; nom vide → message « Le nom ne peut pas être vide : l'IA garde le sien. », rien
+  ne change) et **Retirer de la partie** (`removeBot`, message « X quitte la partie. »). Les autres
+  téléphones voient une ligne simple. Partie partie (ou IA disparue), `renderLobby` ferme la
+  fenêtre. Les listes de joueurs (lobby, fenêtre Joueurs, choix de race, historique, rejeu)
+  passent par `session.roster` : une IA retirée n'y est plus.
 - Reprise depuis l'historique : `wakeBots(session)` juste après `Session.resume` (`app.js`).
 - Fenêtre Joueurs : pour une IA, la ligne dit « IA sur ce téléphone » (`routeLabel('bot')`) au
   lieu de la latence.
