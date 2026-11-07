@@ -395,7 +395,6 @@ button.close-btn svg { width: 18px; height: 18px; }
 .climate-name.hot { color: #ff9a4d; }
 .climate-name.mild { color: var(--food); }
 .climate-name.cold { color: #7fc8ff; }
-#soil-zone .climate { margin-bottom: 10px; }
 .pi-head-right { display: flex; align-items: center; gap: 12px; }
 .fi-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .fi-fuel { display: grid; gap: 4px; }
@@ -812,11 +811,10 @@ html.view-only .screen { pointer-events: none; }
 .badge .rci, .race-tag .rci { color: var(--race, var(--accent)); }
 #race-others .rci { width: 18px; height: 18px; }
 
-/* Nom de la planète, son climat sur la même ligne, ses gisements juste dessous. */
+/* Nom de la planète (sans son climat, D-311) : il prend la place libre, les boutons restent à
+   droite. */
 .planet-head { gap: 10px; flex-wrap: wrap; }
-.planet-head h2 { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.planet-head .climate { margin-left: auto; white-space: nowrap; font-size: 0.75rem; }
-.planet-head .climate .qty .ri { margin-left: 0.1em; }
+.planet-head h2 { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Compteur de joueurs en ligne (barre du haut) : ouvre la fenêtre des joueurs. */
 button.net-btn {
@@ -885,8 +883,6 @@ button#btn-journal { color: var(--text); }
 .topbar { display: none; }
 .map-head, .planet-head { min-height: 48px; }
 .planet-head #net { margin-left: 8px; }
-/* Climat centré entre le nom de la planète et le compteur de joueurs. */
-.planet-head .climate { flex: 1; margin-left: 0; text-align: center; }
 /* L'icône du compteur garde la couleur du bouton (vert, orange si lent), partout. */
 #net .ic { color: inherit; }
 /* Aide de la carte à gauche, à côté des coordonnées : sa bulle s'ouvre vers la droite. */

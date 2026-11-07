@@ -789,20 +789,17 @@ function costText(cost) {
 const climX = (v) => `×${v.toFixed(2).replace('.', ',')}`;
 
 /** « Chaud · production ×1,2 ⚡ · ×1,1 ◆ · ×0,9 🍃 » : le climat et son effet sur la production, en HTML. */
-function climateHtml(c, short = false) {
+function climateHtml(c) {
   const cls = c.heat >= 0.6 ? 'hot' : c.heat < 0.4 ? 'cold' : 'mild';
   const name = `<span class="climate-name ${cls}">${climateName(c.heat)}</span>`;
-  // Version courte (à côté du nom de la planète) : le nom seul ; les coefficients sont dans les
-  // cartes de ressources (D-221).
-  if (short) return name;
   const qty = ['energy', 'minerals', 'food'].map((r) => `<span class="qty">${climX(c[r])}${resIcon(r)}</span>`);
   return `${name} · production ${qty.join(' · ')}`;
 }
 
 /** Ligne du climat dans `el` (cachée pour une planète d'avant le climat). */
-function showClimate(el, climate, short = false) {
+function showClimate(el, climate) {
   el.hidden = !climate;
-  if (climate) setHtml(el, climateHtml(climate, short));
+  if (climate) setHtml(el, climateHtml(climate));
 }
 
 /** innerHTML, réécrit seulement s'il a changé (ces lignes sont rafraîchies à chaque tic). */
@@ -1253,7 +1250,6 @@ function renderPlanet(me, now) {
 
   $('planet-title').textContent = openKey === 'home' ? pl.name : `${pl.name} · colonie`;
   $('soil-zone').hidden = !planet.nature;
-  showClimate($('soil-climate'), planet.climate, true);
   if (planet.nature) fillSoil('soil', planet.nature, s.reserve, f.soil);
 
   for (const r of R.resources) {
