@@ -2930,6 +2930,76 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   (quota simulé dans la page : ce navigateur accepte ≈ 26 M), toast quand l'écriture est refusée.
 - Qui : Vincent (demande, par le router : corriger #41), Claude (méthode). Source : session
   `ae22884b`. Statut : en vigueur. Modifie D-066 et D-170.
+**D-260 — Le lien d'invitation dit de quelle partie il vient ; l'invité n'envoie que son identité de celle-là**
+- 2026-11-06 22:35. Contexte : issue #43. Le `hello` d'un invité portait toujours `astra.identity`,
+  c'est-à-dire la **dernière partie ouverte** (même par « Revoir »). Revenir dans la partie A par une
+  invitation, après avoir joué ou revu une partie B, faisait entrer un nouveau joueur dans A (nouveau
+  pid, ancienne fiche orpheline) et envoyait **le secret de B** à l'hôte de A. Puis `onWelcome`
+  écrasait `astra.identities[A]`. Numéro : D-163 à D-259 étant pris ou réservés par d'autres PR,
+  cette PR prend D-260.
+- Choix de Claude : piste « mettre le `gid` dans l'invitation », mais **dans le lien**, pas dans le
+  code. `inviteLink(code, gid)` (`js/invite.js`) donne `…/?g=<gid>#o2.<code>` ; `inviteGid(texte)`
+  le relit. `session.answer` garde ce `gid` ; `onFirstLink` envoie alors `identityFor(gid)` et la
+  copie `savedGame(gid)` (`js/save.js`), ou rien si je n'ai pas de fiche dans cette partie. Le secret
+  et la copie d'une autre partie que celle nommée par le lien ne partent pas (voir la limite plus bas). `onWelcome` lit lui aussi l'identité et la copie
+  **de la partie reçue**, plus celles de la dernière ouverte : `identities[A]` garde mon secret.
+  `boot()` (`js/app.js`) passe `?g=…#code` à l'écran « rejoindre ». Le lien copié, partagé, ou
+  dans le QR porte `?g=`.
+- Pourquoi pas le code lui-même (version `o3`) : `decode` refuse un autre numéro de version, donc un
+  ancien téléphone ne pourrait plus lire l'invitation. Un ancien téléphone lit seulement ce qui suit
+  le `#` : le `?g=` ne le gêne pas, le code ne change pas.
+- Pourquoi pas « envoyer seulement les `gid` + `pid`, le secret ensuite » : un hôte d'une ancienne
+  version fait entrer le joueur dès le premier `hello` (pas de deuxième échange possible). Tout
+  retour vers un ancien hôte serait devenu un nouveau joueur. Et l'invité donnait à l'hôte la liste
+  de toutes ses parties.
+- Ancien lien ou code seul (sans `?g=`) : **inchangé**, l'invité envoie l'identité de la dernière
+  partie ouverte, comme avant. Cela garde le retour qui marchait (A ouverte en dernier, lien d'un
+  ancien hôte). Limite connue : dans ce cas seulement, si la dernière partie ouverte n'est pas
+  celle de l'hôte, son secret part encore chez lui (comportement d'avant). Ce cas disparaît quand
+  les hôtes ont la nouvelle version.
+- Hôte : `onHello` ne change pas. Ancien invité (avec ou sans identité) : comme avant.
+- Vérifié : `tests/invitation.test.mjs` (6 scénarios, deux vraies `Session` reliées par de faux
+  liens, lecture de tout ce que l'invité envoie) ; 3 échouent sans la correction. Vrai jeu, deux
+  onglets (`localhost` et `127.0.0.1`, WebRTC réel) : A, puis une partie contre l'IA (B), puis
+  nouvelle invitation de A → même pid, 2 joueurs, ni le secret ni le `gid` de B dans les messages.
+- Limite connue : l'invité fait confiance au `gid` écrit dans le lien. Un hôte qui joue aussi dans
+  B (donc connaît le `gid` de B) pourrait écrire `?g=<gid de B>` et recevoir mon secret de B. Avant,
+  **tout** hôte recevait le secret de la dernière partie ouverte, sans condition. Même limite pour
+  la piste `o3`.
+- Non traité : un hôte qui ne reconnaît pas le pid (fiche perdue, ancien hôte) donne un nouveau pid,
+  et `onWelcome` remplace alors l'identité gardée de cette partie (comme avant).
+- Qui : Vincent (demande : corriger #43, sans jamais envoyer le secret d'une autre partie, ancien
+  téléphone et ancien code compatibles), Claude (choix de la piste). Source : session `3a0e3d4e`.
+  Statut : en vigueur. Complète D-066.
+- Fusion de `main` (2026-11-07, D-411) : `savedGame(gid)` suit le format de D-415 (partie en cours
+  dans `astra.save`, les autres dans `astra.save.<gid>`) au lieu de l'ancien bloc `astra.saves` ;
+  `onWelcome` garde aussi `loadClock()` de D-165 ; le lien gardé pour « Rejoindre » (#69) garde
+  son `?g=`. Cache `astra-p2p-v107`.
+
+**D-340 — Mini-graphes des tuiles : un historique par planète (#71)**
+- 2026-11-06. Contexte : issue #71. Les mini-graphes des tuiles n'avaient qu'un historique pour
+  toutes les planètes (clé `partie|joueur|planète ouverte`). En ouvrant une colonie, l'historique
+  repartait de zéro, et `drawSparks` sautait les tuiles à moins de 2 relevés : la colonie montrait
+  la courbe de la planète mère pendant ~5 s. Au retour, la mère avait perdu ses relevés.
+- Choix : `localStorage['astra.hist']` garde `{ id: 'partie|joueur', p: { clé de planète: { t, v } } }`.
+  Chaque planète a sa série et ses 10 dernières minutes ; un relevé (toutes les 5 s) ne touche que
+  la planète ouverte. Avec moins de 2 relevés, le tracé de la tuile est vidé (`d=""`). La logique
+  est dans un petit module pur, `js/spark.js` (`ownHistory`, `addSample`, `sparkPath`), pour la
+  tester en Node ; `app.js` garde `sampleHistory`/`drawSparks` (DOM et localStorage). L'ancien
+  format (un seul historique) n'est pas repris : on repart d'un historique vide.
+- Alternatives écartées : vider l'historique à chaque changement de planète (perd la mère) ;
+  relever aussi depuis la carte toutes les planètes (pas demandé, plus de travail à chaque image).
+- Qui : Claude, par défaut (la piste de l'issue). Source : session `4fc11ee6`. Statut : en vigueur.
+- Tests : `tests/spark.test.mjs` (5 tests : mère → colonie → mère, moins de 2 relevés, un relevé
+  toutes les 5 s par planète, 10 minutes par planète, ancien format). Vu dans le vrai jeu.
+
+**D-341 — Cache `astra-p2p-v89`, puis `astra-p2p-v108`**
+- 2026-11-06. Contexte : v88 est pris dans `main` (D-165, D-166).
+- Choix : `VERSION` passe à `astra-p2p-v89`, et `js/spark.js` entre dans la liste du cache. Si une
+  autre PR prend v89 avant, monter au numéro suivant. À la fusion de `main` (2026-11-07, v107,
+  D-411) : `astra-p2p-v108`.
+- Qui : Claude, par défaut. Source : session `4fc11ee6`. Statut : en vigueur.
+
 
 
 **D-417 — « Retour » pendant une partie en cours : une question avant de quitter**
@@ -2956,4 +3026,4 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   lobby (la tâche l'exclut).
 - Qui : Vincent (demande), router (pas d'alerte au lobby ni à la fin, fenêtre `.sheet`
   préférée), Claude par défaut (fenêtre fermée d'abord, 2ᵉ retour = quitter, accueil quand rien
-  avant). Source : session `3e243082`. Statut : en vigueur. Cache `astra-p2p-v107`. Numérotée D-401 au départ ; D-412 à D-416 étant pris ou réservés par la chaîne de D-411, renumérotée D-417 à la fusion de `main`.
+  avant). Source : session `3e243082`. Statut : en vigueur. Cache `astra-p2p-v109` (v107, puis v109 à la 2ᵉ fusion de `main`, v108). Numérotée D-401 au départ ; D-412 à D-416 étant pris ou réservés par la chaîne de D-411, renumérotée D-417 à la fusion de `main`.

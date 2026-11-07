@@ -285,6 +285,21 @@ function identities() {
 
 export const loadIdentity = () => read(ID_KEY, null);
 
+/** Mon identité dans la partie `gid` (en cours ou gardée), ou null (D-260). */
+export function identityFor(gid) {
+  const ids = identities();
+  const id = Object.hasOwn(ids, gid) ? ids[gid] : null;
+  return id?.gid === gid ? id : null;
+}
+
+/** Ma sauvegarde de la partie `gid` (en cours ou dans l'historique), ou null (D-260). */
+export function savedGame(gid) {
+  // Format D-415 : la partie en cours dans `astra.save`, les autres chacune dans `astra.save.<gid>`.
+  const cur = loadGame();
+  if (cur?.state.gid === gid) return cur;
+  return typeof gid === 'string' && gid ? stored(gid) : null;
+}
+
 /** Mon identité dans la partie en cours, gardée aussi pour la reprendre plus tard. */
 export function saveIdentity(id) {
   const ids = identities(); // avant d'écraser l'identité en cours, pour la garder
