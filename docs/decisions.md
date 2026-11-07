@@ -2794,3 +2794,68 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
 - Qui : Vincent (demande), router (« un nom vide est refusé », style du lobby), Claude par défaut
   (règle par l'état, fenêtre, 16 caractères). Source : session `f074c23b`. Statut : en vigueur ;
   modifie la règle « race définitive » (regles.md §12). Cache `astra-p2p-v104`.
+## 6 novembre 2026 — Annuler le scanner à tout moment (#42)
+
+**D-250 — L'annulation du scan fait la course avec chaque attente**
+- 2026-11-06 22:27. Contexte : issue #42. `scanQr` ne posait son écouteur `abort` qu'après le
+  chargement de jsQR, `getUserMedia` et `play()`. Un « Annuler » arrivé avant était perdu : la
+  promesse ne finissait jamais, `#scanner` restait affiché, la caméra restait allumée, et un
+  second « Annuler » ne faisait rien. Numéro : D-163 à D-249 étant pris ou réservés, D-250.
+- Choix de Claude, par défaut :
+  1. Signal déjà annulé à l'appel → `AbortError` tout de suite, rien ne démarre.
+  2. L'écouteur `abort` est posé dès l'entrée ; il crée une promesse `aborted` qui rejette.
+     Chaque attente (`loadJsQR`, `getUserMedia`, `video.play`, boucle de lecture) passe par
+     `Promise.race([attente, aborted])` : le rejet arrive en quelques ms, à n'importe quelle étape.
+  3. Un flux donné par `getUserMedia` après l'annulation est éteint à son arrivée et n'est jamais
+     branché sur la vidéo.
+  4. `stop()` arrête toutes les pistes et débranche aussi la vidéo (`srcObject = null`), à
+     l'annulation comme après un QR lu ; l'écouteur est retiré à la fin.
+  5. `scan()` (`js/app.js`) annule un scan encore ouvert avant d'en ouvrir un autre, et seul le
+     scan courant cache `#scanner` dans son `finally`.
+- Alternatives écartées : vérifier `signal.aborted` après chaque `await` sans course (le rejet
+  attendrait la fin de la boîte d'autorisation, qui peut durer longtemps sur téléphone) ;
+  annuler la demande `getUserMedia` elle-même (impossible : l'API n'a pas de signal).
+- Sans effet sur #86 (chargement de jsQR raté qui reste raté) : `loadJsQR` n'est pas touché ; une
+  annulation pendant le chargement laisse ce chargement finir et servir au scan suivant.
+- Cache `sw.js` : `astra-p2p-v87`, puis `astra-p2p-v97` au rebase sur la PR #169 (v96), puis
+  `astra-p2p-v105` à la fusion de `main` (#169 et #192 mergées, v104 ; voir D-411).
+- Vérifié : `tests/scanner.test.mjs` (caméra simulée, annulation à 100 ms, 1 s, au démarrage de la
+  vidéo et pendant la lecture ; 4 tests sur 7 restent bloqués sans la correction ; tests simples et
+  non scénarios filmés, car il n'y a ni partie ni carte à montrer) ; vrai Chrome sur
+  la vraie appli (Rejoindre → Scanner → Annuler à 100 ms, 1 s, 3 s ; scan normal d'un QR filmé).
+- Qui : Vincent (demande : corriger #42), Claude (forme de la correction). Source : session
+  `b919ce58`. Statut : en vigueur.
+
+## 7 novembre 2026 — Mise à jour des PR en conflit
+
+**D-410 — Une PR en conflit se met à jour par rebase, pas par merge de `main`** (remplacée par D-411)
+- 2026-11-07 07:50. Contexte : plusieurs PR ouvertes en même temps touchent les mêmes fichiers de
+  doc et `sw.js` ; jusqu'ici, chaque worker fusionnait `main` dans sa branche (merge, sans
+  force-push).
+- Choix : mise à jour des PR en conflit : rebase sur `main` (ou sur la branche de la PR qui sera
+  mergée juste avant), puis `git push --force-with-lease`, à la place du merge de `main`.
+- Alternative écartée : merge de `main` dans la branche (historique chargé de commits de fusion).
+- Qui : Vincent, tranché le 2026-11-07 (« rebase les PR systematiquement quand elle ont des
+  conflits »), transmis par la session de coordination. Source : session `b919ce58`, PR #170.
+  Statut : remplacée par D-411 (le force-push après rebase est bloqué par les permissions).
+  Remplaçait, pour les PR en conflit, la consigne de merge donnée aux workers.
+
+**D-411 — Retour au merge de `main` quand le force-push après rebase est bloqué ; 14 PR mises en chaîne**
+- 2026-11-07 21:38. Contexte : 14 PR de l'audit du 2026-11-05 (#170 à #187) sont toutes en
+  conflit avec `main` (v104) : elles changent toutes `VERSION` de `sw.js` et la doc. Vincent :
+  « prend les PR encore ouvert une par une, rebase et merge les toutes ». Le mode auto refuse
+  `git push --force-with-lease` (motif « Git Destructive »), essayé encore une fois ici sur
+  `claude/scanner-annuler-42` : refusé. Le rebase de D-410 ne peut donc pas être poussé.
+- Choix : retour au merge de `main` (`git merge`, puis `git push` normal, refspec explicite).
+  Les 14 PR sont mises en **chaîne**, dans l'ordre #170, #171, #172, #173, #174, #175, #176,
+  #177, #180, #182, #183, #184, #185, #187 : chaque branche fusionne la branche à jour de la
+  précédente (#170 fusionne `origin/main`). Ainsi, chaque PR reste sans conflit après le merge
+  de la précédente. Conflits : les deux côtés gardés ; `VERSION` = celle de la tête de la
+  chaîne + 1 (v105 pour #170, puis un cran par PR) ; un numéro D-xxx déjà pris est renuméroté
+  (D-240 à D-242 de #171 → D-412 à D-414 ; D-240 de #172 → D-415 ; D-400 de #185 → D-416).
+  La D-300 de #170 était la décision de #169, déjà dans `main` sous le numéro D-398 : enlevée.
+- Alternatives écartées : rebase avec force-push (refusé par les permissions, pas contourné) ;
+  fusionner `main` dans chaque PR séparément (les PR resteraient en conflit entre elles).
+- Qui : Vincent, tranché le 2026-11-07 (retour au merge quand le force-push est bloqué) ; chaîne
+  et ordre décidés par la session de coordination. Source : worker `worker-merger`
+  (session `996daf2e`), PR #170. Statut : en vigueur. Remplace D-410.
