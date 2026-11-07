@@ -322,7 +322,6 @@ button.close-btn svg { width: 18px; height: 18px; }
 .race-link { color: var(--accent); font-weight: 600; }
 .race .race-link { background: none; border: 0; padding: 0; min-height: 0; font: inherit; text-decoration: underline; cursor: pointer; }
 /* Fin de partie (D-143) : classement final, médailles carrées */
-.finish .sheet-panel { align-self: center; border-bottom: 1px solid var(--line); }
 .finish h2 { display: inline-flex; align-items: center; gap: 8px; }
 .finish-board { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .finish-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); background: var(--panel); }
@@ -477,26 +476,35 @@ button.close-btn svg { width: 18px; height: 18px; }
   z-index: 20;
   background: rgba(3, 5, 12, 0.7);
   display: flex;
-  align-items: flex-end;
+  /* Toutes les fenêtres ont le style du Journal (D-302, D-246) : panneau centré, 12 px de
+     marge autour, fond assombri derrière. */
+  align-items: center;
   justify-content: center;
+  padding: 12px;
 }
 .sheet-panel {
   width: 100%;
-  max-width: 560px;
-  max-height: 92dvh;
+  max-width: 760px;
+  /* Toute la hauteur restante (D-302) ; le contenu défile dedans, sous l'en-tête collé. */
+  height: 100%;
   overflow-y: auto;
   overscroll-behavior: contain; /* le défilement reste dans le panneau (D-243) */
   background: var(--bg);
   border: 1px solid var(--line);
-  border-bottom: 0;
   border-radius: 0;
-  padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  padding: 0 max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
   display: grid;
+  align-content: start;
   gap: 18px;
 }
 /* Panneau ouvert : la page derrière ne défile plus (D-243). */
 body:has(.sheet:not([hidden])) { overflow: hidden; }
-.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.sheet-head {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  /* En-tête collé en haut du panneau, comme le Journal (D-246, D-302). */
+  position: sticky; top: 0; z-index: 1; background: var(--bg);
+  padding-top: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--line);
+}
 .sheet-head h2 { font-size: 1.2rem; }
 
 /* ----- Caméra ----- */
@@ -700,7 +708,6 @@ button:not(:disabled):hover { border-color: var(--accent); }
 .card, .tile, .banner, .map-wrap { box-shadow: none; }
 .tile { border-top-width: 1px; }
 .toast { box-shadow: none; }
-.sheet-panel { border-bottom: 0; }
 .scanner-frame { border-width: 2px; }
 
 /* Icônes de l'interface : trait fin, couleur du texte. */
@@ -839,14 +846,6 @@ button#btn-journal { color: var(--text); }
 .journal .j-forces th:first-child, .journal .j-forces td:first-child { text-align: left; }
 .journal .j-forces th { color: var(--muted); font-weight: normal; }
 #sheet-journal section { margin-top: 12px; }
-/* Journal en modale presque plein écran (D-246) : petite marge autour, fond assombri, titre et
-   croix collés en haut, le contenu défile dedans. */
-#sheet-journal { align-items: center; padding: 12px; }
-#sheet-journal .sheet-panel {
-  height: 100%; max-height: none; max-width: 760px; overflow-y: auto;
-  align-content: start; border-bottom: 1px solid var(--line); padding-top: 0;
-}
-#sheet-journal .sheet-head { position: sticky; top: 0; z-index: 1; background: var(--bg); padding-top: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
 #sheet-players .sheet-panel { gap: 14px; }
 #net-detail { margin: 0; }
 
