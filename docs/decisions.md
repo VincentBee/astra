@@ -2434,8 +2434,12 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
      (peut-être l'ordre en cours de l'expéditeur, encore modifiable) est recopiée. La copie se
      fait à l'envoi, comme avant : la fiche de l'expéditeur peut changer avant la livraison. La
      clé `orders` garde sa place : la fiche est la même au caractère près.
-  2. `onRecord` (`js/session.js`) ne refait pas de copie quand la fiche vient d'un lien `local`
-     (elle est déjà à lui) ; par le réseau, rien ne change.
+     Le gel repose sur une règle : l'entrée de l'ordre en cours est toujours la dernière du
+     journal (`touch` l'ajoute une fois, à la fin). Une écriture dans une entrée gelée lève une
+     erreur (mode strict) : un manquement se voit tout de suite.
+  2. `onRecord` (`js/session.js`) ne refait pas de copie quand le lien dit `copied` (lien en
+     mémoire : la fiche est déjà à lui) ; par le réseau, rien ne change. `LINK.fullCopy` (tests)
+     remet exactement l'ancien chemin : copie JSON complète à l'envoi et à la réception.
   3. `onRecord` appelle `onchange('state', 'record')` ; `app.js` regroupe ces rendus sur la
      prochaine image (`requestAnimationFrame`) : au plus un rendu complet par image, aucun
      quand la page est cachée. Les changements venus du joueur redessinent tout de suite.
@@ -2452,7 +2456,9 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
   IA), même classement, même rejeu ; partie à 3 IA jouée jusqu'au bout (45 min) : même gagnant,
   même heure de fin. Test : `tests/bot.test.mjs` « D-370 » (7 IA, 22 min, copie complète contre
   copie D-370 : partie identique, < 100 Ko/s, au moins 5 fois moins de JSON).
-- Limites : le nombre de messages reste en (nombre d'IA)², mais chacun coûte peu ; la
+- Limites : le nombre de messages reste en (nombre d'IA)², mais chacun coûte peu. Le critère
+  de l'issue « 7 IA ≤ 3,5 × 2 IA » n'est pas tenu : minutes 20-25, messages 1,0 contre
+  0,2 ms/s (5×), JSON 71 contre 8,3 Ko/s (8,5×) ; c'est le coût de chaque message qui a baissé ; la
   réflexion des IA (`think`, ~5 ms/s à 7 IA) n'est pas touchée. Non confirmé sur un vrai
   téléphone (mesures : Node, et Chromium ralenti 4×).
 - Qui : **choix de Claude** (le ticket laissait le choix de la méthode). Source : session

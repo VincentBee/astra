@@ -884,7 +884,7 @@ export class Session {
     this.beforeRec(rec.id);
     // Lien en mémoire (une IA, même téléphone) : la fiche est déjà une copie à moi, faite à l'envoi
     // (js/bot.js copyRec, D-370) ; par le réseau, elle est recopiée ici comme avant.
-    const own = link?.local ? rec : JSON.parse(JSON.stringify(rec));
+    const own = link?.copied ? rec : JSON.parse(JSON.stringify(rec));
     this.state.players[rec.id] = normalize({ ...own, online: this.online(rec.id) });
     this.afterRec(rec.id);
     // Une ou plusieurs entrées de journal accompagnent la fiche.

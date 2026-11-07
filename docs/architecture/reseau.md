@@ -243,7 +243,7 @@ Il n'y a **pas de message « je pars »**. Un départ = un lien qui se ferme : s
   JSON, comme par le réseau, sauf les entrées du journal `orders` (jusqu'à 1 500), partagées par
   référence entre les Sessions du téléphone et gelées (`Object.freeze`, en profondeur) : aucune
   Session ne peut modifier celles d'une autre. La dernière entrée (peut-être celle de l'ordre en
-  cours de l'expéditeur) est recopiée. `onRecord` ne refait pas de copie pour un lien `local` ; par
+  cours de l'expéditeur) est recopiée. `onRecord` ne refait pas de copie quand le lien dit `copied` (lien en mémoire) ; par
   le réseau, il recopie comme avant. Les autres messages (`hb`, `sync`…) passent en JSON. `LINK.fullCopy`
   (tests) remet l'ancienne copie complète. Le journal des ordres est quand même relayé aux IA :
   `seenNews` lit sa longueur chez les autres, et le rejeu en dépend. Mesure : `node tests/perf-ia.mjs
