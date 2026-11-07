@@ -477,7 +477,7 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
     au fil (une recherche au fil ne l'empêche plus de lancer tout de suite).
     **Remplacé par D-420** : fil pas vide (quoi qu'il tienne), tous les boutons passent en +
     (« Ajouter … au fil ») ; ↑ et ×n seulement fil vide, chantier libre et stock suffisant.
-  - Le chantier de la fiche de la carte (`data-pi-ship`) lance toujours directement, sans fil.
+  - Le chantier de la fiche de la carte (`data-pi-ship`) lance toujours directement, sans fil (remplacé par D-312, puis D-420).
   - Vérifié dans Chromium (`index.html?view`, partie à un joueur humain, fil : labo, Propulsion,
     5 cargos, centrale) : trois onglets, 360 et 320 px, pas de défilement horizontal.
 - Mise en page d'une ligne (2026-11-02, D-157) : `.plan-item` est une grille à deux colonnes,

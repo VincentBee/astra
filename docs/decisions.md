@@ -3438,6 +3438,6 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - Vérifié : 4 scénarios (`tests/plan.test.mjs`), 3 échouent sur `main` ; vrai jeu (Chrome,
   390 px) : fil « Propulsion » qui attend, la Ferme passe de ↑ à + et va en 2ᵉ place, Propulsion
   garde son départ.
-- Qui : Vincent (règle), Claude (redirection dans la session, rejeu, IA, par défaut ; IA validée
-  par le router). Source : session `3c9e3331`, issue #194. Statut : en vigueur. Modifie D-158.
+- Qui : Vincent (règle), Claude (redirection dans la session, rejeu, IA, par défaut ; pour l'IA,
+  option proposée au router, réponse non confirmée au moment du commit). Source : session `3c9e3331`, issue #194. Statut : en vigueur. Modifie D-158.
   Cache `astra-p2p-v120`.
