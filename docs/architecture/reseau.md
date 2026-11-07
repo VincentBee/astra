@@ -134,7 +134,7 @@ Découpage convenu avec code-regles : **ici** constructeur, création/arrivée, 
 | `touch(log)` | 584 | J'ai changé ma fiche : `actAt = max(now, actAt+1)`, `v = FORMAT`, ajout de l'ordre en cours au journal `orders`, diffusion. |
 | `gameKey` / `meet()` / `onRoomLink` | 599 / 604 / 619 | Rendez-vous automatique. Parties sans `key` : clé `k-<gid>`. |
 | `dial` / `onSignal` | 628 / 643 | Maillage : un joueur déjà connecté relaie l'offre et la réponse. |
-| `openInvite` / `acceptAnswer` / `cancelInvite` | 674 / 680 / 689 | Invitations (tout joueur peut inviter). |
+| `openInvite` / `acceptAnswer` / `cancelInvite` | 752 / 769 / 779 | Invitations (tout joueur peut inviter). Jeton numéroté (`inviteTicket`, D-300) : une invitation fermée ou remplacée pendant sa préparation est fermée dès qu'elle est prête, et `openInvite` renvoie `null`. |
 | `addLog` / `pushLog` | 1772 / 1779 | Journal de partie : 120 caractères par entrée, 40 entrées gardées. |
 | `snapshot()` | 1787 | Copie envoyée : journal limité aux 20 dernières entrées, champ `online` retiré. |
 | `changed()` / `scheduleSave()` / `save()` | 1793 / 1799 / 1807 | Sauvegarde immédiate après action ; différée de 500 ms à la réception d'une fiche. On ne sauve que si `status === 'playing'`. |
