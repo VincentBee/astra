@@ -362,3 +362,27 @@ scenario('D-280 : deux IA machines jouent jusqu’au bout ; une IA n’a jamais 
   assert.ok(joins > 0);
   assert.equal(twins, 0);
 });
+
+// Issue #39 (D-370) : avec 7 IA, la fiche d'une IA n'est plus recopiée en entier, journal compris,
+// pour chaque Session du téléphone. Même graine : la même partie, au caractère près, que l'ancienne
+// copie complète en JSON ; et beaucoup moins de JSON écrit pendant la livraison des messages.
+scenario('D-370 : 7 IA, même graine : même partie qu’avec la copie complète, cinq fois moins de JSON', async (film) => {
+  const { measure } = await import('./perf-ia.mjs');
+  const { LINK } = await import('../js/bot.js');
+  LINK.fullCopy = true;
+  const full = await measure({ bots: 7, minutes: 22, seed: 3 }).finally(() => (LINK.fullCopy = false));
+  const fast = await measure({ bots: 7, minutes: 22, seed: 3 });
+  const late = (rows) => rows.filter((r) => r.minute >= 17).reduce((t, r) => t + r.koParS, 0) / 5;
+  const [kFull, kFast] = [late(full.rows), late(fast.rows)];
+  film.look(fast.host, `22 min, même graine : copie complète puis copie D-370 ; JSON pendant la livraison (min 17-22) ${kFull.toFixed(0)} puis ${kFast.toFixed(0)} Ko/s`, [
+    { show: 'fiches chez l’hôte (empreinte)', expected: full.result.hote, got: fast.result.hote },
+    { show: 'fiches chez chaque IA (empreintes)', expected: full.result.ias.join(' '), got: fast.result.ias.join(' ') },
+    { show: 'classement', expected: full.result.classement.join(' '), got: fast.result.classement.join(' ') },
+    { show: 'rejeu (empreinte)', expected: full.result.rejeu, got: fast.result.rejeu },
+    { show: 'JSON < 100 Ko/s', expected: true, got: kFast < 100 },
+    { show: 'au moins 5 fois moins de JSON', expected: true, got: kFast * 5 <= kFull },
+  ]);
+  assert.deepEqual(fast.result, full.result);
+  assert.ok(!full.result.rejeu.startsWith('erreur'), full.result.rejeu);
+  assert.ok(kFast < 100 && kFast * 5 <= kFull, `${kFast} Ko/s contre ${kFull}`);
+});
