@@ -200,7 +200,8 @@ export function normalize(p) {
   if (!Array.isArray(p.orders)) p.orders = [];
   if (p.deathPts !== undefined && !Number.isFinite(p.deathPts)) delete p.deathPts;
   // Prêt (heure) et départ de la partie vu par ce joueur (heure) : des nombres, ou rien.
-  for (const k of ['ready', 'go', 'clockFix']) if (p[k] !== undefined && !Number.isFinite(p[k])) delete p[k];
+  // Parti avant le départ (IA retirée du lobby, D-399) : une heure, ou rien.
+  for (const k of ['ready', 'go', 'clockFix', 'left']) if (p[k] !== undefined && !Number.isFinite(p[k])) delete p[k];
   return p;
 }
 
@@ -343,7 +344,7 @@ export class Session {
     s.loadClock();
     s.intel = saved.intel || {}; // brouillard (D-124) : ce que j'ai vu des planètes des autres
     s.journal = saved.journal || null; // avant le rattrapage : les combats de l'absence s'y inscrivent
-    s.botIds = Array.isArray(saved.bots) ? saved.bots.filter((pid) => pidOk(pid) && s.state.players[pid]) : []; // IA jouées par ce téléphone (D-151), réveillées par js/bot.js
+    s.botIds = Array.isArray(saved.bots) ? saved.bots.filter((pid) => pidOk(pid) && s.state.players[pid] && !Number.isFinite(s.state.players[pid].left)) : []; // IA jouées par ce téléphone (D-151), réveillées par js/bot.js
     s.refreshOnline();
     s.start();
     s.tick();
@@ -757,7 +758,7 @@ export class Session {
     link.send({ type: 'hello-ack' });
     // Pas de validation : l'hôte a lui-même scanné (ou collé) la réponse, et
     // une invitation ne sert qu'une fois. C'est déjà son accord.
-    if (Object.keys(st.players).length >= MAX_PLAYERS) {
+    if (this.roster.length >= MAX_PLAYERS) {
       link.send({ type: 'refused', reason: 'La partie est complète (8 joueurs).' });
       return setTimeout(() => link.close(), 300);
     }
@@ -1056,7 +1057,17 @@ export class Session {
 
   /** On peut jouer : partie en cours, pas finie, et je ne suis pas éliminé. */
   get canAct() {
-    return this.status === 'playing' && !this.over && !this.state?.players[this.me]?.out;
+    const p = this.state?.players[this.me];
+    return this.status === 'playing' && !this.over && !p?.out && !Number.isFinite(p?.left);
+  }
+
+  /**
+   * Joueurs de la partie, sans ceux partis avant le départ (`left`, IA retirée du lobby,
+   * D-399). Leur fiche reste dans `state.players` (sinon la copie d'un autre la ferait
+   * revenir), mais on ne la montre ni ne la compte plus.
+   */
+  get roster() {
+    return Object.values(this.state?.players || {}).filter((p) => !Number.isFinite(p.left));
   }
 
   /** Points de l'empire d'un joueur (toutes ses planètes, ses recherches, ses vaisseaux). */
@@ -1089,7 +1100,7 @@ export class Session {
   /** Joueurs présents (moi, et ceux en ligne avec moi) pas encore prêts ni déjà dans la course. */
   get notReady() {
     return Object.values(this.state?.players || {}).filter(
-      (p) => (p.id === this.me || p.online) && !p.out && !p.home && !Number.isFinite(p.ready) && !Number.isFinite(p.since),
+      (p) => (p.id === this.me || p.online) && !p.out && !Number.isFinite(p.left) && !p.home && !Number.isFinite(p.ready) && !Number.isFinite(p.since),
     );
   }
 
@@ -1480,19 +1491,64 @@ export class Session {
     return this.state?.players[this.me]?.race || null;
   }
 
-  /** Choix de race : une seule fois, il ne se défait pas. */
+  /**
+   * Choix de race. Il devient définitif quand la partie part (ou dès qu'on a une planète) ;
+   * avant, on peut en changer (D-400 : l'hôte change la race d'une IA dans le lobby ;
+   * l'écran du joueur, lui, ne propose le choix qu'une fois).
+   */
   chooseRace(race) {
     if (!this.canAct || !RACES[race]) return false;
     const p = this.state.players[this.me];
     if (!p) return false;
-    if (p.race) {
+    const was = p.race;
+    if (was && (this.startedAt != null || p.home || Number.isFinite(p.since))) {
       this.ontoast?.(`Tu as déjà choisi : ${RACES[p.race].name}. Ce choix est définitif.`);
       return false;
     }
+    if (was === race) return false;
     p.race = race;
     // Joueur d'avant le choix de planète : il garde la sienne.
     if (p.home) p.planet = newPlanet(race, this.now());
-    this.touch(this.addLog(`${p.name} rejoint le camp des ${RACES[race].name}.`));
+    this.touch(this.addLog(was ? `${p.name} passe dans le camp des ${RACES[race].name}.` : `${p.name} rejoint le camp des ${RACES[race].name}.`));
+    this.changed();
+    return true;
+  }
+
+  /** Avant le départ, la partie pas encore partie et sans planète : sinon null. */
+  get beforeStart() {
+    const p = this.state?.players[this.me];
+    return !!p && this.startedAt == null && !p.home && !Number.isFinite(p.since);
+  }
+
+  /**
+   * Changer de nom, avant le départ seulement (D-400 : l'hôte renomme une IA dans le lobby).
+   * Un nom vide est refusé : on garde l'ancien. 16 caractères au plus, comme à l'arrivée.
+   */
+  rename(name) {
+    if (!this.canAct || !this.beforeStart) return false;
+    const p = this.state.players[this.me];
+    const next = String(name ?? '').trim().slice(0, 16);
+    if (!next || next === p.name) return false;
+    const old = p.name;
+    p.name = next;
+    this.name = next;
+    this.touch(this.addLog(`${old} s’appelle maintenant ${next}.`));
+    this.changed();
+    return true;
+  }
+
+  /**
+   * Quitter la partie avant le départ (D-399 : l'hôte retire une IA du lobby). La fiche
+   * reste, marquée `left` : la plus récente, elle l'emporte sur toutes les copies, et le
+   * joueur n'est plus ni montré, ni compté, ni attendu au départ.
+   */
+  leave() {
+    if (!this.canAct || !this.beforeStart) return false;
+    const p = this.state.players[this.me];
+    p.left = this.now();
+    delete p.ready;
+    delete p.go;
+    this.touch(this.addLog(`${p.name} quitte la partie.`));
     this.changed();
     return true;
   }
@@ -3283,7 +3339,7 @@ function maxTech(a, b) {
   return out;
 }
 
-export const ORDER_KINDS = ['chooseRace', 'ready', 'begin', 'claimPlanet', 'build', 'planBuild', 'planResearch', 'planShips', 'unplan', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'setFleetStance', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'joinFleet', 'splitFleet', 'returnFleet', 'power'];
+export const ORDER_KINDS = ['chooseRace', 'rename', 'leave', 'ready', 'begin', 'claimPlanet', 'build', 'planBuild', 'planResearch', 'planShips', 'unplan', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'setFleetStance', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'joinFleet', 'splitFleet', 'returnFleet', 'power'];
 for (const k of [...ORDER_KINDS, 'tick']) {
   const act = Session.prototype[k];
   Session.prototype[k] = function (...a) {

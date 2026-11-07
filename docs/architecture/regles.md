@@ -70,7 +70,8 @@ Créée par `addPlayer` (`js/session.js:696-713`), complétée par `normalize`
 | `rank` | heure d'arrivée (ordre d'arrivée) | `js/session.js:704` |
 | `actAt` | heure de la dernière modification (la plus récente gagne) | `js/session.js:712`, `touch` `js/session.js:586` |
 | `v` | version du format (`FORMAT = 7`) | `js/session.js:41`, `js/session.js:587` |
-| `race` | `human`, `machine` ou `alien`, choisie une seule fois | `chooseRace` `js/session.js:722-736` |
+| `race` | `human`, `machine` ou `alien` ; définitive dès que la partie part (avant, une IA peut en changer, D-400) | `chooseRace` |
+| `left` | heure à laquelle le joueur a quitté la partie avant le départ (IA retirée du lobby, D-399) ; absent sinon | `Session.leave` |
 | `ready` | heure à laquelle le joueur s'est dit prêt (D-120) ; absent tant qu'il ne l'est pas | `Session.ready` |
 | `go` | heure du départ, si c'est ce joueur qui l'a donné (tous les présents prêts, D-120) | `Session.begin` |
 | `since` | entrée dans la course : apparition de la flotte de départ (D-120), ou installation dans une partie d'avant | `enterRace`, `claimPlanet` |
@@ -761,7 +762,14 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
 
 ## 12. Installation et colonies
 
-- **Race** : choisie une fois, définitive (`chooseRace`, `js/session.js:722-736`).
+- **Race** : définitive dès que la partie part, ou dès qu'on a une planète (`chooseRace`). Avant, un
+  second `chooseRace` change de race (« X passe dans le camp des … ») : seul l'hôte d'une IA s'en
+  sert, depuis le lobby (D-400) ; l'écran d'un joueur ne propose le choix qu'une fois.
+- **IA du lobby (D-399, D-400)** : avant le départ, deux ordres de plus, notés au journal
+  (`ORDER_KINDS`) et donc rejoués : `rename(nom)` (nom coupé à 16 caractères, espaces retirés ;
+  vide ou inchangé → refusé, l'ancien reste) et `leave()` (champ `left` = heure ; `ready` et `go`
+  retirés). Après `leave`, `canAct` est faux. Un joueur parti n'est ni montré, ni compté
+  (`Session.roster` : les fiches sans `left`), ni attendu au départ (`notReady`), ni classé.
 - **Départ commun (D-120)** : après sa race, chaque joueur se dit prêt (ordre `ready`, champ
   `ready` = heure ; `ready(false)` le retire tant que la partie n'est pas partie). Un joueur qui
   n'a pas encore choisi sa race n'est pas prêt. `checkStart` (hors ordre, appelé par le minuteur

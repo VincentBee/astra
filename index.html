@@ -127,10 +127,10 @@
       </div>
       <div id="trades" class="trades" hidden></div>
       <div class="map-head">
-        <span><i data-ic="planet"></i> <strong id="my-coords" class="mono"></strong> <span class="help-wrap"><button id="btn-map-help" class="ghost help-btn" aria-expanded="false" aria-describedby="map-help" aria-label="Aide de la carte">?</button><span id="map-help" role="tooltip" class="tooltip">Touche une planète pour voir ses gisements, la tienne pour ouvrir ses bâtiments, une de tes flottes (triangle, ou sa case sous la carte) pour la piloter : touche ensuite sa cible, ou traîne directement la flotte jusqu’à elle et lâche. Plusieurs ordres possibles, ou plusieurs objets sous le doigt : un petit menu s’ouvre au doigt. Retoucher la flotte la relâche. Losange jaune : ce que son carburant lui permet d’atteindre. Sous la carte, chaque planète a aussi sa case : construire des vaisseaux, faire décoller ceux à quai. Zoom : pince la carte (ou molette, ou boutons + et −), glisse pour te déplacer. Planètes en pointillés : libres. Halo : ta portée de détection ; les flottes adverses n’apparaissent que dedans.</span></span></span>
+        <span><i data-ic="planet"></i> <strong id="my-coords" class="mono"></strong></span>
         <span class="pi-head-right"></span>
       </div>
-      <div class="map-wrap"><canvas id="map" aria-label="Carte de l'univers : touche une planète"></canvas>
+      <div id="map-wrap" class="map-wrap"><canvas id="map" aria-label="Carte de l'univers : touche une planète"></canvas>
         <div class="map-zoom" role="group" aria-label="Zoom de la carte">
           <button id="btn-zoom-in" class="secondary small icon-only" title="Zoomer" aria-label="Zoomer"><i data-ic="plus"></i></button>
           <button id="btn-zoom-out" class="secondary small icon-only" title="Dézoomer" aria-label="Dézoomer"><i data-ic="minus"></i></button>
@@ -190,7 +190,6 @@
       <div class="planet-head">
         <button id="btn-back-map" class="icon-btn" title="Retour à la carte" aria-label="Retour à la carte"><i data-ic="back"></i></button>
         <h2 id="planet-title"></h2>
-        <p id="soil-climate" class="climate" title="Production selon le climat" hidden></p>
       </div>
 
       <section id="soil-zone" hidden>
@@ -365,6 +364,22 @@
         <p id="fleet-tank" class="hint"></p>
       </div>
       <button id="btn-fleet-go" class="primary"><i data-ic="fleet"></i>Décoller</button>
+    </div>
+  </div>
+
+  <!-- Une IA du lobby (D-399, D-400) : son nom, sa race, ou la retirer -->
+  <div id="sheet-bot" class="sheet" hidden>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="bot-title">
+      <div class="sheet-head">
+        <h2 id="bot-title"></h2>
+        <button id="btn-bot-close" class="icon-btn close-btn" title="Fermer" aria-label="Fermer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <label class="field" for="bot-name">Nom
+        <input id="bot-name" maxlength="16" autocomplete="off">
+      </label>
+      <div id="bot-races" class="races bot-races" role="radiogroup" aria-label="Race de l’IA"></div>
+      <button id="btn-bot-save" class="primary"><i data-ic="check"></i>Valider</button>
+      <button id="btn-bot-remove" class="secondary danger"><i data-ic="close"></i>Retirer de la partie</button>
     </div>
   </div>
 
