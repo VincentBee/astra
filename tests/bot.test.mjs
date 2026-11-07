@@ -205,6 +205,78 @@ scenario('D-151 : trois IA jouent une partie entière, sans conquête avant 10 m
   for (const p of Object.values(state.players)) assert.equal(r.faithful[p.id], true, `fiche de ${p.name}`);
 });
 
+scenario('D-220 : la page de l’hôte se fige 31 s ; le lien de l’IA ne se coupe pas, elle continue de jouer et rien n’est perdu à la reprise', async (film) => {
+  const clock = { t: 10_000_000 };
+  const h = host(clock);
+  const bot = addBot(h, { timers: false, clock: () => clock.t });
+  await flush();
+  h.ready();
+  h.checkStart();
+  await run(h, clock, MIN);
+  const b = () => h.state.players[bot.me];
+  const before = { actAt: b().actAt, orders: b().orders.length };
+  // La page se fige : 31 s sans un seul message, puis le battement de cœur passe le premier
+  // au réveil (modèle d'un téléphone verrouillé, issue #38). L'heure de `performance.now`, que
+  // lit `heartbeat`, est indépendante de l'horloge du test.
+  const real = performance.now.bind(performance);
+  let skew = 0;
+  performance.now = () => real() + skew;
+  try {
+    skew = 31_000;
+    clock.t += 31_000;
+    h.heartbeat();
+    await flush();
+    film.look(h, 'réveil après 31 s : chez l’hôte, l’IA est toujours en ligne (avant D-220 : lien fermé, « Seul en ligne »)', [
+      { show: 'liens de l’hôte', expected: 1, got: h.links.size },
+      { show: 'IA en ligne', expected: true, got: b().online },
+      { show: 'bandeau « Seul en ligne »', expected: false, got: h.alone },
+    ]);
+    assert.equal(h.links.size, 1, 'le lien en mémoire n’est pas fermé pour silence');
+    assert.equal(b().online, true);
+    assert.equal(h.alone, false, 'pas de « Seul en ligne · Rejoindre » avec une IA de ce téléphone');
+    // Les liens WebRTC, eux, se coupent toujours après 30 s de silence.
+    const other = { send() {}, close() { this.closed = true; h.links.delete('pX'); }, lastSeen: real() + skew - 31_000 };
+    h.links.set('pX', other);
+    h.heartbeat();
+    assert.equal(other.closed, true, 'un lien réseau muet depuis 31 s est fermé');
+    assert.equal(h.links.size, 1);
+  } finally {
+    performance.now = real;
+  }
+  await run(h, clock, MIN);
+  const after = { actAt: b().actAt, orders: b().orders.length };
+  film.look(h, 'une minute plus tard : la fiche de l’IA avance de nouveau chez l’hôte', [
+    { show: 'actAt avance', expected: true, got: after.actAt > before.actAt, ok: after.actAt > before.actAt },
+    { show: 'ordres de l’IA', expected: true, got: after.orders > before.orders, ok: after.orders > before.orders },
+    { show: 'copie de l’hôte = Session de l’IA', expected: me(bot).orders.length, got: after.orders },
+  ]);
+  assert.ok(after.actAt > before.actAt, `actAt avance (${before.actAt} → ${after.actAt})`);
+  assert.ok(after.orders > before.orders, `de nouveaux ordres (${before.orders} → ${after.orders})`);
+  assert.equal(after.orders, me(bot).orders.length, 'l’hôte a tous les ordres joués par l’IA');
+
+  // Rechargement : la partie reprend depuis la sauvegarde de l'hôte, l'IA se réveille.
+  const played = me(bot).orders.length;
+  h.end();
+  const { start, meet, now } = Session.prototype;
+  Object.assign(Session.prototype, { start() {}, meet() {}, now() { return this.entry?.t ?? clock.t; } });
+  let r;
+  try {
+    r = Session.resume(loadGame());
+  } finally {
+    Object.assign(Session.prototype, { start, meet, now });
+  }
+  r.now = () => r.entry?.t ?? clock.t;
+  wakeBots(r, { timers: false, clock: () => clock.t });
+  await flush();
+  const kept = r.state.players[bot.me].orders.length;
+  film.look(r, 'après rechargement : aucun ordre joué par l’IA n’est perdu', [
+    { show: 'ordres de l’IA gardés', expected: played, got: kept },
+    { show: 'IA en ligne', expected: true, got: r.state.players[bot.me].online },
+  ]);
+  assert.equal(kept, played, 'aucun ordre perdu au rechargement');
+  r.end();
+});
+
 scenario('D-280 : des vaisseaux sortis après le départ d’une conquête rejoignent la flotte en route, sans 2e conquête de la même planète', (film) => {
   const { players: [A, B], clock, sync } = newGame(2, ['machine', 'human']);
   const both = () => {

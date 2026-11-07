@@ -499,7 +499,7 @@ Aucune conversation ne les prouve.
 - 2026-10-28 21:47. Choix : plus de « appuie encore une fois » ; l'ancienne partie va dans
   l'historique (reprendre, revoir, oublier) ; l'identité du joueur est gardée par partie.
 - Qui : Vincent (demande) ; le nombre 10 et les boutons par Claude.
-- Source : `f4afbcd0` 21:47:41, 21:50:00 ; `1eeb2c1`. Statut : en vigueur (`KEEP = 10`).
+- Source : `f4afbcd0` 21:47:41, 21:50:00 ; `1eeb2c1`. Statut : en vigueur (`KEEP = 10`) ; stockage modifié par D-415 (une clé par partie, les plus vieilles retirées si la mémoire est pleine).
 
 **D-067 — Parallaxe : pas au doigt, mais à l'accéléromètre**
 - 2026-10-28 22:15–22:16. Choix : le glissé du doigt ne bouge pas les étoiles (sinon elles
@@ -692,7 +692,7 @@ Aucune conversation ne les prouve.
   de la planète ; la planète est rebâtie à neuf pour la race du vainqueur.
 - Alternative écartée : conquête automatique à chaque attaque gagnée (on n'aurait plus pu
   seulement piller).
-- Qui : Vincent (règle), Claude (ordre séparé). Statut : en vigueur (`9b37782`).
+- Qui : Vincent (règle), Claude (ordre séparé). Statut : en vigueur (`9b37782`), modifiée par D-200 (à l'arrivée, la cible est le propriétaire actuel de la case).
 
 **D-093 — Bâtiments de défense par race**
 - 2026-10-29 08:45. Demande : « rajoute des batiments de defences comme des bouclier ou des
@@ -1102,7 +1102,8 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   de construction dans chaque case ; une case qui sélectionne la planète sans rien ouvrir.
 - Qui : Vincent (la demande), Claude (la forme). Source : session `012yisg4`.
 - Statut : en vigueur. Vérifié dans Chromium (390 × 844) : construire depuis la case, compte à
-  rebours, décollage, flotte en orbite. Sur un vrai téléphone : **non confirmé**.
+  rebours, décollage, flotte en orbite. Sur un vrai téléphone : **non confirmé**. Bord vert des
+  cases de planètes : **modifié par D-301** (plus de bord gauche coloré).
 
 **D-116 — Cache `astra-p2p-v64`**
 - 2026-10-31. Choix de Claude : `index.html`, `style.css`, `js/app.js` (D-115, D-117) et
@@ -1267,7 +1268,7 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
 - Non traité : la fenêtre Joueurs montre toujours le nombre de planètes et de vaisseaux à quai
   de chacun.
 - Qui : Vincent (la règle), Claude (la forme). Source : cette session.
-- Statut : en vigueur. 3 tests (`tests/fog.test.mjs`). Rendu dans le navigateur : non confirmé.
+- Statut : en vigueur, précisée par D-190 (le menu d'ordres d'une flotte suit aussi le brouillard). 3 tests (`tests/fog.test.mjs`). Rendu dans le navigateur : non confirmé.
 
 **D-125 — Cache `astra-p2p-v68`**
 - 2026-10-31. Choix de Claude : `js/app.js`, `js/session.js`, `js/save.js` changent (D-124).
@@ -1964,13 +1965,38 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   l'heure présente, pas à l'arrivée : la planète peut bâtir ou recevoir des renforts d'ici là.
 - Alternatives écartées : additionner vaisseaux et bâtiments en un seul ⚔ ◇ (on ne voit plus ce
   qui vient d'où) ; simuler à l'heure d'arrivée (on ne connaît pas ce que l'autre fera d'ici là).
-- Qui : Vincent (demande), Claude (forme et seuils). Source : session `fb0c1844`. Statut : en vigueur.
+- Qui : Vincent (demande), Claude (forme et seuils). Source : session `fb0c1844`. Statut : en vigueur, modifiée par D-190 (hors de ma détection, plus de défense ni d'estimation).
 - Tests : `tests/end.test.mjs`, trois tests « Attaquer » et « Conquérir »… / sans vaisseaux posés / hors de ma détection.
 
 **D-161 — Cache `astra-p2p-v82`**
 - 2026-11-03. Contexte : fusion de `main` (D-157 à D-159 et cache v81 déjà pris) dans la PR des ordres d'assaut (D-160).
 - Choix : `VERSION` passe à `astra-p2p-v82` pour que les téléphones prennent le nouveau `session.js`.
 - Qui : Claude, par défaut. Source : session `fb0c1844`. Statut : en vigueur.
+
+**D-162 — Guides de jeu par race et page des limites, chiffres mesurés, dans `docs/guides/`**
+- 2026-11-04 23:35 UTC. Contexte : demande de Vincent (guides par race, limites du jeu : seuil de
+  flotte qui prend une planète, victoire la plus rapide, investissements rentables, meilleur
+  départ) pendant l'audit `astra-audit-2026-11-05`. Les ordres de `GUIDE.md` datent d'avant le
+  tempo 2,5, la recherche, la place et les vaisseaux (le fichier dit « à refaire »).
+- Choix (Claude, par défaut) : un dossier `docs/guides/` avec un fichier par race
+  (`humains.md`, `machines.md`, `aliens.md`), `limites.md`, `questions.md` (24 questions de
+  joueurs préparées par la session `questions`, ajoutées le 2026-11-05) et un index `README.md` ; `GUIDE.md`
+  garde son texte mais renvoie en tête vers ces guides, qui remplacent ses ordres de
+  construction. Chaque chiffre vient d'une mesure (script Node sur les règles de `js/game.js`,
+  `js/fleet.js`, `js/bot.js`, ou constante lue dans le code) ; chaque tableau donne le commit
+  mesuré (`15ca511`), la date et le script. Les scripts restent **hors du dépôt**
+  (`~/.claude/swarm-runs/astra-audit-2026-11-05/guides/`), comme demandé pour l'audit. Ce qui
+  n'est pas mesuré est écrit « non confirmé ». Minutes réelles depuis le départ commun.
+  Les mesures des autres sessions de l'audit (`eq-eco`, `eq-tech`, `eq-combat`, `eq-rythme`,
+  `eq-races`, `eq-ia`) sont reprises avec leur source ; quand deux mesures ne s'accordent pas
+  (attaque rapide : gagne chez `eq-ia`, perd chez `eq-races` ; pouvoirs aliens : +45 à +90 %),
+  les deux sont écrites, sans trancher.
+- Alternatives écartées : réécrire `GUIDE.md` en entier (un seul long fichier, et on perdrait la
+  partie « Flottes et voyage » encore juste) ; mettre les scripts de mesure dans `tests/`
+  (l'audit interdit d'écrire autre chose que les guides ; à reconsidérer pour pouvoir refaire
+  les mesures) ; recopier les anciens chiffres (périmés).
+- Qui : Vincent (demande), Claude (organisation, méthode de mesure). Source : session
+  `fd4119a6`. Statut : en vigueur.
 
 **D-163 — Le froid détruit les flottes qu'il atteint (issue #33)**
 - 2026-11-06 17:40. Contexte : issue #33. Un joueur « prêt » qui ne fondait jamais sa planète mère
@@ -2064,7 +2090,9 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
 - Vérifié : scénario « D-170 : un historique abîmé… » (`tests/decisions-reseau.test.mjs`, les 5
   formes de l'issue), qui échoue sans la correction ; vrai jeu avec `{"zzz":null}` puis `"abc"`.
 - Qui : Vincent (demande : corriger #87), Claude (forme de la correction). Source : session
-  `9e675a52`. Statut : en vigueur. Complète D-066.
+  `9e675a52`. Statut : en vigueur, modifiée par D-415 (le bloc `astra.saves` n'existe plus : il est
+  repris puis effacé ; même règle pour l'index `astra.games` et les clés `astra.save.<gid>`, et
+  l'historique n'est plus réécrit à chaque ordre, seulement au changement de partie). Complète D-066.
 
 **D-175 — Le calcul de l'économie est borné à 2 000 pas ; l'heure d'une planète reçue a un plancher**
 - 2026-11-06. Contexte : issue #32. `steps` et `until` intégraient l'économie par pas de 48 s
@@ -2111,6 +2139,970 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
   `game.js` et `session.js`.
 - Qui : Claude, par défaut. Source : session `424ded66`. Statut : en vigueur.
 
+**D-190 — Le menu d'ordres d'une flotte suit le brouillard**
+- 2026-11-06 22:15. Contexte : issue #35. Flotte choisie, toucher une planète des autres hors de
+  ma portée affichait « Attaquer Orion (IA Véga) · défense ⚔ 12 ◇ 120 + ? vaisseaux · victoire
+  incertaine », alors que la fiche de la planète la disait libre (D-124). Il suffisait de choisir
+  une flotte et de toucher chaque planète pour trouver les bases ennemies et leur force. Un
+  colonisateur se voyait proposer « Attaquer » au lieu de « Coloniser ».
+- Choix : `ordersAt` part de `knownOwner(cell)`, comme la fiche. Dans ma portée : rien ne change
+  (vrai propriétaire, défense, vaisseaux posés, estimation, D-160). Hors de portée, propriétaire
+  retenu : « Attaquer X (joueur) · hors de portée : défense inconnue » et « Conquérir X · hors de
+  portée : défense inconnue », sans estimation (`odds` absent). Hors de portée, jamais vue (ou vue
+  libre) : les ordres d'une planète libre (« Coloniser » avec un colonisateur, « Juste y aller »).
+- Choix de Claude, par défaut : `moveFleet` ne refuse plus ce que je ne vois pas. « Coloniser »
+  vers une planète prise hors de ma portée part ; l'arrivée dit « déjà prise : la flotte reste en
+  orbite » (`arrive`, inchangé). « Attaquer » / « Conquérir » vers une planète retenue mais
+  quittée depuis part aussi ; à l'arrivée, la flotte reste en orbite. Si la planète est encore
+  prise, l'ordre vise son vrai propriétaire, et le combat se joue comme avant. `moveFleet` ne devient jamais plus strict : l'IA
+  (sans brouillard, D-124) l'appelle avec ses propres cibles. `moveFleet` décide avec la partie
+  seule (`seesCell`), jamais avec mes souvenirs (`intel`, propres au téléphone) : le replay
+  (`js/replay.js`) refait la même décision. Planète libre en vrai mais hors de vue : l'ordre part
+  sans cible (`pid: null`, `key: null`), la flotte reste en orbite : `arrive` ne trouve pas de
+  joueur et s'arrête là, sans planter (testé). Le journal (partagé, rejoué) ne lit pas `intel`
+  non plus : il nomme le propriétaire seulement à portée (« part conquérir Hadar (J1) »), hors de
+  vue juste la planète (« attaque Hadar »). Avec la PR de #36 (`arrive` attaque le propriétaire
+  actuel de la planète), une flotte partie vers une planète qui paraît libre combattra son vrai
+  propriétaire à l'arrivée : c'est voulu (le brouillard ne change que l'affichage et le choix de
+  l'ordre, pas ce qui se passe à l'arrivée). Non confirmé tant que #36 n'est pas fusionnée.
+- Alternatives écartées : garder le menu et cacher seulement les chiffres (le nom du joueur
+  suffisait à trouver ses bases) ; refuser « Coloniser » au départ quand la planète est prise (le
+  refus disait ce que je ne vois pas).
+- Qui : Vincent (la règle D-124, l'issue), Claude (la forme du libellé, `moveFleet`). Source :
+  session `5c1afab8`. Statut : en vigueur. Précise D-124, modifie D-160 (cas « hors de ma
+  détection »).
+- Tests : `tests/vision.test.mjs`, quatre scénarios « … le menu la croit libre », « colonisateur… »,
+  « à portée : … hors de portée ensuite … », « ordre « Conquérir » vers une planète retenue, quittée… » ; `tests/end.test.mjs` « hors de ma détection : ni
+  défense, ni vaisseaux posés, ni estimation (D-190) ». Vu dans le navigateur.
+
+**D-191 — Cache `astra-p2p-v87`**
+- 2026-11-06. Contexte : v83 à v86 sont pris dans `main` (D-163, D-170, D-176).
+- Choix : `VERSION` passe à `astra-p2p-v87` pour que les téléphones prennent le nouveau
+  `session.js` (D-190). Si une autre PR prend v87 avant, monter au numéro suivant.
+- Qui : Claude, par défaut. Source : session `5c1afab8`. Statut : en vigueur.
+
+**D-164 — Horloges décalées : bloquer « Prêt » et refuser les dates « déjà arrivées » du futur (remplacée par D-165 et D-166)**
+- 2026-11-06. Contexte : issue #45. Un téléphone en avance voit le froid trop tôt, écrit `p.over`
+  daté dans le futur, et les autres l'adoptent : la partie finit trop tôt pour tous.
+- Choix de Vincent (premier) : comparer les horloges au salon, message d'erreur et « Prêt »
+  impossible si l'une est décalée ; toute date « déjà arrivée » reçue dans le futur en erreur.
+  Codé sur la branche (seuil 10 s), jamais fusionné.
+- Pourquoi abandonné : refuser une fiche datée du futur bloque toute la synchro du joueur en
+  avance (chaque ordre date sa fiche, `actAt`, avec son heure) ; Vincent a préféré ne refuser
+  personne.
+- Qui : Vincent. Source : session `6a1c3a43` (via la session de coordination). Statut : remplacée
+  par D-165 et D-166 avant fusion.
+
+**D-165 — Heure commune : celle du créateur de la partie, avancée par l'horloge interne du navigateur**
+- 2026-11-06. Contexte : #45 (D-164 abandonnée).
+- Choix de Vincent : « n'importe laquelle est acceptée » : personne n'est refusé à cause de son
+  heure. Au salon, chaque téléphone envoie son heure ; la partie compte sur l'heure du créateur.
+- Comment (`js/session.js`) : `now()` = heure commune = heure du téléphone à l'ouverture de la page
+  + `clockOff`, puis avancée par `performance.now()` (`clock()`). Le créateur a l'heure commune
+  (`clockSynced`) ; un joueur qui ne l'a pas la prend au premier battement de cœur d'un joueur qui
+  l'a (`hb`/`hb-ack` portent `w` = heure commune, `sy`, `ep`). Gardée par partie dans
+  `localStorage['astra.clocks']` sous la forme « heure commune − heure du téléphone », 10
+  parties au plus. Les IA prennent l'heure de leur hôte.
+- Choix de Claude : `performance.now()` (changer l'heure du téléphone page ouverte ne change plus
+  rien) ; mesure comme NTP, médiane des 5 derniers battements ; garder l'écart dans une clé à part
+  plutôt que dans `astra.save` (ne pas toucher `js/save.js`, modifié par #87).
+- Alternatives écartées : médiane des heures au départ (plus de code pour le même résultat de
+  jeu) ; corriger seulement les dates reçues (chaque fonction de règle devrait savoir de qui vient
+  une date).
+- Effet : #45 corrigé (le froid, `checkOver` et `over` comptent sur la même heure partout).
+  #48 et #92 réduits mais pas fermés : leurs critères (tests précis, pillage) ne sont pas vérifiés.
+- Qui : Vincent (règle), Claude (moyens). Source : session `6a1c3a43`. Statut : en vigueur.
+- Tests : `tests/clock.test.mjs`.
+
+**D-166 — Heure qui a changé : les autres le disent, et s'ils sont tous d'accord il est resynchronisé**
+- 2026-11-06. Contexte : #45, suite de D-165. Reste possible : l'heure du téléphone change
+  pendant que l'appli est fermée ; à la réouverture, l'heure commune est fausse.
+- Choix de Vincent : à chaque battement, les autres comparent son heure à celle attendue ; trop
+  loin, ils lui envoient « ton heure a changé » (`clock-changed`, avec ce qu'ils savent de lui ;
+  `clock-ok` quand c'est revenu). Si **tous** les joueurs humains en ligne avec lui qui l'ont
+  mesuré (au moins 1 ; ni les IA, ni les hors ligne) le disent, il reprend l'heure du groupe, et ce
+  qu'il a fait avec sa mauvaise heure est remplacé par ce que les autres savent de lui. À deux, le
+  créateur de la partie l'emporte (« celui qui a fait la partie a plus de poids »).
+- Comment : chaque téléphone garde la dernière fiche de chaque joueur reçue quand son heure était
+  juste (`clockTrust` ; en attente tant qu'elle n'est pas mesurée). À la resynchronisation, sa
+  fiche devient la plus récente de ces copies, avec `clockFix` + 1 : une fiche au `clockFix` plus
+  grand l'emporte sur l'heure de fiche (`actAt`), une fiche au `clockFix` plus petit ne passe
+  plus. `FORMAT` passe à 11 (un téléphone d'avant garderait la fiche fautive).
+- Choix de Claude : marge de 10 s (`CLOCK_DRIFT_MS`) ; 3 mesures avant de juger ; duel sans le
+  créateur : le premier arrivé (`rank`) l'emporte ; fiche relayée (pas de lien direct) jugée juste
+  si elle n'est pas datée de plus de 10 s dans mon futur.
+- Limites (non corrigées) : les lignes du journal partagé écrites avec la mauvaise heure restent
+  (le journal est une union des copies) ; ce que la fiche fautive a déjà fait chez les autres
+  (dégâts appliqués) n'est pas défait ; une heure en retard sur une fiche relayée n'est pas vue.
+  Pendant les ~5 s avant le consensus (3 battements), la fiche fautive est adoptée par tous (toute
+  heure est acceptée) : si elle portait une fin de partie (`over`), l'écran « Fin de partie »
+  s'ouvrirait, et il ne se referme pas tout seul quand la fin disparaît (`showFinish`,
+  `js/app.js`). Cache : `astra-p2p-v88` (et non v84 : `main` est passé à v85, v86 puis v87 avec #159, #160 et #161).
+- Alternatives écartées : refuser la fiche (D-164) ; à deux, personne n'est corrigé (avertissement
+  seul).
+- Qui : Vincent (règle, duel, votants, sens de « resynchronisé »), Claude (marge, détails). Source :
+  session `6a1c3a43`. Statut : en vigueur.
+- Tests : `tests/clock.test.mjs` (consensus à 3, duel à 2 dans les deux sens, hors ligne, IA,
+  bruit < 10 s, téléphone d'avant).
+
+**D-180 — À l'élimination, toutes les flottes du joueur disparaissent**
+- 2026-11-06 22:16. Contexte : issue #34. Les flottes en vol d'un joueur éliminé exécutaient encore
+  leur ordre : une « conquête » prenait la planète d'un autre (et pouvait l'éliminer), le mort
+  possédait une colonie ; une « attaque » pillait.
+- Choix (Vincent, transmis par la session de coordination) : « au moment ou un joueur est
+  eliminé, toute ses flottes disparaissent ». À quai ou en vol, à l'heure de l'élimination
+  (`p.out`), pas à l'heure où un téléphone s'en aperçoit ; plus de combat, de pillage ni de prise
+  après, même en interception ; les autres téléphones ne voient plus ces flottes, même si le mort
+  est hors ligne.
+- Mise en œuvre (Claude) : `eliminate(p, at, pts)` dans `js/session.js`, seul endroit qui pose
+  `p.out`, appelé par `losePlanet`, `noColonizer`, `freezeFleets` et `fleetHit` (ces deux-là venus
+  de D-163). Filet dans `tick` pour une fiche `out` qui a encore des flottes. Autres téléphones :
+  `sees` (par `deadAt`), `ownerAt` (un joueur `out` ne possède rien ; prise après la mort de
+  l'attaquant ignorée, `goneBy`), `applyEffects` (rapport daté de la mort de l'auteur ou après
+  ignoré). `deadAt` date la prise d'un joueur hors ligne à l'heure du rapport de l'attaquant, plus
+  à « maintenant ».
+- Alternatives écartées : flottes gardées mais sans ordre, inertes (la piste de l'issue) : elles
+  resteraient sur la carte et dans les combats d'interception ; test de `p.out` dans `arrive` et
+  `capture` (deuxième endroit, et ne couvre pas les autres téléphones).
+- Limite : fiches reçues dans le désordre (le mort livre son arrivée avant de recevoir le rapport
+  qui l'élimine) : non corrigé, voir `regles.md` §19.3.
+- Qui : Vincent (règle), Claude (mise en œuvre). Source : session `1d0dae27`, issue #34. Statut :
+  en vigueur.
+- Tests : `tests/end.test.mjs`, trois scénarios « éliminé pendant que sa flotte vole… » et
+  « éliminé et hors ligne… ».
+
+**D-181 — Cache `astra-p2p-v89`**
+- 2026-11-06. Contexte : v86 (PR #160), v87 (PR #161) et v88 (PR #162) sont dans `main`.
+- Choix : `VERSION` passe à `astra-p2p-v89` pour que les téléphones prennent le nouveau
+  `session.js`.
+- Qui : Claude, par défaut. Source : session `1d0dae27`. Statut : en vigueur.
+
+**D-200 — Une flotte qui arrive sur une planète qui a changé de main vise son propriétaire actuel (issue #36)**
+- 2026-11-06. Contexte : issue #36 (constats code-flotte-02 et code-fin-08). Une flotte
+  « Attaquer » ou « Conquérir » gardait `{ pid, key }` de l'ancien propriétaire ; à l'arrivée,
+  `arrive` se battait contre la fiche de cet ancien propriétaire sans regarder `ownerAt`. Si un
+  3e joueur avait pris la planète pendant le trajet, on pillait un stock fantôme (ressources
+  créées de rien), on écrivait un rapport à un joueur qui ne l'appliquerait jamais, et la
+  conquête finissait évacuée par `checkClaim` avec un colonisateur offert par `evacuate`. Deux
+  conquêtes de suite par le même joueur : la 2e refaisait le combat et écrasait la colonie de la
+  1re (vaisseaux effacés, 2 rapports de prise).
+- Choix :
+  - **Vincent** (via la session de coordination, ses mots : « Attaquer le nouveau
+    propriétaire ») : à l'arrivée, si la case n'est plus au joueur visé, la flotte combat le
+    propriétaire actuel, avec sa défense et son stock, et le même ordre.
+  - Propriétaire actuel = moi : pas de combat, la flotte se pose (`dock`) et ajoute ses vaisseaux
+    (consigne de la coordination). Pas d'alliances dans le jeu, donc pas de cas « allié ».
+  - **Choix de Claude** : case sans propriétaire → la flotte reste en orbite, même pour une
+    conquête avec un colonisateur à bord (coloniser demanderait les contrôles de `colonize` :
+    froid, taille, `takenBefore` ; le joueur peut donner l'ordre lui-même).
+  - **Choix de Claude** : le propriétaire actuel est `ownerAt(f.to)` au passage (`tick`) qui
+    traite l'arrivée, pas un `ownerAt` « à l'heure `f.arrive` » : les fiches ne gardent pas
+    l'historique des propriétaires (les rapports lus disparaissent), et les flottes d'un même
+    passage ne sont pas traitées dans l'ordre de leurs arrivées. Le rejeu refait les mêmes
+    passages sur les mêmes fiches, donc le résultat reste rejouable (comme `defenseAt`).
+  - **Choix de Claude** : une colonie prise au combat porte `captured: true` ; `evacuate` ne lui
+    ajoute pas de colonisateur (il n'en a consommé aucun). Les colonies fondées par un
+    colonisateur, et les vieilles fiches sans ce champ, gardent le +1.
+- Alternatives écartées : annuler l'ordre (« la planète a changé de main ») et rester en orbite,
+  proposé par l'issue (Vincent a choisi d'attaquer) ; comparer seulement à `order.pid` et tomber
+  en orbite si la case est à moi (la 2e flotte serait restée en vol au lieu de renforcer la prise).
+- Critère de l'issue non suivi tel quel : « ses vaisseaux et sa soute sont inchangés » à
+  l'arrivée de A ; avec la règle de Vincent, A combat C, donc sa flotte et sa soute changent. Ce
+  qui reste vrai : aucun rapport vers B, et le butin sort du stock de C (C le perd en lisant le
+  rapport), donc rien n'est créé.
+- Preuve : 4 scénarios dans `tests/end.test.mjs` (échouent sur l'ancien code, passent après) ;
+  4 parties IA contre IA (3 et 4 IA) : 0 re-capture, rejeu identique, mais l'ancien code n'en
+  faisait pas non plus dans ces parties : ce n'est pas une preuve du correctif. Le script d'audit
+  `recapture.mjs` n'est pas publié : **non rejoué**.
+- Qui : Vincent (règle), Claude (cas sans propriétaire, heure du propriétaire, marque
+  `captured`). Source : worker `worker-cible`, issue #36.
+- Statut : en vigueur. Modifie D-092 (conquête). Cache `astra-p2p-v90` (v84 avant la fusion de `main`, qui avait déjà v89).
+
+**D-201 — Plus de carte « Ta planète gèle dans… » pendant la partie : le bandeau `#race` ne sert qu'à la fin**
+- 2026-11-06. Contexte : Vincent envoie une capture du bandeau du haut (« Ta planète gèle dans
+  30:53 · va vers le soleil · 2 en vie ») : « n'affiche plus l'aide comme ceci », puis, à la
+  question de ce qu'il faut changer : « retire toute la card ».
+- Choix :
+  - **Vincent** : la carte disparaît pendant la partie (toutes ses variantes : « Ta planète la
+    plus exposée gèle… », « Le soleil s'éteint… »).
+  - **Choix de Claude par défaut** (session router « Affichage aide ») : elle disparaît aussi
+    quand le joueur est éliminé (« Éliminé · encore n en vie »), mais on la **garde en fin de
+    partie** (« Victoire ! / Perdu. · partie finie · Classement · Voir la courbe des points »),
+    car son bouton Classement est le seul moyen de rouvrir l'écran de fin (D-143) une fois fermé.
+  - La règle du froid ne change pas (`frostOf`, `ranking`, cercle sur la carte) ; le bandeau
+    rouge de menace `#threat` reste.
+- Alternatives écartées : retirer aussi la carte en fin de partie (on perdrait l'accès au
+  Classement) ; garder le texte « Éliminé ».
+- Source : capture et messages de Vincent, transmis par la session « Affichage aide ».
+- Statut : en vigueur (cette PR). Change le bandeau de course de la session `26f178b9` (`interface.md` §12) ; D-104 (lien vers la courbe) et D-143 (bouton Classement) restent vrais.
+
+**D-221 — Les coefficients du climat vont dans les cartes de ressources de la planète**
+- 2026-11-06. Contexte : Vincent envoie une capture de la ligne `#soil-climate` (« Chaud ×1,10⚡
+  ×1,05◆ ×0,96🍃 ») : « affiche les info dans les cards de ressource de la planette ».
+- Choix :
+  - **Vincent** : le coefficient de chaque ressource s'affiche dans sa carte (`#resources`).
+  - **Choix de Claude par défaut** (session router « Affichage aide ») : la ligne `#soil-climate`
+    ne garde que le nom du climat (« Brûlant », « Chaud »…, avec sa couleur), à côté du nom de la
+    planète, pour ne pas répéter les chiffres.
+  - **Choix de Claude** : le « ×1,10 » se place juste après l'icône de la ressource, en petit,
+    vert (`--ok`) au-dessus de 1, orange (`--warn`) en dessous, gris à 1 (arrondi au centième) ; un
+    fond de la couleur de la carte le garde lisible au-dessus de la petite courbe. Rien pour une
+    planète d'avant le climat. Une race sans une ressource (pas de nourriture pour les machines)
+    n'a pas sa carte, donc pas son coefficient.
+  - Ne change pas : la formule de production, la fiche d'une planète sur la carte (`#pi-climate`
+    garde « Brûlant · production ×… · ×… · ×… »).
+- Alternatives écartées : le coefficient sur la ligne du débit (« +12 / min ») ; garder aussi les
+  chiffres sur la ligne du climat.
+- Source : capture et message de Vincent, transmis par la session « Affichage aide ».
+- Statut : en vigueur (PR suivante, après #179), modifiée par D-311 (le nom du climat ne s'affiche
+  plus du tout dans l'en-tête de la vue planète ; les coefficients restent dans les cartes).
+
+**D-210 — Le Journal ne trahit plus l'ordre d'une flotte que je ne vois pas (issue #37)**
+- 2026-11-06 22:18. Contexte : issue #37. `moveFleet` (attaque, conquête) et `chaseFleet`
+  (poursuite) écrivaient au journal partagé « La flotte de A attaque Rigel (B) » ou « … prend en
+  chasse une flotte de B ». La fenêtre Journal (« Ce qui me concerne », D-110) montrait à B toutes
+  les lignes qui contiennent son nom : B apprenait l'attaque dès l'ordre, flotte hors de sa
+  détection, alors que la carte (D-128) et l'alerte (D-133) ne montraient rien.
+- Choix de Claude : **marquer et filtrer**. Une ligne d'ordre de flotte porte `{ pid, fleet }`
+  (le joueur et sa flotte) dans le journal partagé ; `showsLog(l)` (`js/session.js`) la montre à
+  son auteur toujours, aux autres seulement tant qu'ils voient cette flotte (`sees`, la règle de
+  la carte et de l'alerte). Flotte disparue (posée, détruite) : la ligne reste cachée ; le
+  combat a ses propres lignes (« est attaquée par », « prend … à », carnet D-110), jamais
+  marquées, toujours montrées. `openJournal` (`js/app.js`) passe par `showsLog`. Une marque mal
+  formée reçue du réseau est ignorée (`pushLog` : `pid` et `fleet` doivent être du texte) ; la
+  ligne redevient ordinaire. Tous les ordres de `moveFleet` sont marqués (coloniser et se poser
+  ne nomment que l'auteur : aucun changement pour eux).
+- Alternative écartée : garder ces lignes hors du journal partagé (journal local de l'auteur
+  seulement). Il aurait fallu un second journal, sauvegardé à part, et B n'aurait jamais lu
+  l'ordre, même flotte en vue. La marque garde un seul journal et suit la même règle que la
+  carte. Comme D-128, c'est un **filtre d'affichage, pas un secret** : la ligne voyage toujours
+  avec la fiche (la fiche contient d'ailleurs déjà l'ordre de la flotte), et la console
+  (`printLog`) la montre toujours, pour le débogage.
+- Avec D-190 (fusionné avant) : la ligne ne nomme la cible que si l'auteur voit sa planète
+  (`live`). Hors de sa vue, la ligne ne contient pas le nom de B et n'est déjà pas dans son
+  Journal. La marque reste utile quand l'auteur voit la planète (un éclaireur, du radar) mais que
+  la cible ne voit pas la flotte d'attaque : les scénarios d'attaque et de conquête placent un
+  éclaireur de A à 1 case de la planète de B pour couvrir ce cas.
+- Rejeu (`js/replay.js`) : inchangé. Son journal rejoué ne garde que `{ at, pid, text }`, et la
+  marque ne change pas l'état de la partie ; `tests/replay.test.mjs` passe sans changement.
+- Vérifié : 4 scénarios (`tests/journal.test.mjs`) : attaque et conquête depuis 19 cases (B ne lit
+  pas l'ordre tant qu'il ne voit pas la flotte, A toujours ; flotte à 2 cases : B la voit,
+  l'alerte sonne, l'ordre se lit ; après le combat, B lit le résultat) ; poursuite (A, radar 3,
+  voit le cargo de B à 4 cases, B ne voit pas A) ; marque gardée par `onRecord`, marque mal formée
+  ignorée. Contrôlés par mutation (`showsLog` qui renvoie toujours vrai : les 4 échouent).
+  222/222. Vu dans le vrai jeu (interface de test, contre l'IA) : Journal de B avant, flotte en
+  vue, après le combat.
+- Qui : Claude (choix de méthode, demandé par la session de coordination). Source : session
+  `89918100`.
+  Statut : en vigueur. Applique D-128 et D-133 au Journal (D-110).
+
+**D-211 — Cache `astra-p2p-v91`**
+- 2026-11-06. Choix de Claude : `js/app.js` et `js/session.js` changent (D-210) ; nouvelle
+  version de cache pour que les téléphones les récupèrent. Prévu en v84 ; `main` est passé à v86
+  (D-176), puis à v90 (#161, #162, #165, #166) avant les fusions, d'où v91.
+- Statut : en vigueur.
+
+## 6 novembre 2026 — IA coupée après une pause de la page (#38)
+
+Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autres PR en cours.
+
+**D-220 — Le lien en mémoire d'une IA ne se coupe jamais pour silence**
+- 2026-11-06 22:15. Contexte : issue #38. Une IA (D-151) est reliée à l'hôte par un lien en
+  mémoire (`LocalLink`, `js/bot.js`). `heartbeat()` (`js/session.js`) ferme tout lien muet depuis
+  30 s (`SILENCE_MS`). Si la page de l'hôte se fige plus de 30 s (téléphone verrouillé, appli en
+  arrière-plan), au réveil le battement passe avant le moindre message : le lien de l'IA était
+  fermé, et rien ne le recréait. L'IA jouait dans sa copie, mais l'hôte ne recevait plus ses
+  fiches (« déconnecté », « Seul en ligne · Rejoindre ») ; au rechargement, ses ordres joués
+  pendant la coupure étaient perdus.
+- Choix de Claude : `LocalLink` porte `local = true`, et `heartbeat` ne ferme pas pour silence un
+  lien `local` (il lui envoie toujours `hb`, pour la latence et « IA sur ce téléphone »). Les
+  deux bouts sont sur le même téléphone : un silence veut seulement dire que la page était en
+  pause, pendant laquelle l'IA non plus n'a pas joué. Le lien ne se ferme plus qu'à la fin
+  (`end()`). Le bandeau « Seul en ligne » suit tout seul : le lien de l'IA compte dans
+  `links`, donc `alone` reste faux ; `js/app.js` n'a pas changé.
+- Alternatives écartées : recréer l'IA quand son lien se ferme (`wakeBots` après avoir retiré
+  l'entrée morte de `host.bots`) : plus de code, et la nouvelle Session repartirait de la fiche
+  figée chez l'hôte, donc perdrait les ordres joués entre-temps ; faire de `lastSeen` un getter
+  de `LocalLink` (toujours « à l'instant ») : magie cachée, `attach` l'écrit.
+- Vérifié : scénario « D-220 : la page de l'hôte se fige 31 s… » (`tests/bot.test.mjs`), qui
+  échoue sans la correction (liens 1 → 0, IA hors ligne, `alone` vrai) ; vrai jeu (page bloquée
+  31 s, IA toujours en ligne, fiche qui avance, rien de perdu au rechargement). Cache `sw.js` :
+  `astra-p2p-v92` (v86 au départ ; v92 au merge, au-dessus de v91 de `main`).
+- Qui : Vincent (demande : corriger #38), Claude (méthode). Source : session `2f996c1d`.
+  Statut : en vigueur. Complète D-151.
+
+**D-240 — Avant le départ, la carte est voilée ; l'icône des boutons pleins du bandeau se voit**
+- 2026-11-06 22:45. Demande de Vincent (via la session « Cacher la carte en préparation ») :
+  « lors de la preparation de partie, on ne doit pas voir la map et prendre connaissance des
+  planetes, c'est la surprise pour quand la partie commence, de plus, le bouton "je suis pret"
+  n'a pas d'icon visible ».
+- Choix :
+  - Tant que `session.startedAt` est nul (`mapVeiled()`, `js/app.js`), `mapPlanets()` renvoie
+    une liste vide : aucune planète, aucun astéroïde, aucune comète n'est dessiné, et rien ne
+    se touche (`mapItems`, la fiche de planète et les noms de case passent tous par
+    `mapPlanets`). Le soleil n'est pas dessiné non plus. Un voile `#map-veil` par-dessus le
+    canvas dit « La carte se dévoile au départ ». Seules les étoiles du décor et le quadrillage
+    restent. Dès le départ, tout réapparaît.
+  - On cache à l'affichage seulement : la carte est générée et partagée comme avant (règles et
+    réseau inchangés). Un joueur qui lit le code ou la mémoire de la page peut encore la voir :
+    c'est une surprise, pas un secret.
+  - Icône : `.banner .ic` peignait toute icône du bandeau en bleu accent, donc aussi celle du
+    bouton bleu « Je suis prêt » (bleu sur bleu). `.banner button.primary .ic` reprend la
+    couleur du texte du bouton. Vaut aussi pour **Ma flotte**.
+- Alternatives écartées : ne pas envoyer la carte avant le départ (touche au réseau, refusé par
+  le brief) ; flouter la carte (on devinerait encore le nombre et la place des planètes).
+- Qui : Vincent (demande, cacher à l'affichage décidé par le router), Claude (voile, soleil
+  caché aussi, correctif CSS). Source : worker `worker-prep-carte`.
+- Statut : en vigueur, modifiée par D-241 (plus de voile : pas de carte du tout avant le départ). Cache : voir D-246.
+
+**D-241 — Avant le départ, pas de carte du tout ; les joueurs du bandeau en liste**
+- 2026-11-06 22:52. Demandes de Vincent, dans la session du worker `worker-prep-carte` : « afficher
+  les joueurs sous forme de liste, les uns au dessus des autres », puis « ne pas afficher du tout
+  la carte ».
+- Choix : `#map-wrap` (canvas, zoom, menu) est caché tant que `mapVeiled()` est vrai
+  (`renderLobby` et `drawMap`) ; le voile `#map-veil` de D-240 est retiré. `mapPlanets()` reste
+  vide avant le départ (rien à toucher). L'en-tête (« avant le départ », Journal, réglages,
+  joueurs) reste. `.pick-who` passe en colonne : un joueur par ligne.
+- Alternative écartée : garder le voile avec son message (Vincent ne veut pas de carte du tout).
+- Qui : Vincent. Source : session `96b96929`. Statut : en vigueur. Cache : voir D-246.
+
+**D-230 — Service worker : le cache répond si le réseau se tait 3 s (issue #40)**
+- 2026-11-06. Contexte : `sw.js` faisait `fetch` puis, seulement en cas d'échec, `caches.match`.
+  Sur un réseau qui accepte la connexion sans répondre (portail captif, métro, 4G à une barre),
+  `fetch` n'échoue pas avant longtemps : page blanche alors que les 32 fichiers sont en cache.
+- Choix : **course entre le réseau et un délai de 3 s** (`NET_WAIT`), pour chaque requête.
+  1. Le réseau répond avant 3 s : sa réponse est servie et mise en cache (comme avant).
+  2. Délai dépassé : la copie en cache est servie ; s'il n'y en a pas, on continue d'attendre le
+     réseau (une page jamais mise en cache ne doit pas échouer juste parce qu'elle est lente).
+  3. Le réseau échoue : la copie en cache (comme avant).
+  4. Drapeau `mute` : après un délai dépassé, les requêtes suivantes prennent le cache tout de
+     suite ; la première réponse du réseau le remet à faux. Sans lui, chaque `import` de la
+     chaîne des modules attendait 3 s de plus (vu dans Chromium : rien après 10 s).
+  5. La réponse du réseau arrivée après le délai est quand même écrite dans le cache
+     (`e.waitUntil` appelé tout de suite) : la prochaine ouverture a la nouvelle version.
+- Alternatives écartées : « stale-while-revalidate » (cache d'abord, réseau en fond) : plus
+  rapide, mais chaque mise à jour n'arrive qu'à l'ouverture suivante, et `index.html` neuf
+  pourrait charger d'anciens modules ; délai sans drapeau `mute` (3 s par niveau d'`import`,
+  plus de 10 s) ; délai plus court (1 s : une vraie 4G lente perdrait trop souvent la nouvelle
+  version) ; `AbortController` sur le `fetch` (on perdrait la réponse tardive qui met le cache
+  à jour).
+- Limites : sur un réseau lent mais vivant, `index.html` peut arriver du réseau avant 3 s et un
+  module du cache après 3 s : une page neuve avec d'anciens modules pour cette ouverture (le
+  risque existait déjà si le réseau lâchait en plein chargement ; la réponse tardive mise en
+  cache répare l'ouverture suivante). Juste après le retour du réseau, une ouverture peut
+  encore servir le cache une fois ; le drapeau est perdu quand le navigateur arrête le service worker (retour au
+  comportement normal). Ne touche ni #84 (`technologies.html` absente de `FILES`) ni #89 (les
+  réponses d'erreur sont mises en cache, y compris la réponse tardive, comme avant).
+- Qui : **choix de Claude** (le ticket laissait le choix de la méthode). Source : session
+  `7bec2792`, issue #40. Statut : en vigueur.
+- Tests : `tests/sw.test.mjs` (vrai `sw.js` dans un `vm`, serveur local qui répond, lent, muet,
+  coupé) ; `tests/sw-browser.mjs` (même parcours dans Chromium, hors `node --test`).
+
+**D-231 — Cache `astra-p2p-v94`**
+- 2026-11-06. Contexte : à l'ouverture de la PR, v86 était dans `main` (D-176) et la PR prenait
+  v87 ; à la fusion de `main` (#161 à #166 mergées), `main` était à v92 (PR à v93), puis #179
+  a pris v93 à son tour.
+- Choix : `VERSION` passe à `astra-p2p-v94`, au-dessus de `main`, pour que les téléphones
+  prennent le nouveau `sw.js`.
+- Qui : Claude, par défaut. Source : session `7bec2792`. Statut : en vigueur.
+
+**D-242 — Avant le départ, le bandeau du lobby prend toute la hauteur, boutons en bas**
+- 2026-11-07 07:32. Demande de Vincent (via le router) : « il faut que la card du lobby prenne
+  toute la hauteur et que les bouton d'actions soient tout en bas ».
+- Choix : pendant le lobby (bandeau du départ visible et `mapVeiled()`), `renderLobby` met la
+  classe `lobby` sur `#screen-game`. Alors l'écran fait la hauteur de la fenêtre (`100dvh` moins
+  les zones sûres), l'en-tête de la carte (« avant le départ », Journal, réglages, joueurs)
+  passe en haut (`order: -1`), le bandeau `#pick` remplit le reste, les boutons sont collés en
+  bas (`margin-top: auto`). Sur un écran trop petit, la liste des joueurs défile, les boutons
+  restent visibles. Après le départ, la classe tombe : bandeau et carte comme avant.
+- Alternative écartée : `min-height` au lieu de `height` (avec beaucoup de joueurs, les boutons
+  sortiraient de l'écran).
+- Qui : Vincent (demande), Claude (en-tête en haut, liste qui défile). Source : session
+  `96b96929`. Statut : en vigueur, modifiée par D-310 (le bouton joueurs `#net` n'est plus dans
+  l'en-tête avant le départ). Cache : voir D-246.
+
+**D-243 — Les fenêtres (`.sheet`) font la hauteur de l'écran visible ; la page derrière ne défile plus**
+- 2026-11-07 07:36. Demande de Vincent (via le router), avec une capture du Journal coupé en bas :
+  « corrige le bug de scroll avec le journal ».
+- Cause : `.sheet` était `position: fixed; inset: 0`. Son bas suivait la hauteur de la fenêtre
+  (`innerHeight`), qui peut être plus grande que l'écran visible : mesuré dans l'aperçu
+  téléphone, `innerHeight` 988 px pour 812 px visibles (`100dvh`, `clientHeight`). Le panneau,
+  collé en bas de `.sheet`, sortait donc de l'écran : on ne voyait que le titre du Journal. Même
+  cas sur un téléphone quand la barre du navigateur cache le bas de l'écran.
+- Choix : `.sheet` en `top: 0; height: 100dvh` ; `max-height` des panneaux en `dvh` (92, et 85
+  pour le Journal) ; `overscroll-behavior: contain` sur le panneau ; `body` sans défilement tant
+  qu'une fenêtre est ouverte (`body:has(.sheet:not([hidden]))`). Vaut pour toutes les fenêtres.
+- Alternative écartée : ne changer que le Journal (les autres fenêtres ont la même cause).
+- Qui : Vincent (demande), Claude (cause et correctif). Source : session `96b96929`.
+- Statut : en vigueur, modifiée par D-246 pour le Journal (modale presque plein écran), puis par D-302 (toutes les fenêtres prennent toute la hauteur : plus de `max-height` 92 / 85 dvh). Le décalage n'a pas pu être recréé après le correctif dans l'aperçu (il
+  n'apparaît pas à chaque fois) : corrigé par construction (`100dvh` = écran visible), **non
+  confirmé** sur un vrai téléphone.
+
+**D-244 — L'en-tête de la carte dit « préparation » avant le départ**
+- 2026-11-07 07:36. Demande de Vincent (via le router) : « change "avant le depart" pour
+  "preparation" ». Choix : `#my-coords` affiche « préparation » tant que `session.startedAt` est
+  nul ; ensuite « à fonder », les coordonnées ou « éliminé », comme avant. Les commentaires du
+  code ne changent pas. Qui : Vincent. Source : session `96b96929`. Statut : en vigueur.
+
+**D-245 — Plus de bouton d'aide `?` dans l'en-tête de la carte**
+- 2026-11-07 07:36. Demande de Vincent (via le router) : « retire l'icon "?" avec l'aide ».
+- Choix : supprimés partout (avant et après le départ) : le bouton `#btn-map-help` et sa bulle
+  `#map-help` (`index.html`), ses deux écouteurs (`js/app.js`), et les styles devenus inutiles
+  (`.help-btn`, `.help-wrap`, `.tooltip`). Rien d'autre ne les utilisait, aucun test n'en
+  dépendait. Le texte d'aide (toucher une planète, piloter une flotte, zoom…) n'est plus nulle
+  part dans le jeu.
+- Qui : Vincent. Source : session `96b96929`. Statut : en vigueur. Cache : voir D-246.
+
+**D-290 — Le lien d'invitation reçu sans nom ne sert qu'une fois ; « Autre invitation » à l'étape 2**
+- 2026-11-06. Contexte : issue #69. Un lien d'invitation ouvert sans nom remplaçait le `onclick`
+  de **Rejoindre** pour toute la vie de la page (`boot`) : chaque appui suivant relançait
+  `startJoin(vieux code)`, donc l'étape 2 sur une invitation morte, sans erreur. L'étape 1 ne
+  revenait qu'après l'échec de la connexion (15 à 180 s), ou en rechargeant.
+- Choix de Claude :
+  1. `boot` ne touche plus au bouton : il garde le code dans `pendingInvite`. Le gestionnaire
+     normal de **Rejoindre** le prend une fois, le remet à `null` et cache la note « Invitation
+     reçue… ». Ensuite, **Rejoindre** ouvre l'étape 1, champ vide.
+  2. Un bouton **Autre invitation** (`#btn-other-invite`, sous le statut de l'étape 2) revient à
+     l'étape 1. Il arrête la tentative en cours comme la flèche Retour (`session.end()`,
+     `session = null`) : la vieille réponse ne peut plus se connecter ni afficher plus tard une
+     erreur d'échec sur l'étape 1. `useOffer` refait une session pour la nouvelle invitation.
+- Alternatives écartées : rétablir l'ancien `onclick` après usage (deux endroits qui écrivent le
+  même gestionnaire) ; garder la tentative vivante derrière « Autre invitation » (une vieille
+  réponse pourrait se connecter pendant qu'on scanne une autre invitation).
+- Limite : si l'on crée une partie au lieu de rejoindre, `pendingInvite` reste gardé jusqu'au
+  prochain appui sur **Rejoindre** (une seule fois). Non traité : rare, et sans effet durable.
+- Qui : Claude, par défaut (la piste venait de l'issue). Source : session `07a4ccd7`, issue #69.
+  Statut : en vigueur. Cache `astra-p2p-v87`, puis `astra-p2p-v95` à la fusion de `main` (#167 à v94).
+
+**D-246 — Le Journal est une modale presque plein écran**
+- 2026-11-07 07:41. Demande de Vincent (via le router) : « il faut que le journal soit une modal
+  quasiment fullscreen ».
+- Choix : `#sheet-journal` centre son panneau avec 12 px de marge autour (fond assombri
+  derrière) ; le panneau prend toute la hauteur restante (`height: 100%` d'une `.sheet` en
+  `100dvh`, D-243), au plus 760 px de large (sur un grand écran, la colonne reste lisible au lieu
+  de s'étirer sur toute la largeur) ; son en-tête (titre, croix) est collé en haut
+  (`position: sticky`) ; le contenu défile dedans ; la page derrière ne défile pas (D-243).
+  Fermeture inchangée : croix, Échap, toucher le fond. Les autres fenêtres restent des panneaux
+  du bas.
+- Alternatives écartées : toute la largeur sur grand écran (lignes trop longues) ; changer
+  toutes les fenêtres (pas demandé).
+- Qui : Vincent (demande), Claude (marge 12 px, largeur 760 px, en-tête collé). Source : session
+  `96b96929`. Statut : en vigueur, modifiée par D-302 (le même style vaut maintenant pour toutes
+  les fenêtres ; l'« alternative écartée » ci-dessus est retenue). Cache `astra-p2p-v97` pour toute la PR #178 (D-240 à D-246),
+  au-dessus de v96 de `main`. Numéros : D-201 à D-207 puis D-221 à D-227 sur la branche,
+  renumérotés D-240 à D-246 au rebase sur `main` (qui avait pris D-201 puis D-221).
+
+**D-300 — Jauges de stock sous mes planètes, sur la carte (sans chiffre)**
+- **Modifiée par D-303** : les jauges ne sont plus dessinées sur la carte, mais dans les cases
+  de mes planètes de la grille sous la carte. Le reste (une barre par stock, sans chiffre) tient.
+- 2026-11-07 07:50. Contexte : Vincent : « je voudrais que dans la vue de carte, les planete aient
+  les jauges de ressources stoqué par le joueur visible, sans le montant exacte, pour se rendre
+  compte de quel planete est vide et quel planete est pleine ».
+- Choix (forme : **Claude par défaut**, router « Jauges de stock des planètes sur la carte », puis
+  worker `worker-jauges-carte`) :
+  - Sous chacune de **mes** planètes vivantes (aussi astéroïde ou comète à moi), sous l'anneau
+    blanc (`cy + 0,56 case`), une mini-barre horizontale par ressource de ma race, dans l'ordre
+    de `RACES[race].resources` (minéraux, nourriture, énergie ; 2 barres pour une race sans
+    nourriture), couleurs `--minerals`, `--food`, `--energy`. Partie vide : blanc à 16 % ;
+    l'ensemble posé sur un fond sombre pour rester lisible sur le quadrillage et le froid.
+  - Remplissage = stock / plafond de l'entrepôt (`caps`, `storageCap`), borné à 0..1. Aucun
+    chiffre.
+  - **4e barre, habitants** (`--pop`) : seulement pour une race qui en a (`RACES[race].pop`),
+    car leur plafond est clair (logements, `popCap`). Pas de barre pour une race sans
+    population.
+  - Valeurs prises au même calcul que les alertes (`renderAlerts`, `stateAt` à l'instant, 5 fois
+    par seconde) : pas de `stateAt` de plus, et rien dans la boucle d'image de la carte.
+  - Tailles en `max(pixels, part de case)` : visibles au zoom 1 sur téléphone, plus grandes en
+    zoomant. Le toucher et l'aimant (`js/aim.js`) ne changent pas.
+  - Planètes des autres et libres : jamais de barre (on ne connaît pas leurs stocks).
+- Alternatives écartées : barres dans l'anneau (trop peu de place au zoom 1 : environ 4 px
+  entre le disque et le cercle blanc) ; une seule jauge (le minimum ou la moyenne : cache quelle
+  ressource manque) ; un anneau coloré autour de la planète (moins lisible à petite taille).
+- Limite connue : une 3e flotte à quai sur la même case se pose juste sous la planète et peut
+  chevaucher les barres.
+- Qui : Vincent (le besoin), Claude par défaut (la forme). Source : session router « Jauges de
+  stock des planètes sur la carte », worker `e2d13b65`. Statut : en vigueur (cette PR), cache
+  `astra-p2p-v97`, puis `astra-p2p-v98` au rebase sur `main` (qui avait pris v97), puis `astra-p2p-v100` (v98 et v99 pris par les PR #188 et #189).
+
+**D-301 — Plus de bord gauche coloré sur les cases de mes planètes (grille sous la carte)**
+- 2026-11-07 08:05. Contexte : après D-300, Vincent : « et retire la border-left de ces cards »
+  (transmis par le router « Jauges de stock des planètes sur la carte »). Ce sont les cases des
+  planètes de `#map-fleets` (`.mf.mp`), qui avaient un bord gauche vert de 3 px (D-115).
+- Choix : `.mf.mp` garde le cadre fin normal (`1px solid var(--line)`) sur les quatre côtés.
+  Les cases des flottes ne changent pas : bord gauche bleu, rouge si attaque (`.mf.hot`).
+- Alternative écartée : retirer aussi le bord des flottes (le rouge signale une attaque).
+- Qui : Vincent (la demande), le router (la portée : planètes seulement). Source : session router,
+  worker `e2d13b65`. Statut : en vigueur (PR #186). Modifie D-115.
+
+**D-303 — Les jauges de stock vont dans les cases d'accès rapide, plus sur la carte**
+- 2026-11-07 08:20. Contexte : après D-300, Vincent, avec une capture de la case « Kochab » de la
+  grille sous la carte : « c'est dans les acces rapide que je veux les jauges » (transmis par le
+  router).
+- Choix :
+  - Plus rien sous les planètes du canvas : `drawStockBars`, `stocksNow` et le calcul ajouté à
+    `renderAlerts` sont retirés.
+  - Chaque case de planète `.mf.mp` de `#map-fleets` porte, sous le nom, une barre fine (3 px)
+    par ressource de la race (`RACES[race].resources`) puis les habitants s'il y en a ; couleurs
+    `--minerals`, `--food`, `--energy`, `--pop` ; partie vide blanche à 12 %. Remplissage =
+    stock / plafond (entrepôt, ou logements pour les habitants), **aucun chiffre**. Les cases
+    des flottes n'en ont pas.
+  - Mise à jour en place dans `renderMapFleets` (largeur des barres, comme les comptes à rebours) :
+    le HTML de la case ne change pas avec le stock, donc pas de réécriture ni de clignotement,
+    et le toucher sur + et Décoller n'est pas perdu.
+  - **Choix de Claude par défaut** : accessibilité par un `aria-label` en mots sur le groupe de
+    barres (`role="img"`, « Stocks : minéraux presque plein, nourriture vide… » ; vide, presque
+    vide, à moitié, presque plein, plein), plutôt que `aria-hidden` : un lecteur d'écran
+    retrouve ainsi l'information sans chiffre exact.
+- Alternatives écartées : garder aussi les barres sur la carte (l'utilisateur les veut dans les
+  cases) ; barres sous le statut (le nom puis les barres se lisent d'un coup d'œil, le statut et
+  les boutons restent en bas).
+- Qui : Vincent (l'endroit), Claude (la forme dans la case, l'`aria-label`). Source : router,
+  worker `e2d13b65`. Statut : en vigueur (PR #186). Modifie D-300. (Numérotée D-303 : D-302 est prise par la PR #189.)
+
+**D-310 — La fenêtre Joueurs n'est accessible qu'une fois la partie commencée**
+- 2026-11-07 08:03. Demande de Vincent (via le router), avec une capture de la préparation et de
+  la fenêtre Joueurs ouverte : « la liste des joueurs ne doit apparaitre que quand la partie est
+  commencé, elle fait doublon avec le lobby ».
+- Choix : tant que la partie n'est pas partie (`mapVeiled()`, c'est-à-dire
+  `session.startedAt == null`), `renderLobby` cache le bouton joueurs `#net` (icône + nombre) de
+  l'en-tête et ferme `#sheet-players` si elle était ouverte ; le clic sur `#net` ne fait rien en
+  préparation. Au départ (`startedAt` posé, bandeau « Envoie ton colonisateur »), le bouton
+  réapparaît au rendu suivant, chez chaque joueur, et après un rechargement. Le lobby garde son
+  bouton **Inviter** et sa liste prêt / pas prêt (D-241). Contenu de la fenêtre Joueurs après le
+  départ inchangé.
+- Alternatives écartées : garder le bouton mais ouvrir le lobby (le lobby est déjà à l'écran,
+  bouton inutile) ; cacher seulement le classement dans la fenêtre (doublon « Inviter » gardé).
+- Qui : Vincent (demande), router (cacher le bouton), Claude (fermer la fenêtre et couper le
+  clic en préparation). Source : session `a10e3777`. Statut : en vigueur. Modifie D-242. Cache
+  `astra-p2p-v98`.
+
+**D-302 — Toutes les fenêtres ont le style du Journal** (modifie D-246, D-243)
+- 2026-11-07 08:05. Demande de Vincent (via le router), avec une capture de la fenêtre Réglages
+  en petit panneau collé en bas : « cette modal doit avoir le meme style que le journal, toutes
+  les modal doivent avoir le meme style ».
+- Choix : le style du Journal (D-246) devient la règle commune de `.sheet`, `.sheet-panel` et
+  `.sheet-head` dans `style.css` : fond assombri, 12 px de marge, panneau centré sur toute la
+  hauteur restante, 760 px de large au plus, bord de 1 px partout, en-tête (titre, croix) collé en
+  haut avec un trait dessous, contenu qui défile dedans. Les variantes qui le contredisaient sont
+  supprimées : `#sheet-journal …` (devenu inutile), `.finish .sheet-panel` (centrage propre à la
+  fin de partie), `.sheet-panel { border-bottom: 0 }`. Vaut pour toutes les fenêtres
+  d'`index.html` : Planète, Joueurs, Fin de partie, Réglages, Journal, Invitation, Décoller,
+  Donner/Scinder, Échange. `replay.html`, `technologies.html` et `tests/ui/` n'ont pas de
+  fenêtre `.sheet`. Contenu, boutons, ouverture et fermeture (croix, Échap, fond) inchangés.
+- Conséquence acceptée : une petite fenêtre (Réglages, Joueurs) est aussi haute que le Journal,
+  avec du vide sous son contenu ; la fiche de planète cache maintenant la carte au lieu d'en
+  laisser voir le haut (on la ferme pour revenir à la carte, comme avant).
+- Alternative écartée : une hauteur ajustée au contenu (panneau centré mais plus court) : ce
+  n'est plus le même style que le Journal, ce que la demande exclut.
+- Qui : Vincent (demande) ; Claude (règle commune, suppression des variantes). Source : session
+  `d9ace210`. Statut : en vigueur. Numéro D-302 et cache `astra-p2p-v99` : la PR #186 (jauges
+  sur la carte, en cours) a déjà pris D-300, D-301 et v98 ; `main` est aussi en v98 depuis #188
+  (D-310), v99 reste au-dessus après la fusion de `main`.
+
+**D-311 — Plus de nom du climat dans l'en-tête de la vue planète** (modifie D-221)
+- 2026-11-07 08:16. Demande de Vincent (via le router), avec une capture de la vue planète
+  (« ← Rigel », « Chaud » en orange, boutons journal / alerte / réglages) : « retire le "Chaud" de
+  cette page ».
+- Choix : l'élément `#soil-climate` est supprimé de `#view-planet` (HTML), avec son écriture dans
+  `renderPlanet` et le code devenu mort : le paramètre `short` de `climateHtml` / `showClimate`
+  (seul `#soil-climate` s'en servait) et les règles CSS `.planet-head .climate` et
+  `#soil-zone .climate`. Le nom de la planète prend la place libre (`flex: 1 1 auto`) : les
+  boutons restent à droite, et le compteur de joueurs tient maintenant sur la même ligne en
+  375 px.
+- Ne change pas : les coefficients du climat dans les cartes de ressources (D-221), le climat dans
+  la fiche d'une planète sur la carte (`#pi-climate`), les règles du climat.
+- Alternative écartée : cacher l'élément sans le supprimer (code mort).
+- Qui : Vincent (demande) ; Claude (suppression du code mort, nom qui prend la place). Source :
+  session `d9ace210`. Statut : en vigueur. Cache `astra-p2p-v101` (v99 pour #189, v100 pour #186,
+  toutes deux fusionnées dans `main` avant cette PR ; `main` fusionné dans la branche à 08:52).
+
+**D-312 — La fiche de planète de la carte met aussi les vaisseaux au fil**
+- 2026-11-07 08:27. Demande de Vincent (via le router) : « on devrait pouvoir rajouter la
+  construction de vaisseau a la fil de construction ».
+- Constat dans le vrai jeu : l'onglet chantier de la vue planète savait déjà ajouter un lot au
+  fil (D-158) ; la fiche ouverte depuis la carte (bouton **+** de la case sous la carte, ou
+  toucher sa planète) n'appelait que `buildShips` : chantier occupé ou stock trop bas → tous
+  les boutons grisés.
+- Choix : `renderPickYard` reprend la logique de `renderYard`. Chantier libre, pas de vaisseaux
+  déjà au fil et stock suffisant → ×1 / ×5 / ×N construisent tout de suite ; sinon les boutons
+  deviennent +1 / +5 / +N et ajoutent le lot au fil (`planShips`). Le bouton **Max** au fil
+  prend ce que le stock paie au moment du toucher (1 à 50) ; à 0 il reste grisé (« Stock
+  insuffisant »). Fil plein (12) → boutons grisés avec la raison, aussi écrite dans la ligne
+  d'état (pas d'info-bulle sur téléphone). Comme dans l'onglet, la fiche compte le chantier et
+  les recherches au fil (`planAhead`) : un vaisseau dont la recherche est au fil apparaît déjà.
+  Format du fil et règles de la session inchangés.
+- Alternatives écartées : griser Max quand le lot va au fil (on perd le « autant que je peux
+  payer » qui fait l'intérêt de la fiche) ; un bouton « au fil » à part (deux boutons de plus
+  par ligne, et l'onglet ne le fait pas).
+- Qui : Vincent (demande), router (endroit), Claude (Max, ligne d'état, `planAhead`). Source :
+  session `b2e2c598`. Statut : en vigueur. Complète D-106 et D-158. Cache `astra-p2p-v102`.
+
+**D-398 — Une invitation abandonnée pendant sa préparation est fermée (jeton numéroté)**
+- 2026-11-06. Contexte : issue #70. `openInvite` attendait `createInvite()` (collecte des
+  adresses, jusqu'à 3,5 s) avant de ranger l'invitation : fermer « Inviter » pendant cette
+  attente n'annulait rien, et plusieurs ouvertures rapides laissaient des `RTCPeerConnection`
+  orphelines, même après `session.end()`.
+- Choix : chaque `openInvite` prend un jeton numéroté (`inviteTicket`), que `cancelInvite`
+  change. Si le jeton a changé à la fin de l'attente (fenêtre fermée, ou nouvelle invitation),
+  l'invitation obtenue est fermée et `openInvite` renvoie `null` ; une erreur de
+  `createInvite` survenue pendant une préparation abandonnée est ignorée (personne n'attend
+  plus ce message). `openInviteSheet` ne dessine rien quand il reçoit `null`. Une invitation
+  acceptée n'est plus dans `session.invite` : la fermer ou rouvrir ne touche pas sa connexion.
+  Cache `astra-p2p-v103` (v87 au départ, relevée au-dessus de v102 de `main` au rebase).
+- Alternatives écartées : désactiver « Fermer » tant que le QR n'est pas prêt (attente subie,
+  et rouvrir vite fuirait toujours) ; ranger la promesse en cours dans `session.invite`
+  (change le type que lit `acceptAnswer`).
+- Qui : Claude, par défaut (piste de l'issue). Source : session `6ca7574f`, issue #70.
+  Statut : en vigueur.
+- Tests : `tests/invite-open.test.mjs` (fausse `RTCPeerConnection` qui compte les connexions
+  ouvertes : 1 et 5 ouvertures/fermetures → 0 ouverte ; 3 ouvertures d'affilée → 1 ; une
+  invitation acceptée reste ouverte).
+
+**D-399 — Retirer une IA du lobby : sa fiche est marquée `left`, pas effacée**
+- 2026-11-07. Contexte : Vincent : « Dans le lobby, il faut pouvoir retirer une IA et changer sa
+  race et changer son nom. » Les copies de la partie se fusionnent fiche par fiche, la plus
+  récente gagnant, et rien ne s'efface : une fiche supprimée chez l'hôte reviendrait avec la copie
+  du premier invité qui se resynchronise.
+- Choix : avant le départ seulement, et seulement sur le téléphone qui fait jouer l'IA
+  (`editableBot`). L'IA se donne l'ordre `leave` (nouvel ordre noté au journal, donc rejoué) :
+  champ `left` = heure, `ready` et `go` retirés. Sa fiche, la plus récente, l'emporte partout ;
+  `Session.roster` (les fiches sans `left`) sert à montrer et compter les joueurs (lobby, fenêtre
+  Joueurs, choix de race, 8 places, historique, rejeu) ; `notReady` ne l'attend pas ; l'hôte
+  arrête l'IA et l'enlève de `botIds` (elle ne se réveille plus à la reprise). Dans le lobby, un
+  toucher sur la ligne de l'IA ouvre une fenêtre avec **Retirer de la partie**, sans
+  confirmation (on peut en rajouter une tout de suite).
+- Alternatives écartées : effacer la fiche (elle revient) ; une liste `gone` au niveau de la
+  partie (une fusion de plus à écrire, et le rejeu ne connaîtrait pas l'IA) ; marquer l'IA
+  « éliminée » (`out`, qui a un sens en partie et la laisserait au classement).
+- Qui : Vincent (demande), router (avant le départ seulement, seul l'hôte de l'IA), Claude par
+  défaut (fiche marquée, `roster`, sans confirmation). Source : session `f074c23b`. Statut : en
+  vigueur. Cache `astra-p2p-v104`.
+
+**D-400 — Renommer une IA et changer sa race dans le lobby ; la race reste définitive une fois la partie partie**
+- 2026-11-07. Contexte : même demande que D-399. La race était « choisie une fois, définitive »,
+  et le nom fixé à l'arrivée.
+- Choix : nouvel ordre `rename(nom)` (16 caractères, espaces autour retirés ; vide ou inchangé →
+  refusé, l'ancien nom reste) et `chooseRace` accepte un second choix **tant que la partie n'est
+  pas partie** et qu'on n'a pas de planète. La règle tient à l'état de la partie, pas au fait
+  d'être une IA : le rejeu refait les ordres sur des Sessions ordinaires. Seule la fenêtre de l'IA
+  (`#sheet-bot`, chez l'hôte qui la fait jouer, avant le départ) s'en sert ; l'écran d'un joueur
+  ne propose toujours le choix de race qu'une fois. Fenêtre : champ Nom, trois races en boutons
+  radio (dessin du choix de race), **Valider** ; un nom vide affiche « Le nom ne peut pas être
+  vide : l'IA garde le sien. ». Pas de modification en ligne dans `#pick-who` : la liste est
+  redessinée à chaque fiche reçue, un champ y perdrait ce qu'on tape.
+- Alternatives écartées : changer la race en retirant puis rajoutant l'IA (une fiche partie de
+  plus à chaque fois, et `mergeIn` limite les fiches inconnues) ; réserver le second choix aux IA
+  par `isBot` (le rejeu ne le sait pas, la fiche ne retomberait plus juste) ; modifier en ligne.
+- Qui : Vincent (demande), router (« un nom vide est refusé », style du lobby), Claude par défaut
+  (règle par l'état, fenêtre, 16 caractères). Source : session `f074c23b`. Statut : en vigueur ;
+  modifie la règle « race définitive » (regles.md §12). Cache `astra-p2p-v104`.
+## 6 novembre 2026 — Annuler le scanner à tout moment (#42)
+
+**D-250 — L'annulation du scan fait la course avec chaque attente**
+- 2026-11-06 22:27. Contexte : issue #42. `scanQr` ne posait son écouteur `abort` qu'après le
+  chargement de jsQR, `getUserMedia` et `play()`. Un « Annuler » arrivé avant était perdu : la
+  promesse ne finissait jamais, `#scanner` restait affiché, la caméra restait allumée, et un
+  second « Annuler » ne faisait rien. Numéro : D-163 à D-249 étant pris ou réservés, D-250.
+- Choix de Claude, par défaut :
+  1. Signal déjà annulé à l'appel → `AbortError` tout de suite, rien ne démarre.
+  2. L'écouteur `abort` est posé dès l'entrée ; il crée une promesse `aborted` qui rejette.
+     Chaque attente (`loadJsQR`, `getUserMedia`, `video.play`, boucle de lecture) passe par
+     `Promise.race([attente, aborted])` : le rejet arrive en quelques ms, à n'importe quelle étape.
+  3. Un flux donné par `getUserMedia` après l'annulation est éteint à son arrivée et n'est jamais
+     branché sur la vidéo.
+  4. `stop()` arrête toutes les pistes et débranche aussi la vidéo (`srcObject = null`), à
+     l'annulation comme après un QR lu ; l'écouteur est retiré à la fin.
+  5. `scan()` (`js/app.js`) annule un scan encore ouvert avant d'en ouvrir un autre, et seul le
+     scan courant cache `#scanner` dans son `finally`.
+- Alternatives écartées : vérifier `signal.aborted` après chaque `await` sans course (le rejet
+  attendrait la fin de la boîte d'autorisation, qui peut durer longtemps sur téléphone) ;
+  annuler la demande `getUserMedia` elle-même (impossible : l'API n'a pas de signal).
+- Sans effet sur #86 (chargement de jsQR raté qui reste raté) : `loadJsQR` n'est pas touché ; une
+  annulation pendant le chargement laisse ce chargement finir et servir au scan suivant.
+- Cache `sw.js` : `astra-p2p-v87`, puis `astra-p2p-v97` au rebase sur la PR #169 (v96), puis
+  `astra-p2p-v105` à la fusion de `main` (#169 et #192 mergées, v104 ; voir D-411).
+- Vérifié : `tests/scanner.test.mjs` (caméra simulée, annulation à 100 ms, 1 s, au démarrage de la
+  vidéo et pendant la lecture ; 4 tests sur 7 restent bloqués sans la correction ; tests simples et
+  non scénarios filmés, car il n'y a ni partie ni carte à montrer) ; vrai Chrome sur
+  la vraie appli (Rejoindre → Scanner → Annuler à 100 ms, 1 s, 3 s ; scan normal d'un QR filmé).
+- Qui : Vincent (demande : corriger #42), Claude (forme de la correction). Source : session
+  `b919ce58`. Statut : en vigueur.
+
+## 7 novembre 2026 — Mise à jour des PR en conflit
+
+**D-410 — Une PR en conflit se met à jour par rebase, pas par merge de `main`** (remplacée par D-411)
+- 2026-11-07 07:50. Contexte : plusieurs PR ouvertes en même temps touchent les mêmes fichiers de
+  doc et `sw.js` ; jusqu'ici, chaque worker fusionnait `main` dans sa branche (merge, sans
+  force-push).
+- Choix : mise à jour des PR en conflit : rebase sur `main` (ou sur la branche de la PR qui sera
+  mergée juste avant), puis `git push --force-with-lease`, à la place du merge de `main`.
+- Alternative écartée : merge de `main` dans la branche (historique chargé de commits de fusion).
+- Qui : Vincent, tranché le 2026-11-07 (« rebase les PR systematiquement quand elle ont des
+  conflits »), transmis par la session de coordination. Source : session `b919ce58`, PR #170.
+  Statut : remplacée par D-411 (le force-push après rebase est bloqué par les permissions).
+  Remplaçait, pour les PR en conflit, la consigne de merge donnée aux workers.
+
+**D-411 — Retour au merge de `main` quand le force-push après rebase est bloqué ; 14 PR mises en chaîne**
+- 2026-11-07 21:38. Contexte : 14 PR de l'audit du 2026-11-05 (#170 à #187) sont toutes en
+  conflit avec `main` (v104) : elles changent toutes `VERSION` de `sw.js` et la doc. Vincent :
+  « prend les PR encore ouvert une par une, rebase et merge les toutes ». Le mode auto refuse
+  `git push --force-with-lease` (motif « Git Destructive »), essayé encore une fois ici sur
+  `claude/scanner-annuler-42` : refusé. Le rebase de D-410 ne peut donc pas être poussé.
+- Choix : retour au merge de `main` (`git merge`, puis `git push` normal, refspec explicite).
+  Les 14 PR sont mises en **chaîne**, dans l'ordre #170, #171, #172, #173, #174, #175, #176,
+  #177, #180, #182, #183, #184, #185, #187 : chaque branche fusionne la branche à jour de la
+  précédente (#170 fusionne `origin/main`). Ainsi, chaque PR reste sans conflit après le merge
+  de la précédente. Conflits : les deux côtés gardés ; `VERSION` = celle de la tête de la
+  chaîne + 1 (v105 pour #170, puis un cran par PR) ; un numéro D-xxx déjà pris est renuméroté
+  (D-240 à D-242 de #171 → D-412 à D-414 ; D-240 de #172 → D-415 ; D-400 de #185 → D-416).
+  La D-300 de #170 était la décision de #169, déjà dans `main` sous le numéro D-398 : enlevée.
+- Alternatives écartées : rebase avec force-push (refusé par les permissions, pas contourné) ;
+  fusionner `main` dans chaque PR séparément (les PR resteraient en conflit entre elles).
+- Qui : Vincent, tranché le 2026-11-07 (retour au merge quand le force-push est bloqué) ; chaîne
+  et ordre décidés par la session de coordination. Source : worker `worker-merger`
+  (session `996daf2e`), PR #170. Statut : en vigueur. Remplace D-410.
+## 6 novembre 2026 — mémoire pleine (#41)
+
+Numérotée D-240 au départ (D-163 à D-239 pris ou réservés par les autres PR en cours) ; D-240 étant
+prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fusion de `main` (D-411).
+
+**D-415 — Une clé par partie ; mémoire pleine : les plus vieilles parties laissent la place**
+- 2026-11-06 22:28 UTC. Contexte : issue #41. `saveGame` écrivait `astra.save` (partie en cours)
+  puis `astra.saves` (tout l'historique, partie en cours comprise : stockée deux fois), et
+  `write()` avalait `QuotaExceededError`. Quand l'historique remplissait les ≈ 5 M caractères du
+  `localStorage`, la partie en cours n'était plus sauvée, sans message, et chaque nouvelle partie
+  faisait disparaître la précédente. La demande (router) : la partie en cours n'est jamais perdue ;
+  manque de place → retirer les plus anciennes jusqu'à ce que l'écriture passe ; la partie en
+  cours stockée une fois ; un message si la sauvegarde échoue malgré tout.
+- Choix de Claude :
+  1. **Format** : `astra.save` garde la partie en cours, elle seule (même forme qu'avant : rien ne
+     change pour `loadGame`, `replay.html`) ; chaque partie de l'historique a sa clé
+     `astra.save.<gid>` ; un petit index `astra.games` `{ gid: savedAt }` donne l'ordre sans lire
+     les parties (le faux `localStorage` des tests ne sait pas énumérer ses clés). 10 parties au
+     plus, partie en cours comprise (D-066 inchangé).
+  2. **Écritures** : une action n'écrit que `astra.save`. L'historique ne change qu'au changement
+     de partie (nouvelle partie, partie rejointe, reprise depuis l'accueil) : la nouvelle partie
+     est écrite d'abord, puis l'ancienne est rangée dans sa clé.
+  3. **Mémoire pleine** : sur `QuotaExceededError` (ou ses variantes Safari, ancien Firefox), on
+     retire la plus ancienne partie de l'historique, jamais la partie en cours, et on réessaie,
+     jusqu'à ce que ça passe. En reprenant une partie de l'historique, sa propre copie là-bas part
+     la première (sinon, pendant un instant, la partie serait comptée deux fois et une autre
+     partie serait retirée pour rien). Si même l'historique vide ne suffit pas, les parties retirées sont
+     remises (elles tenaient avant) : on ne perd rien pour rien. Une autre erreur (stockage bloqué)
+     ne retire rien.
+  4. **Message** : si la partie en cours n'a pas pu être sauvée, toast « Sauvegarde impossible : la
+     mémoire du téléphone est pleine. La partie continue, mais elle ne sera pas gardée si tu
+     fermes l'appli. » (8 s), au plus une fois par minute tant que ça dure. `save.js` ne connaît
+     pas l'écran : `app.js` s'abonne par `onSaveFailed` (rien à changer dans `session.js`). Une
+     partie retirée de l'historique pour faire de la place ne donne pas de message (c'est le
+     comportement demandé). Appli cachée (sauvegarde à `pagehide`) : pas de toast possible, la
+     minute n'est pas comptée, le prochain échec préviendra.
+  5. **Reprise de l'ancien format** (`migrate`, au premier accès) : `astra.saves` est lu en
+     mémoire, effacé d'abord, puis chaque partie valide reçoit sa clé, la plus récente d'abord ;
+     la copie de la partie en cours n'est pas recopiée (gardée si elle est plus récente que
+     `astra.save`). Effacer d'abord : recopier 5 M à côté de 5 M ne tiendrait pas. Le risque
+     (fermeture entre l'effacement et la recopie) est nul en pratique : c'est du JS synchrone.
+- Alternatives écartées : garder `astra.saves` sans la partie en cours (simple, mais chaque
+  retrait réécrit tout le bloc, et un seul bloc abîmé touche toutes les parties) ; compresser
+  les parties (repousse la limite sans la supprimer) ; IndexedDB (asynchrone, change tout le
+  code qui sauvegarde) ; un message à chaque partie retirée (bruit, alors que c'est voulu).
+- Effet de bord : règle aussi #91 (« chaque action réécrit tout l'historique ») : avec 9 parties
+  de 450 K en historique, une action écrit 450 140 car. au lieu de 4 951 504 (Node) ;
+  `saveGame` prend 0,5 à 0,9 ms au lieu de 8,6 à 10,9 ms (Chromium, Mac, 10 parties de 451 K).
+  Scénario « D-415 (#91) » : un vrai ordre écrit moins de 1,2 × la taille de la partie en cours.
+  Non mesuré sur téléphone. La PR ferme donc aussi #91.
+- Reprise de l'ancien format qui échoue (une partie ne peut pas être recopiée, alors que
+  `astra.saves` est déjà effacé) : on essaie quand même les suivantes, et le joueur est prévenu
+  (`onSaveFailed('history', n)`, toast « Mémoire du téléphone pleine : n ancienne(s) partie(s)
+  n'a/ont pas pu être gardée(s). »). Demandé par le router à la vérification.
+- Limites : les identités des parties retirées restent dans `astra.identities` (quelques dizaines
+  de caractères chacune) ; une partie en cours plus grosse que toute la mémoire n'est pas sauvée
+  (message).
+- Cache : `sw.js` passe à `astra-p2p-v87` (v86 est dans `main`), puis `astra-p2p-v106` à la fusion
+  de `main` (v105, D-411).
+- Vérifié : 5 scénarios D-415 (`tests/decisions-reseau.test.mjs`, quota simulé de 5 242 880
+  car. qui lève `QuotaExceededError`) : 6 parties de 1 M jouées l'une après l'autre ; échec forcé
+  (mémoire et stockage bloqué) ; reprise d'une partie de 1,2 M à mémoire presque pleine (aucune
+  autre partie perdue ; échoue sans la correction) ; reprise de l'ancien format (petites parties, et 3 parties de 1,25 M
+  qui remplissent la mémoire, et une partie refusée : prévenu) ; un ordre avec 10 parties en historique
+  n'écrit que la partie en cours (#91). Scénario D-170 adapté. Vrai jeu dans Chromium : reprise de
+  l'ancien format (4 parties de 1,2 M), retrait de la plus vieille en reprenant une partie
+  (quota simulé dans la page : ce navigateur accepte ≈ 26 M), toast quand l'écriture est refusée.
+- Qui : Vincent (demande, par le router : corriger #41), Claude (méthode). Source : session
+  `ae22884b`. Statut : en vigueur. Modifie D-066 et D-170.
+**D-260 — Le lien d'invitation dit de quelle partie il vient ; l'invité n'envoie que son identité de celle-là**
+- 2026-11-06 22:35. Contexte : issue #43. Le `hello` d'un invité portait toujours `astra.identity`,
+  c'est-à-dire la **dernière partie ouverte** (même par « Revoir »). Revenir dans la partie A par une
+  invitation, après avoir joué ou revu une partie B, faisait entrer un nouveau joueur dans A (nouveau
+  pid, ancienne fiche orpheline) et envoyait **le secret de B** à l'hôte de A. Puis `onWelcome`
+  écrasait `astra.identities[A]`. Numéro : D-163 à D-259 étant pris ou réservés par d'autres PR,
+  cette PR prend D-260.
+- Choix de Claude : piste « mettre le `gid` dans l'invitation », mais **dans le lien**, pas dans le
+  code. `inviteLink(code, gid)` (`js/invite.js`) donne `…/?g=<gid>#o2.<code>` ; `inviteGid(texte)`
+  le relit. `session.answer` garde ce `gid` ; `onFirstLink` envoie alors `identityFor(gid)` et la
+  copie `savedGame(gid)` (`js/save.js`), ou rien si je n'ai pas de fiche dans cette partie. Le secret
+  et la copie d'une autre partie que celle nommée par le lien ne partent pas (voir la limite plus bas). `onWelcome` lit lui aussi l'identité et la copie
+  **de la partie reçue**, plus celles de la dernière ouverte : `identities[A]` garde mon secret.
+  `boot()` (`js/app.js`) passe `?g=…#code` à l'écran « rejoindre ». Le lien copié, partagé, ou
+  dans le QR porte `?g=`.
+- Pourquoi pas le code lui-même (version `o3`) : `decode` refuse un autre numéro de version, donc un
+  ancien téléphone ne pourrait plus lire l'invitation. Un ancien téléphone lit seulement ce qui suit
+  le `#` : le `?g=` ne le gêne pas, le code ne change pas.
+- Pourquoi pas « envoyer seulement les `gid` + `pid`, le secret ensuite » : un hôte d'une ancienne
+  version fait entrer le joueur dès le premier `hello` (pas de deuxième échange possible). Tout
+  retour vers un ancien hôte serait devenu un nouveau joueur. Et l'invité donnait à l'hôte la liste
+  de toutes ses parties.
+- Ancien lien ou code seul (sans `?g=`) : **inchangé**, l'invité envoie l'identité de la dernière
+  partie ouverte, comme avant. Cela garde le retour qui marchait (A ouverte en dernier, lien d'un
+  ancien hôte). Limite connue : dans ce cas seulement, si la dernière partie ouverte n'est pas
+  celle de l'hôte, son secret part encore chez lui (comportement d'avant). Ce cas disparaît quand
+  les hôtes ont la nouvelle version.
+- Hôte : `onHello` ne change pas. Ancien invité (avec ou sans identité) : comme avant.
+- Vérifié : `tests/invitation.test.mjs` (6 scénarios, deux vraies `Session` reliées par de faux
+  liens, lecture de tout ce que l'invité envoie) ; 3 échouent sans la correction. Vrai jeu, deux
+  onglets (`localhost` et `127.0.0.1`, WebRTC réel) : A, puis une partie contre l'IA (B), puis
+  nouvelle invitation de A → même pid, 2 joueurs, ni le secret ni le `gid` de B dans les messages.
+- Limite connue : l'invité fait confiance au `gid` écrit dans le lien. Un hôte qui joue aussi dans
+  B (donc connaît le `gid` de B) pourrait écrire `?g=<gid de B>` et recevoir mon secret de B. Avant,
+  **tout** hôte recevait le secret de la dernière partie ouverte, sans condition. Même limite pour
+  la piste `o3`.
+- Non traité : un hôte qui ne reconnaît pas le pid (fiche perdue, ancien hôte) donne un nouveau pid,
+  et `onWelcome` remplace alors l'identité gardée de cette partie (comme avant).
+- Qui : Vincent (demande : corriger #43, sans jamais envoyer le secret d'une autre partie, ancien
+  téléphone et ancien code compatibles), Claude (choix de la piste). Source : session `3a0e3d4e`.
+  Statut : en vigueur. Complète D-066.
+- Fusion de `main` (2026-11-07, D-411) : `savedGame(gid)` suit le format de D-415 (partie en cours
+  dans `astra.save`, les autres dans `astra.save.<gid>`) au lieu de l'ancien bloc `astra.saves` ;
+  `onWelcome` garde aussi `loadClock()` de D-165 ; le lien gardé pour « Rejoindre » (#69) garde
+  son `?g=`. Cache `astra-p2p-v107`.
+
+**D-340 — Mini-graphes des tuiles : un historique par planète (#71)**
+- 2026-11-06. Contexte : issue #71. Les mini-graphes des tuiles n'avaient qu'un historique pour
+  toutes les planètes (clé `partie|joueur|planète ouverte`). En ouvrant une colonie, l'historique
+  repartait de zéro, et `drawSparks` sautait les tuiles à moins de 2 relevés : la colonie montrait
+  la courbe de la planète mère pendant ~5 s. Au retour, la mère avait perdu ses relevés.
+- Choix : `localStorage['astra.hist']` garde `{ id: 'partie|joueur', p: { clé de planète: { t, v } } }`.
+  Chaque planète a sa série et ses 10 dernières minutes ; un relevé (toutes les 5 s) ne touche que
+  la planète ouverte. Avec moins de 2 relevés, le tracé de la tuile est vidé (`d=""`). La logique
+  est dans un petit module pur, `js/spark.js` (`ownHistory`, `addSample`, `sparkPath`), pour la
+  tester en Node ; `app.js` garde `sampleHistory`/`drawSparks` (DOM et localStorage). L'ancien
+  format (un seul historique) n'est pas repris : on repart d'un historique vide.
+- Alternatives écartées : vider l'historique à chaque changement de planète (perd la mère) ;
+  relever aussi depuis la carte toutes les planètes (pas demandé, plus de travail à chaque image).
+- Qui : Claude, par défaut (la piste de l'issue). Source : session `4fc11ee6`. Statut : en vigueur.
+- Tests : `tests/spark.test.mjs` (5 tests : mère → colonie → mère, moins de 2 relevés, un relevé
+  toutes les 5 s par planète, 10 minutes par planète, ancien format). Vu dans le vrai jeu.
+
+**D-341 — Cache `astra-p2p-v89`, puis `astra-p2p-v108`**
+- 2026-11-06. Contexte : v88 est pris dans `main` (D-165, D-166).
+- Choix : `VERSION` passe à `astra-p2p-v89`, et `js/spark.js` entre dans la liste du cache. Si une
+  autre PR prend v89 avant, monter au numéro suivant. À la fusion de `main` (2026-11-07, v107,
+  D-411) : `astra-p2p-v108`.
+- Qui : Claude, par défaut. Source : session `4fc11ee6`. Statut : en vigueur.
+
+**D-192 — Échap ferme la fenêtre du dessus : la dernière visible dans l'ordre du HTML**
+- 2026-11-06. Contexte : issue #72. Échap prenait la première fenêtre visible du HTML
+  (`find`) ; la fiche de planète est la première de la page, donc avec le journal ouvert par-dessus,
+  Échap fermait la fiche cachée dessous et laissait le journal.
+- Choix : prendre la dernière visible (`findLast`). Toutes les fenêtres ont le même `z-index` (20)
+  et aucun parent ne crée de contexte d'empilement : celle qui se voit devant est donc toujours la
+  dernière du HTML. Un deuxième Échap ferme la suivante.
+- Alternatives écartées : une pile dans l'ordre d'ouverture. Elle peut contredire l'écran : une
+  fenêtre plus haut dans le HTML, ouverte après une autre (par exemple « Fin de partie » ouverte
+  pendant que le journal est affiché), s'affiche **sous** elle ; la pile fermerait alors celle
+  qu'on ne voit pas. Remettre chaque fenêtre devant à son ouverture (`z-index` croissant) changerait
+  l'affichage, hors du sujet de #72.
+- Hors sujet, noté : le menu d'ordres de la carte a son propre Échap (`closeMenu`) ; s'il est
+  ouvert en même temps qu'une fenêtre, un seul Échap ferme les deux (comme avant). Le focus qui
+  reste derrière les fenêtres (#148) n'est pas touché.
+- Qui : Claude, par défaut (worker de la session « Regarde les issues du projet »). Source :
+  session `a4571475`. Statut : en vigueur. Tests : `tests/escape.test.mjs` ; vu dans le vrai jeu.
+- Fusion de `main` (2026-11-07, D-411) : D-302 a donné un `z-index` à `.sheet-head` (en-tête collé
+  dans la fenêtre) ; le test ne compte plus que la règle `.sheet` elle-même (`.sheet(?![\w-])`), la
+  règle tient toujours (un seul `z-index` pour les fenêtres).
+
+**D-193 — Cache `astra-p2p-v89`, puis `astra-p2p-v109`**
+- 2026-11-06. Contexte : `main` est à v88 (D-165, D-166).
+- Choix : `VERSION` passe à `astra-p2p-v89` pour que les téléphones prennent le nouveau `app.js`
+  (D-192). Si une autre PR prend v89 avant, monter au numéro suivant. À la fusion de `main`
+  (2026-11-07, v108, D-411) : `astra-p2p-v109`.
+- Qui : Claude, par défaut. Source : session `a4571475`. Statut : en vigueur.
+**D-270 — Fil : un élément qu'on ne pourra pas payer ne bloque plus les autres (#46)**
+- 2026-11-06. Contexte : issue #46. Le premier élément prêt du fil a la priorité sur le stock
+  (D-158). En famine (nourriture à 0, tout ce qui rentre est mangé) ou en panne d'énergie, un
+  élément dont le prix demande cette ressource ne pouvait jamais partir, et il bloquait pour
+  toujours les éléments des autres chantiers (et ceux du sien), avec « plus de 6 h » et aucune
+  raison. Exemple : Agronomie (40 nourriture) au fil devant une ferme (75 minéraux) ; chez les
+  machines, un nexus (60 énergie) devant le réacteur qui réparerait la panne.
+- Choix : un élément prêt est « sans revenu » (`starved`, `js/game.js`) quand une ressource de
+  son prix manque au stock et ne peut pas monter avec la production actuelle : solde ≤ 0, ou
+  demande pas couverte (`effF < 1` pour la nourriture, `effE < 1` pour l'énergie). Un tel
+  élément ne bloque personne, **pas même son propre chantier**, mais reste candidat : `planNext`
+  rend la liste de ces éléments, suivie du premier élément prêt payable un jour ; `until` avance
+  pas à pas (mêmes pas, `MAX_STEPS` gardé) et lance le premier de la liste que le stock couvre.
+  Si la ressource se remet à rentrer, il repasse donc devant ceux qui le suivent. `planForecast`
+  donne sa raison (« Pas de nourriture qui rentre », « Pas d’énergie qui rentre », « Pas de
+  minéraux qui rentrent »), déjà affichée par `js/app.js`.
+- Sans famine ni panne, la liste n'a qu'un élément : le calcul est exactement celui d'avant.
+  Comparaison sur 3 000 planètes tirées au hasard (ancien et nouveau `game.js`) : 2 923
+  identiques ; les 77 autres ont toutes un élément sans revenu (stock à 0 ou qui baisse), qui
+  bloquait le fil pour toujours avant. Calcul déterministe (même état, mêmes pas) : identique
+  sur tous les téléphones et au rejeu.
+- Alternatives écartées : en faire un prérequis manquant (`why`) qui garde l'ordre de son
+  chantier (le réacteur resterait bloqué derrière le nexus, cas de l'issue) ; l'écarter tout à
+  fait jusqu'au prochain événement (il ne repartirait pas tout seul si la ressource revient
+  pendant une longue attente) ; dans `stateAt`, essayer l'élément suivant quand `until` échoue
+  à l'horizon (l'horizon n'est que le prochain événement : « pas encore » et « jamais » se
+  confondent, et il faudrait refaire avancer le temps deux fois).
+- Limite connue : « sans revenu » se juge sur la production à l'instant de chaque événement.
+  Un élément sans revenu pendant qu'un bâtiment qui la réparera est en chantier laisse passer
+  les suivants, qui peuvent prendre le stock avant lui. Ne règle pas #50 (« Entrepôt trop
+  petit » bloque toujours les suivants de son chantier, sans raison pour eux).
+- Qui : **choix de Claude** (le ticket laissait la méthode libre). Source : session `259a9124`,
+  issue #46. Statut : en vigueur.
+- Tests : `tests/plan.test.mjs` (famine : la ferme part, Agronomie reste au fil ; l'estimation
+  dit « Pas de nourriture qui rentre » ; panne machines : le réacteur part derrière un nexus ;
+  panne aliens : le prisme part derrière un amplificateur ; le nexus repasse devant dès que
+  l'énergie rentre).
+
+**D-271 — Cache `astra-p2p-v87`, puis `astra-p2p-v110`**
+- 2026-11-06. Contexte : v86 est pris (PR #160, dans `main`).
+- Choix : `VERSION` passe à `astra-p2p-v87` pour que les téléphones prennent le nouveau
+  `game.js`. D'autres PR ouvertes en même temps peuvent viser le même numéro (non confirmé) :
+  à la fusion, garder une version plus grande que celle de `main`. À la fusion de `main`
+  (2026-11-07, v109, D-411) : `astra-p2p-v110`.
+- Qui : Claude, par défaut. Source : session `259a9124`. Statut : en vigueur.
+**D-350 — La fenêtre Scinder / Donner suit sa flotte**
+- 2026-11-06 22:45. Contexte : issue #73. La fenêtre « Scinder » / « Donner » était remplie une
+  fois, à l'ouverture. Si la flotte disparaissait pendant qu'elle était ouverte (combat, fusion,
+  élimination), la fenêtre restait, et son bouton ne faisait rien, sans message (`splitFleet`
+  renvoyait `false` avant tout `refuse`). Après une jonction (D-159), `selFleet` passait à la
+  flotte absorbante : le bouton aurait agi sur une autre flotte que celle affichée.
+- Choix : la fenêtre garde l'identifiant de la flotte pour laquelle elle a été ouverte
+  (`moveSheet.from`, `js/app.js`) et n'agit que sur elle, jamais sur `selFleet`. À chaque
+  rafraîchissement (`refreshMoveSheet`, appelé par `renderFleetInfo`, 5 fois par seconde), si
+  cette flotte, ou celle qui reçoit pour « Donner », n'existe plus, la fenêtre se ferme avec le
+  message « Cette flotte n'existe plus. ». `splitFleet` refuse une flotte inconnue avec
+  « Flotte introuvable. » (`transferFleet` le faisait déjà, par `pairOf`).
+- Même idée pour la vue d'une colonie (4e critère de #73, demandé par le router) : si la colonie
+  affichée n'est plus à moi, `renderPlanet` revient sur la planète mère, comme avant, mais dit
+  d'abord « Tu as perdu ta colonie X : retour à ta planète mère. » (X : le nom affiché au
+  rafraîchissement d'avant, `openName`). Seulement si la vue planète est à l'écran : depuis la
+  carte, le retour reste silencieux (rien ne change à l'écran).
+- Alternatives écartées : garder la fenêtre ouverte avec un message dedans (un bouton qui ne
+  peut plus rien faire reste à l'écran) ; suivre la flotte absorbante comme la fiche de flotte
+  (la fenêtre parlerait d'une flotte, et agirait sur une autre).
+- Qui : Claude, par défaut (textes des messages, fermeture plutôt que message dans la fenêtre) ;
+  router (colonie perdue incluse dans la PR). Source : session `c88abd15`, issue #73. Statut : en vigueur.
+- Tests : `tests/fleet.test.mjs`, scénario « flotte détruite au combat pendant « Scinder » ou
+  « Donner » … ». Fermeture de la fenêtre et message de la colonie : vérifiés dans le vrai jeu
+  (pas de DOM sous Node).
+
+**D-351 — Cache `astra-p2p-v90`, puis `astra-p2p-v111`**
+- 2026-11-06. Contexte : v89 (PR #166) est dans `main`.
+- Choix : `VERSION` passe à `astra-p2p-v90` pour que les téléphones prennent les nouveaux
+  `app.js` et `session.js`. À la fusion de `main` (2026-11-07, v110, D-411) : `astra-p2p-v111`.
+- Qui : Claude, par défaut. Source : session `c88abd15`. Statut : en vigueur.
 **D-280 — L'IA ne lance pas une 2e conquête vers une planète déjà visée : les renforts rejoignent la flotte en route**
 - 2026-11-06. Contexte : issue #47. `attack()` (`js/bot.js`) ne regardait pas ses propres flottes
   en vol : chaque chasseur sorti du chantier partait seul, 3 s après le précédent, vers la même
@@ -2149,7 +3141,8 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
   rejoignent la flotte en route » ; partie de 2 IA machines jusqu'au bout sans deux conquêtes
   vers la même planète).
 
-**D-281 — Cache `astra-p2p-v92`**
+**D-281 — Cache `astra-p2p-v92`, puis `astra-p2p-v112`**
 - 2026-11-06. Contexte : v86 est dans `main` ; v87 à v91 sont pris par des PR ouvertes.
 - Choix : `VERSION` passe à `astra-p2p-v92` pour que les téléphones prennent le nouveau `bot.js`.
+  À la fusion de `main` (2026-11-07, v111, D-411) : `astra-p2p-v112`.
 - Qui : Claude, par défaut. Source : session `9ae32aeb`. Statut : en vigueur.
