@@ -2975,3 +2975,27 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   dans `astra.save`, les autres dans `astra.save.<gid>`) au lieu de l'ancien bloc `astra.saves` ;
   `onWelcome` garde aussi `loadClock()` de D-165 ; le lien gardé pour « Rejoindre » (#69) garde
   son `?g=`. Cache `astra-p2p-v107`.
+
+**D-340 — Mini-graphes des tuiles : un historique par planète (#71)**
+- 2026-11-06. Contexte : issue #71. Les mini-graphes des tuiles n'avaient qu'un historique pour
+  toutes les planètes (clé `partie|joueur|planète ouverte`). En ouvrant une colonie, l'historique
+  repartait de zéro, et `drawSparks` sautait les tuiles à moins de 2 relevés : la colonie montrait
+  la courbe de la planète mère pendant ~5 s. Au retour, la mère avait perdu ses relevés.
+- Choix : `localStorage['astra.hist']` garde `{ id: 'partie|joueur', p: { clé de planète: { t, v } } }`.
+  Chaque planète a sa série et ses 10 dernières minutes ; un relevé (toutes les 5 s) ne touche que
+  la planète ouverte. Avec moins de 2 relevés, le tracé de la tuile est vidé (`d=""`). La logique
+  est dans un petit module pur, `js/spark.js` (`ownHistory`, `addSample`, `sparkPath`), pour la
+  tester en Node ; `app.js` garde `sampleHistory`/`drawSparks` (DOM et localStorage). L'ancien
+  format (un seul historique) n'est pas repris : on repart d'un historique vide.
+- Alternatives écartées : vider l'historique à chaque changement de planète (perd la mère) ;
+  relever aussi depuis la carte toutes les planètes (pas demandé, plus de travail à chaque image).
+- Qui : Claude, par défaut (la piste de l'issue). Source : session `4fc11ee6`. Statut : en vigueur.
+- Tests : `tests/spark.test.mjs` (5 tests : mère → colonie → mère, moins de 2 relevés, un relevé
+  toutes les 5 s par planète, 10 minutes par planète, ancien format). Vu dans le vrai jeu.
+
+**D-341 — Cache `astra-p2p-v89`, puis `astra-p2p-v108`**
+- 2026-11-06. Contexte : v88 est pris dans `main` (D-165, D-166).
+- Choix : `VERSION` passe à `astra-p2p-v89`, et `js/spark.js` entre dans la liste du cache. Si une
+  autre PR prend v89 avant, monter au numéro suivant. À la fusion de `main` (2026-11-07, v107,
+  D-411) : `astra-p2p-v108`.
+- Qui : Claude, par défaut. Source : session `4fc11ee6`. Statut : en vigueur.
