@@ -3103,6 +3103,49 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - Choix : `VERSION` passe à `astra-p2p-v90` pour que les téléphones prennent les nouveaux
   `app.js` et `session.js`. À la fusion de `main` (2026-11-07, v110, D-411) : `astra-p2p-v111`.
 - Qui : Claude, par défaut. Source : session `c88abd15`. Statut : en vigueur.
+**D-280 — L'IA ne lance pas une 2e conquête vers une planète déjà visée : les renforts rejoignent la flotte en route**
+- 2026-11-06. Contexte : issue #47. `attack()` (`js/bot.js`) ne regardait pas ses propres flottes
+  en vol : chaque chasseur sorti du chantier partait seul, 3 s après le précédent, vers la même
+  planète. Ces flottes arrivaient après la prise et « reprenaient » la colonie que la 1re venait
+  de prendre (bug de re-conquête de `session.js`, code-fin-08), et les deux IA s'affaiblissaient
+  toutes seules. Numéro : D-163 à D-279 étant pris ou réservés par d'autres PR, cette PR prend
+  D-280 (et D-281 pour le cache).
+- Choix de Claude :
+  1. **Jamais deux conquêtes de la même planète en même temps** : `attack()` liste ses flottes
+     dont l'ordre est `conquer` (`aimedTargets`, clé « joueur:planète »). Une cible de cette
+     liste n'est plus visée en `conquer`.
+  2. **Les renforts vont en `join`** : si la meilleure cible des vaisseaux posés est déjà visée,
+     ils décollent et rejoignent la flotte en route (`joinFleet`, D-159), si le carburant suffit
+     et s'ils **arrivent après elle** (`canJoin`). Arrivés avant, la fusion (`merge`) effacerait
+     l'ordre de conquête de la 1re flotte et la planète ne serait pas attaquée. Sinon, ils visent
+     la cible suivante, ou restent posés (et grossissent avec les suivants : ils partiront
+     groupés). Après la prise, le renfort ne trouve plus la flotte : il reste en orbite, puis se
+     pose sur la planète la plus proche (`dockNearest`), souvent celle qui vient d'être prise.
+- Alternatives écartées : seulement retirer les cibles visées (la piste de base de l'issue) :
+  les chasseurs restaient posés ou partaient vers une 2e cible plus faible, sans aider la 1re
+  flotte ; attendre d'avoir un nombre minimal de vaisseaux avant d'attaquer : change le rythme de
+  l'IA bien plus que le bug ne le demande.
+- Mesures (20 parties IA contre IA, mêmes graines avant/après, script de mesure local de la
+  session) : toutes les parties finissent par un gagnant avant et après. Trois IA (humain,
+  machine, alien) : machine gagne 9 fois sur 10 avant, 10 sur 10 après (l'humain gagnait 1
+  fois) ; durée moyenne 28 → 26 min ; ordres `conquer` 1 238 → 639. Deux IA machines : 10/10
+  avant et après ; 28 → 27 min ; `conquer` 1 684 → 750. Moments où une IA a deux flottes
+  `conquer` vers la même planète : 1 633 → 0 et 2 357 → 0. Les machines gagnent donc un peu
+  plus souvent à trois IA (9/10 → 10/10) : à suivre avec l'issue d'équilibrage #56.
+- Limites : la file de vaisseaux posés ne tient pas compte d'une flotte de conquête partie
+  d'une **autre** de mes planètes vers une cible plus lointaine ; non confirmé face à un vrai
+  joueur.
+- Qui : Claude, par défaut (le ticket laissait le choix). Source : session `9ae32aeb`, issue #47.
+  Statut : en vigueur.
+- Tests : `tests/bot.test.mjs` (scénario « des vaisseaux sortis après le départ d'une conquête
+  rejoignent la flotte en route » ; partie de 2 IA machines jusqu'au bout sans deux conquêtes
+  vers la même planète).
+
+**D-281 — Cache `astra-p2p-v92`, puis `astra-p2p-v112`**
+- 2026-11-06. Contexte : v86 est dans `main` ; v87 à v91 sont pris par des PR ouvertes.
+- Choix : `VERSION` passe à `astra-p2p-v92` pour que les téléphones prennent le nouveau `bot.js`.
+  À la fusion de `main` (2026-11-07, v111, D-411) : `astra-p2p-v112`.
+- Qui : Claude, par défaut. Source : session `9ae32aeb`. Statut : en vigueur.
 
 **D-417 — « Retour » pendant une partie en cours : une question avant de quitter**
 - 2026-11-07. Contexte : Vincent : « je veux que quand on fait back, avant de quitter une partie
@@ -3130,4 +3173,4 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   lobby (la tâche l'exclut).
 - Qui : Vincent (demande), router (pas d'alerte au lobby ni à la fin, fenêtre `.sheet`
   préférée), Claude par défaut (fenêtre fermée d'abord, 2ᵉ retour = quitter, accueil quand rien
-  avant). Source : session `3e243082`. Statut : en vigueur. Cache `astra-p2p-v112` (v107, v109, v111, puis v112 à la 4ᵉ fusion de `main`, v111). Numérotée D-401 au départ ; D-412 à D-416 étant pris ou réservés par la chaîne de D-411, renumérotée D-417 à la fusion de `main`.
+  avant). Source : session `3e243082`. Statut : en vigueur. Cache `astra-p2p-v113` (v107, v109, v111, v112, puis v113 à la 5ᵉ fusion de `main`, v112). Numérotée D-401 au départ ; D-412 à D-416 étant pris ou réservés par la chaîne de D-411, renumérotée D-417 à la fusion de `main`.
