@@ -2597,6 +2597,19 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
  * quai, chantier en cours, boutons Construire et Décoller) et une par flotte, pour la
  * sélectionner sans la chercher.
  */
+// Jauges de stock dans les cases de mes planètes, sous la carte (D-303) : sans chiffre.
+const GAUGE_NAMES = { minerals: 'Minéraux', food: 'Nourriture', energy: 'Énergie', pop: 'Habitants' };
+const fill = (v, cap) => Math.max(0, Math.min(1, v / Math.max(1, cap)));
+/** Une jauge par ressource de la race, puis les habitants (plafond : les logements), s'il y en a. */
+function stockFill(race, s) {
+  const R = RACES[race];
+  const out = R.resources.map((res) => ({ res, k: fill(s.stock[res] || 0, s.prod.caps[res]) }));
+  if (R.pop) out.push({ res: 'pop', k: fill(s.pop, s.prod.popCap) });
+  return out;
+}
+/** Le remplissage en mots, pour les lecteurs d'écran : jamais de chiffre exact. */
+const fillWord = (k) => (k <= 0.02 ? 'vide' : k < 0.25 ? 'presque vide' : k < 0.75 ? 'à moitié' : k < 0.98 ? 'presque plein' : 'plein');
+
 function renderMapFleets(me = session?.state?.players[session.me], now = session?.now()) {
   const box = $('map-fleets');
   const fleets = me?.fleets || [];
@@ -2626,8 +2639,13 @@ function renderMapFleets(me = session?.state?.players[session.me], now = session
       const go = docked
         ? `<button class="secondary small icon-only" data-mp-go="${esc(pl.key)}" title="Faire décoller des vaisseaux ${esc(de(pl.name))}" aria-label="Faire décoller des vaisseaux ${esc(de(pl.name))}">${ic('fleet')}</button>`
         : '';
+      // Jauges : une barre par stock ; leur largeur et leur texte se mettent à jour en place (plus bas).
+      const gauges = stockFill(me.race, s)
+        .map((g) => `<i class="mp-g" data-g="${g.res}" style="--c: var(--${g.res})"><b></b></i>`)
+        .join('');
       return `<div class="mf mp" role="group" aria-label="${esc(pl.name)}" data-planet="${esc(pl.key)}">
         <span class="mf-top"><strong>${ic('planet')}${esc(pl.name)}</strong><span class="mf-clock"></span></span>
+        <span class="mp-gauges" role="img">${gauges}</span>
         <span class="mf-ships">${shipIcons(s.ships)}</span>
         <span class="mf-status">${esc(status)}</span>
         <span class="mp-actions">${build}${go}</span></div>`;
@@ -2651,8 +2669,19 @@ function renderMapFleets(me = session?.state?.players[session.me], now = session
   for (const b of box.children) {
     if (b.dataset.planet) {
       const pl = planets.find((x) => x.key === b.dataset.planet);
-      const job = pl && stateAt(pl.planet, now).yard;
+      const s = pl && stateAt(pl.planet, now);
+      const job = s?.yard;
       b.querySelector('.mf-clock').textContent = job ? clock(Math.max(0, job.end - now)) : '';
+      const gbox = b.querySelector('.mp-gauges');
+      if (s && gbox) {
+        const gs = stockFill(me.race, s);
+        for (const g of gs) {
+          const bar = gbox.querySelector(`[data-g="${g.res}"] b`);
+          if (bar) bar.style.width = `${(g.k * 100).toFixed(1)}%`;
+        }
+        const label = `Stocks : ${gs.map((g) => `${GAUGE_NAMES[g.res].toLowerCase()} ${fillWord(g.k)}`).join(', ')}`;
+        if (gbox.getAttribute('aria-label') !== label) gbox.setAttribute('aria-label', label);
+      }
       continue;
     }
     const f = fleets.find((x) => x.id === b.dataset.fleet);
