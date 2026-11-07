@@ -25,12 +25,12 @@ function poor() {
 }
 
 /**
- * Une vraie partie à un joueur humain, A, sur la case de `poor()` (la première de la carte
+ * Une vraie partie à un joueur (humain, ou de la race `race`), A, sur la case de `poor()` (la première de la carte
  * « gtest ») ; l'horloge part de T0. show(p, intitulé, heure) : la planète de A devient `p`, et A
  * la touche à cette heure-là ; l'image ouvre sa fiche (avec « Voir la planète », D-139).
  */
-function stage(film) {
-  const { players: [A], clock } = newGame(1, ['human']);
+function stage(film, race = 'human') {
+  const { players: [A], clock } = newGame(1, [race]);
   const P = A.state.players[A.me];
   const show = (p, label, t = clock.t) => {
     P.planet = p;
@@ -265,6 +265,98 @@ scenario('fil mixte : le premier élément prêt passe avant les autres sur le s
   assert.deepEqual(starts.map((d) => d.lane), ['queue', 'research']);
   assert.ok(starts[0].start > T0, 'la mine attend ses minéraux');
   assert.ok(starts[1].start >= starts[0].start, 'Radar ne la double pas');
+});
+
+/** Planète humaine en famine (D-270) : nourriture 0, population 60 pour une ferme ; 2 000 minéraux. */
+function famished() {
+  const p = game.newPlanet('human', T0, game.planetsFor('gtest')[0]);
+  p.levels = { ...p.levels, farm: 1, habitat: 4, lab: 1 };
+  p.pop = 60;
+  p.stock = { minerals: 2000, food: 0, energy: 500 };
+  return p;
+}
+
+scenario('famine : une recherche qui attend sa nourriture ne bloque pas une ferme payable (#46)', (film) => {
+  const { show } = stage(film);
+  const p = famished();
+  p.plan = [{ tech: 'agro' }, 'farm'];
+  const s0 = game.stateAt(p, T0);
+  assert.ok(s0.prod.effF < 1, 'la planète est en famine');
+  assert.equal(s0.stock.food, 0);
+  show(p, 'famine, nourriture 0 ; au fil : Agronomie (40 nourriture), puis une ferme (minéraux)', T0);
+  const s = game.stateAt(p, T0 + SEC);
+  show(p, 'une seconde plus tard : la ferme est lancée, Agronomie attend sa nourriture', T0 + SEC);
+  const starts = s.done.filter((d) => d.kind === 'start');
+  assert.deepEqual(starts.map((d) => d.key), ['farm'], 'la ferme part tout de suite');
+  assert.equal(starts[0].start, T0);
+  assert.deepEqual(s.plan, [{ tech: 'agro' }], 'la recherche reste au fil');
+  assert.equal(s.research, null);
+});
+
+scenario('famine : l’estimation dit pourquoi la recherche attend', (film) => {
+  const { show } = stage(film);
+  const p = famished();
+  p.plan = [{ tech: 'agro' }, 'mine'];
+  show(p, 'famine ; au fil : Agronomie, puis une mine (qui ne règle pas la famine)', T0);
+  const s = game.stateAt(p, T0 + SEC);
+  assert.equal(s.queue?.key, 'mine', 'la mine part');
+  assert.deepEqual(s.plan, [{ tech: 'agro' }]);
+  const f = game.planForecast(p, T0 + SEC);
+  show(p, 'la mine est lancée ; Agronomie : « Pas de nourriture qui rentre » au lieu de « plus de 6 h »', T0 + SEC);
+  assert.equal(f.length, 1);
+  assert.equal(f[0].key, 'agro');
+  assert.equal(f[0].start, null);
+  assert.equal(f[0].why, 'Pas de nourriture qui rentre');
+  // 30 min plus tard, toujours rien : la nourriture ne rentre pas.
+  assert.deepEqual(game.stateAt(p, T0 + 30 * MIN).plan, [{ tech: 'agro' }]);
+});
+
+scenario('panne d’énergie (machines) : le réacteur part, même derrière un bâtiment qui coûte de l’énergie (#46)', (film) => {
+  const { show } = stage(film, 'machine');
+  const p = game.newPlanet('machine', T0, game.planetsFor('gtest')[0]);
+  p.levels = { ...p.levels, drill: 4, reactor: 1 };
+  p.stock = { minerals: 900, food: 0, energy: 0 };
+  p.plan = ['nexus', 'reactor'];
+  const s0 = game.stateAt(p, T0);
+  assert.ok(s0.prod.effE < 1, 'la planète est en panne');
+  assert.ok(game.upgradeCost('machine', 'nexus', 0).energy > 0, 'le nexus coûte de l’énergie');
+  show(p, 'panne, énergie 0 ; au fil : un nexus (60 énergie), puis un réacteur (minéraux seulement)', T0);
+  const s = game.stateAt(p, T0 + SEC);
+  show(p, 'une seconde plus tard : le réacteur est lancé ; le nexus attend son énergie', T0 + SEC);
+  assert.equal(s.queue?.key, 'reactor');
+  assert.equal(s.queue.level, 2);
+  assert.deepEqual(s.plan, ['nexus']);
+  const f = game.planForecast(p, T0 + SEC);
+  assert.equal(f[0].key, 'nexus');
+  assert.equal(f[0].why, 'Pas d’énergie qui rentre');
+});
+
+scenario('panne d’énergie (aliens) : le prisme part, même derrière un amplificateur', (film) => {
+  const { show } = stage(film, 'alien');
+  const p = game.newPlanet('alien', T0, game.planetsFor('gtest')[0]);
+  p.levels = { ...p.levels, amplifier: 3 };
+  p.stock = { ...p.stock, minerals: 900, energy: 0 };
+  p.plan = ['amplifier', 'prism'];
+  assert.ok(game.stateAt(p, T0).prod.effE < 1, 'la planète est en panne');
+  show(p, 'panne, énergie 0 ; au fil : un amplificateur (80 énergie), puis un prisme (minéraux)', T0);
+  const s = game.stateAt(p, T0 + SEC);
+  show(p, 'une seconde plus tard : le prisme est lancé', T0 + SEC);
+  assert.equal(s.queue?.key, 'prism');
+  assert.deepEqual(s.plan, ['amplifier']);
+});
+
+scenario('un élément qui attend sa ressource repasse en tête dès qu’elle rentre', (film) => {
+  const { show } = stage(film, 'machine');
+  const p = game.newPlanet('machine', T0, game.planetsFor('gtest')[0]);
+  p.levels = { ...p.levels, drill: 4, reactor: 1 };
+  p.stock = { minerals: 900, food: 0, energy: 0 };
+  // Deux réacteurs règlent la panne ; le nexus, de nouveau payable, reprend alors sa place en tête.
+  p.plan = ['nexus', 'reactor', 'reactor', 'reactor'];
+  show(p, 'panne ; au fil : un nexus, puis trois réacteurs', T0);
+  const s = game.stateAt(p, T0 + 60 * MIN);
+  show(p, '1 h plus tard : deux réacteurs ont réglé la panne, puis le nexus est passé avant le 3ᵉ', T0 + 60 * MIN);
+  const keys = s.done.filter((d) => d.kind === 'start').map((d) => d.key);
+  assert.deepEqual(keys, ['reactor', 'reactor', 'nexus', 'reactor']);
 });
 
 scenario('fil mixte : labo au fil, puis une recherche qui l’attend ; l’estimation le dit', (film) => {

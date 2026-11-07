@@ -4,7 +4,7 @@
 // vérifient aussi que l'hôte la sauve, la réveille à la reprise, et que tout se rejoue.
 import { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { Session, newLobby, game, clone } from './harness.mjs';
+import { Session, newGame, newLobby, game, clone } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
 
 const { think, addBot, wakeBots, PEACE_MS } = await import('../js/bot.js');
@@ -275,6 +275,92 @@ scenario('D-220 : la page de l’hôte se fige 31 s ; le lien de l’IA ne se co
   ]);
   assert.equal(kept, played, 'aucun ordre perdu au rechargement');
   r.end();
+});
+
+scenario('D-280 : des vaisseaux sortis après le départ d’une conquête rejoignent la flotte en route, sans 2e conquête de la même planète', (film) => {
+  const { players: [A, B], clock, sync } = newGame(2, ['machine', 'human']);
+  const both = () => {
+    sync(A, B);
+    sync(B, A);
+  };
+  clock.t += PEACE_MS + 1000; // la trêve est passée
+  const arm = (n) => {
+    const home = A.planetsOf(me(A))[0];
+    home.planet.ships = { fighter: n };
+    home.planet.stock.energy = 500;
+  };
+  const conquests = () => (me(A).fleets || []).filter((f) => f.order?.kind === 'conquer');
+  arm(4);
+  both();
+  think(A, 30);
+  film.look(A, 'quatre drones posés : ils partent conquérir la planète de J1', [{ show: 'flottes « Conquérir »', expected: 1, got: conquests().length }]);
+  assert.equal(conquests().length, 1);
+  const first = conquests()[0];
+
+  // 3 s plus tard, le chantier a sorti quatre autres drones.
+  clock.t += 3000;
+  A.tick();
+  arm(4);
+  both();
+  think(A, 30);
+  const join = (me(A).fleets || []).find((f) => f.order?.kind === 'join');
+  film.look(A, 'quatre nouveaux drones : ils rejoignent la flotte en route, pas de 2e conquête', [
+    { show: 'flottes « Conquérir »', expected: 1, got: conquests().length },
+    { show: 'renfort vers la 1re flotte', expected: first.id, got: join?.order.fleet },
+  ]);
+  assert.equal(conquests().length, 1, 'une seule conquête de la planète de J1');
+  assert.equal(join?.order.fleet, first.id, 'le renfort part rejoindre la 1re flotte');
+  assert.ok(join.arrive >= first.arrive, 'il arrive après elle : la fusion n’efface pas l’ordre de conquête');
+
+  // On laisse arriver les deux flottes.
+  for (let t = 0; t < 120_000; t += 1000) {
+    clock.t += 1000;
+    A.tick();
+    B.tick();
+    both();
+  }
+  const taken = A.planetsOf(me(A)).filter((pl) => pl.key !== 'home');
+  const captures = me(A).orders.filter((o) => o.k === 'moveFleet' && o.a?.[2] === 'conquer').length;
+  film.look(A, 'la 1re flotte a pris la planète ; le renfort arrive après, sans la reprendre', [
+    { show: 'planètes prises à J1', expected: 1, got: taken.length },
+    { show: 'ordres « Conquérir » donnés', expected: 1, got: captures },
+  ]);
+  assert.equal(taken.length, 1);
+  assert.equal(captures, 1);
+});
+
+scenario('D-280 : deux IA machines jouent jusqu’au bout ; une IA n’a jamais deux flottes « Conquérir » en route vers la même planète', (film) => {
+  game.FROST.delayMs = 12 * MIN;
+  const { players, clock, sync } = newLobby(2, ['machine', 'machine']);
+  const all = () => {
+    for (const a of players) for (const b of players) if (a !== b) sync(a, b);
+  };
+  let twins = 0;
+  for (let step = 0; step < 45 * 20 && !players[0].over; step++) {
+    for (const s of players) {
+      s.tick();
+      s.checkStart();
+      think(s);
+      const aims = (me(s).fleets || []).filter((f) => f.order?.kind === 'conquer').map((f) => `${f.order.pid}:${f.order.key}`);
+      if (new Set(aims).size < aims.length) twins++;
+    }
+    all();
+    clock.t += 3000;
+  }
+  const state = clone(players[0].snapshot());
+  const orders = Object.values(state.players).flatMap((p) => p.orders);
+  const conquests = orders.filter((o) => o.k === 'moveFleet' && o.a?.[2] === 'conquer').length;
+  const joins = orders.filter((o) => o.k === 'joinFleet').length;
+  film.look(players[0], 'fin de la partie', [
+    { show: 'partie finie, avec un gagnant', expected: true, got: !!players[0].over?.winner },
+    { show: 'des conquêtes tentées', expected: true, got: conquests > 0 },
+    { show: 'des renforts envoyés en jonction', expected: true, got: joins > 0 },
+    { show: 'moments où une IA a 2 conquêtes vers la même planète', expected: 0, got: twins },
+  ]);
+  assert.ok(players[0].over?.winner, 'un gagnant');
+  assert.ok(conquests > 0);
+  assert.ok(joins > 0);
+  assert.equal(twins, 0);
 });
 
 // Issue #39 (D-370) : avec 7 IA, la fiche d'une IA n'est plus recopiée en entier, journal compris,
