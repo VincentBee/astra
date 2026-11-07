@@ -19,7 +19,8 @@
 
 import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Rendezvous } from './rendezvous.js';
-import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity } from './save.js';
+import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity, identityFor, savedGame } from './save.js';
+import { inviteGid } from './invite.js';
 import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, PLAN_MAX, planItem, planId, planAhead, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, FROST, sunFor, fortOf, seeded } from './game.js';
 import { TECHS, SHIPS, sightRange, TEMPO, techMissing, shipUnlocked } from './tech.js';
 import { cleanReport } from './report.js';
@@ -200,7 +201,8 @@ export function normalize(p) {
   if (!Array.isArray(p.orders)) p.orders = [];
   if (p.deathPts !== undefined && !Number.isFinite(p.deathPts)) delete p.deathPts;
   // Prêt (heure) et départ de la partie vu par ce joueur (heure) : des nombres, ou rien.
-  for (const k of ['ready', 'go', 'clockFix']) if (p[k] !== undefined && !Number.isFinite(p[k])) delete p[k];
+  // Parti avant le départ (IA retirée du lobby, D-399) : une heure, ou rien.
+  for (const k of ['ready', 'go', 'clockFix', 'left']) if (p[k] !== undefined && !Number.isFinite(p[k])) delete p[k];
   return p;
 }
 
@@ -343,7 +345,7 @@ export class Session {
     s.loadClock();
     s.intel = saved.intel || {}; // brouillard (D-124) : ce que j'ai vu des planètes des autres
     s.journal = saved.journal || null; // avant le rattrapage : les combats de l'absence s'y inscrivent
-    s.botIds = Array.isArray(saved.bots) ? saved.bots.filter((pid) => pidOk(pid) && s.state.players[pid]) : []; // IA jouées par ce téléphone (D-151), réveillées par js/bot.js
+    s.botIds = Array.isArray(saved.bots) ? saved.bots.filter((pid) => pidOk(pid) && s.state.players[pid] && !Number.isFinite(s.state.players[pid].left)) : []; // IA jouées par ce téléphone (D-151), réveillées par js/bot.js
     s.refreshOnline();
     s.start();
     s.tick();
@@ -355,6 +357,7 @@ export class Session {
   async answer(offer) {
     this.pendingAnswer?.cancel();
     const ans = await answerInvite(offer);
+    this.inviteGid = inviteGid(offer); // la partie de l'hôte, si le lien la dit (D-260)
     this.pendingAnswer = ans;
     this.status = 'answering';
     ans.link.then(
@@ -375,7 +378,11 @@ export class Session {
     this.status = 'waiting';
     this.attach(link, null);
     this.firstLink = link;
-    const id = loadIdentity();
+    // D-260 : si l'invitation dit de quelle partie elle vient, je n'envoie que mon identité
+    // et ma copie de celle-là, jamais le secret d'une autre. Ancien lien ou code seul : comme
+    // avant, l'identité de la dernière partie ouverte.
+    const gid = this.inviteGid;
+    const id = gid ? identityFor(gid) : loadIdentity();
     this.newSecret = rid(16);
     const hello = {
       type: 'hello',
@@ -386,7 +393,7 @@ export class Session {
       secretHash: await sha256(this.newSecret),
       // Ma copie de la partie, si j'en ai une : ma progression faite hors
       // ligne est gardée.
-      copy: loadGame()?.state,
+      copy: (gid ? savedGame(gid) : loadGame())?.state,
     };
     // Le tout premier message d'un canal qui vient de s'ouvrir se perd
     // parfois : on le renvoie chaque seconde jusqu'à l'accusé de réception.
@@ -655,7 +662,8 @@ export class Session {
   heartbeat() {
     const now = performance.now();
     for (const link of [...this.links.values()]) {
-      if (now - link.lastSeen > SILENCE_MS) link.close();
+      // Le lien d'une IA de ce téléphone (`local`) ne se coupe jamais pour silence (D-220).
+      if (!link.local && now - link.lastSeen > SILENCE_MS) link.close();
       else {
         link.send(this.beatMsg('hb', now));
         link.route?.().then((r) => r && (link.routeType = r));
@@ -756,7 +764,7 @@ export class Session {
     link.send({ type: 'hello-ack' });
     // Pas de validation : l'hôte a lui-même scanné (ou collé) la réponse, et
     // une invitation ne sert qu'une fois. C'est déjà son accord.
-    if (Object.keys(st.players).length >= MAX_PLAYERS) {
+    if (this.roster.length >= MAX_PLAYERS) {
       link.send({ type: 'refused', reason: 'La partie est complète (8 joueurs).' });
       return setTimeout(() => link.close(), 300);
     }
@@ -781,7 +789,7 @@ export class Session {
     if (link !== this.firstLink || !msg.state || typeof msg.from !== 'string') return;
     // On adopte la copie de l'hôte, complétée par la nôtre s'il s'agit de la
     // même partie (progression faite hors ligne).
-    const mine = loadGame();
+    const mine = savedGame(msg.state.gid); // ma copie de CETTE partie, pas forcément la dernière ouverte (D-260)
     let st = clean(msg.state);
     if (mine && mine.state.gid === st.gid) st = mergeStates(st, clean(mine.state));
     // Mon carnet de combats de cette partie, s'il est sur ce téléphone (même joueur).
@@ -792,8 +800,8 @@ export class Session {
     this.me = msg.you;
     this.state = st;
     this.loadClock(); // nouveau venu : pas d'heure commune, il la prend de son hôte au premier battement (D-165)
-    const id = loadIdentity();
-    const secret = id?.gid === st.gid && id?.pid === msg.you ? id.secret : this.newSecret;
+    const id = identityFor(st.gid);
+    const secret = id?.pid === msg.you ? id.secret : this.newSecret;
     saveIdentity({ gid: st.gid, pid: msg.you, secret });
     this.firstLink = null;
     this.status = 'playing';
@@ -991,10 +999,27 @@ export class Session {
 
   // ----- invitations (tout le monde peut inviter) ---------------------------
 
+  /**
+   * Prépare une invitation et renvoie son code, ou null si elle a été abandonnée pendant sa
+   * préparation (#70) : chaque appel prend un jeton numéroté ; si cancelInvite ou un autre
+   * openInvite passe pendant l'attente, le jeton change et l'invitation obtenue est fermée
+   * au lieu d'être rangée. Ouvrir une invitation ferme la précédente.
+   */
   async openInvite() {
-    this.invite?.cancel();
-    this.invite = await createInvite();
-    return this.invite.code;
+    const ticket = this.cancelInvite();
+    let invite;
+    try {
+      invite = await createInvite();
+    } catch (e) {
+      if (ticket !== this.inviteTicket) return null;
+      throw e;
+    }
+    if (ticket !== this.inviteTicket) {
+      invite.cancel();
+      return null;
+    }
+    this.invite = invite;
+    return invite.code;
   }
 
   async acceptAnswer(answer) {
@@ -1006,9 +1031,12 @@ export class Session {
     return link;
   }
 
+  /** Ferme l'invitation ouverte et abandonne celle en préparation ; renvoie le nouveau jeton. */
   cancelInvite() {
     this.invite?.cancel();
     this.invite = null;
+    this.inviteTicket = (this.inviteTicket ?? 0) + 1;
+    return this.inviteTicket;
   }
 
   // ----- jeu ---------------------------------------------------------------------
@@ -1035,7 +1063,17 @@ export class Session {
 
   /** On peut jouer : partie en cours, pas finie, et je ne suis pas éliminé. */
   get canAct() {
-    return this.status === 'playing' && !this.over && !this.state?.players[this.me]?.out;
+    const p = this.state?.players[this.me];
+    return this.status === 'playing' && !this.over && !p?.out && !Number.isFinite(p?.left);
+  }
+
+  /**
+   * Joueurs de la partie, sans ceux partis avant le départ (`left`, IA retirée du lobby,
+   * D-399). Leur fiche reste dans `state.players` (sinon la copie d'un autre la ferait
+   * revenir), mais on ne la montre ni ne la compte plus.
+   */
+  get roster() {
+    return Object.values(this.state?.players || {}).filter((p) => !Number.isFinite(p.left));
   }
 
   /** Points de l'empire d'un joueur (toutes ses planètes, ses recherches, ses vaisseaux). */
@@ -1068,7 +1106,7 @@ export class Session {
   /** Joueurs présents (moi, et ceux en ligne avec moi) pas encore prêts ni déjà dans la course. */
   get notReady() {
     return Object.values(this.state?.players || {}).filter(
-      (p) => (p.id === this.me || p.online) && !p.out && !p.home && !Number.isFinite(p.ready) && !Number.isFinite(p.since),
+      (p) => (p.id === this.me || p.online) && !p.out && !Number.isFinite(p.left) && !p.home && !Number.isFinite(p.ready) && !Number.isFinite(p.since),
     );
   }
 
@@ -1223,12 +1261,26 @@ export class Session {
   noColonizer(p, now) {
     if (!Number.isFinite(p.ready) || !Number.isFinite(p.since) || p.home || p.out != null) return false;
     if ((p.fleets || []).some((f) => f.ships?.colony > 0)) return false;
-    p.deathPts = this.scoreOf(p);
-    p.out = now;
     this.addLog(`${p.name} n’a plus de colonisateur pour fonder sa planète : ${p.name} est éliminé.`);
+    this.eliminate(p, now, this.scoreOf(p));
     this.ontoast?.('Plus de colonisateur pour fonder ta planète : tu es éliminé.', 8000);
     this.note(p, { at: now, kind: 'planet', tone: 'bad', text: 'Plus de colonisateur pour fonder ta planète : tu es éliminé.' });
     return true;
+  }
+
+  /**
+   * Le joueur `p` est éliminé à l'heure `at` (D-180), quelle qu'en soit la cause (planète prise,
+   * planète gelée, plus de colonisateur) : `pts` départage le classement (ses points d'avant la
+   * chute). Toutes ses flottes, à quai ou en vol, disparaissent à cette heure : plus de combat,
+   * de pillage ni de prise après sa mort. Les autres téléphones ne les voient plus dès qu'ils
+   * savent qu'il est mort (`sees`, par `deadAt`), même s'il est hors ligne.
+   */
+  eliminate(p, at, pts) {
+    p.out = at;
+    p.deathPts = pts;
+    const n = (p.fleets || []).length;
+    p.fleets = [];
+    if (n) this.addLog(`Les flottes ${de(p.name)} disparaissent avec lui (${n} flotte${n > 1 ? 's' : ''}).`);
   }
 
   /** Heure à laquelle le froid prend la case `cell` (Infinity : partie sans froid). */
@@ -1276,6 +1328,7 @@ export class Session {
     if (!dead.length) return false;
     const pts = this.scoreOf(p); // points d'avant le gel : ce qui départage s'il est éliminé
     for (const { f, at } of dead) {
+      if (!p.fleets.includes(f)) continue; // disparue avec son joueur, éliminé plus tôt dans ce passage (D-180)
       p.fleets = p.fleets.filter((x) => x !== f);
       const pos = fleetPos(f, at);
       const where = `[${Math.round(pos.x)}:${Math.round(pos.y)}]`;
@@ -1285,9 +1338,8 @@ export class Session {
       this.note(p, { at, kind: 'fleet', tone: 'bad', text: `Le froid a détruit ta flotte en ${where} (${shipsText(n)}).` });
       const stuck = !p.home && p.out == null && Number.isFinite(p.since) && !(p.fleets || []).some((g) => g.ships?.colony > 0);
       if (stuck && f.ships?.colony > 0) {
-        p.out = at;
-        p.deathPts = pts;
         this.addLog(`${p.name} n’a plus de colonisateur pour fonder sa planète : ${p.name} est éliminé.`);
+        this.eliminate(p, at, pts);
         this.ontoast?.('Le froid a pris ton dernier colonisateur : tu es éliminé.', 8000);
         this.note(p, { at, kind: 'planet', tone: 'bad', text: 'Le froid a pris ton dernier colonisateur : tu es éliminé.' });
       }
@@ -1322,8 +1374,18 @@ export class Session {
     const all = this.planetsOf(p);
     if (!all.length) return this.colonizerDeadAt(p, now);
     if (this.livePlanets(p, now).length) return null;
-    const frozen = all.map((pl) => this.frostOf(pl.cell)).filter((t) => t <= now);
-    return frozen.length === all.length ? Math.max(...frozen) : now;
+    // Chaque planète perdue à l'heure du gel, ou de la prise lue dans le rapport de l'attaquant
+    // (D-180) : la mort d'un joueur hors ligne tombe à sa vraie heure, pas quand on s'en aperçoit.
+    const players = Object.values(this.state?.players || {});
+    const lostAt = (pl) => {
+      const frost = this.frostOf(pl.cell);
+      if (frost <= now) return frost;
+      const since = pl.key === 'home' ? p.claimAt || p.rank || 0 : pl.planet.claimAt || 0;
+      const caps = players.flatMap((o) => (o.effects || []).filter((e) => e.capture && e.to === p.id && sameCell(e.cell, pl.cell) && e.at >= since && !this.goneBy(o, e.at)).map((e) => e.at));
+      return caps.length ? Math.min(...caps) : now;
+    };
+    const t = Math.max(...all.map(lostAt));
+    return t <= now ? t : null; // demandé pour une heure d'avant la prise : encore en vie
   }
 
   /** Fin de la partie, ou null : { at, winner }, la plus ancienne qu'un joueur a vue. */
@@ -1398,9 +1460,8 @@ export class Session {
       .sort((a, b) => (a.planet.claimAt || 0) - (b.planet.claimAt || 0) || (a.key < b.key ? -1 : 1))[0];
     if (!next) {
       p.home = null;
-      p.out = at;
-      p.deathPts = this.wave.pts;
       this.addLog(`${p.name} perd ${pl.name} (${why}) : plus aucune planète, ${p.name} est éliminé.`);
+      this.eliminate(p, at, this.wave.pts);
       this.ontoast?.(`${pl.name} perdue (${why}) : tu es éliminé.`, 8000);
       this.note(p, { at, kind: 'planet', tone: 'bad', text: `${pl.name} perdue (${why}) : tu es éliminé.` });
       return;
@@ -1436,19 +1497,64 @@ export class Session {
     return this.state?.players[this.me]?.race || null;
   }
 
-  /** Choix de race : une seule fois, il ne se défait pas. */
+  /**
+   * Choix de race. Il devient définitif quand la partie part (ou dès qu'on a une planète) ;
+   * avant, on peut en changer (D-400 : l'hôte change la race d'une IA dans le lobby ;
+   * l'écran du joueur, lui, ne propose le choix qu'une fois).
+   */
   chooseRace(race) {
     if (!this.canAct || !RACES[race]) return false;
     const p = this.state.players[this.me];
     if (!p) return false;
-    if (p.race) {
+    const was = p.race;
+    if (was && (this.startedAt != null || p.home || Number.isFinite(p.since))) {
       this.ontoast?.(`Tu as déjà choisi : ${RACES[p.race].name}. Ce choix est définitif.`);
       return false;
     }
+    if (was === race) return false;
     p.race = race;
     // Joueur d'avant le choix de planète : il garde la sienne.
     if (p.home) p.planet = newPlanet(race, this.now());
-    this.touch(this.addLog(`${p.name} rejoint le camp des ${RACES[race].name}.`));
+    this.touch(this.addLog(was ? `${p.name} passe dans le camp des ${RACES[race].name}.` : `${p.name} rejoint le camp des ${RACES[race].name}.`));
+    this.changed();
+    return true;
+  }
+
+  /** Avant le départ, la partie pas encore partie et sans planète : sinon null. */
+  get beforeStart() {
+    const p = this.state?.players[this.me];
+    return !!p && this.startedAt == null && !p.home && !Number.isFinite(p.since);
+  }
+
+  /**
+   * Changer de nom, avant le départ seulement (D-400 : l'hôte renomme une IA dans le lobby).
+   * Un nom vide est refusé : on garde l'ancien. 16 caractères au plus, comme à l'arrivée.
+   */
+  rename(name) {
+    if (!this.canAct || !this.beforeStart) return false;
+    const p = this.state.players[this.me];
+    const next = String(name ?? '').trim().slice(0, 16);
+    if (!next || next === p.name) return false;
+    const old = p.name;
+    p.name = next;
+    this.name = next;
+    this.touch(this.addLog(`${old} s’appelle maintenant ${next}.`));
+    this.changed();
+    return true;
+  }
+
+  /**
+   * Quitter la partie avant le départ (D-399 : l'hôte retire une IA du lobby). La fiche
+   * reste, marquée `left` : la plus récente, elle l'emporte sur toutes les copies, et le
+   * joueur n'est plus ni montré, ni compté, ni attendu au départ.
+   */
+  leave() {
+    if (!this.canAct || !this.beforeStart) return false;
+    const p = this.state.players[this.me];
+    p.left = this.now();
+    delete p.ready;
+    delete p.go;
+    this.touch(this.addLog(`${p.name} quitte la partie.`));
     this.changed();
     return true;
   }
@@ -1490,6 +1596,11 @@ export class Session {
    * moment (ou coupés l'un de l'autre) ; c'est le plus ancien qui compte,
    * partout pareil.
    */
+  /** `o` s'est-il déclaré éliminé à l'heure `at` ou avant ? Ses actes d'après ne comptent pas (D-180). */
+  goneBy(o, at) {
+    return Number.isFinite(o?.out) && at >= o.out;
+  }
+
   ownerAt(cell) {
     let best = null;
     const consider = (p, t) => {
@@ -1499,9 +1610,11 @@ export class Session {
     const w = this.planets.find((x) => sameCell(x, cell));
     const players = Object.values(this.state?.players || {});
     // Prise par un attaquant dont le rapport n'est pas encore lu : elle n'est déjà plus à son ancien propriétaire.
-    const taken = players.flatMap((o) => (o.effects || []).filter((e) => e.capture && sameCell(e.cell, cell)));
+    // Une prise après la mort de l'attaquant ne compte pas (D-180).
+    const taken = players.flatMap((o) => (o.effects || []).filter((e) => e.capture && sameCell(e.cell, cell) && !this.goneBy(o, e.at)));
     const lost = (p, t) => taken.some((e) => e.to === p.id && e.at >= t);
     for (const p of players) {
+      if (Number.isFinite(p.out)) continue; // un joueur éliminé ne possède rien (D-180)
       const t = p.claimAt || p.rank || 0;
       if (sameCell(p.home, cell) && !lost(p, t)) consider(p, t);
       const col = w && p.colonies?.[w.id];
@@ -1612,7 +1725,9 @@ export class Session {
     p.fleets ||= [];
     if (!colony || p.fleets.length >= MAX_FLEETS) return null;
     settle(colony, now);
-    colony.ships = { ...(colony.ships || {}), colony: (colony.ships?.colony || 0) + 1 };
+    // Le colonisateur qui l'a fondée repart avec la flotte ; une colonie prise au combat n'en a pas consommé (D-200).
+    colony.ships = { ...(colony.ships || {}) };
+    if (!colony.captured) colony.ships.colony = (colony.ships.colony || 0) + 1;
     let room = fleetCargo(p.race, colony.ships);
     const cargo = {};
     for (const r of SOIL) {
@@ -1943,7 +2058,8 @@ export class Session {
     if (f.stranded) this.ontoast?.('Pas assez de carburant : la flotte tombera en panne en route.');
     // Au journal, seulement les ordres qui comptent : les simples déplacements le noieraient.
     const who = here && live && here.owner.id !== this.me ? ` (${here.owner.name})` : ''; // hors de vue, pas de nom (D-190)
-    this.touch(order ? this.addLog(`La flotte ${de(p.name)} ${ORDERS[order.kind].verb} ${here ? here.name : w.name}${who}.`) : null);
+    // Marquée de la flotte : la cible ne la lit que si elle voit la flotte (D-210, `showsLog`).
+    this.touch(order ? this.addLog(`La flotte ${de(p.name)} ${ORDERS[order.kind].verb} ${here ? here.name : w.name}${who}.`, { pid: this.me, fleet: f.id }) : null);
     this.changed();
     return true;
   }
@@ -2000,7 +2116,24 @@ export class Session {
   sees(owner, f, now, eyes = this.eyes(now)) {
     if (owner?.id === this.me) return true;
     if (this.fleetDeadAt(owner, f, now) <= now) return false; // détruite par le froid ou au combat (D-163), même si sa fiche ne le dit pas encore
+    // Joueur éliminé : ses flottes ont disparu avec lui (D-180), même si sa fiche, hors ligne, en montre encore.
+    const dead = this.deadAt(owner, now);
+    if (dead != null && dead <= now) return false;
     return this.seesCell(fleetPos(f, now), now, eyes);
+  }
+
+  /**
+   * Une ligne du journal partagé, montrée dans mon Journal (D-210) ? Une ligne marquée d'une
+   * flotte (ordre d'attaque, de conquête, de poursuite…) ne l'est que pour son auteur, ou tant
+   * que je vois cette flotte : sinon l'ordre trahirait une flotte que la carte me cache (D-128).
+   * Flotte disparue (posée, détruite, fusionnée hors de vue) : la ligne reste cachée ; le combat,
+   * lui, a ses propres lignes.
+   */
+  showsLog(l, now = this.now()) {
+    if (!l?.fleet || l.pid === this.me) return true;
+    const owner = this.state.players[l.pid];
+    const f = owner && this.fleetOf(owner, l.fleet);
+    return !!f && this.sees(owner, f, now);
   }
 
   /** Un point de la carte est-il dans ma détection ? */
@@ -2119,7 +2252,7 @@ export class Session {
     f.order = { kind: 'chase', pid, fleet: target.id, seen: null };
     this.tickLogs = []; // un combat immédiat écrit au journal : ses entrées partent avec ma fiche
     this.pursue(p, f, this.now());
-    if (f.order) this.addLog(`La flotte ${de(p.name)} prend en chasse une flotte ${de(enemy.name)}.`);
+    if (f.order) this.addLog(`La flotte ${de(p.name)} prend en chasse une flotte ${de(enemy.name)}.`, { pid: this.me, fleet: f.id }); // D-210
     const logs = this.tickLogs;
     this.tickLogs = null;
     this.touch(logs.length ? logs : null);
@@ -2702,6 +2835,11 @@ export class Session {
     if (colonyTech) for (const pl of mine) shareTech(pl);
     // Les combats des autres d'abord : mes flottes agissent ensuite avec leurs vraies pertes.
     if (this.applyEffects(p, now)) changed = true;
+    // Filet (D-180) : éliminé par un chemin qui n'est pas passé par eliminate() (vieille fiche…), ses flottes disparaissent aussi.
+    if (Number.isFinite(p.out) && p.fleets?.length) {
+      p.fleets = [];
+      changed = true;
+    }
     for (const f of [...(p.fleets || [])]) {
       if (f.order?.kind === 'chase') {
         if (this.pursue(p, f, now, from)) changed = true;
@@ -2802,9 +2940,24 @@ export class Session {
     }
 
     if (order.kind === 'attack' || order.kind === 'conquer') {
-      const enemy = this.state.players[order.pid];
-      const pl = enemy && this.planetOf(enemy, order.key);
-      if (!pl || !sameCell(pl.cell, f.to)) return true;
+      // La planète a pu changer de main pendant le trajet (D-200) : on vise son propriétaire
+      // d'aujourd'hui, pas celui de l'ordre, dont la fiche la montre encore tant qu'il n'a pas lu le rapport de prise.
+      const enemy = this.ownerAt(f.to);
+      const pl = enemy && this.planetsOf(enemy).find((x) => sameCell(x.cell, f.to));
+      const was = this.state.players[order.pid];
+      const gone = was && this.planetOf(was, order.key);
+      const here = this.planets.find((x) => sameCell(x, f.to))?.name || gone?.name || `[${f.to.x}:${f.to.y}]`;
+      if (!pl) {
+        this.addLog(`Plus personne n'habite ${here} : la flotte ${de(p.name)} reste en orbite.`);
+        return true;
+      }
+      if (enemy.id === this.me) {
+        // Déjà à moi (une autre de mes flottes l'a prise juste avant) : elle s'y pose.
+        f.order = { kind: 'dock', key: pl.key };
+        return this.arrive(p, f);
+      }
+      // Un ordre sans cible (pid null : planète vue libre, D-190) n'a pas d'ancien propriétaire à citer.
+      if (order.pid && enemy.id !== order.pid) this.addLog(`${enemy.name} a pris ${pl.name}${was ? ` à ${was.name}` : ''} entre-temps : la flotte ${de(p.name)} l'attaque.`);
       // Je calcule le combat avec ce que je sais du défenseur à l'heure de l'arrivée ;
       // son téléphone appliquera ses pertes en lisant mon rapport.
       const def = this.defenseAt(p, enemy, pl, f.arrive);
@@ -2900,6 +3053,7 @@ export class Session {
     colony.stock.energy = Math.floor(fuelAt(f, p.race, now));
     colony.tech = { ...techOf(p) };
     colony.claimAt = f.arrive;
+    colony.captured = true; // prise au combat, sans colonisateur : evacuate n'en rendra pas (D-200)
     colony.ships = { ...res.attLeft };
     p.colonies = { ...(p.colonies || {}), [w.id]: colony };
     const docked = { ...(p.docked || {}) };
@@ -2957,6 +3111,7 @@ export class Session {
         if (p.applied.includes(e.id)) continue;
         p.applied = [...p.applied, e.id];
         any = true;
+        if (this.goneBy(other, e.at)) continue; // livré après sa mort : ses flottes n'existaient plus (D-180)
         if (e.fleet && this.fleetHit(p, other, e, now)) continue;
         // Une prise vise une case : ma planète mère a pu changer depuis (la clé « home » ne suffit pas).
         const pl = e.capture
@@ -3036,9 +3191,8 @@ export class Session {
       // autres téléphones ont calculée sans moi (deadAt, D-163), pas à l'heure où je lis le rapport.
       const stuck = !p.home && p.out == null && Number.isFinite(p.since) && !(p.fleets || []).some((g) => g.ships?.colony > 0);
       if (stuck && f.ships?.colony > 0) {
-        p.out = e.at;
-        p.deathPts = pts;
         this.addLog(`${p.name} n’a plus de colonisateur pour fonder sa planète : ${p.name} est éliminé.`);
+        this.eliminate(p, e.at, pts);
         this.ontoast?.(`${other.name} a détruit ton dernier colonisateur : tu es éliminé.`, 8000);
         this.note(p, { at: e.at, kind: 'planet', tone: 'bad', text: `${other.name} a détruit ton dernier colonisateur : tu es éliminé.` });
       }
@@ -3073,8 +3227,9 @@ export class Session {
     this.save();
   }
 
-  addLog(text) {
-    const entry = { at: this.now(), text };
+  /** `mark` : { pid, fleet } pour un ordre de flotte, que les autres ne lisent que s'ils voient la flotte (D-210). */
+  addLog(text, mark = null) {
+    const entry = { at: this.now(), text, ...(mark ? { pid: mark.pid, fleet: mark.fleet } : {}) };
     this.pushLog(entry);
     this.tickLogs?.push(entry);
     return entry;
@@ -3083,7 +3238,8 @@ export class Session {
   pushLog(entry) {
     const log = this.state.log;
     if (log.some((l) => l.at === entry.at && l.text === entry.text)) return;
-    log.push({ at: entry.at, text: String(entry.text).slice(0, 120) });
+    const mark = typeof entry.pid === 'string' && typeof entry.fleet === 'string' ? { pid: entry.pid.slice(0, 64), fleet: entry.fleet.slice(0, 64) } : {};
+    log.push({ at: entry.at, text: String(entry.text).slice(0, 120), ...mark });
     log.sort((a, b) => a.at - b.at);
     if (log.length > 40) log.splice(0, log.length - 40);
   }
@@ -3189,7 +3345,7 @@ function maxTech(a, b) {
   return out;
 }
 
-export const ORDER_KINDS = ['chooseRace', 'ready', 'begin', 'claimPlanet', 'build', 'planBuild', 'planResearch', 'planShips', 'unplan', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'setFleetStance', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'joinFleet', 'splitFleet', 'returnFleet', 'power'];
+export const ORDER_KINDS = ['chooseRace', 'rename', 'leave', 'ready', 'begin', 'claimPlanet', 'build', 'planBuild', 'planResearch', 'planShips', 'unplan', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'setFleetStance', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'joinFleet', 'splitFleet', 'returnFleet', 'power'];
 for (const k of [...ORDER_KINDS, 'tick']) {
   const act = Session.prototype[k];
   Session.prototype[k] = function (...a) {
