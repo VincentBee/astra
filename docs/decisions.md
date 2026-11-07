@@ -3357,3 +3357,47 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - Qui : Vincent (demande), router (pas d'alerte au lobby ni à la fin, fenêtre `.sheet`
   préférée), Claude par défaut (fenêtre fermée d'abord, 2ᵉ retour = quitter, accueil quand rien
   avant). Source : session `3e243082`. Statut : en vigueur. Cache `astra-p2p-v118` (v107, puis un cran à chaque fusion de `main` ; v118 sur `main` à v117). Numérotée D-401 au départ ; D-412 à D-416 étant pris ou réservés par la chaîne de D-411, renumérotée D-417 à la fusion de `main`.
+**D-412 — Bulle d'aide de la carte calée sur l'en-tête** (sans objet depuis D-245)
+- 2026-11-06. Contexte : issue #51. La bulle `#map-help` partait du bord gauche du « ? »
+  (D-055), placé vers x ≈ 187 px, et faisait 270 px de large : elle finissait vers x ≈ 443-457.
+  Fermée, elle n'est que transparente (`visibility: hidden` garde sa place) : la page devenait
+  plus large que l'écran (443 px sur un téléphone de 320 px), l'écran glissait de côté et les
+  fenêtres ouvertes depuis la carte étaient coupées.
+- Choix : la bulle de la carte se place depuis l'en-tête `.map-head` entier : `.map-head` est
+  `position: relative`, son `.help-wrap` `position: static`, la bulle `left: 0; right: 0;
+  width: auto`. Elle prend la largeur de l'en-tête, ouverte ou fermée, et ne peut plus en sortir.
+  Le fondu (opacité) et l'ouverture au survol, au clavier ou au toucher ne changent pas. La règle
+  générale `.tooltip` n'est pas touchée (seule `#map-help` l'utilise aujourd'hui).
+- Alternatives écartées : `display: none` quand elle est fermée (perd le fondu, et la bulle
+  ouverte dépassait encore) ; `max-width: calc(100vw - 32px)` en gardant l'ancrage sur le « ? »
+  (dépend de la place du « ? », qui suit la longueur des coordonnées) ; bulle en
+  `position: fixed`.
+- Pas fait : le texte de l'aide en points courts (constat ui-ergo-03 dans #51) ; hors du ticket
+  confié, à décider à part.
+- Qui : Claude, par défaut (le ticket laissait le choix). Source : session `42405fcd`, issue #51.
+  Statut : sans objet depuis D-245 (bouton « ? » et bulle supprimés de la carte, PR #178). Le CSS
+  de la bulle n'a pas été fusionné ; #51 est réglé par D-245, et D-413 garde la largeur de la page.
+  Numérotée D-240 au départ ; D-240 étant prise dans `main`, renumérotée D-412 à la fusion de
+  `main` (D-411), comme D-241 → D-413 et D-242 → D-414.
+
+**D-413 — Test de mise en page dans un vrai Chrome, sans dépendance**
+- 2026-11-06. Contexte : `node --test` n'a pas de mise en page, il ne peut pas mesurer la
+  largeur de la page ; le projet n'a aucune dépendance (pas de Playwright).
+- Choix : `tests/layout.test.mjs` lance le Chrome (ou Chromium) de la machine sans fenêtre
+  (`--headless=new`) et le pilote par son protocole de débogage (CDP) avec le `WebSocket` intégré
+  à Node. Il sert lui-même les fichiers du jeu, émule un téléphone (320, 375, 430 px, `mobile`),
+  joue l'accueil → contre l'IA → race → « Je suis prêt », et vérifie `scrollWidth` = largeur de
+  l'écran dans le lobby, en partie, puis Journal ouvert (étapes de la bulle retirées à la fusion
+  de `main`, la bulle n'existant plus depuis D-245 ; le test reste un garde-fou de largeur). Sans Chrome
+  trouvé, le test est sauté (chemin forcé par la variable `CHROME`).
+- Alternatives écartées : ajouter Playwright (première dépendance du projet) ; mesure à la main
+  seulement (pas de garde contre un retour du défaut).
+- Qui : Claude, par défaut. Source : session `42405fcd`, issue #51. Statut : en vigueur.
+
+**D-414 — Cache `astra-p2p-v88`, puis `astra-p2p-v119`**
+- 2026-11-06. Contexte : v86 est dans `main` ; plusieurs PR ouvertes prennent v87.
+- Choix : `VERSION` passe à `astra-p2p-v88` pour que les téléphones prennent le nouveau
+  `style.css`. À la fusion de `main` (2026-11-07, v117, D-411) : `astra-p2p-v118`, puis
+  `astra-p2p-v119` à une seconde fusion (#193 avait pris v118) (seul
+  `tests/layout.test.mjs` change alors, la montée garde la règle « une version par mise en ligne »).
+- Qui : Claude, par défaut. Source : session `42405fcd`. Statut : en vigueur.

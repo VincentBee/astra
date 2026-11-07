@@ -193,3 +193,6 @@ que fait le code.
 | D-391 | Cache `astra-p2p-v115` (v95 au départ) | non testable |  | version du service worker |
 | D-370 | IA du même téléphone : le journal des ordres passe sans être recopié (entrées partagées et gelées), même partie qu'avant (issue #39) | nouveau test | `bot.test.mjs` « D-370 : 7 IA, même graine : même partie qu’avec la copie complète, cinq fois moins de JSON » (empreintes des fiches chez l'hôte et chez chaque IA, classement, rejeu ; < 100 Ko/s) | `LINK.fullCopy` rejoue l'ancien chemin ; égalité avec `main` vérifiée par `tests/perf-ia.mjs` (graines 1 et 2) |
 | D-371 | Cache `astra-p2p-v117` (v98 au départ) | non testable |  | version du service worker |
+| D-412 | Bulle d'aide de la carte calée sur l'en-tête (issue #51) | sans objet | | bulle supprimée par D-245 |
+| D-413 | Largeur de la page sur téléphone, dans un vrai Chrome sans dépendance (issue #51) | nouveau test | `layout.test.mjs` 320, 375, 430 px : `scrollWidth` = largeur de l'écran dans le lobby, en partie, Journal ouvert ; sauté sans Chrome | garde-fou de mise en page |
+| D-414 | Cache `astra-p2p-v119` (v88 au départ) | non testable |  | version du service worker |
