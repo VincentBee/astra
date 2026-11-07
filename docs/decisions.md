@@ -2756,3 +2756,41 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
   ouvertes : 1 et 5 ouvertures/fermetures → 0 ouverte ; 3 ouvertures d'affilée → 1 ; une
   invitation acceptée reste ouverte).
 
+**D-399 — Retirer une IA du lobby : sa fiche est marquée `left`, pas effacée**
+- 2026-11-07. Contexte : Vincent : « Dans le lobby, il faut pouvoir retirer une IA et changer sa
+  race et changer son nom. » Les copies de la partie se fusionnent fiche par fiche, la plus
+  récente gagnant, et rien ne s'efface : une fiche supprimée chez l'hôte reviendrait avec la copie
+  du premier invité qui se resynchronise.
+- Choix : avant le départ seulement, et seulement sur le téléphone qui fait jouer l'IA
+  (`editableBot`). L'IA se donne l'ordre `leave` (nouvel ordre noté au journal, donc rejoué) :
+  champ `left` = heure, `ready` et `go` retirés. Sa fiche, la plus récente, l'emporte partout ;
+  `Session.roster` (les fiches sans `left`) sert à montrer et compter les joueurs (lobby, fenêtre
+  Joueurs, choix de race, 8 places, historique, rejeu) ; `notReady` ne l'attend pas ; l'hôte
+  arrête l'IA et l'enlève de `botIds` (elle ne se réveille plus à la reprise). Dans le lobby, un
+  toucher sur la ligne de l'IA ouvre une fenêtre avec **Retirer de la partie**, sans
+  confirmation (on peut en rajouter une tout de suite).
+- Alternatives écartées : effacer la fiche (elle revient) ; une liste `gone` au niveau de la
+  partie (une fusion de plus à écrire, et le rejeu ne connaîtrait pas l'IA) ; marquer l'IA
+  « éliminée » (`out`, qui a un sens en partie et la laisserait au classement).
+- Qui : Vincent (demande), router (avant le départ seulement, seul l'hôte de l'IA), Claude par
+  défaut (fiche marquée, `roster`, sans confirmation). Source : session `f074c23b`. Statut : en
+  vigueur. Cache `astra-p2p-v104`.
+
+**D-400 — Renommer une IA et changer sa race dans le lobby ; la race reste définitive une fois la partie partie**
+- 2026-11-07. Contexte : même demande que D-399. La race était « choisie une fois, définitive »,
+  et le nom fixé à l'arrivée.
+- Choix : nouvel ordre `rename(nom)` (16 caractères, espaces autour retirés ; vide ou inchangé →
+  refusé, l'ancien nom reste) et `chooseRace` accepte un second choix **tant que la partie n'est
+  pas partie** et qu'on n'a pas de planète. La règle tient à l'état de la partie, pas au fait
+  d'être une IA : le rejeu refait les ordres sur des Sessions ordinaires. Seule la fenêtre de l'IA
+  (`#sheet-bot`, chez l'hôte qui la fait jouer, avant le départ) s'en sert ; l'écran d'un joueur
+  ne propose toujours le choix de race qu'une fois. Fenêtre : champ Nom, trois races en boutons
+  radio (dessin du choix de race), **Valider** ; un nom vide affiche « Le nom ne peut pas être
+  vide : l'IA garde le sien. ». Pas de modification en ligne dans `#pick-who` : la liste est
+  redessinée à chaque fiche reçue, un champ y perdrait ce qu'on tape.
+- Alternatives écartées : changer la race en retirant puis rajoutant l'IA (une fiche partie de
+  plus à chaque fois, et `mergeIn` limite les fiches inconnues) ; réserver le second choix aux IA
+  par `isBot` (le rejeu ne le sait pas, la fiche ne retomberait plus juste) ; modifier en ligne.
+- Qui : Vincent (demande), router (« un nom vide est refusé », style du lobby), Claude par défaut
+  (règle par l'état, fenêtre, 16 caractères). Source : session `f074c23b`. Statut : en vigueur ;
+  modifie la règle « race définitive » (regles.md §12). Cache `astra-p2p-v104`.

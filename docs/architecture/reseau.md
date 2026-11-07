@@ -243,6 +243,18 @@ Il n'y a **pas de message « je pars »**. Un départ = un lien qui se ferme : s
   intel, bots)`) ; `Session.resume` le relit (`botIds`, identifiants valides et présents dans
   la partie) ; `app.js` appelle `wakeBots(session)` juste après la reprise. `host.bots` (Map pid
   → Session) ; `Session.end` appelle `end()` de chaque IA (minuteur arrêté, lien fermé).
+- **Retirer, renommer, changer de race (D-399, D-400)**, avant le départ seulement, et seulement
+  sur le téléphone qui fait jouer l'IA (`editableBot(host, pid)` : l'IA est dans `host.bots` et
+  `host.startedAt` est nul). `renameBot` et `setBotRace` donnent l'ordre à la `Session` de l'IA
+  (`rename`, `chooseRace`) : sa fiche part comme d'habitude (`rec` → hôte → autres téléphones).
+  `removeBot` : l'IA se donne l'ordre `leave` (fiche marquée `left`, la plus récente), l'hôte
+  la reçoit tout de suite par `onRecord` (le lien en mémoire se ferme juste après, le message
+  en route serait perdu) et la relaie, puis l'IA s'arrête (`end`) et sort de `host.bots` et
+  `host.botIds`. **La fiche n'est pas effacée** : la fusion garde toujours la plus récente et
+  n'efface rien, une fiche supprimée reviendrait avec la copie d'un autre ; marquée `left`, elle
+  l'emporte sur toutes les copies et chacun la cache (`Session.roster`). `Session.resume` ne
+  réveille pas une IA partie. Une place libérée resservira : le compte des 8 joueurs
+  (`onHello`, `addBot`, bouton) se fait sur `roster`.
 
 ### 6.8 Heure commune et changement d'heure (D-165, D-166)
 - `now()` est l'**heure commune** : `clock()` = heure du téléphone à l'ouverture de la page +
