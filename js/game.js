@@ -433,7 +433,13 @@ export const RACES = {
 
 export const RACE_KEYS = Object.keys(RACES);
 
-/** Pouvoirs psychiques des aliens. */
+/** « 48 s » : une durée en ms, en secondes réelles (déjà divisée par TEMPO). */
+export const secs = (ms) => `${Math.round(ms / 1000)} s`;
+
+/**
+ * Pouvoirs psychiques des aliens. Tous les textes de durée (description, journal,
+ * toast, carte) se calculent depuis `duration` et `cooldown` (#75).
+ */
 export const POWERS = {
   lift: {
     name: 'Arrachement télékinésique',
@@ -443,9 +449,11 @@ export const POWERS = {
   },
   trance: {
     name: 'Transe collective',
-    desc: `L’extraction télékinésique double pendant ${Math.round(120 / TEMPO)} s.`,
     cooldown: 360_000 / TEMPO,
     duration: 120_000 / TEMPO,
+    get desc() {
+      return `L’extraction télékinésique double pendant ${secs(this.duration)}.`;
+    },
     cost: (pop) => ({ minerals: 0, energy: 25 * Math.ceil(pop) }),
   },
 };
@@ -1016,9 +1024,6 @@ export function powerCost(planet, key, pop = planet.pop) {
 }
 
 /**
- * Déclenche un pouvoir. Renvoie { error } ou { text } (résumé pour le journal).
- */
-/**
  * Minéraux qu'un arrachement ajouterait : pas plus que ce qu'il reste au sol,
  * ni que ce que l'entrepôt peut recevoir.
  */
@@ -1032,6 +1037,11 @@ export function liftGain(planet, amp = 1 + 0.25 * lv(planet.levels, 'amplifier')
   return Math.max(0, Math.min(Math.max(cap, before), before + Math.min(soil, LIFT_PER_PSI * planet.pop * amp)) - before);
 }
 
+/**
+ * Déclenche un pouvoir. Renvoie { error }, ou { text, toast } : `text` pour le
+ * journal partagé, `toast` pour le joueur. La durée de la transe vient de
+ * `POWERS.trance.duration` (jamais écrite en dur).
+ */
 export function usePower(planet, key, now) {
   if (planet.race !== 'alien') return { error: 'Seuls les aliens ont des pouvoirs psychiques.' };
   const P = own(POWERS, key);
@@ -1051,11 +1061,11 @@ export function usePower(planet, key, now) {
   if (key === 'lift') {
     planet.stock.minerals += gain;
     if (planet.nature?.minerals) planet.reserve = { ...planet.reserve, minerals: planet.reserve.minerals - gain };
-    return { text: `arrache ${fmt(gain)} minéraux par télékinésie` };
+    return { text: `arrache ${fmt(gain)} minéraux par télékinésie`, toast: `${P.name} : +${fmt(gain)} minéraux` };
   }
   // transe : extraction doublée pendant un temps.
   planet.trance = now + P.duration;
-  return { text: 'entre en transe collective : extraction doublée 2 min' };
+  return { text: `entre en transe collective : extraction doublée ${secs(P.duration)}`, toast: `${P.name} : extraction doublée ${secs(P.duration)}` };
 }
 
 // ---------------------------------------------------------------------------

@@ -87,6 +87,44 @@ scenario('l’arrachement est refusé, sans rien payer, quand il ne rapporterait
   assert.deepEqual(p.powers || {}, before.powers || {}, 'pas de recharge lancée');
 });
 
+scenario('#75 : le journal et le toast des pouvoirs donnent la vraie durée et le vrai gain', (film) => {
+  // Toutes les durées sont divisées par TEMPO : à TEMPO 2,5, la transe dure 120 / 2,5 = 48 s
+  // réelles, pas « 2 min ». A déclenche les deux pouvoirs depuis la vraie Session.
+  const { A, show } = stage(film, 'alien');
+  const p = planet('alien');
+  p.stock.energy = 500;
+  show(p, 'planète alien, 500 d’énergie : les deux pouvoirs sont prêts');
+  const toasts = [];
+  A.ontoast = (t) => toasts.push(t);
+  const gain = game.liftGain(p);
+  assert.ok(gain > 0);
+  A.power('lift');
+  A.power('trance');
+  show(A.state.players[A.me].planet, 'A a lancé l’arrachement puis la transe');
+  const log = A.state.log.map((e) => e.text);
+  const T = game.POWERS.trance;
+  const s = `${Math.round(T.duration / 1000)} s`;
+  assert.equal(s, `${Math.round(120 / game.TEMPO)} s`);
+  if (game.TEMPO === 2.5) assert.equal(s, '48 s');
+  // Journal (partagé) et toast (pour le joueur) : même durée que la carte du pouvoir.
+  assert.ok(log.some((t) => t.endsWith(`entre en transe collective : extraction doublée ${s}.`)), log.join(' | '));
+  assert.ok(log.some((t) => t.endsWith(`arrache ${game.fmt(gain)} minéraux par télékinésie.`)), log.join(' | '));
+  assert.deepEqual(toasts, [`Arrachement télékinésique : +${game.fmt(gain)} minéraux`, `Transe collective : extraction doublée ${s}`]);
+  assert.ok(T.desc.includes(s), T.desc);
+  assert.ok(!log.join(' ').includes('2 min'), 'plus de « 2 min » écrit en dur');
+  // Si la durée change (autre TEMPO), le texte suit : rien n'est écrit en dur.
+  const saved = T.duration;
+  try {
+    T.duration = 30_000;
+    const q = planet('alien');
+    q.stock.energy = 500;
+    assert.match(game.usePower(q, 'trance', T0).text, /doublée 30 s$/);
+    assert.match(T.desc, /pendant 30 s\./);
+  } finally {
+    T.duration = saved;
+  }
+});
+
 scenario('des clés héritées (constructor, __proto__…) sont refusées sans planter', (film) => {
   // Ces clés n'existent sur aucun bouton : l'image montre la planète de A après ces ordres
   // trafiqués, sans chantier, recherche ni vaisseaux lancés. Les pouvoirs (planète alien à part)

@@ -2674,7 +2674,7 @@ export class Session {
     const res = usePower(pl.planet, key, this.now());
     if (res.error) return this.ontoast?.(res.error);
     this.touch(this.addLog(`${p.name} ${res.text}.`));
-    this.ontoast?.(`${POWERS[key].name} !`);
+    this.ontoast?.(res.toast || `${POWERS[key].name} !`);
     this.changed();
   }
 

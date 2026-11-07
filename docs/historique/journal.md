@@ -446,6 +446,13 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 22:53 | `7bec2792` | Router : « VÉRIFIÉ » puis « MAIN A BOUGÉ — #161, #162, #166, #165, #163 et #164 sont mergées… VERSION de `sw.js` au-dessus de celle de `main` (v92) » | Fusion de `main` (sans rebase) : conflits `sw.js`, `decisions.md`, `tests-decisions.md`, `docs/README.md`, journal (les deux côtés gardés) ; cache v93 (D-231 mise à jour) ; 256/256 ; Chromium, serveur muet : accueil en 3048 ms | (PR #167) | D-230, D-231 |
 | 23:00 | `7bec2792` | Router : « MAIN A BOUGÉ (encore) — une autre PR, #179, a été mergée… Merge `origin/main`… VERSION au-dessus de celle de `main` » | Deuxième fusion de `main` (#179, D-201, qui prend aussi v93) : conflit du journal (les deux côtés gardés) ; cache v94 (D-231 mise à jour) ; tests et Chromium relancés | (PR #167) | D-231 |
 
+## 7 novembre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 06:00 | `8d3ef9fb` (worker-transe) | Worker du router (bugs ouverts) : corriger l'issue #75, « la transe alien "doublée 2 min" ne dure que 48 s » | `secs(ms)` et `usePower` → `{ text, toast }` (`js/game.js`) : journal et toast de la transe depuis `POWERS.trance.duration` (48 s), toast de l'arrachement avec son gain ; carte : recharge par `secs`, gain attendu de l'arrachement (`js/app.js`) ; `power()` affiche `res.toast` (`js/session.js`). Scénario dans `tests/rules.test.mjs` (échoue sur `main`) ; vu dans le vrai jeu contre l'IA (aliens) ; cache v95 | (PR fermant #75) | D-390, D-391 |
+| 06:30 | `8d3ef9fb` (worker-transe) | Router : « VÉRIFIÉ, avec 1 correction — … D-360 et D-361 sont déjà pris par la PR #183 (#44). Renumérote les tiennes en D-390 et D-391 » | Décisions renumérotées D-390, D-391 dans `decisions.md`, `tests-decisions.md`, `regles.md`, `interface.md`, le journal et la PR | (PR #184) | D-390, D-391 |
+
 ### Travaux en cours au 2026-10-29
 
 - **Rythme des parties** (`26f178b9`) : commité sur `claude/swarm-it-game-pacing-1d4502`
