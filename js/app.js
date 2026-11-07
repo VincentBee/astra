@@ -3014,7 +3014,7 @@ function openBotSheet(pid) {
   $('bot-name').value = p.name;
   $('bot-races').innerHTML = RACE_KEYS.map(
     (k) => `<button type="button" class="race" role="radio" aria-checked="${k === botRace}" data-botrace="${k}" style="--race:${RACES[k].color}">
-      <span class="race-top">${raceIcon(k)}<span class="race-name">${RACES[k].name}</span></span>
+      ${raceIcon(k)}<span class="race-name">${RACES[k].name}</span>
     </button>`,
   ).join('');
   $('sheet-bot').hidden = false;
