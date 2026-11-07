@@ -70,7 +70,8 @@ Créée par `addPlayer` (`js/session.js:696-713`), complétée par `normalize`
 | `rank` | heure d'arrivée (ordre d'arrivée) | `js/session.js:704` |
 | `actAt` | heure de la dernière modification (la plus récente gagne) | `js/session.js:712`, `touch` `js/session.js:586` |
 | `v` | version du format (`FORMAT = 7`) | `js/session.js:41`, `js/session.js:587` |
-| `race` | `human`, `machine` ou `alien`, choisie une seule fois | `chooseRace` `js/session.js:722-736` |
+| `race` | `human`, `machine` ou `alien` ; définitive dès que la partie part (avant, une IA peut en changer, D-400) | `chooseRace` |
+| `left` | heure à laquelle le joueur a quitté la partie avant le départ (IA retirée du lobby, D-399) ; absent sinon | `Session.leave` |
 | `ready` | heure à laquelle le joueur s'est dit prêt (D-120) ; absent tant qu'il ne l'est pas | `Session.ready` |
 | `go` | heure du départ, si c'est ce joueur qui l'a donné (tous les présents prêts, D-120) | `Session.begin` |
 | `since` | entrée dans la course : apparition de la flotte de départ (D-120), ou installation dans une partie d'avant | `enterRace`, `claimPlanet` |
@@ -199,7 +200,18 @@ l'intègre par pas (`js/game.js:13-15`).
     le suivent (chaque chantier garde l'ordre du fil) ;
   - le premier élément prêt **a la priorité sur le stock** : `stateAt` avance l'économie pas à
     pas (`until`) jusqu'à ce que le stock couvre son prix, au plus jusqu'au prochain événement ;
-    ceux d'après attendent (on ne double pas dans le fil pour une question de prix).
+    ceux d'après attendent (on ne double pas dans le fil pour une question de prix) ;
+  - **sauf un élément prêt qu'on ne pourra pas payer avec la production actuelle** (D-270,
+    `starved`) : une ressource de son prix manque au stock et ne peut pas monter (solde ≤ 0,
+    ou demande pas couverte : famine pour la nourriture, panne pour l'énergie). Il ne bloque
+    personne, **pas même les éléments de son propre chantier** (le réacteur qui répare la
+    panne part même s'il est derrière un bâtiment qui coûte de l'énergie). Il reste candidat :
+    `planNext` rend la liste de ces éléments-là, suivie du premier élément prêt payable un
+    jour, et `until` lance le premier de la liste que le stock couvre (si la ressource se remet
+    à rentrer, il repasse devant ceux qui le suivent). Sans famine ni panne, la liste n'a qu'un
+    élément : le calcul est celui d'avant. `planForecast` affiche alors sa raison (« Pas de
+    nourriture qui rentre », « Pas d’énergie qui rentre », « Pas de minéraux qui rentrent »)
+    au lieu de « plus de 6 h ».
   Trouvé : il paye, remplit sa file, sort du fil, et note `{ kind: 'start', lane, i, … }`
   dans `done` (`i` : sa place dans le fil de départ). Le fil avance aussi pendant une absence.
   `planForecast(planet, now)` part d'une copie soldée à `now`, refait ce calcul 10 min puis
@@ -514,6 +526,9 @@ pas (`ORDERS[kind]?.name || 'Ordre'`) et n'exécute jamais les ordres des flotte
   visible (`js/session.js:1088`), on perd la poursuite si la cible sort de vue
   (`js/session.js:1114-1119`), et on ne peut échanger qu'avec une flotte visible
   (`js/session.js:1228`).
+- **Journal** (D-210) : l'ordre d'une flotte (attaque, conquête, poursuite) est marqué de cette
+  flotte au journal partagé ; « Ce qui me concerne » ne le montre aux autres que tant qu'ils la
+  voient (`showsLog`). L'auteur le lit toujours ; le résultat du combat, toujours tout le monde.
 - **Brouillard sur les planètes** (D-124) : `knownOwner(cell)` dit ce que je sais d'une case.
   Mes planètes : toujours vues. Une case dans ma portée (`seesCell`) : son vrai propriétaire,
   retenu dans `intel` ({ "x,y": { pid, at } }), propre à ce téléphone, sauvegardé avec la
@@ -562,6 +577,20 @@ pas (`ORDERS[kind]?.name || 'Ordre'`) et n'exécute jamais les ordres des flotte
   (`assaultView`, D-160) joue `battle` à l'heure présente avec ce que je vois : « bataille
   perdue » si perdu, « victoire incertaine » si gagné sans voir les vaisseaux ou en perdant plus de
   la moitié de la flotte, sinon « victoire probable ».
+- **La cible se relit à l'arrivée** (D-200) : l'ordre garde `{ pid, key }` du propriétaire au
+  moment de l'ordre, mais la planète a pu changer de main pendant le trajet. `arrive` cherche
+  donc le propriétaire **actuel** de la case (`ownerAt(f.to)`, ce que mon téléphone sait au
+  passage qui traite l'arrivée) et sa planète sur cette case, pas la fiche de l'ancien
+  propriétaire (qui la montre encore tant qu'il n'a pas lu le rapport de prise).
+  - Propriétaire actuel = un autre joueur que celui de l'ordre : le même ordre (attaquer ou
+    conquérir) vise ce nouveau propriétaire, avec sa défense et son stock ; le journal dit
+    « C a pris Hadar à B entre-temps : la flotte de A l'attaque. ». Aucun rapport n'est écrit
+    pour l'ancien propriétaire.
+  - Propriétaire actuel = moi (une autre de mes flottes l'a prise juste avant) : pas de combat,
+    la flotte s'y pose (ordre `dock`), ses vaisseaux s'ajoutent à ceux de la colonie. Deux
+    conquêtes de suite font donc une seule prise.
+  - Plus de propriétaire : la flotte reste en orbite (« Plus personne n'habite … »).
+  - Pas d'alliances dans le jeu : aucun autre cas.
 - Hors de ma détection (D-190), `ordersAt` part de `knownOwner(cell)` : propriétaire retenu →
   « Attaquer X (joueur) · hors de portée : défense inconnue » (et « Conquérir »), sans défense
   ni estimation ; jamais vue → les ordres d'une planète libre. `moveFleet` ne refuse pas ce que
@@ -586,7 +615,8 @@ pas (`ORDERS[kind]?.name || 'Ordre'`) et n'exécute jamais les ordres des flotte
 - **Conquête** (`conquer` gagné, sur une case que le froid n'a pas prise) : le rapport porte en
   plus `capture: true` et `cell`. `Session.capture` crée tout de suite une colonie neuve de ma
   race sur la case (`newPlanet`, les bâtiments adverses sont perdus), avec les survivants, la
-  cargaison, le butin et le carburant ; la flotte s'y pose. `ownerAt` ne compte plus l'ancien
+  cargaison, le butin et le carburant ; la flotte s'y pose. La colonie porte `captured: true` :
+  elle n'a consommé aucun colonisateur (D-200). `ownerAt` ne compte plus l'ancien
   propriétaire dès que le rapport existe (même s'il ne l'a pas lu) ; `checkClaim` ne confond pas
   cette perte avec une installation simultanée. Le téléphone du perdant, en lisant le rapport
   (`applyEffects`, par la case et non la clé), appelle `losePlanet` (section 19).
@@ -743,7 +773,14 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
 
 ## 12. Installation et colonies
 
-- **Race** : choisie une fois, définitive (`chooseRace`, `js/session.js:722-736`).
+- **Race** : définitive dès que la partie part, ou dès qu'on a une planète (`chooseRace`). Avant, un
+  second `chooseRace` change de race (« X passe dans le camp des … ») : seul l'hôte d'une IA s'en
+  sert, depuis le lobby (D-400) ; l'écran d'un joueur ne propose le choix qu'une fois.
+- **IA du lobby (D-399, D-400)** : avant le départ, deux ordres de plus, notés au journal
+  (`ORDER_KINDS`) et donc rejoués : `rename(nom)` (nom coupé à 16 caractères, espaces retirés ;
+  vide ou inchangé → refusé, l'ancien reste) et `leave()` (champ `left` = heure ; `ready` et `go`
+  retirés). Après `leave`, `canAct` est faux. Un joueur parti n'est ni montré, ni compté
+  (`Session.roster` : les fiches sans `left`), ni attendu au départ (`notReady`), ni classé.
 - **Départ commun (D-120)** : après sa race, chaque joueur se dit prêt (ordre `ready`, champ
   `ready` = heure ; `ready(false)` le retire tant que la partie n'est pas partie). Un joueur qui
   n'a pas encore choisi sa race n'est pas prêt. `checkStart` (hors ordre, appelé par le minuteur
@@ -788,7 +825,8 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
   à l'heure d'arrivée `f.arrive` (`takenBefore`, `js/session.js:794-799`).
 - **Perdant** (choix simultanés, partie coupée en deux) : `checkClaim` rend la planète.
   Pour une colonie, `evacuate` remet vaisseaux (colonisateur compris), cargaison et carburant
-  en orbite (`js/session.js:840-889`). Pour une planète mère fondée par le colonisateur de
+  en orbite ; une colonie prise au combat (`captured`) ne rend que ses vaisseaux, sans
+  colonisateur en plus (D-200) (`js/session.js:840-889`). Pour une planète mère fondée par le colonisateur de
   départ (D-120), `evacuate` le remet de même en orbite : le joueur l'envoie sur une autre.
   Dans une partie d'avant, le joueur doit en choisir une autre (`js/session.js:853-862`).
 - **Fiche antidatée** (`backdated`) : une planète mère datée d'avant la fiche qui ne l'avait pas

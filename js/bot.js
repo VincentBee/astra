@@ -106,7 +106,7 @@ export function think(s, budget = BUDGET) {
 
 /** Race la moins prise par les autres (au hasard entre les ex æquo). */
 function pickRace(s) {
-  const taken = Object.values(s.state.players).map((o) => o.race);
+  const taken = s.roster.filter((o) => o.id !== s.me).map((o) => o.race);
   const keys = Object.keys(RACES);
   const fewest = Math.min(...keys.map((k) => taken.filter((r) => r === k).length));
   const pool = keys.filter((k) => taken.filter((r) => r === k).length === fewest);
@@ -404,7 +404,9 @@ class LocalLink {
     this.peer = null;
     this.closed = false;
     this.viaRoom = false;
-    this.local = true; // même téléphone, même horloge (D-165)
+    // Même téléphone : même horloge (D-165), et le silence ne veut rien dire, la page était
+    // seulement en pause (D-220).
+    this.local = true;
     this.queue = [];
     this.handler = null;
     this.closer = null;
@@ -511,7 +513,7 @@ function botSession(host, pid, timers, clock) {
  */
 export function addBot(host, { race = null, name = null, timers = true, clock = null } = {}) {
   const st = host.state;
-  if (!st || Object.keys(st.players).length >= 8) return null;
+  if (!st || host.roster.length >= 8) return null;
   const used = new Set(Object.values(st.players).map((o) => o.name));
   name ||= NAMES.find((n) => !used.has(n)) || `IA ${Object.keys(st.players).length + 1}`;
   const pid = newPid();
@@ -526,6 +528,47 @@ export function addBot(host, { race = null, name = null, timers = true, clock = 
   think(bot);
   host.changed();
   return bot;
+}
+
+/**
+ * L'IA `pid` que ce téléphone fait jouer, si l'hôte peut encore la modifier : seulement avant
+ * le départ (D-399, D-400). Sinon null.
+ */
+export function editableBot(host, pid) {
+  const bot = host.bots?.get(pid);
+  if (!bot || host.startedAt != null || !host.state?.players[pid] || Number.isFinite(host.state.players[pid].left)) return null;
+  return bot;
+}
+
+/**
+ * Retire du lobby l'IA `pid` (D-399) : elle quitte la partie (sa fiche, marquée `left`,
+ * part chez tous comme ses autres changements), puis s'arrête. Renvoie true si c'est fait.
+ */
+export function removeBot(host, pid) {
+  const bot = editableBot(host, pid);
+  if (!bot || !bot.leave()) return false;
+  // Sa fiche rejoint l'hôte tout de suite, par le même chemin qu'un message (le lien en
+  // mémoire se ferme juste après, le message en route serait perdu).
+  const link = host.links.get(pid);
+  const log = bot.state.log.at(-1);
+  if (link) host.onRecord(link, copy(bot.state.players[pid]), log);
+  bot.end();
+  host.bots.delete(pid);
+  host.botIds = (host.botIds || []).filter((x) => x !== pid);
+  host.changed();
+  return true;
+}
+
+/** Renomme l'IA `pid` (D-400). Un nom vide est refusé (elle garde l'ancien). */
+export function renameBot(host, pid, name) {
+  const bot = editableBot(host, pid);
+  return !!bot && bot.rename(name);
+}
+
+/** Change la race de l'IA `pid` (D-400), avant le départ. */
+export function setBotRace(host, pid, race) {
+  const bot = editableBot(host, pid);
+  return !!bot && bot.chooseRace(race);
 }
 
 /** Reprise d'une partie : les IA que ce téléphone faisait jouer se remettent à jouer. */
