@@ -758,6 +758,9 @@ const withCap = (v, cap) => `${fmt(v)}<span class="cap"> / ${fmt(cap)}</span>`;
 const compact = (v) => (v >= 1e5 ? `${fmt(Math.floor(v / 1000))} k` : fmt(v));
 
 // Toutes les fenêtres se ferment d'un toucher sur le fond sombre ou avec Échap (comme leur croix).
+// Échap ferme seulement celle du dessus (#72) : toutes les fenêtres ont le même z-index (style.css,
+// `.sheet`), donc celle qui se voit devant est la dernière ouverte dans l'ordre du HTML. Un deuxième
+// Échap ferme la suivante.
 for (const sheet of document.querySelectorAll('.sheet')) {
   sheet.addEventListener('click', (e) => {
     if (e.target === sheet) sheet.querySelector('.close-btn')?.click();
@@ -765,7 +768,7 @@ for (const sheet of document.querySelectorAll('.sheet')) {
 }
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  const open = [...document.querySelectorAll('.sheet')].find((s) => !s.hidden);
+  const open = [...document.querySelectorAll('.sheet')].findLast((s) => !s.hidden);
   open?.querySelector('.close-btn')?.click();
 });
 

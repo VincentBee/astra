@@ -107,6 +107,14 @@ Toutes se ferment par leur croix (`.close-btn`), un toucher sur le fond sombre o
 
 Style commun (D-302, celui du Journal, D-246) : une seule règle dans `style.css` (`.sheet`, `.sheet-panel`, `.sheet-head`) pour **toutes** les fenêtres, sans variante par fenêtre. `.sheet` fait `100dvh` (haut de l'écran visible, pas `inset: 0`, D-243), fond assombri, 12 px de marge ; le panneau est centré, prend toute la hauteur restante (`height: 100%`), 760 px de large au plus, bord de 1 px sur les quatre côtés ; son en-tête (titre, croix) est collé en haut (`position: sticky`) avec un trait dessous ; le contenu défile dans le panneau (`overscroll-behavior: contain`) et, tant qu'une fenêtre est ouverte, la page derrière ne défile pas (`body:has(.sheet:not([hidden])) { overflow: hidden; }`). Seuls l'espacement interne (`gap`) et le contenu changent d'une fenêtre à l'autre.
 
+Échap ne ferme que la fenêtre du dessus (D-192, issue #72) : toutes les fenêtres ont le même
+`z-index` (20, `.sheet` dans `style.css`), donc celle qui se voit devant est la **dernière visible
+dans l'ordre du HTML** ; le gestionnaire la prend avec `findLast` (`js/app.js`, « Toutes les
+fenêtres se ferment… »). Un deuxième Échap ferme la suivante. `tests/escape.test.mjs` vérifie ce
+dont la règle a besoin : un seul `z-index` pour les fenêtres, une croix dans chacune, `findLast`
+dans le gestionnaire. Si un jour une fenêtre reçoit son propre `z-index`, ou sort de l'ordre du
+HTML, cette règle ne tient plus : il faudra une pile d'ouverture.
+
 | Fenêtre | Ouverte par | Contenu / action | Code |
 |---|---|---|---|
 | `#sheet-players` (`index.html:203-216`) | `#net` (seulement après le départ, D-310 ; fermée par `renderLobby` tant que `mapVeiled()`) | Détail réseau, **Inviter un joueur**, classement (`#players`). | 319-327 ; liste `renderState` 765-779 ; lignes `renderLive` 835-865 (score, `style.order` pour trier sans redessiner, 864). |
