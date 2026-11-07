@@ -1337,18 +1337,39 @@ export class Session {
     const all = this.planetsOf(p);
     if (!all.length) return this.colonizerDeadAt(p, now);
     if (this.livePlanets(p, now).length) return null;
-    // Chaque planète perdue à l'heure du gel, ou de la prise lue dans le rapport de l'attaquant
-    // (D-180) : la mort d'un joueur hors ligne tombe à sa vraie heure, pas quand on s'en aperçoit.
-    const players = Object.values(this.state?.players || {});
-    const lostAt = (pl) => {
-      const frost = this.frostOf(pl.cell);
-      if (frost <= now) return frost;
-      const since = pl.key === 'home' ? p.claimAt || p.rank || 0 : pl.planet.claimAt || 0;
-      const caps = players.flatMap((o) => (o.effects || []).filter((e) => e.capture && e.to === p.id && sameCell(e.cell, pl.cell) && e.at >= since && !this.goneBy(o, e.at)).map((e) => e.at));
-      return caps.length ? Math.min(...caps) : now;
-    };
-    const t = Math.max(...all.map(lostAt));
+    const t = Math.max(...all.map((pl) => this.planetLostAt(p, pl, now)));
     return t <= now ? t : null; // demandé pour une heure d'avant la prise : encore en vie
+  }
+
+  /**
+   * Heure à laquelle le joueur `p` a perdu sa planète `pl` (un élément de planetsOf), vue par
+   * tous : l'heure du gel, ou de la prise lue dans le rapport `capture` de l'attaquant (D-180,
+   * D-400) : la mort d'un joueur hors ligne tombe à sa vraie heure, pas quand on s'en aperçoit.
+   * `now` si elle est perdue sans rapport connu (cas rare, non confirmé).
+   */
+  planetLostAt(p, pl, now) {
+    const frost = this.frostOf(pl.cell);
+    if (frost <= now) return frost;
+    const since = pl.key === 'home' ? p.claimAt || p.rank || 0 : pl.planet.claimAt || 0;
+    const players = Object.values(this.state?.players || {});
+    const caps = players.flatMap((o) => (o.effects || []).filter((e) => e.capture && e.to === p.id && sameCell(e.cell, pl.cell) && e.at >= since && !this.goneBy(o, e.at)).map((e) => e.at));
+    return caps.length ? Math.min(...caps) : now;
+  }
+
+  /**
+   * Points du joueur `p`, tombé à l'heure `dead`, juste avant sa chute (D-400). Sa fiche le dit
+   * (`deathPts`) quand son téléphone a vu sa chute. Sinon (hors ligne, sa fiche a encore tout),
+   * on les calcule comme lui le fera : les planètes perdues à cette heure-là (la dernière vague),
+   * pas celles perdues avant, et ses flottes encore en vie à cette heure. Ainsi le classement
+   * ne change pas quand il revient.
+   */
+  pointsAtDeath(p, dead) {
+    if (p.deathPts !== undefined) return p.deathPts;
+    const all = this.planetsOf(p);
+    if (Number.isFinite(p.out) || !all.length) return this.scoreOf(p);
+    const wave = all.filter((pl) => this.planetLostAt(p, pl, dead) >= dead);
+    const fleets = (p.fleets || []).filter((f) => this.fleetDeadAt(p, f, dead) > dead);
+    return empireScore(p.race, wave.map((x) => x.planet), fleets);
   }
 
   /** Fin de la partie, ou null : { at, winner }, la plus ancienne qu'un joueur a vue. */
@@ -1366,8 +1387,8 @@ export class Session {
   /**
    * Classement : [{ id, pts, dead, best }], les vivants d'abord, puis les derniers tombés, puis
    * les points. `pts` : ce que le joueur a maintenant (0 s'il a tout perdu). `best` départage :
-   * pour un joueur tombé, ses points juste avant sa chute (`deathPts`) ; une fiche qui n'a pas
-   * encore vu sa chute a encore ses planètes, donc ces mêmes points.
+   * pour un joueur tombé, ses points juste avant sa chute (pointsAtDeath, D-400), les mêmes
+   * avant et après qu'il a vu sa chute.
    */
   ranking(now = this.now()) {
     return Object.values(this.state?.players || {})
@@ -1375,7 +1396,7 @@ export class Session {
       .map((p) => {
         const pts = this.scoreOf(p);
         const dead = this.deadAt(p, now);
-        return { id: p.id, pts, dead, best: dead != null ? (p.deathPts ?? pts) : pts };
+        return { id: p.id, pts, dead, best: dead != null ? this.pointsAtDeath(p, dead) : pts };
       })
       .sort((a, b) => (a.dead ?? Infinity) !== (b.dead ?? Infinity) ? (b.dead ?? Infinity) - (a.dead ?? Infinity) : b.best - a.best || (a.id < b.id ? -1 : 1));
   }

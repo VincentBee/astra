@@ -449,6 +449,12 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 22:58 | `07a4ccd7` | Router : « MAIN A BOUGÉ — […] Merge `origin/main` dans ta branche (sans rebase), VERSION de `sw.js` au-dessus de celle de `main` » | Fusion de `main` (jusqu'à #167, cache v94) : conflits du journal et des décisions (les deux côtés gardés, D-290 après celles de `main`) et de `sw.js` (v95) ; tests relancés | (PR #168) | D-290 |
 | 22:56 | `worker-carte-froid` | Capture de la ligne du climat « Chaud ×1,10⚡ ×1,05◆ ×0,96🍃 » : « affiche les info dans les cards de ressource de la planette » (transmis par la session « Affichage aide ») | Coefficient du climat dans chaque carte de ressource (`[data-clim]`, `renderPlanet`, `js/app.js` ; style dans `style.css`) ; `#soil-climate` ne garde que le nom du climat ; `#pi-climate` inchangé. Vu dans le vrai jeu (bureau et 375 px, planète sans climat : rien affiché, pas d'erreur) ; cache v96 (`main` avait pris v94, puis v95) ; #179 (T1) déjà fusionnée, donc nouvelle PR | (PR climat) | D-221 |
 
+## 7 novembre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 07:50 | `1eb0cfdf` | Issue #77, transmise par le router : « l'heure de mort d'un joueur dont la planète a été prise est l'heure du combat […] elle ne change pas quand il revient » ; pour `best`, « les points de la victime à cette heure si `deathPts` manque » | Constaté : l'heure était déjà juste sur `main` (D-180). Reste corrigé : `best` d'une victime hors ligne (`pointsAtDeath`, planètes de la dernière vague + flottes en vie) ; `planetLostAt` sort de `deadAt`. `tests/finish.test.mjs` : 2 scénarios #77 ; 258/258 ; cache v96 | (cette PR) | D-400 |
+
 ### Travaux en cours au 2026-10-29
 
 - **Rythme des parties** (`26f178b9`) : commité sur `claude/swarm-it-game-pacing-1d4502`
