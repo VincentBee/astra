@@ -2456,6 +2456,10 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
   IA), même classement, même rejeu ; partie à 3 IA jouée jusqu'au bout (45 min) : même gagnant,
   même heure de fin. Test : `tests/bot.test.mjs` « D-370 » (7 IA, 22 min, copie complète contre
   copie D-370 : partie identique, < 100 Ko/s, au moins 5 fois moins de JSON).
+  Vrai jeu (`index.html`, 7 IA, Chromium ralenti 4× sur le Mac, deux parties en même temps,
+  graines différentes) : tâches longues (> 50 ms) minutes 13-25, avant 2 à 55 par minute (pire
+  166 ms), après **aucune** sur 25 min ; rendus complets 100-155 par minute avant, 90-142 après
+  (jamais plus d'un par image).
 - Limites : le nombre de messages reste en (nombre d'IA)², mais chacun coûte peu. Le critère
   de l'issue « 7 IA ≤ 3,5 × 2 IA » n'est pas tenu : minutes 20-25, messages 1,0 contre
   0,2 ms/s (5×), JSON 71 contre 8,3 Ko/s (8,5×) ; c'est le coût de chaque message qui a baissé ; la

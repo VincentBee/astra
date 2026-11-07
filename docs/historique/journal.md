@@ -450,7 +450,7 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 
 | Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
 |---|---|---|---|---|---|
-| 07:40 | `940aeddb` | Worker du router (bugs ouverts) : « Corriger l'issue #39 » (plusieurs IA ralentissent le téléphone de l'hôte) | `copyRec` (`js/bot.js`) : une fiche passe d'une Session à l'autre du téléphone sans recopier son journal d'ordres (entrées partagées et gelées) ; `onRecord` sans deuxième copie pour un lien `local` ; rendus groupés par image (`js/app.js`). Script `tests/perf-ia.mjs` ; 7 IA, min 20-25 : messages 9,2 → 1,0 ms/s, JSON 1 160 → 71 Ko/s ; même partie et même rejeu qu'avant (même graine) ; scénario D-370 ; 257/257 ; cache v95 | (PR, ferme #39) | D-370, D-371 |
+| 07:40 | `940aeddb` | Worker du router (bugs ouverts) : « Corriger l'issue #39 » (plusieurs IA ralentissent le téléphone de l'hôte) | `copyRec` (`js/bot.js`) : une fiche passe d'une Session à l'autre du téléphone sans recopier son journal d'ordres (entrées partagées et gelées) ; `onRecord` sans deuxième copie pour un lien `local` ; rendus groupés par image (`js/app.js`). Script `tests/perf-ia.mjs` ; 7 IA, min 20-25 : messages 9,2 → 1,0 ms/s, JSON 1 160 → 71 Ko/s ; vrai jeu (Chromium 4×, 25 min) : tâches longues après 13 min 2 à 55/min avant, 0 après ; même partie et même rejeu qu'avant (même graine) ; scénario D-370 ; 257/257 ; cache v95 | (PR, ferme #39) | D-370, D-371 |
 
 ### Travaux en cours au 2026-10-29
 
