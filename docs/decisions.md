@@ -2351,7 +2351,8 @@ les numéros d'après D-161. D-162 à D-169 restent à qui en a besoin.
 - Alternatives écartées : le coefficient sur la ligne du débit (« +12 / min ») ; garder aussi les
   chiffres sur la ligne du climat.
 - Source : capture et message de Vincent, transmis par la session « Affichage aide ».
-- Statut : en vigueur (PR suivante, après #179).
+- Statut : en vigueur (PR suivante, après #179), modifiée par D-311 (le nom du climat ne s'affiche
+  plus du tout dans l'en-tête de la vue planète ; les coefficients restent dans les cartes).
 
 **D-210 — Le Journal ne trahit plus l'ordre d'une flotte que je ne vois pas (issue #37)**
 - 2026-11-06 22:18. Contexte : issue #37. `moveFleet` (attaque, conquête) et `chaseFleet`
@@ -2603,3 +2604,20 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
 - Qui : Vincent (demande), router (cacher le bouton), Claude (fermer la fenêtre et couper le
   clic en préparation). Source : session `a10e3777`. Statut : en vigueur. Modifie D-242. Cache
   `astra-p2p-v98`.
+
+**D-311 — Plus de nom du climat dans l'en-tête de la vue planète** (modifie D-221)
+- 2026-11-07 08:16. Demande de Vincent (via le router), avec une capture de la vue planète
+  (« ← Rigel », « Chaud » en orange, boutons journal / alerte / réglages) : « retire le "Chaud" de
+  cette page ».
+- Choix : l'élément `#soil-climate` est supprimé de `#view-planet` (HTML), avec son écriture dans
+  `renderPlanet` et le code devenu mort : le paramètre `short` de `climateHtml` / `showClimate`
+  (seul `#soil-climate` s'en servait) et les règles CSS `.planet-head .climate` et
+  `#soil-zone .climate`. Le nom de la planète prend la place libre (`flex: 1 1 auto`) : les
+  boutons restent à droite, et le compteur de joueurs tient maintenant sur la même ligne en
+  375 px.
+- Ne change pas : les coefficients du climat dans les cartes de ressources (D-221), le climat dans
+  la fiche d'une planète sur la carte (`#pi-climate`), les règles du climat.
+- Alternative écartée : cacher l'élément sans le supprimer (code mort).
+- Qui : Vincent (demande) ; Claude (suppression du code mort, nom qui prend la place). Source :
+  session `d9ace210`. Statut : en vigueur. Cache `astra-p2p-v101` (v99 pour #189, v100 pour #186,
+  PR en cours).
