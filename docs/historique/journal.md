@@ -532,6 +532,12 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 22:33 | `3c9e3331` (worker-fil-ordre) | Worker du router, bug signalé par Vincent : « quand j'ai une fil d'action qui attend d'avoir assé de ressource pour construire le prochain item, je peux construire quelque chose de moins chere imediatement et ralonger le temps de construction du prochain item de la fil […] quand on a une fil, toute construction arrive a la fin de la fil » | Issue #194 créée (reproduit : Propulsion au fil, ferme lancée à la main, départ 62 s → 121 s). Fil pas vide : `build` / `research` / `buildShips` vont à la fin du fil (`js/session.js`), noté au journal sous le vrai nom ; vieux journaux rejoués pareil (`replaying`, `js/replay.js`) ; boutons en + dès que le fil n'est pas vide (`js/app.js`) ; IA sans recherche ni vaisseaux fil pas vide (`js/bot.js`). 4 scénarios (`tests/plan.test.mjs`) ; vrai jeu avant / après ; cache v120 | (PR, ferme #194) | D-420 |
 | 22:39 | `3c9e3331` (worker-fil-ordre) | Router : « À CORRIGER — PR #195 : prends l'option B pour les bots […] L'IA met ses recherches et ses vaisseaux au fil, sans doublon […] et ne dépasse jamais PLAN_MAX » | `js/bot.js` : fil pas vide, `planResearch` / `planShips` (une recherche et un lot au plus, technologie pas déjà demandée, `PLAN_MAX`), bâtiment dès que le fil n'en tient pas ; scénario D-151 complété ; parties de 3 IA avant / après (graines 1 à 3) : points −3 à −8 %, recherche 12 → 14 ; 323/323 | (PR #195) | D-421 |
 
+## 8 novembre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 12:25 | `6700d27f` (worker-titre-ellipsis) | Worker du router, demande de Vincent avec une capture de « Bételgeuse » : « Il y a encore un petit problème d'overflow quand le nom de la planète est trop grand. Il faut ellipsis le nom de la planète. » | `.planet-head h2` : `flex: 1 1 0; width: 0` (`style.css`) : le nom se coupe en « … », les boutons restent sur une ligne, un très long nom n'élargit plus la page ; nom complet en `title` (`js/app.js`). Vrai jeu (Chrome, 360 et 320 px) avant / après ; limite à 320 px avec 5 boutons (9 px pour le nom) posée au router ; 323/323 ; cache v121 | (PR) | D-422 |
+
 ### Travaux en cours au 2026-10-29
 
 - **Rythme des parties** (`26f178b9`) : commité sur `claude/swarm-it-game-pacing-1d4502`

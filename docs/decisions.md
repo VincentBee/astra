@@ -2716,6 +2716,8 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
 - Qui : Vincent (demande) ; Claude (suppression du code mort, nom qui prend la place). Source :
   session `d9ace210`. Statut : en vigueur. Cache `astra-p2p-v101` (v99 pour #189, v100 pour #186,
   toutes deux fusionnées dans `main` avant cette PR ; `main` fusionné dans la branche à 08:52).
+  Modifiée par D-422 (`flex: 1 1 0` et `width: 0` : un nom long se coupe au lieu de pousser les
+  boutons à la ligne).
 
 **D-312 — La fiche de planète de la carte met aussi les vaisseaux au fil**
 - 2026-11-07 08:27. Demande de Vincent (via le router) : « on devrait pouvoir rajouter la
@@ -3468,3 +3470,29 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   et des recherches mises au fil. 323/323.
 - Qui : router (option B), Claude (détails). Source : session `3c9e3331`, PR #195. Statut : en
   vigueur. Modifie D-420 (partie IA) et D-151.
+
+**D-422 — Un nom de planète long se coupe en « … » ; les boutons de l'en-tête restent sur une ligne** (modifie D-311)
+- 2026-11-08 12:25 UTC. Demande de Vincent (via le router), avec une capture de la vue
+  « Bételgeuse » : « Il y a encore un petit problème d'overflow quand le nom de la planète est
+  trop grand. Il faut ellipsis le nom de la planète. »
+- Cause : `.planet-head` est en `flex-wrap` (pour la liste des alertes, D-111) et le nom avait
+  `flex: 1 1 auto`. Sa base était donc la largeur du texte : quand le nom et les boutons ne
+  tenaient pas, le navigateur passait un bouton à la ligne au lieu de couper le nom. Mesuré dans
+  le vrai jeu : 360 px avec l'alerte ⚠ 1, « Bételgeuse » → le compteur de joueurs passe dessous ;
+  un nom très long (sans espace où couper : `nowrap`) élargissait même la grille de l'écran, donc
+  la page (513 px pour 320 px d'écran).
+- Choix : `.planet-head h2 { flex: 1 1 0; width: 0; min-width: 0 }` (`style.css`). Base 0 : le
+  nom prend seulement la place qui reste et finit en « … » ; `width: 0` : il ne compte plus dans
+  la largeur de la grille. Le nom complet est en `title` du titre (`renderPlanet`, `js/app.js`).
+  Un nom court s'affiche comme avant.
+- Limite connue : à 320 px avec les cinq boutons (retour, Journal, ⚠, Réglages, joueurs), il ne
+  reste que 9 px pour le nom (on ne voit que le début d'une lettre). Question posée au router
+  (resserrer l'en-tête sous 360 px ?) ; par défaut, rien d'autre ne change. Non confirmé par
+  l'utilisateur.
+- Écarté : garder `flex: 1 1 auto` et retirer `flex-wrap` (la liste des alertes ne passerait
+  plus sous l'en-tête) ; donner au nom une largeur minimale (les boutons repasseraient à la
+  ligne sur petit écran).
+- Même défaut ailleurs : non. La carte n'a pas de nom long dans son en-tête (coordonnées et
+  boutons dans `.pi-head-right`).
+- Qui : Vincent (demande) ; Claude (choix CSS). Source : session `6700d27f`. Statut : en vigueur.
+  Cache `astra-p2p-v121`.

@@ -816,9 +816,12 @@ html.view-only .screen { pointer-events: none; }
 #race-others .rci { width: 18px; height: 18px; }
 
 /* Nom de la planète (sans son climat, D-311) : il prend la place libre, les boutons restent à
-   droite. */
+   droite. Base 0 (D-422) : avec `auto`, un nom long faisait passer les boutons à la ligne
+   (l'en-tête est en `flex-wrap` pour la liste des alertes) au lieu de se couper en « … ».
+   width: 0 : sinon un très long nom (sans espace possible : nowrap) élargissait la grille de
+   l'écran, donc la page. */
 .planet-head { gap: 10px; flex-wrap: wrap; }
-.planet-head h2 { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.planet-head h2 { flex: 1 1 0; width: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Compteur de joueurs en ligne (barre du haut) : ouvre la fenêtre des joueurs. */
 button.net-btn {
