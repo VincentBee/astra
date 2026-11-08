@@ -3468,3 +3468,38 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   et des recherches mises au fil. 323/323.
 - Qui : router (option B), Claude (détails). Source : session `3c9e3331`, PR #195. Statut : en
   vigueur. Modifie D-420 (partie IA) et D-151.
+
+**D-460 — Écran de fin : le gagnant du bandeau en tête, avec l'or**
+- 2026-11-08 12:15 UTC. Contexte : issue #79 (audit du 2026-11-05, code-fin-07). `finalBoard`
+  rangeait les joueurs par `ranking(over.at)` et donnait l'or au premier, sans lire
+  `over.winner`. Quand la fin a été écrite sur une vue périmée, ou que les fiches ont changé
+  depuis, le bandeau disait « J2 gagne. » et l'écran de fin mettait J0 1er, en or, « en vie ».
+- Choix : `finalBoard` (`js/finish.js`) met `over.winner` à la place 1, puis les autres dans
+  l'ordre de `ranking(over.at)` ; places et médailles suivent ce nouvel ordre. Le bandeau et
+  l'écran de fin disent la même chose.
+- Écarté : figer le classement dans `p.over` au moment de la fin (change la fiche et le réseau,
+  pour un écran) ; corriger seulement les causes en amont (code-fin-03 à 05, d'autres issues) :
+  l'écran resterait fragile.
+- Vérifié : `tests/finish.test.mjs` « #79 : la fin écrite nomme un gagnant… » (échoue sur
+  `main`) ; `tests/end.test.mjs` vérifie le 1er de l'écran de fin dans deux parties à gagnant.
+- Qui : Claude, par défaut (piste de l'issue). Source : session `066d0da8`, issue #79.
+  Statut : en vigueur. Modifie D-143.
+
+**D-461 — Écran de fin : la ligne du gagnant dit « gagne », jamais « éliminé »**
+- 2026-11-08 12:15 UTC. Contexte : issue #79 (jeu-solo-04). Quand le froid prend tout le monde,
+  le dernier tombé gagne (§19.4) ; sa ligne disait « éliminé », comme celles des perdants.
+- Choix : `finalBoard` donne `winner` (vrai pour `over.winner`) et `status`, le texte sous le
+  nom : « en vie · gagne » ou « tombé en dernier · gagne » pour le gagnant, « éliminé » ou
+  « en vie » pour les autres. `js/app.js` affiche `status` ; la ligne du gagnant n'a pas la
+  classe `.dead` (nom pas grisé).
+- Écarté : « dernier en vie » (faux : il est tombé aussi) ; ne rien écrire sous le gagnant.
+- Vérifié : `tests/finish.test.mjs` « #79 : le froid prend tout le monde… » (échoue sur
+  `main`) ; vrai jeu, captures avant / après dans la PR.
+- Qui : Claude, par défaut (libellés). Source : session `066d0da8`, issue #79. Statut : en
+  vigueur. Modifie D-143.
+
+**D-462 — Cache `astra-p2p-v121`**
+- 2026-11-08. Contexte : `main` est en v120 ; `js/finish.js` et `js/app.js` changent.
+- Choix : `VERSION` passe à `astra-p2p-v121` pour que les téléphones prennent les nouveaux
+  fichiers.
+- Qui : Claude, par défaut. Source : session `066d0da8`. Statut : en vigueur.

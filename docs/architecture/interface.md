@@ -575,7 +575,9 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   (qui revient aussi sur la carte) le ferment.
 - Chaque ligne `.finish-row` : médaille `.medal` (carré avec la place ; `.gold`, `.silver`,
   `.bronze` aux trois premiers s'il y a un vainqueur), pastille de couleur, nom (« toi » pour
-  moi), race · « éliminé » ou « en vie », points (`best`). Ma ligne : `.me` (bordure et trait
+  moi), race · `status` (« en vie · gagne » ou « tombé en dernier · gagne » pour le gagnant,
+  sinon « éliminé » ou « en vie », D-461), points (`best`). Le gagnant (`over.winner`) est
+  toujours 1er, comme dans le bandeau (D-460) ; sa ligne n'est jamais grisée (`.dead`). Ma ligne : `.me` (bordure et trait
   bleus à gauche). Données : `finalBoard` (`js/finish.js`), testé dans `tests/finish.test.mjs`.
 - Couleurs : `--gold` `#f5c542`, `--silver` `#c9d1e3`, `--bronze` `#d08a52` (`style.css`,
   `:root`).

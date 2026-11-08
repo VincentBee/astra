@@ -5,6 +5,7 @@ import { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame, game, fleet } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
+import { finalBoard } from '../js/finish.js';
 
 const scenario = scenarios(import.meta.url);
 
@@ -114,6 +115,7 @@ scenario('à deux, celui que le froid prend en dernier gagne, même si l’autre
   sync(first, last);
   film.look(first, 'le perdant reçoit la fin de partie', [{ show: 'gagnant, chez le perdant', expected: last.me, got: first.over?.winner }]);
   assert.equal(first.over?.winner, last.me, 'la fin se propage');
+  for (const s of [first, last]) assert.equal(finalBoard(s).rows[0].id, last.me, 'écran de fin : le gagnant en tête (#79)');
   const levels = JSON.stringify(me(first).planet.levels);
   first.build('mine');
   film.look(first, 'le perdant ordonne une mine après la fin : rien ne change', [{ show: 'bâtiments changés', expected: false, got: JSON.stringify(me(first).planet.levels) !== levels }]);
@@ -478,6 +480,7 @@ scenario('mort simultanée : le meilleur score d’avant la chute gagne, les poi
   ]);
   assert.equal(B.over?.winner, B.me);
   assert.equal(A.over?.winner, B.me);
+  for (const s of [A, B]) assert.deepEqual([finalBoard(s).rows[0].id, finalBoard(s).rows[0].status], [B.me, 'tombé en dernier · gagne'], 'écran de fin : le gagnant en tête, pas « éliminé » (#79)');
 });
 
 /**
