@@ -499,7 +499,7 @@ Aucune conversation ne les prouve.
 - 2026-10-28 21:47. Choix : plus de « appuie encore une fois » ; l'ancienne partie va dans
   l'historique (reprendre, revoir, oublier) ; l'identité du joueur est gardée par partie.
 - Qui : Vincent (demande) ; le nombre 10 et les boutons par Claude.
-- Source : `f4afbcd0` 21:47:41, 21:50:00 ; `1eeb2c1`. Statut : en vigueur (`KEEP = 10`) ; stockage modifié par D-415 (une clé par partie, les plus vieilles retirées si la mémoire est pleine).
+- Source : `f4afbcd0` 21:47:41, 21:50:00 ; `1eeb2c1`. Statut : en vigueur (`KEEP = 10`) ; stockage modifié par D-415 (une clé par partie, les plus vieilles retirées si la mémoire est pleine) ; identités complétées par D-520 (elles suivent l'historique).
 
 **D-067 — Parallaxe : pas au doigt, mais à l'accéléromètre**
 - 2026-10-28 22:15–22:16. Choix : le glissé du doigt ne bouge pas les étoiles (sinon elles
@@ -3494,3 +3494,24 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   flottes décoller ou scinder est refusé, puis permis de nouveau à 15. Tous échouent sur `main`.
 - Qui : Claude par défaut, validé par le router (option A, réponse du 2026-11-08). Source : session `f5d122f7`, issue #80. Statut :
   en vigueur. Cache `astra-p2p-v121`.
+
+**D-520 — Les identités suivent l'historique ; « Oublier » efface aussi `astra.identity`**
+- 2026-11-08 12:20 UTC. Contexte : issue #88. « Oublier » retirait la partie et son entrée de
+  `astra.identities`, mais laissait `astra.identity` (la partie en cours) ; `identities()` la
+  remettait dans l'historique à la sauvegarde suivante, secret compris. Et rien n'élaguait
+  `astra.identities` : 12 identités pour 10 parties gardées après 12 créations.
+- Choix (`js/save.js`) :
+  - `forgetGame(gid)` efface `astra.identity` si c'est l'identité de `gid` (pas sinon).
+  - Quand l'historique change de partie (`archiveSave`, appelée par `saveGame` et `selectGame`),
+    `pruneIdentities` ne garde que les identités des parties de l'index `astra.games`, de la
+    partie en cours, et de l'identité en cours (une partie rejointe ou créée pas encore sauvée :
+    `Session.create` et `onWelcome` appellent `saveIdentity` avant la première sauvegarde).
+  - Une partie retirée par manque de mémoire (`fit()`, D-415) garde son identité jusqu'au
+    prochain changement de partie (≈ 70 caractères) : accepté, pour ne pas toucher `fit()`.
+- Écarté : élaguer dans `saveIdentity` seulement (rien n'écrit `astra.identities` quand une
+  partie sort de l'historique : on resterait à 11 pour 10) ; élaguer dans `drop()` (aussi appelé
+  quand une partie passe de l'historique à la partie en cours, dont l'identité doit rester).
+- Vérifié : scénario D-520 (`tests/decisions-reseau.test.mjs`), échoue sur `main` ; vrai
+  navigateur (« Oublier », puis `localStorage` avant / après).
+- Qui : Claude par défaut (règle proposée par l'issue). Source : session `1470f4be`
+  (worker-identites), issue #88. Statut : en vigueur. Complète D-066 et D-415. Cache `astra-p2p-v122` (v121 prise par D-470).
