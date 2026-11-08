@@ -3468,3 +3468,27 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   et des recherches mises au fil. 323/323.
 - Qui : router (option B), Claude (détails). Source : session `3c9e3331`, PR #195. Statut : en
   vigueur. Modifie D-420 (partie IA) et D-151.
+
+**D-470 — Les vaisseaux d'une planète rendue repartent en orbite même au-delà de 16 flottes (issue #80)**
+- 2026-11-08 12:10 UTC. Contexte : quand deux joueurs s'installent sur la même planète, celui
+  arrivé après la rend (`checkClaim`) ; `evacuate` remet ses vaisseaux (colonisateur compris),
+  sa cargaison et son carburant en flotte, en orbite. À 16 flottes (`MAX_FLEETS`), `evacuate`
+  renvoyait `null` et la colonie était effacée quand même : tout ce qui y était posé
+  disparaissait, sans message. Même chose pour une planète mère fondée par le colonisateur de
+  départ (D-120).
+- Choix (option A) : `evacuate` ne regarde plus `MAX_FLEETS`. C'est un retour forcé, pas un
+  ordre : la flotte rendue peut être la 17ᵉ. La limite tient toujours pour les ordres du joueur
+  (`takeOff`, Scinder, IA : `>= MAX_FLEETS`) : il ne relance une flotte qu'une fois revenu sous
+  16. Aucun téléphone ne refuse une fiche qui a plus de 16 flottes (vérifié dans
+  `js/session.js`).
+- Écarté : (B) fusionner avec une de mes flottes arrêtées sur la case, sinon dépasser : plus de
+  code pour un cas rare, et il faut quand même dépasser quand aucune flotte n'est là ; garder la
+  colonie en attente : un état de plus à synchroniser ; un simple message : les vaisseaux
+  restaient perdus.
+- L'évacuation ne peut plus échouer avec des vaisseaux à bord : `evacuate` prend tous les
+  vaisseaux de la colonie, une cargaison et un carburant bornés par les soutes, les réservoirs
+  et le stock ; `launch` (`js/fleet.js`) ne refuse alors qu'une flotte vide (colonie prise au
+  combat sans vaisseau posé, D-200), où il n'y a rien à rendre. Pas de toast à ajouter.
+- Vérifié : 2 scénarios (`tests/end.test.mjs`, « #80 : … »), qui échouent sur `main`.
+- Qui : Claude (option A, proposée au router). Source : session `f5d122f7`, issue #80. Statut :
+  en vigueur. Cache `astra-p2p-v121`.
