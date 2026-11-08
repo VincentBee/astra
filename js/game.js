@@ -946,7 +946,8 @@ export function planForecast(planet, now) {
     } else out = { key: item.ship, count: item.n, cost: shipsCost(race, item.ship, item.n) };
     let why = null;
     if (!hit) {
-      why = (stuck[lane] && `Attend ${stuck[lane]}`) || need.why || (dry && NO_INCOME[dry]) || null;
+      // Sa propre raison d'abord (« Plus de place »…), sinon l'élément qui bloque son chantier.
+      why = need.why || (stuck[lane] && `Attend ${stuck[lane]}`) || (dry && NO_INCOME[dry]) || null;
       if (need.why && !stuck[lane]) stuck[lane] = planName(race, item, out);
     }
     return { item, lane, ...out, start: hit?.start ?? null, end: hit?.end ?? null, why };

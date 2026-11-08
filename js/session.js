@@ -1857,8 +1857,9 @@ export class Session {
     if (Number.isFinite(pl.planet.places) && taken >= pl.planet.places) return this.ontoast?.(`Plus de place : les ${pl.planet.places} places de cette planète seront prises.`);
     // Prix plus grand que l'entrepôt, même une fois le fil fini : il ne partirait jamais et
     // bloquerait les bâtiments mis après lui (#50, D-441). L'entrepôt au fil ou en chantier compte.
+    // Au rejeu, un vieux journal garde son sens (comme D-420).
     const ahead = planAhead(stateAt(pl.planet, pl.planet.at)).levels;
-    const big = tooBig(p.race, ahead, upgradeCost(p.race, key, ahead[key] || 0));
+    const big = !this.replaying && tooBig(p.race, ahead, upgradeCost(p.race, key, ahead[key] || 0));
     if (big) return this.ontoast?.(`${big} (fil compris).`);
     pl.planet.plan = [...plan, key];
     this.touch(this.addLog(`${p.name} ajoute ${R.buildings[key].name} au fil de ${pl.name}.`));

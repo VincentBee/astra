@@ -3479,8 +3479,9 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   pas que la centrale ne partira jamais.
 - Choix : `planForecast` (`js/game.js`) garde, pour chaque chantier, le premier élément sans
   départ qui a une raison de bloquer (`planNeed` : place, labo, prérequis, chantier naval,
-  entrepôt). Les éléments suivants du même chantier, sans départ, disent « Attend Mine niv 8 »
-  (`planName`). Les autres chantiers ne sont pas touchés. Un élément qui attend une ressource qui
+  entrepôt). Les éléments suivants du même chantier, sans départ et sans raison à eux, disent
+  « Attend Mine niv 8 » (`planName`) ; un élément qui a sa propre raison (« Plus de place »…) la
+  garde. Les autres chantiers ne sont pas touchés. Un élément qui attend une ressource qui
   ne rentre plus (D-270) ne bloque personne et ne compte pas. La raison « Entrepôt trop petit »
   dit maintenant le niveau qu'il faut : « Entrepôt trop petit : il faut Entrepôt niv 1 »
   (`storeFor`, `storeShort`). La règle du fil ne change pas (D-158).
@@ -3500,7 +3501,8 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   se voit pas au doigt). Un entrepôt mis au fil avant compte : « entrepôt, puis mine niv 8 » se
   met au fil d'un coup, comme les prérequis des recherches (D-158). Seulement les bâtiments : un
   fil d'avant qui tient déjà un tel élément est affiché par D-440. L'IA n'est pas touchée : elle
-  monte l'entrepôt avant (`chooseBuilding`, marge de 5 %).
+  monte l'entrepôt avant (`chooseBuilding`, marge de 5 %). Au rejeu (`replaying`), un vieux
+  journal garde son sens : le refus ne joue pas, comme D-420.
 - Écarté : (B) accepter et marquer (le joueur peut encore se piéger). Recherches et vaisseaux :
   non traités ici (aucun cas vu ; à voir si besoin).
 - Qui : Claude (option A recommandée au router ; réponse non confirmée au moment du commit).

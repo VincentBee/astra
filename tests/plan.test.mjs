@@ -608,3 +608,13 @@ scenario('#50 : le joueur ne peut pas mettre au fil un bâtiment plus cher que l
   film.look(a, 'entrepôt au fil d’abord, puis la mine : acceptée', [{ show: 'fil', at: home, expected: ['store', 'mine'], got: pa().plan }]);
   assert.deepEqual(pa().plan, ['store', 'mine']);
 });
+
+scenario('#50 : un élément qui a sa propre raison la garde, même derrière un élément bloqué', (film) => {
+  const { show } = stage(film);
+  const p = poor();
+  p.places = game.usedPlaces(p.levels);
+  p.plan = ['mine', 'farm'];
+  show(p, 'planète pleine : mine puis ferme au fil, chacune dit « Plus de place »', T0);
+  const f = game.planForecast(p, T0);
+  assert.deepEqual(f.map((x) => x.why), ['Plus de place', 'Plus de place']);
+});

@@ -536,7 +536,7 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 
 | Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
 |---|---|---|---|---|---|
-| 12:20 | `b0b71c59` (worker-fil-entrepot) | Worker du router : « Corriger l'issue GitHub #50 » (un bâtiment trop cher pour l'entrepôt bloque les suivants sans le dire) | Vérifié sur `main` (75a269d) : toujours là. `planForecast` : « Attend Mine niv 8 » pour la suite du chantier bloqué, « Entrepôt trop petit : il faut Entrepôt niv 1 » (`js/game.js`) ; `planBuild` refuse un bâtiment plus cher que l'entrepôt de fin de fil (`js/session.js`) ; bouton + grisé, raison sur la carte, plafond sur la carte Entrepôt (`js/app.js`, `style.css`). 2 scénarios (`tests/plan.test.mjs`, échouent sur `main`) ; vrai jeu avant / après (Chrome, 375 px) ; cache v121 | (PR, ferme #50) | D-440, D-441, D-442, D-443 |
+| 12:20 | `b0b71c59` (worker-fil-entrepot) | Worker du router : « Corriger l'issue GitHub #50 » (un bâtiment trop cher pour l'entrepôt bloque les suivants sans le dire) | Vérifié sur `main` (75a269d) : toujours là. `planForecast` : « Attend Mine niv 8 » pour la suite du chantier bloqué, « Entrepôt trop petit : il faut Entrepôt niv 1 » (`js/game.js`) ; `planBuild` refuse un bâtiment plus cher que l'entrepôt de fin de fil (`js/session.js`) ; bouton + grisé, raison sur la carte, plafond sur la carte Entrepôt (`js/app.js`, `style.css`). 3 scénarios (`tests/plan.test.mjs`, les 2 premiers échouent sur `main`) ; refus ignoré au rejeu (`replaying`, comme D-420) ; 326/326 ; vrai jeu avant / après (Chrome, 375 px) ; cache v121 | (PR, ferme #50) | D-440, D-441, D-442, D-443 |
 
 ### Travaux en cours au 2026-10-29
 
