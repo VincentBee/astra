@@ -560,3 +560,51 @@ scenario('rejeu : les ordres envoyés au fil et un vieux journal « tout de suit
   film.look(a, '10 min plus tard : la partie rejouée retombe sur la même fiche', [{ show: 'fiche rejouée à l’identique', expected: true, got: same }]);
   for (const p of Object.values(a.state.players)) assert.equal(comparable(r.players[p.id]), comparable(p), `fiche de ${p.name}`);
 });
+
+scenario('#50 : derrière un bâtiment trop cher pour l’entrepôt, la suite du chantier dit qu’elle l’attend', (film) => {
+  const { show } = stage(film);
+  const p = poor();
+  // Mine niv 4 → niv 8 (1 025 minéraux, l'entrepôt de départ en tient 1 000), puis ferme et centrale.
+  p.plan = ['mine', 'mine', 'mine', 'mine', 'farm', 'solar'];
+  show(p, 'A met 4 mines, une ferme et une centrale au fil, sans entrepôt', T0);
+  const f = game.planForecast(p, T0);
+  assert.deepEqual(f.map((x) => `${x.key} ${x.level}`), ['mine 5', 'mine 6', 'mine 7', 'mine 8', 'farm 2', 'solar 3']);
+  assert.equal(f[3].start, null);
+  assert.equal(f[3].why, 'Entrepôt trop petit : il faut Entrepôt niv 1');
+  // Avant : « plus de 6 h » (why null) pour la ferme et la centrale, sans dire pourquoi.
+  assert.equal(f[4].why, 'Attend Mine niv 8');
+  assert.equal(f[5].why, 'Attend Mine niv 8');
+  // Les autres chantiers (recherche, vaisseaux) ne sont pas concernés : un entrepôt mis au fil
+  // derrière est, lui aussi, bloqué (même chantier), et le dit.
+  p.plan = ['mine', 'mine', 'mine', 'mine', 'store'];
+  assert.equal(game.planForecast(p, T0)[4].why, 'Attend Mine niv 8');
+  // L'entrepôt mis au fil avant la mine : plus rien ne bloque.
+  p.plan = ['store', 'mine', 'mine', 'mine', 'mine', 'farm'];
+  assert.ok(game.planForecast(p, T0).every((x) => !x.why));
+  assert.equal(game.storeFor({ minerals: 1025, energy: 0 }), 1);
+  assert.equal(game.tooBig('human', { store: 0 }, { minerals: 1025, energy: 0 }), 'Entrepôt trop petit : il faut Entrepôt niv 1');
+  assert.equal(game.tooBig('human', { store: 1 }, { minerals: 1025, energy: 0 }), null);
+});
+
+scenario('#50 : le joueur ne peut pas mettre au fil un bâtiment plus cher que l’entrepôt (fil compris)', (film) => {
+  const { players } = newGame(1);
+  const [a] = players;
+  const pa = () => a.state.players[a.me].planet;
+  const toasts = [];
+  a.ontoast = (t) => toasts.push(t);
+  const home = a.state.players[a.me].home;
+  pa().levels = { ...pa().levels, mine: 7 }; // la mine niv 8 coûte 1 025 minéraux, l'entrepôt en tient 1 000
+  pa().stock = { ...pa().stock, minerals: 0 };
+  a.planBuild('mine');
+  film.look(a, 'A veut mettre la mine niv 8 au fil, sans entrepôt : refusé', [
+    { show: 'fil', at: home, expected: [], got: pa().plan || [] },
+    { show: 'message', expected: 'Entrepôt trop petit : il faut Entrepôt niv 1 (fil compris).', got: toasts.at(-1) },
+  ]);
+  assert.deepEqual(pa().plan || [], []);
+  assert.equal(toasts.at(-1), 'Entrepôt trop petit : il faut Entrepôt niv 1 (fil compris).');
+  // Un entrepôt au fil d'abord : la mine niv 8 passe.
+  a.planBuild('store');
+  a.planBuild('mine');
+  film.look(a, 'entrepôt au fil d’abord, puis la mine : acceptée', [{ show: 'fil', at: home, expected: ['store', 'mine'], got: pa().plan }]);
+  assert.deepEqual(pa().plan, ['store', 'mine']);
+});

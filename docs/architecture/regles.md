@@ -216,7 +216,10 @@ l'intègre par pas (`js/game.js:13-15`).
   dans `done` (`i` : sa place dans le fil de départ). Le fil avance aussi pendant une absence.
   `planForecast(planet, now)` part d'une copie soldée à `now`, refait ce calcul 10 min puis
   6 h plus loin, et rend pour chaque élément `{ item, lane, key, level, count, cost, start,
-  end, why }` (affichage seulement). `planAhead(s)` donne les niveaux et technologies une fois
+  end, why }` (affichage seulement). Un élément sans départ qui bloque son chantier (`planNeed`
+  donne une raison) fait dire aux suivants du même chantier « Attend Mine niv 8 » au lieu de
+  « plus de 6 h » (#50, D-440) ; l'entrepôt trop petit dit le niveau qu'il faut : « Entrepôt
+  trop petit : il faut Entrepôt niv 1 » (`storeFor`, `storeShort`). `planAhead(s)` donne les niveaux et technologies une fois
   fini tout ce qui est lancé ou au fil : c'est sur eux qu'on ajoute au fil.
 - `settle(planet, now)` (`js/game.js:591-607`) écrit cet état dans la planète. Seul le
   propriétaire l'appelle. **Une heure qui recule est ignorée** : `now = max(now, planet.at)`,
@@ -303,7 +306,8 @@ Tests : `tests/alerts.test.mjs`. L'affichage est dans [interface.md](interface.m
   place) ne disparaît qu'à la fin du chantier. La file `queue` porte alors `demolish: true` ;
   `stateAt` applique `levels[key] = job.level` comme pour une construction (le niveau baisse).
 - **Fil d'attente** (D-105, D-158) : ordres `Session.planBuild(key, where)` (bâtiment ; refusé
-  si les places bâties + le chantier + les bâtiments du fil atteignent `places`),
+  si les places bâties + le chantier + les bâtiments du fil atteignent `places`, ou si son prix
+  dépasse ce que tiendra l'entrepôt une fois le chantier et le fil finis : `tooBig`, #50, D-441),
   `Session.planResearch(key, where)` (recherche ; labo, niveau maximum et prérequis comptés
   **fil compris** avec `planAhead` : « labo, puis telle recherche » se met au fil d'un coup ;
   refusé si la même technologie est en recherche ou au fil sur une autre de mes planètes) et

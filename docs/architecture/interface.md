@@ -452,7 +452,10 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   chantier est libre, le fil vide et le stock suffisant → `session.build` ; sinon
   `data-mode="plan"` (icône +) → `session.planBuild`. Le niveau affiché est celui du prochain
   ajout (chantier et fil compris), comme le prix. Désactivé si les places ne suffiront pas ou si
-  le fil est plein. Le compte à rebours du chantier passe dans l'étiquette de niveau
+  le fil est plein, ou si le prix dépasse l'entrepôt de fin de fil (`tooBig(race,
+  planAhead(s).levels, cost)`, #50, D-441) : la carte dit alors « il faut Entrepôt niv 1 » à la
+  place de la durée (`.building .cost .neg`). La carte Entrepôt dit son plafond : « niv 0 · max
+  1 000 » (D-442). Le compte à rebours du chantier passe dans l'étiquette de niveau
   (« niv 2 → 3 · 0:04 ») : le bouton reste libre pour ajouter.
 - `renderPlan` : une ligne par élément, « 1. Mine niv 5 ≈ dans 0:07 → fini dans 0:09 » et un
   bouton × (`[data-unplan]` + `data-key` : la session refuse si le fil a bougé entre-temps). L'estimation (`planForecast`) est recalculée au plus une fois par

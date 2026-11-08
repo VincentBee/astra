@@ -198,3 +198,7 @@ que fait le code.
 | D-414 | Cache `astra-p2p-v119` (v88 au départ) | non testable |  | version du service worker |
 | D-420 | Fil pas vide : toute construction lancée à la main va à la fin du fil (issue #194) | nouveau test | `plan.test.mjs` « fil qui attend : un bâtiment moins cher… », « … recherche et vaisseaux payables… », « fil vide : … part tout de suite », « rejeu : … vieux journal … » (3 échouent sur `main`) | boutons ↑ / + : vérifiés dans le vrai jeu (Chrome, 390 px) |
 | D-421 | L'IA met ses recherches et ses vaisseaux au fil, sans doublon | test complété | `bot.test.mjs` « D-151 : trois IA jouent une partie entière… » : à chaque passage, fil des IA sans doublon (1 recherche, 1 lot au plus) et ≤ 12 ; des `planResearch` dans les journaux | force de l'IA : mesurée à part (`tests/perf-ia.mjs`, graines 1 à 3) |
+| D-440 | Le fil dit « Attend Mine niv 8 » et quel entrepôt il faut | nouveau test | `plan.test.mjs` « #50 : derrière un bâtiment trop cher pour l’entrepôt… » (échoue sur `main`) | affichage du fil : vérifié dans le vrai jeu (Chrome, 375 px) |
+| D-441 | Pas de bâtiment plus cher que l'entrepôt au fil (fil compris) | nouveau test | `plan.test.mjs` « #50 : le joueur ne peut pas mettre au fil… » (refus, puis entrepôt au fil d'abord : accepté) | bouton grisé et carte : vérifiés dans le vrai jeu (Chrome, 375 px) |
+| D-442 | Plafond de l'entrepôt sur la carte Entrepôt | non testable |  | DOM : vérifié dans le vrai jeu (« niv 0 · max 1 000 ») |
+| D-443 | Cache `astra-p2p-v121` | non testable |  | `sw.test.mjs` vérifie la liste des fichiers |

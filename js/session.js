@@ -21,7 +21,7 @@ import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity, identityFor, savedGame } from './save.js';
 import { inviteGid } from './invite.js';
-import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, PLAN_MAX, planItem, planId, planAhead, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, FROST, sunFor, fortOf, seeded, RES } from './game.js';
+import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, PLAN_MAX, planItem, planId, planAhead, tooBig, upgradeCost, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, FROST, sunFor, fortOf, seeded, RES } from './game.js';
 import { TECHS, SHIPS, sightRange, TEMPO, techMissing, shipUnlocked } from './tech.js';
 import { cleanReport } from './report.js';
 import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, firstContact, salvage, applyLosses, parkedCell, fleetPos, fleetCargo, fleetTank, ORDERS, MAX_FLEETS, STANCES, aggressive, armed } from './fleet.js';
@@ -1855,6 +1855,11 @@ export class Session {
     const q = pl.planet.queue;
     const taken = usedPlaces(pl.planet.levels) + (q ? (q.demolish ? -1 : 1) : 0) + plan.filter((x) => typeof x === 'string').length;
     if (Number.isFinite(pl.planet.places) && taken >= pl.planet.places) return this.ontoast?.(`Plus de place : les ${pl.planet.places} places de cette planète seront prises.`);
+    // Prix plus grand que l'entrepôt, même une fois le fil fini : il ne partirait jamais et
+    // bloquerait les bâtiments mis après lui (#50, D-441). L'entrepôt au fil ou en chantier compte.
+    const ahead = planAhead(stateAt(pl.planet, pl.planet.at)).levels;
+    const big = tooBig(p.race, ahead, upgradeCost(p.race, key, ahead[key] || 0));
+    if (big) return this.ontoast?.(`${big} (fil compris).`);
     pl.planet.plan = [...plan, key];
     this.touch(this.addLog(`${p.name} ajoute ${R.buildings[key].name} au fil de ${pl.name}.`));
     this.changed();
