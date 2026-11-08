@@ -17,8 +17,17 @@ import { ICE_SERVERS, relayUrls } from './config.js';
 const APP_ID = 'astra-vincentbee-p2p';
 const ACTION = 'astra'; // 12 octets au plus
 
+// Chargement de Trystero. Un échec n'est pas gardé (#86, D-510) : on oublie la
+// promesse ratée, et l'essai suivant change d'adresse (`?r=1`, `?r=2`…), car
+// Chromium garde l'échec d'un import() pour la même adresse.
 let lib = null;
-const loadLib = () => (lib ??= import('../vendor/trystero-nostr.mjs'));
+let failures = 0;
+const loadLib = () =>
+  (lib ??= import(failures ? `../vendor/trystero-nostr.mjs?r=${failures}` : '../vendor/trystero-nostr.mjs').catch((e) => {
+    lib = null;
+    failures++;
+    throw e;
+  }));
 
 async function routeOf(pc) {
   try {
