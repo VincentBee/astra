@@ -1314,8 +1314,12 @@ les mêmes ordres qu'un joueur, notés dans son journal (la partie se rejoue, §
   vaisseaux lourds (1 à 4) ou des chasseurs (2 à 8) avec ce qui dépasse la réserve (250
   minéraux, 150 énergie, 120 nourriture sauf humains). Pas de colonisateur sur une planète qui
   gèle dans moins de 3 min.
-- **Colonies** (`colonyTargets`, `launchColonizer`) : planètes libres, pas déjà visées, qui ne
-  gèlent pas avant 4 min ; note = minutes avant le gel (60 au plus) − 0,6 × distance + places / 4.
+- **Colonies** (`colonyTargets`, `launchColonizer`) : planètes libres, pas déjà visées par un
+  de mes colonisateurs ni par un colonisateur adverse qui y arrivera avant le mien (D-490 ;
+  à la même milliseconde, le plus petit identifiant passe), qui ne gèlent pas avant 4 min ;
+  note = minutes avant le gel (60 au plus) − 0,6 × distance + places / 4. Un colonisateur en
+  route qu'un adversaire devance change de cap au passage suivant (`beaten`, `sendColonizer`
+  depuis sa position), planète mère comprise.
   Le colonisateur part avec un tiers des minéraux et un quart de la nourriture (dans sa soute)
   et le carburant du trajet + 10 %.
 - **Attaque** (`attack`) : pas avant `PEACE_MS` = 10 min après le départ (D-153). Pour chaque

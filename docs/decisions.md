@@ -3468,3 +3468,39 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   et des recherches mises au fil. 323/323.
 - Qui : router (option B), Claude (détails). Source : session `3c9e3331`, PR #195. Statut : en
   vigueur. Modifie D-420 (partie IA) et D-151.
+
+**D-490 — L'IA ne fonce pas sur une planète qu'un colonisateur adverse prendra avant elle**
+- 2026-11-08 12:20 UTC. Contexte : issue #83 (audit du 2026-11-05). Toutes les IA notent les
+  planètes avec la même formule (froid, distance, places) : au départ, deux IA voisines visent
+  souvent la même planète mère. Le premier arrivé la garde (D-120) ; l'autre ne le voyait qu'en
+  arrivant, repartait, et pouvait ne jamais fonder. Mesuré sur `main` : 5 parties sur 20 à
+  3 IA, 4 sur 4 à 8 joueurs, avec une IA sans planète mère après 1 à 2 min.
+- Choix (`js/bot.js`) :
+  - `colonyTargets` écarte une planète vers laquelle un colonisateur adverse en route
+    (`order.kind === 'colonize'`) arrivera avant le mien (heure d'arrivée de sa flotte contre
+    mon trajet calculé par `tripMs` à la vitesse de ma flotte). L'IA voit toutes les flottes
+    et leurs ordres (D-152).
+  - Un colonisateur déjà en route, qu'un colonisateur adverse devance sur sa planète, change
+    de cap au passage suivant (`beaten`, puis `sendColonizer` depuis sa position du moment).
+    C'est nécessaire : au départ, les IA choisissent au même passage, sans voir l'ordre des
+    autres ; la course se règle 3 s plus tard au lieu d'un aller-retour. Sans autre planète à
+    sa portée, il garde son cap.
+  - Égalité à la milliseconde : le plus petit identifiant de joueur passe, pour que deux IA
+    symétriques ne s'écartent pas toutes les deux.
+- Ce n'est pas une règle du jeu : un joueur garde « premier arrivé, premier servi » (D-120) et
+  voit les mêmes flottes sur la carte. Le rejeu ne change pas (il refait les ordres notés).
+- Écarté : seulement filtrer les cibles (ne règle pas les choix faits au même passage : le
+  scénario échoue encore) ; tirer la cible au hasard (rejeu des réflexions moins lisible,
+  planètes moins bonnes) ; pénaliser au lieu d'écarter (laisse des courses perdues).
+- Vérifié : scénario D-490 (`tests/bot.test.mjs`) : 20 parties à 3 IA, 12 s après le départ
+  aucune paire d'IA sur la même planète mère et toutes fondées en 1 min ; 4 parties à 8 joueurs
+  (hôte + 7 IA), toutes fondées en 1,5 min. Il échoue sur `main`.
+- Pas fait : la double fondation au même pas (code-fin-04) ; la fin de partie à 0,9 min
+  (code-fin-03). Autres issues.
+- Qui : Claude (par défaut, worker du router ; l'issue proposait le filtre). Source : session
+  `844ebf3c`, issue #83. Statut : en vigueur. Complète D-152.
+
+**D-491 — Cache `astra-p2p-v121`**
+- 2026-11-08 12:20 UTC. Choix : `VERSION` de `sw.js` passe de v120 (`main`) à v121 pour la
+  PR de l'issue #83 (D-490) ; remontée si `main` bouge avant la fusion. Qui : Claude (règle du
+  router). Source : session `844ebf3c`. Statut : en vigueur.
