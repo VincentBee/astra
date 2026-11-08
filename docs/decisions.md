@@ -3487,7 +3487,8 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   (`storeFor`, `storeShort`). La règle du fil ne change pas (D-158).
 - Écarté : laisser l'élément bloqué ne bloquer personne, comme D-270 (change la règle du fil :
   l'ordre d'un chantier ne serait plus gardé).
-- Qui : Claude (par défaut, piste de l'issue). Source : session `b0b71c59`, issue #50. Statut :
+- Qui : Claude par défaut, validé par le router (« Garde aussi la partie commune »). Source :
+  session `b0b71c59`, issue #50. Statut :
   en vigueur.
 
 **D-441 — On ne peut plus mettre au fil un bâtiment plus cher que l'entrepôt (fil compris)**
@@ -3505,7 +3506,9 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   journal garde son sens : le refus ne joue pas, comme D-420.
 - Écarté : (B) accepter et marquer (le joueur peut encore se piéger). Recherches et vaisseaux :
   non traités ici (aucun cas vu ; à voir si besoin).
-- Qui : Claude (option A recommandée au router ; réponse non confirmée au moment du commit).
+- Qui : router (option A : « on refuse, comme pour les prérequis des recherches, fil
+  compris »). L'entrepôt ne compte que s'il est en chantier ou placé avant dans le fil : c'est
+  toujours le cas, car `planBuild` ajoute en fin de fil.
   Source : session `b0b71c59`, issue #50. Statut : en vigueur.
 
 **D-442 — Le plafond de l'entrepôt se lit sur la carte Entrepôt**
