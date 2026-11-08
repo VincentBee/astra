@@ -3478,7 +3478,10 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   `index.html`, `replay.html`, `technologies.html` et `manifest.json`, suit les `src` / `href`,
   les `import … from`, les `import()` et les `new URL('…', import.meta.url)`, et exige que
   chaque fichier atteint soit dans `FILES` (et que chaque fichier de `FILES` existe, sinon
-  `cache.addAll` casse l'installation). Un nouveau fichier oublié fait échouer le test.
+  `cache.addAll` casse l'installation), ainsi que `location.href = '…'`, `.src = '…'` et
+  `fetch('…')`. Un nouveau fichier oublié fait échouer le test. Vérifié à la main le
+  2026-11-08 : aucun `url(…)` local dans `style.css` ni dans le `<style>` de
+  `technologies.html`, aucun `fetch` d'un fichier local dans `js/`.
 - Écarté : générer `FILES` à la main par un script (le dépôt n'a pas de build, D-001 et
   suivantes) ; mettre en cache n'importe quel fichier à la volée (déjà fait par le `fetch`, mais
   ne couvre pas une page jamais ouverte en ligne).
