@@ -3489,6 +3489,8 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   vaisseaux de la colonie, une cargaison et un carburant bornés par les soutes, les réservoirs
   et le stock ; `launch` (`js/fleet.js`) ne refuse alors qu'une flotte vide (colonie prise au
   combat sans vaisseau posé, D-200), où il n'y a rien à rendre. Pas de toast à ajouter.
-- Vérifié : 2 scénarios (`tests/end.test.mjs`, « #80 : … »), qui échouent sur `main`.
-- Qui : Claude (option A, proposée au router). Source : session `f5d122f7`, issue #80. Statut :
+- Même règle pour la planète mère fondée par le colonisateur de départ (même `evacuate`).
+- Vérifié : 3 scénarios (`tests/end.test.mjs`, « #80 : … ») : colonie, planète mère, et à 17
+  flottes décoller ou scinder est refusé, puis permis de nouveau à 15. Tous échouent sur `main`.
+- Qui : Claude par défaut, validé par le router (option A, réponse du 2026-11-08). Source : session `f5d122f7`, issue #80. Statut :
   en vigueur. Cache `astra-p2p-v121`.

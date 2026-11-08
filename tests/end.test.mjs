@@ -666,3 +666,36 @@ scenario('#80 : à 16 flottes, une planète mère rendue rend son colonisateur d
   assert.equal(me(A).home, null);
   assert.equal(back?.ships?.colony, 1, 'le colonisateur de départ n’est pas perdu');
 });
+
+scenario('#80 : à 17 flottes après une planète rendue, lancer ou scinder une flotte est refusé', (film) => {
+  const { players: [A, B, C], clock, sync } = newGame(3, ['human', 'machine', 'alien']);
+  const w = A.planets.find((x) => !A.ownerAt(x));
+  sixteenFleets(A);
+  me(A).colonies = { [w.id]: { ...game.newPlanet('human', clock.t - 200, w), claimAt: clock.t - 200, ships: { fighter: 8 } } };
+  me(C).colonies = { [w.id]: { ...game.newPlanet('alien', clock.t - 500, w), claimAt: clock.t - 500 } };
+  C.touch();
+  sync(A, C);
+  clock.t += 1000;
+  A.tick(); // checkClaim : la flotte rendue est la 17e
+  const back = me(A).fleets.find((f) => f.ships.colony);
+  me(A).planet.ships = { fighter: 1 };
+  const launched = A.takeOff('home', { fighter: 1 }, {}, 0);
+  const split = A.splitFleet(back.id, { fighter: 1 });
+  film.look(A, 'A a 17 flottes : décoller ou scinder est refusé', [
+    { show: 'flottes de A', expected: fleet.MAX_FLEETS + 1, got: me(A).fleets.length },
+    { show: 'décollage', expected: 'refusé', got: launched === false ? 'refusé' : 'accepté' },
+    { show: 'scinder la flotte rendue', at: [A, back.id], expected: 'refusé', got: split === false ? 'refusé' : 'accepté' },
+  ]);
+  assert.equal(launched, false, 'pas de 18e flotte sur ordre');
+  assert.equal(split, false, 'pas de 18e flotte en scindant');
+  assert.equal(me(A).fleets.length, fleet.MAX_FLEETS + 1);
+  // Revenu à 15 flottes (moins de 16), A relance une flotte.
+  me(A).fleets.splice(0, 2);
+  const again = A.takeOff('home', { fighter: 1 }, {}, 0);
+  film.look(A, 'deux flottes de moins (15) : A peut de nouveau décoller', [
+    { show: 'décollage', expected: 'accepté', got: again ? 'accepté' : 'refusé' },
+    { show: 'flottes de A', expected: fleet.MAX_FLEETS, got: me(A).fleets.length },
+  ]);
+  assert.ok(again, 'sous la limite, le décollage repart');
+  assert.equal(me(A).fleets.length, fleet.MAX_FLEETS);
+});

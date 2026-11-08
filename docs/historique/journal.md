@@ -537,6 +537,7 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
 |---|---|---|---|---|---|
 | 12:10 | `f5d122f7` (worker-16-flottes) | Worker du router : corriger l'issue #80, « Avec 16 flottes, une colonie perdue à l'installation perd ses vaisseaux » | Constaté sur `main` (`75a269d`) : `evacuate` renvoyait `null` à 16 flottes et `checkClaim` effaçait quand même la colonie (vaisseaux, colonisateur, stock perdus) ; pareil pour la planète mère fondée par le colonisateur de départ. `evacuate` (`js/session.js`) ne regarde plus `MAX_FLEETS` : la flotte rendue peut être la 17ᵉ ; les ordres du joueur gardent la limite. 2 scénarios dans `tests/end.test.mjs` (colonie, planète mère), qui échouent sur `main` ; cache v121 | (PR, ferme #80) | D-470 |
+| 12:30 | `f5d122f7` (worker-16-flottes) | Router : « option A, d'accord […] Note-le dans D-470 : "Claude par défaut, validé par le router". Ajoute aussi un test qui vérifie qu'à 17 flottes, lancer une nouvelle flotte est bien refusé » | D-470 : qui a tranché, planète mère citée ; 3ᵉ scénario `tests/end.test.mjs` (17 flottes : décoller et scinder refusés, à 15 décoller permis) | PR #196 | D-470 |
 
 ### Travaux en cours au 2026-10-29
 
