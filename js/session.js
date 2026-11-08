@@ -1784,12 +1784,14 @@ export class Session {
    * Colonie perdue au profit d'un joueur arrivé avant moi : comme si ma
    * flotte de colonisation l'avait trouvée prise en arrivant, ses
    * vaisseaux (colonisateur compris), ce qui tient dans leurs soutes et
-   * leurs réservoirs repartent en flotte, en orbite. Renvoie cette flotte.
+   * leurs réservoirs repartent en flotte, en orbite, même au-delà de
+   * MAX_FLEETS (D-470). Renvoie cette flotte.
    */
   evacuate(p, colony, w) {
     const now = this.now();
     p.fleets ||= [];
-    if (!colony || p.fleets.length >= MAX_FLEETS) return null;
+    // Pas de limite de flottes ici : c'est un retour forcé, pas un ordre ; sinon les vaisseaux disparaîtraient (#80, D-470).
+    if (!colony) return null;
     settle(colony, now);
     // Le colonisateur qui l'a fondée repart avec la flotte ; une colonie prise au combat n'en a pas consommé (D-200).
     colony.ships = { ...(colony.ships || {}) };
