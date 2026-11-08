@@ -224,9 +224,11 @@ $('games').addEventListener('click', (e) => {
   const saved = selectGame(resume || replay);
   if (!saved) return showSaved();
   if (replay) return (location.href = 'replay.html');
+  $('home-note').hidden = true;
   session = Session.resume(saved);
   session.ontoast = toast;
   session.onchange = onSessionChange;
+  session.onlost = onLost;
   wakeBots(session); // les IA que ce téléphone faisait jouer reprennent (D-151)
   startGame();
   toast('Partie reprise.');
@@ -236,6 +238,21 @@ $('games').addEventListener('click', (e) => {
   showAbsence(Date.now() - saved.savedAt);
 });
 
+/**
+ * La partie a été ouverte dans un autre onglet (ou l'appli installée, D-430) : elle continue
+ * là-bas, celui-ci s'est arrêté sans rien sauver. Retour à l'accueil, avec un message qui reste
+ * (l'onglet est souvent caché à ce moment : un toast ne serait pas vu).
+ */
+function onLost() {
+  stopGame();
+  for (const el of document.querySelectorAll('.sheet')) el.hidden = true;
+  session = null;
+  show('home');
+  showSaved();
+  $('home-note').textContent = 'Cette partie a été ouverte dans un autre onglet : elle continue là-bas. Pour la jouer ici, appuie sur « Reprendre ».';
+  $('home-note').hidden = false;
+}
+
 window.addEventListener('pagehide', () => session?.save?.()); // en lecture seule (D-139), `save` ne fait rien
 
 $('btn-create').onclick = async () => {
@@ -244,6 +261,7 @@ $('btn-create').onclick = async () => {
   session = await Session.create(name);
   session.ontoast = toast;
   session.onchange = onSessionChange;
+  session.onlost = onLost;
   startGame();
 };
 
@@ -255,6 +273,7 @@ $('btn-solo').onclick = async () => {
   session = await Session.create(name);
   session.ontoast = toast;
   session.onchange = onSessionChange;
+  session.onlost = onLost;
   addBot(session);
   startGame();
 };
@@ -318,6 +337,7 @@ async function useOffer(text) {
     session = new Session(name);
     session.ontoast = toast;
     session.onchange = onSessionChange;
+    session.onlost = onLost;
   }
   try {
     $('join-status').textContent = 'Préparation de ta réponse…';

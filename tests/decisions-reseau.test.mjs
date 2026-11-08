@@ -677,6 +677,104 @@ scenario('D-415 : les sauvegardes de l’ancien format sont reprises sans perte'
   })));
 });
 
+// ----- D-430 : une partie ne se joue que dans un seul onglet (issue #49)
+
+/**
+ * Faux navigator.locks, partagé par les « onglets » du test (comme deux onglets d'un même
+ * navigateur) : `steal` prend le verrou à celui qui l'a, dont la demande échoue (AbortError).
+ */
+function fakeLocks() {
+  const held = new Map();
+  return {
+    request(name, opts, cb) {
+      return new Promise((resolve, reject) => {
+        const prev = held.get(name);
+        if (prev && !opts?.steal) return resolve(Promise.resolve(cb(null)));
+        if (prev) {
+          held.delete(name);
+          prev.reject(new DOMException('pris par un autre onglet', 'AbortError'));
+        }
+        const me = { reject };
+        held.set(name, me);
+        Promise.resolve(cb({ name })).then((v) => {
+          if (held.get(name) === me) held.delete(name);
+          resolve(v);
+        }, reject);
+      });
+    },
+  };
+}
+
+/** navigator.locks remplacé par `locks` le temps de `fn`. */
+async function withLocks(locks, fn) {
+  const old = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  Object.defineProperty(globalThis, 'navigator', { value: { locks }, configurable: true, writable: true });
+  try {
+    return await fn();
+  } finally {
+    if (old) Object.defineProperty(globalThis, 'navigator', old);
+    else delete globalThis.navigator;
+  }
+}
+
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+scenario('D-430 : même partie dans deux onglets — le dernier ouvert joue, l’autre s’arrête et ne sauve plus', (film) =>
+  withStore(() =>
+    withLocks(fakeLocks(), async () => {
+      const s = soloNow('g49');
+      P(s).planet.stock = { minerals: 1e6, food: 1e6, energy: 1e6 };
+      s.save();
+      // Onglet 1 : reprend la partie et lance un chantier.
+      const one = resumeQuiet(save.loadGame());
+      let lost = 0;
+      one.onlost = () => lost++;
+      one.build(firstBuilding(one));
+      one.save();
+      const fromOne = P(one).orders.length;
+      // Onglet 2 : reprend la même partie (onglet 1 resté ouvert), et joue de son côté.
+      const two = resumeQuiet(save.loadGame());
+      await tick();
+      for (const key of Object.keys(game.RACES[P(two).race].buildings).slice(1, 3)) two.build(key);
+      two.save();
+      const fromTwo = P(two).orders.length;
+      film.look(two, 'onglet 2 : la partie reprise, l’onglet 1 s’est arrêté', [
+        { show: 'onglet 1 arrêté', expected: true, got: one.lost },
+        { show: 'onglet 1 prévenu', expected: 1, got: lost },
+        { show: 'ordres de l’onglet 2 (≥ ceux de l’onglet 1)', expected: true, got: fromTwo > fromOne },
+      ]);
+      assert.equal(one.lost, true, 'l’onglet 1 s’arrête dès que l’onglet 2 prend la partie');
+      assert.equal(lost, 1, 'l’onglet 1 est prévenu une fois (message à l’écran)');
+      assert.ok(fromTwo > fromOne, 'l’onglet 2 a joué');
+      // L'onglet 2 est fermé d'abord, puis l'onglet 1 (le dernier fermé écrasait tout, #49).
+      two.end();
+      one.build(firstBuilding(one)); // un appui resté dans l'onglet 1 : il n'est plus sauvé
+      one.end();
+      const back = save.loadGame();
+      film.look(resumeQuiet(back), 'reprise après fermeture des deux onglets : tout l’onglet 2 est là', [
+        { show: 'ordres sauvés', expected: fromTwo, got: back.state.players.p0.orders.length },
+      ]);
+      assert.equal(back.state.players.p0.orders.length, fromTwo, 'la sauvegarde garde tout ce qu’a fait l’onglet 2');
+    }),
+  ),
+);
+
+scenario('D-430 : la partie fermée dans un onglet peut être reprise dans un autre, sans rien arrêter', () =>
+  withStore(() =>
+    withLocks(fakeLocks(), async () => {
+      const s = soloNow('g49b');
+      s.save();
+      const one = resumeQuiet(save.loadGame());
+      one.end(); // l'onglet 1 quitte la partie : il rend le verrou
+      const two = resumeQuiet(save.loadGame());
+      await tick();
+      assert.ok(!one.lost, 'l’onglet 1, déjà sorti, n’est pas « arrêté » une seconde fois');
+      assert.ok(!two.lost);
+      two.end();
+    }),
+  ),
+);
+
 // ----- D-045 / D-049 / D-050 : journal des ordres
 
 scenario('D-045 : un ordre refusé est noté et date la fiche', (film) => {

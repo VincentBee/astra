@@ -21,6 +21,7 @@ import { createInvite, answerInvite, makeOffer, makeAnswer } from './peer.js';
 import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity, identityFor, savedGame } from './save.js';
 import { inviteGid } from './invite.js';
+import { holdGame } from './tablock.js';
 import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, PLAN_MAX, planItem, planId, planAhead, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, FROST, sunFor, fortOf, seeded, RES } from './game.js';
 import { TECHS, SHIPS, sightRange, TEMPO, techMissing, shipUnlocked } from './tech.js';
 import { cleanReport } from './report.js';
@@ -332,6 +333,27 @@ export class Session {
     this.onchange = null;
     this.ontoast = null;
     this.timers = [];
+    this.onlost = null; // la partie a été ouverte dans un autre onglet (D-430)
+    this.lost = false;
+    this.release = null;
+  }
+
+  /**
+   * Cette partie ne se joue plus que dans cet onglet (D-430) : si un autre onglet l'ouvre
+   * ensuite, celui-ci s'arrête sans plus rien sauver (`lose`).
+   */
+  claim() {
+    this.release?.();
+    this.release = holdGame(this.state?.gid, () => this.lose());
+  }
+
+  /** Un autre onglet a pris la partie : tout s'arrête ici, IA comprises, et plus rien n'est sauvé. */
+  lose() {
+    if (this.lost) return;
+    this.lost = true;
+    this.release = null;
+    this.end();
+    this.onlost?.();
   }
 
   // ----- création / arrivée ------------------------------------------------
@@ -348,6 +370,7 @@ export class Session {
     s.addLog(`${name} ouvre la partie.`);
     saveIdentity({ gid: s.state.gid, pid: s.me, secret });
     s.status = 'playing';
+    s.claim();
     s.start();
     s.save();
     return s;
@@ -366,6 +389,7 @@ export class Session {
     s.loadClock();
     s.intel = saved.intel || {}; // brouillard (D-124) : ce que j'ai vu des planètes des autres
     s.journal = saved.journal || null; // avant le rattrapage : les combats de l'absence s'y inscrivent
+    s.claim(); // avant tout : un autre onglet qui jouait cette partie s'arrête (D-430)
     s.botIds = Array.isArray(saved.bots) ? saved.bots.filter((pid) => pidOk(pid) && s.state.players[pid] && !Number.isFinite(s.state.players[pid].left)) : []; // IA jouées par ce téléphone (D-151), réveillées par js/bot.js
     s.refreshOnline();
     s.start();
@@ -826,6 +850,7 @@ export class Session {
     saveIdentity({ gid: st.gid, pid: msg.you, secret });
     this.firstLink = null;
     this.status = 'playing';
+    this.claim();
     this.attach(link, msg.from);
     link.send({ type: 'sync', state: this.snapshot() });
     this.start();
@@ -3389,7 +3414,7 @@ export class Session {
 
   /** Sauvegarde (au plus deux fois par seconde) de ma copie de la partie. */
   scheduleSave() {
-    if (!this.state || !this.me || this.status !== 'playing' || this.saveTimer) return;
+    if (!this.state || !this.me || this.status !== 'playing' || this.saveTimer || this.lost) return;
     this.saveTimer = setTimeout(() => {
       this.saveTimer = null;
       this.save();
@@ -3397,6 +3422,7 @@ export class Session {
   }
 
   save() {
+    if (this.lost) return; // un autre onglet joue cette partie (D-430) : il a la bonne copie
     if (this.state && this.me && this.status === 'playing') this.storeClock();
     if (this.state && this.me && this.status === 'playing') saveGame(this.me, this.state, this.journal, this.intel, this.botIds?.length ? this.botIds : null);
   }
@@ -3420,6 +3446,8 @@ export class Session {
     clearTimeout(this.saveTimer);
     this.saveTimer = null;
     this.save();
+    this.release?.(); // un autre onglet peut reprendre la partie (D-430)
+    this.release = null;
     // Les IA que ce téléphone fait jouer (D-151) s'arrêtent avec lui ; elles reprendront avec la partie.
     for (const bot of this.bots?.values() || []) bot.end();
     this.bots?.clear();
