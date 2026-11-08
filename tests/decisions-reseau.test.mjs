@@ -355,6 +355,65 @@ scenario('D-066 : l’identité est gardée par partie ; reprendre et oublier', 
   });
 });
 
+// ----- D-520 : les identités suivent l'historique (issue #88)
+
+scenario('D-520 : « Oublier » efface l’identité, et une partie sortie de l’historique n’en garde pas', async (film) => {
+  // Les images : une vraie partie reprise. Le contenu de localStorage est vérifié par les asserts.
+  const real = soloNow('gident');
+  film.look(real, 'une partie en cours');
+  const ids = () => JSON.parse(localStorage.getItem('astra.identities') || '{}');
+  const cur = () => JSON.parse(localStorage.getItem('astra.identity') || 'null');
+  const st = (gid) => ({ gid, players: { me: { id: 'me', name: 'Moi', rank: 0 } }, log: [] });
+  let back, other, kept;
+  await withStore(() => {
+    // 1. Oublier la partie en cours, puis jouer une autre partie : A ne revient pas.
+    save.saveGame('me', st('A'));
+    save.saveIdentity({ gid: 'A', pid: 'pa', secret: 'sa' });
+    save.forgetGame('A');
+    assert.equal(cur(), null, 'astra.identity n’est plus A');
+    save.saveIdentity({ gid: 'B', pid: 'pb', secret: 'sb' });
+    save.saveGame('me', st('B'));
+    back = 'A' in ids();
+    assert.equal(back, false, 'A ne revient pas dans astra.identities');
+    // 2. Oublier une autre partie que celle en cours ne touche pas astra.identity.
+    save.saveIdentity({ gid: 'C', pid: 'pc', secret: 'sc' });
+    save.saveGame('me', st('C'));
+    save.forgetGame('B');
+    other = cur()?.gid;
+    assert.equal(other, 'C', 'identité en cours gardée');
+    assert.equal('B' in ids(), false);
+  });
+  await withStore(() => {
+    // 3. 12 parties créées : 10 sauvegardes, 10 identités, les mêmes gid.
+    const now = Date.now;
+    let t = 1_000;
+    Date.now = () => (t += 1_000);
+    try {
+      for (let i = 0; i < 12; i++) {
+        save.saveIdentity({ gid: `g${i}`, pid: 'me', secret: `s${i}` }); // comme Session.create : identité d'abord
+        save.saveGame('me', st(`g${i}`));
+      }
+    } finally {
+      Date.now = now;
+    }
+    const games = save.listGames().map((x) => x.state.gid).sort();
+    kept = Object.keys(ids()).sort();
+    assert.equal(games.length, 10);
+    assert.deepEqual(kept, games, 'une identité par partie gardée, pas plus');
+    // Une partie rejointe pas encore sauvée garde son identité, même si l'historique bouge.
+    save.saveIdentity({ gid: 'J', pid: 'pj', secret: 'sj' });
+    save.selectGame('g5');
+    save.selectGame('g11');
+    assert.equal(save.identityFor('g5')?.pid, 'me');
+  });
+  save.saveGame(real.me, real.state);
+  film.look(resumeQuiet(save.selectGame('gident')), 'la partie reprise ; en haut, ce que localStorage garde des identités', [
+    { show: 'A revient après une autre partie', expected: false, got: back },
+    { show: 'identité en cours après avoir oublié B', expected: 'C', got: other },
+    { show: 'identités gardées après 12 parties', expected: 10, got: kept.length },
+  ]);
+});
+
 // ----- D-170 : un historique abîmé est ignoré (issue #87)
 
 /** Les 5 formes abîmées de `astra.saves` (texte brut, tel que rangé dans localStorage). */
