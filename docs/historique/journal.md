@@ -536,7 +536,8 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 
 | Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
 |---|---|---|---|---|---|
-| 12:25 | `6700d27f` (worker-titre-ellipsis) | Worker du router, demande de Vincent avec une capture de « Bételgeuse » : « Il y a encore un petit problème d'overflow quand le nom de la planète est trop grand. Il faut ellipsis le nom de la planète. » | `.planet-head h2` : `flex: 1 1 0; width: 0` (`style.css`) : le nom se coupe en « … », les boutons restent sur une ligne, un très long nom n'élargit plus la page ; nom complet en `title` (`js/app.js`). Vrai jeu (Chrome, 360 et 320 px) avant / après ; limite à 320 px avec 5 boutons (9 px pour le nom) posée au router ; 323/323 ; cache v121 | (PR) | D-422 |
+| 12:25 | `6700d27f` (worker-titre-ellipsis) | Worker du router, demande de Vincent avec une capture de « Bételgeuse » : « Il y a encore un petit problème d'overflow quand le nom de la planète est trop grand. Il faut ellipsis le nom de la planète. » | `.planet-head h2` : `flex: 1 1 0; width: 0` (`style.css`) : le nom se coupe en « … », les boutons restent sur une ligne, un très long nom n'élargit plus la page ; nom complet en `title` (`js/app.js`). Vrai jeu (Chrome, 360 et 320 px) avant / après ; limite à 320 px avec 5 boutons (9 px pour le nom) posée au router ; 323/323 ; cache v121 | (PR #206) | D-422 |
+| 12:55 | `6700d27f` (worker-titre-ellipsis) | Router : « Fais B, et même un peu plus » ; ajout de Vincent : « Tu peux aussi réduire le gap entre les boutons. » | `.planet-head` : écart 10 → 6 px, marge du bouton joueurs 8 → 0, à toutes les largeurs ; boutons de même taille. Place pour le nom (vrai jeu) : 360 px 112 → 136 (4 boutons), 77 (5 boutons) ; 320 px 96 (4), 37 (5, 9 avant ce changement) ; captures avant / après | (PR #206) | D-422 |
 
 ### Travaux en cours au 2026-10-29
 

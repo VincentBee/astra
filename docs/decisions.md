@@ -3471,7 +3471,7 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - Qui : router (option B), Claude (détails). Source : session `3c9e3331`, PR #195. Statut : en
   vigueur. Modifie D-420 (partie IA) et D-151.
 
-**D-422 — Un nom de planète long se coupe en « … » ; les boutons de l'en-tête restent sur une ligne** (modifie D-311)
+**D-422 — Un nom de planète long se coupe en « … » ; les boutons de l'en-tête restent sur une ligne, plus serrés** (modifie D-311)
 - 2026-11-08 12:25 UTC. Demande de Vincent (via le router), avec une capture de la vue
   « Bételgeuse » : « Il y a encore un petit problème d'overflow quand le nom de la planète est
   trop grand. Il faut ellipsis le nom de la planète. »
@@ -3485,14 +3485,19 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   nom prend seulement la place qui reste et finit en « … » ; `width: 0` : il ne compte plus dans
   la largeur de la grille. Le nom complet est en `title` du titre (`renderPlanet`, `js/app.js`).
   Un nom court s'affiche comme avant.
-- Limite connue : à 320 px avec les cinq boutons (retour, Journal, ⚠, Réglages, joueurs), il ne
-  reste que 9 px pour le nom (on ne voit que le début d'une lettre). Question posée au router
-  (resserrer l'en-tête sous 360 px ?) ; par défaut, rien d'autre ne change. Non confirmé par
-  l'utilisateur.
+- Écart entre les boutons réduit, à toutes les largeurs : `.planet-head { gap: 6px }` (10 avant)
+  et `.planet-head #net { margin-left: 0 }` (8 avant). Les boutons gardent leur taille (zones de
+  toucher inchangées : 40 × 40, 44 × 40, ⚠ 54 × 40, joueurs 60 × 40). Place pour le nom, mesurée
+  dans le vrai jeu (avant → après) : 360 px, 4 boutons 112 → 136 px ; 360 px, 5 boutons (avec ⚠)
+  bouton passé à la ligne → 77 px ; 320 px, 4 boutons, bouton à la ligne → 96 px ; 320 px,
+  5 boutons, deux boutons à la ligne → 37 px (9 px avec le seul `flex: 1 1 0`).
+  Demande de Vincent ajoutée en cours de route : « Tu peux aussi réduire le gap entre les
+  boutons. » ; le router a choisi de le faire à toutes les largeurs (pas seulement sous 360 px).
+- Limite : à 320 px avec les cinq boutons, il ne reste que 37 px pour le nom (« B… »).
 - Écarté : garder `flex: 1 1 auto` et retirer `flex-wrap` (la liste des alertes ne passerait
   plus sous l'en-tête) ; donner au nom une largeur minimale (les boutons repasseraient à la
   ligne sur petit écran).
 - Même défaut ailleurs : non. La carte n'a pas de nom long dans son en-tête (coordonnées et
   boutons dans `.pi-head-right`).
-- Qui : Vincent (demande) ; Claude (choix CSS). Source : session `6700d27f`. Statut : en vigueur.
-  Cache `astra-p2p-v121`.
+- Qui : Vincent (demande, et l'écart réduit) ; router (écart à toutes les largeurs) ; Claude
+  (choix CSS). Source : session `6700d27f`, PR #206. Statut : en vigueur. Cache `astra-p2p-v121`.
