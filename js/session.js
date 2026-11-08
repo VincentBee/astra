@@ -353,7 +353,7 @@ export class Session {
     this.lost = true;
     this.release = null;
     this.end();
-    this.onlost?.();
+    this.onlost?.(this);
   }
 
   // ----- création / arrivée ------------------------------------------------

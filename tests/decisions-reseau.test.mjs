@@ -728,7 +728,7 @@ scenario('D-430 : même partie dans deux onglets — le dernier ouvert joue, l�
       // Onglet 1 : reprend la partie et lance un chantier.
       const one = resumeQuiet(save.loadGame());
       let lost = 0;
-      one.onlost = () => lost++;
+      one.onlost = (s) => s === one && lost++;
       one.build(firstBuilding(one));
       one.save();
       const fromOne = P(one).orders.length;

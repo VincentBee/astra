@@ -243,7 +243,8 @@ $('games').addEventListener('click', (e) => {
  * là-bas, celui-ci s'est arrêté sans rien sauver. Retour à l'accueil, avec un message qui reste
  * (l'onglet est souvent caché à ce moment : un toast ne serait pas vu).
  */
-function onLost() {
+function onLost(lost) {
+  if (lost !== session) return; // une ancienne session de cet onglet, déjà remplacée
   stopGame();
   for (const el of document.querySelectorAll('.sheet')) el.hidden = true;
   session = null;

@@ -50,6 +50,7 @@ pas la différence, sauf `link.viaRoom` (voir §6, `attach`).
 | `js/rendezvous.js` | Reconnexion automatique sans rescanner : salon Trystero/Nostr propre à la partie, chiffré par la clé de la partie. Classe `Rendezvous` l.82. |
 | `js/session.js` | Classe `Session` l.197 : création/arrivée, messages, fusion des copies, maillage, sauvegarde. Contient aussi toutes les règles (l.696-1771, voir `regles.md`). |
 | `js/save.js` | Copie locale de la partie et identité dans `localStorage` ; historique de 10 parties ; `mergeStates` (fusion de deux copies). |
+| `js/tablock.js` | `holdGame(gid, onLost)` : verrou `navigator.locks` `astra.game.<gid>` pris avec `steal` ; `onLost` si un autre onglet le prend ; renvoie `release()` (D-430). |
 | `sw.js` | Service worker : cache hors ligne, « réseau d'abord », cache si le réseau ne répond pas en 3 s (D-230). |
 | `tests/sw.test.mjs` | Test de `sw.js` (vrai fichier dans un `vm`, cache en mémoire, serveur local qui répond, lent, muet ou coupé). |
 | `tests/sw-browser.mjs` | Même parcours dans un vrai Chromium (Playwright pris hors du dépôt), hors de `node --test`. |
@@ -229,7 +230,7 @@ Un pair qui arrive par le rendez-vous et par un lien direct garde le lien rendez
 - Écran d'accueil : `listGames` → reprendre (`selectGame` + `Session.resume`), revoir (`replay.html`), oublier (`forgetGame`) (`app.js:153-189`).
 - Une partie « continue » hors connexion : tout se calcule depuis le temps écoulé ; à la reprise `tick()` rattrape.
 - Copies jouées séparément : fusion par fiche (`mergeStates`), à `welcome` (copie locale), à `hello` (copie de l'invité), à chaque `sync`.
-- **Un seul onglet par partie (D-430)** : `claim()` (`js/session.js`) prend le verrou `navigator.locks` `astra.game.<gid>` (`holdGame`, `js/tablock.js`) à `create`, `resume` et `onWelcome`, avec `steal` : le dernier onglet ouvert l'emporte. L'ancien reçoit `AbortError` → `lose()` : `lost = true`, `end()` sans sauvegarde (`save`/`scheduleSave` ne font plus rien), IA arrêtées, puis `onlost` → `app.js` `onLost` (accueil + `#home-note`). `end()` rend le verrou. Sans `navigator.locks` : pas de verrou.
+- **Un seul onglet par partie (D-430)** : `claim()` (`js/session.js`) prend le verrou `navigator.locks` `astra.game.<gid>` (`holdGame`, `js/tablock.js`) à `create`, `resume` et `onWelcome`, avec `steal` : le dernier onglet ouvert l'emporte. L'ancien reçoit `AbortError` → `lose()` : `lost = true`, `end()` sans sauvegarde (`save`/`scheduleSave` ne font plus rien), IA arrêtées, puis `onlost(session)` → `app.js` `onLost` (accueil + `#home-note`, seulement si c'est la session en cours de l'onglet). `end()` rend le verrou. Sans `navigator.locks` : pas de verrou.
 
 ### 6.6 Départ d'un joueur
 Il n'y a **pas de message « je pars »**. Un départ = un lien qui se ferme : silence de 30 s (`heartbeat` ; jamais pour le lien d'une IA du même téléphone, D-220), état WebRTC `failed/closed`, ou `disconnected` pendant 5 s. Le joueur passe hors ligne (`refreshOnline`) ; **sa fiche reste dans la partie**. Quitter l'écran (`data-go`, `app.js:137`) appelle `end()`. Resté seul (`alone`), l'écran montre un bouton pour rejoindre les autres (`app.js:289`, `762`).
