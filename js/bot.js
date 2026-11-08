@@ -12,7 +12,7 @@
 // planètes adverses comme le menu « Conquérir … · défense ⚔ ◇ » la montre à un joueur.
 
 import { Session } from './session.js';
-import { RACES, stateAt, upgradeCost, startResearch, startShips, usedPlaces, sameCell, distance, fortOf, POWERS, powerReadyAt, powerCost, liftGain } from './game.js';
+import { RACES, PLAN_MAX, planAhead, stateAt, upgradeCost, startResearch, startShips, usedPlaces, sameCell, distance, fortOf, POWERS, powerReadyAt, powerCost, liftGain } from './game.js';
 import { TECHS, SHIPS, shipUnlocked } from './tech.js';
 import { fleetTank, fleetBurn, fuelAt, moving, countShips, armed, battle, fleetSpeed, tripMs, MAX_FLEETS } from './fleet.js';
 
@@ -152,9 +152,12 @@ export function chooseBuilding(race, st, free = Infinity, home = true) {
   return pick(pool[0]);
 }
 
-/** Ajoute un bâtiment au fil de construction, quand le fil est vide. */
+/**
+ * Ajoute un bâtiment au fil de construction, quand le fil n'en tient pas déjà un (recherches et
+ * vaisseaux au fil ne l'empêchent pas, D-421).
+ */
 function planBuilding(ctx, pl, st) {
-  if (ctx.left <= 0 || st.plan.length) return;
+  if (ctx.left <= 0 || st.plan.length >= PLAN_MAX || st.plan.some((x) => typeof x === 'string')) return;
   const free = freePlaces(pl.planet, st);
   if (free <= 0) return;
   // Planète que le froid prendra bientôt : on n'y investit plus.
@@ -163,13 +166,20 @@ function planBuilding(ctx, pl, st) {
   if (key) ctx.order(() => ctx.s.planBuild(key, pl.key));
 }
 
-/** Prochaine technologie voulue que ce labo peut chercher maintenant (ou null : on attend). */
+/**
+ * Prochaine technologie voulue que ce labo peut chercher maintenant (ou null : on attend). Une
+ * recherche en cours ou au fil, ici ou sur une autre planète, ne se demande pas deux fois (D-421).
+ */
 function chooseTech(ctx, pl, st) {
   const race = ctx.p.race;
   const tech = st.tech || {};
   const lab = st.levels.lab || 0;
   if (!lab || st.research) return null;
-  const busy = new Set(ctx.s.planetsOf(ctx.p).map((x) => x.planet.research?.key).filter(Boolean));
+  const busy = new Set();
+  for (const x of ctx.s.planetsOf(ctx.p)) {
+    if (x.planet.research) busy.add(x.planet.research.key);
+    for (const it of x.planet.plan || []) if (it?.tech) busy.add(it.tech);
+  }
   const want = {};
   for (const key of PLAYBOOK[race].techs) {
     want[key] = (want[key] || 0) + 1;
@@ -184,10 +194,17 @@ function chooseTech(ctx, pl, st) {
   return null;
 }
 
+/**
+ * Labo libre : la recherche voulue part tout de suite si le fil est vide (et qu'on peut la
+ * payer). Fil pas vide, elle irait de toute façon à sa fin (D-420) : on l'y met, une seule
+ * recherche au fil à la fois, sans dépasser PLAN_MAX (D-421).
+ */
 function planResearch(ctx, pl, st) {
   if (ctx.left <= 0) return;
+  if (st.plan.length && (st.plan.length >= PLAN_MAX || st.plan.some((x) => x?.tech))) return;
   const key = chooseTech(ctx, pl, st);
   if (!key) return;
+  if (st.plan.length) return ctx.order(() => ctx.s.planResearch(key, pl.key));
   // Essai sur une copie : l'ordre ne part que s'il passe (prix couvert).
   if (startResearch(copy(pl.planet), key, ctx.now)) return;
   ctx.order(() => ctx.s.research(key, pl.key));
@@ -196,14 +213,21 @@ function planResearch(ctx, pl, st) {
 /** Colonisateurs (posés, en vol) et planètes : de quoi savoir s'il en faut un autre. */
 function colonyCount(ctx) {
   const p = ctx.p;
-  const docked = ctx.s.planetsOf(p).reduce((t, x) => t + (x.planet.ships?.colony || 0) + (x.planet.yard?.type === 'colony' ? x.planet.yard.count : 0), 0);
+  // Au fil compris (D-421) : un colonisateur qui attend son tour compte déjà.
+  const planned = (x) => (x.planet.plan || []).reduce((t, it) => t + (it?.ship === 'colony' ? it.n : 0), 0);
+  const docked = ctx.s.planetsOf(p).reduce((t, x) => t + (x.planet.ships?.colony || 0) + (x.planet.yard?.type === 'colony' ? x.planet.yard.count : 0) + planned(x), 0);
   const flying = (p.fleets || []).reduce((t, f) => t + (f.ships.colony || 0), 0);
   return ctx.s.planetsOf(p).length + docked + flying;
 }
 
-/** Chantier naval libre : un colonisateur s'il manque des planètes, sinon des vaisseaux de guerre. */
+/**
+ * Chantier naval libre : un colonisateur s'il manque des planètes, sinon des vaisseaux de guerre.
+ * Fil pas vide, le lot va à sa fin (D-420) : un seul lot au fil à la fois, sans dépasser
+ * PLAN_MAX (D-421).
+ */
 function planShips(ctx, pl, st) {
   if (ctx.left <= 0 || !(st.levels.yard > 0) || st.yard) return;
+  if (st.plan.length && (st.plan.length >= PLAN_MAX || st.plan.some((x) => x?.ship))) return;
   const race = ctx.p.race;
   const tech = st.tech || {};
   const late = ctx.s.frostOf(pl.cell) - ctx.now < 3 * MIN;
@@ -228,7 +252,13 @@ function planShips(ctx, pl, st) {
       }
     }
   }
-  if (!type || startShips(copy(pl.planet), type, count, ctx.now)) return;
+  if (!type) return;
+  if (st.plan.length) {
+    // Recherche au fil comprise : le vaisseau doit être ouvert à son tour (sinon refus).
+    if (!shipUnlocked(race, type, planAhead(st).tech)) return;
+    return ctx.order(() => ctx.s.planShips(type, count, pl.key));
+  }
+  if (startShips(copy(pl.planet), type, count, ctx.now)) return;
   ctx.order(() => ctx.s.buildShips(type, count, pl.key));
 }
 

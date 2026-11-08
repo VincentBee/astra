@@ -449,3 +449,114 @@ scenario('un fil mixte abîmé reçu d’un autre est nettoyé', (film) => {
   ]);
   assert.deepEqual(cleaned, ['mine', { tech: 'forage' }, { ship: 'cargo', n: 3 }]);
 });
+
+// D-420 (#194) : fil pas vide, une construction lancée à la main va à la fin du fil. Elle ne
+// passe jamais devant un élément qui attend son stock, même sur un autre chantier libre.
+
+/** A, humain, avec un labo 1 et 100 minéraux ; Propulsion (200) au fil attend son stock. */
+function waitingFil(film) {
+  const { players, clock } = newGame(1, ['human']);
+  const [a] = players;
+  const pa = () => a.state.players[a.me].planet;
+  const p = pa();
+  p.at = clock.t;
+  p.levels = { ...p.levels, lab: 1 };
+  p.stock = { ...p.stock, minerals: 100, energy: 1000 };
+  a.planResearch('propulsion');
+  const home = a.state.players[a.me].home;
+  return { a, clock, pa, home };
+}
+
+scenario('fil qui attend : un bâtiment moins cher lancé à la main va à la fin du fil (#194)', (film) => {
+  const { a, clock, pa, home } = waitingFil(film);
+  const before = game.planForecast(pa(), clock.t);
+  assert.deepEqual(pa().plan, [{ tech: 'propulsion' }]);
+  assert.ok(before[0].start > clock.t, 'Propulsion attend son stock');
+  film.look(a, 'Propulsion (200 minéraux) attend au fil ; A a 100 minéraux, de quoi payer une ferme (75)', [
+    { show: 'fil', at: home, expected: [{ tech: 'propulsion' }], got: pa().plan },
+  ]);
+  a.build('farm'); // le bouton « tout de suite » d'avant
+  const after = game.planForecast(pa(), clock.t);
+  film.look(a, 'A lance une ferme : elle va à la fin du fil, Propulsion garde son heure', [
+    { show: 'chantier', at: home, expected: null, got: pa().queue },
+    { show: 'fil', at: home, expected: [{ tech: 'propulsion' }, 'farm'], got: pa().plan },
+    { show: 'départ prévu de Propulsion (s)', at: home, expected: Math.round((before[0].start - clock.t) / SEC), got: Math.round((after[0].start - clock.t) / SEC) },
+  ]);
+  assert.equal(pa().queue, null, 'la ferme ne part pas tout de suite');
+  assert.deepEqual(pa().plan, [{ tech: 'propulsion' }, 'farm']);
+  assert.equal(after[0].start, before[0].start, 'Propulsion garde son heure de départ');
+  assert.ok(after[1].start >= after[0].start, 'la ferme part après Propulsion');
+  // Le journal note l'ordre réel : un ajout au fil.
+  assert.equal(a.state.players[a.me].orders.at(-1).k, 'planBuild');
+});
+
+scenario('fil qui attend : recherche et vaisseaux payables lancés à la main vont aussi à la fin du fil (#194)', (film) => {
+  const { a, clock, pa, home } = waitingFil(film);
+  // Un chantier naval et Propulsion déjà connue (le cargo est ouvert) ; un chantier naval niv. 2
+  // (500 minéraux) attend au fil. Le stock paie tout de suite Agronomie (120) ou 1 cargo (110).
+  const p = pa();
+  p.levels = { ...p.levels, yard: 1 };
+  p.tech = { ...p.tech, propulsion: 1 };
+  p.plan = ['yard'];
+  p.stock = { ...p.stock, minerals: 160, food: 80 };
+  assert.ok(game.covers(p.stock, { minerals: 120, food: 40 }), 'Agronomie payable');
+  const start = game.planForecast(p, clock.t)[0].start;
+  assert.ok(start > clock.t, 'le chantier naval attend son stock');
+  a.research('agro');
+  a.buildShips('cargo', 1);
+  film.look(a, 'un chantier naval attend au fil ; A lance Agronomie et 1 cargo, payables : ils vont à la fin du fil', [
+    { show: 'fil', at: home, expected: ['yard', { tech: 'agro' }, { ship: 'cargo', n: 1 }], got: pa().plan },
+    { show: 'recherche en cours', at: home, expected: null, got: pa().research },
+    { show: 'chantier naval en cours', at: home, expected: null, got: pa().yard },
+  ]);
+  assert.deepEqual(pa().plan, ['yard', { tech: 'agro' }, { ship: 'cargo', n: 1 }]);
+  assert.equal(pa().research, null);
+  assert.equal(pa().yard, null);
+  assert.equal(game.planForecast(pa(), clock.t)[0].start, start, 'le chantier naval garde son heure');
+  assert.deepEqual(a.state.players[a.me].orders.slice(-2).map((o) => o.k), ['planResearch', 'planShips']);
+});
+
+scenario('fil vide : une construction payable part tout de suite, comme avant (#194)', (film) => {
+  const { players, clock } = newGame(1, ['human']);
+  const [a] = players;
+  const pa = () => a.state.players[a.me].planet;
+  pa().at = clock.t;
+  pa().stock = { ...pa().stock, minerals: 100 };
+  assert.deepEqual(pa().plan || [], []);
+  a.build('farm');
+  film.look(a, 'fil vide : A lance une ferme, elle part tout de suite', [
+    { show: 'chantier', at: a.state.players[a.me].home, expected: 'farm', got: pa().queue?.key },
+  ]);
+  assert.equal(pa().queue?.key, 'farm');
+  assert.deepEqual(pa().plan || [], []);
+  assert.equal(a.state.players[a.me].orders.at(-1).k, 'build');
+});
+
+scenario('rejeu : les ordres envoyés au fil et un vieux journal « tout de suite » se rejouent pareil (D-420)', (film) => {
+  // Tout par ordres, pour que le rejeu refasse la même partie : 200 minéraux au départ.
+  const { players, clock } = newGame(1, ['human']);
+  const [a] = players;
+  const pa = () => a.state.players[a.me].planet;
+  a.planBuild('yard'); // 250 minéraux : attend son stock
+  a.build('farm'); // 75 : payable, mais redirigé à la fin du fil (noté planBuild)
+  assert.equal(pa().queue, null);
+  assert.deepEqual(pa().plan, ['yard', 'farm']);
+  assert.equal(a.state.players[a.me].orders.at(-1).k, 'planBuild');
+  // Vieux journal (avant D-420) : un ordre « build » parti tout de suite malgré le fil, comme
+  // l'ancien Session.build le faisait et le notait. Au rejeu, il doit garder ce sens-là.
+  clock.t += 2 * SEC;
+  a.entry = { t: clock.t, k: 'build', a: ['mine'] };
+  a.entryKept = false;
+  assert.equal(game.startBuild(pa(), 'mine', clock.t), null);
+  a.touch();
+  a.entry = null;
+  assert.equal(pa().queue?.key, 'mine');
+  for (let i = 0; i < 20; i++) {
+    clock.t += 30 * SEC;
+    a.tick();
+  }
+  const r = replay(clone(a.snapshot()));
+  const same = Object.values(a.state.players).every((p) => comparable(r.players[p.id]) === comparable(p));
+  film.look(a, '10 min plus tard : la partie rejouée retombe sur la même fiche', [{ show: 'fiche rejouée à l’identique', expected: true, got: same }]);
+  for (const p of Object.values(a.state.players)) assert.equal(comparable(r.players[p.id]), comparable(p), `fiche de ${p.name}`);
+});

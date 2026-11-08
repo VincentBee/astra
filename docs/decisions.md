@@ -1922,7 +1922,8 @@ propres numéros. Attention : `D-C1`/`D-C2` de hist-a ≠ `D-C01`/`D-C02` de his
   occupé, priorité sur le stock, labo puis recherche et estimation, le joueur avec refus,
   retrait et rejeu identique, fil abîmé nettoyé) ; 204/204 ; vu dans Chromium à 360 et 320 px.
 - Qui : Vincent (demande), Claude (un seul fil, règle d'ordre, 12 éléments, par défaut). Source :
-  session `012yisg1`. Statut : en vigueur. Modifie D-105.
+  session `012yisg1`. Statut : en vigueur, modifiée par D-420 (fil pas vide : une construction
+  lancée à la main va à la fin du fil, quel que soit son chantier). Modifie D-105.
 **D-159 — Toucher une autre de mes flottes : fusionner, ou la rejoindre pour fusionner**
 - 2026-11-02 22:40. Contexte : « Faciliter la fusion de flotte quand on clique sur une flotte
   allié ». Il n'y a pas d'alliance dans le jeu : compris comme **une autre de mes flottes**
@@ -3401,3 +3402,69 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   `astra-p2p-v119` à une seconde fusion (#193 avait pris v118) (seul
   `tests/layout.test.mjs` change alors, la montée garde la règle « une version par mise en ligne »).
 - Qui : Claude, par défaut. Source : session `42405fcd`. Statut : en vigueur.
+
+**D-420 — Fil pas vide : toute construction lancée à la main va à la fin du fil**
+- 2026-11-07 22:33 UTC. Contexte : issue #194. Vincent : « quand j'ai une fil d'action qui
+  attend d'avoir assé de ressource pour construire le prochain item, je peux construire quelque
+  chose de moins chere imediatement et ralonger le temps de construction du prochain item de la
+  fil, ce n'est pas normal, quand on a une fil, toute construction arrive a la fin de la fil ».
+  Le bouton de chaque chantier ne regardait que les éléments du fil de **son** chantier (D-158 :
+  « une recherche au fil ne l'empêche plus de lancer tout de suite ») ; un bâtiment payable
+  partait devant une recherche qui attendait son stock, et la retardait (62 s → 121 s).
+- Choix :
+  - **Fil pas vide** (après calcul à l'heure de l'ordre, `stateAt`) : `Session.build`,
+    `research` et `buildShips` renvoient l'ordre vers `planBuild`, `planResearch` ou
+    `planShips` (`queuedBehind`, `toPlan`, `js/session.js`). La construction va à la fin du
+    fil, puis `planNext` la lance à son tour : elle ne double jamais un élément prêt qui attend
+    son stock. Fil vide : rien ne change, une construction payable part tout de suite.
+  - Vaut pour tout ce que le fil peut tenir (bâtiments, recherches, lots de vaisseaux), même si
+    le chantier visé est différent et libre : c'est la règle demandée (« toute construction »),
+    et c'est déjà celle du fil (le premier élément prêt a la priorité sur le stock). Un élément
+    dont le chantier est libre et qui ne gêne personne (l'élément en tête attend son propre
+    chantier occupé) part quand même tout de suite, par `planNext`.
+  - Boutons (`js/app.js`) : ↑ / ×n seulement fil vide ; sinon + (« Ajouter … au fil »),
+    sur les quatre écrans (bâtiments, recherche, chantier naval, chantier de la fiche de carte).
+  - **Rejeu** : l'ordre redirigé est noté au journal sous son vrai nom (`planBuild`…), il se
+    rejoue pareil. Un vieux journal peut contenir un `build` parti tout de suite malgré un fil
+    pas vide : au rejeu (`replaying`, `js/replay.js`), un ordre « tout de suite » garde l'ancien
+    sens, la partie se rejoue à l'identique.
+  - IA (`js/bot.js`) : elle ne lance ni recherche ni vaisseaux tant que son fil n'est pas vide
+    (sinon ses ordres iraient au fil, en double à chaque passage). **Remplacé par D-421** : elle
+    les met au fil, sans doublon.
+- Écarté : la règle dans l'interface seulement (un ordre direct, d'une IA ou d'un autre écran,
+  doublait encore le fil) ; la règle dans `startBuild` (`js/game.js`), qui aurait changé le sens
+  des vieux journaux ; ne regarder que le fil du même chantier (le bug).
+- Pas fait : la déconstruction (pas une construction) occupe encore un chantier libre devant un
+  bâtiment qui attend. À décider à part.
+- Vérifié : 4 scénarios (`tests/plan.test.mjs`), 3 échouent sur `main` ; vrai jeu (Chrome,
+  390 px) : fil « Propulsion » qui attend, la Ferme passe de ↑ à + et va en 2ᵉ place, Propulsion
+  garde son départ.
+- Qui : Vincent (règle), Claude (redirection dans la session, rejeu, par défaut). Pour l'IA, le
+  router a choisi l'autre option : voir D-421. Source : session `3c9e3331`, issue #194. Statut : en vigueur. Modifie D-158.
+  Cache `astra-p2p-v120`.
+
+**D-421 — L'IA met ses recherches et ses vaisseaux au fil, sans doublon**
+- 2026-11-07 22:39 UTC. Contexte : avec D-420, une recherche ou un lot de vaisseaux lancé fil
+  pas vide va au fil. L'IA (D-151) ne mettait que des bâtiments au fil, et son fil n'est presque
+  jamais vide : un bâtiment y attend son stock. Ses `research` / `buildShips` y seraient partis
+  en double à chaque passage. Question posée au router : (A) l'IA attend que son fil soit vide ;
+  (B) elle met au fil, sans doublon.
+- Choix (B, router) : `js/bot.js`.
+  - Fil vide : comme avant (recherche ou lot lancé tout de suite s'il est payable).
+  - Fil pas vide : `planResearch` / `planShips`. Une seule recherche et un seul lot de
+    vaisseaux au fil à la fois par planète ; jamais au-delà de `PLAN_MAX` ; une technologie en
+    recherche ou au fil, ici ou ailleurs, ne se redemande pas (`chooseTech`) ; un colonisateur au
+    fil compte déjà (`colonyCount`) ; le vaisseau doit être ouvert, recherche au fil comprise.
+  - Bâtiments : l'IA en ajoute un dès que le fil n'en tient pas (avant : seulement fil vide),
+    sinon une recherche au fil bloquerait ses bâtiments.
+- Écarté : (A) attendre un fil vide : l'IA ne chercherait presque plus (proposée par défaut
+  dans la 1ʳᵉ version de la PR #195, refusée par le router).
+- Vérifié : parties de 3 IA (`tests/perf-ia.mjs`, graines 1 à 3, 10, 20 et 30 min), `main`
+  contre cette PR : total des meilleurs points à 30 min 761 → 740, 564 → 524, 728 → 674 (−3 à
+  −8 %) ; recherche de l'IA en tête 12 → 14 ; deux IA éliminées sur trois dans chaque partie de
+  `main`, une ou zéro avec la PR. L'IA démarre un peu plus lentement (10 min : recherche 8 → 6
+  pour les machines, elle ne double plus son bâtiment en attente). Le scénario D-151
+  (`tests/bot.test.mjs`) vérifie le fil des IA à chaque passage : sans doublon, 12 au plus,
+  et des recherches mises au fil. 323/323.
+- Qui : router (option B), Claude (détails). Source : session `3c9e3331`, PR #195. Statut : en
+  vigueur. Modifie D-420 (partie IA) et D-151.

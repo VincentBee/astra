@@ -1821,6 +1821,7 @@ export class Session {
     if (!p?.planet) return this.ontoast?.('Choisis d’abord ta race.');
     const pl = this.myPlanet(where);
     if (!pl) return;
+    if (this.queuedBehind(pl)) return this.toPlan('planBuild', key, where);
     // Les places sont celles de la carte, pas celles de la fiche (qu'on pourrait effacer ou gonfler).
     // Une planète d'avant la place garde au moins ce qu'elle a déjà bâti.
     const w = this.planets.find((x) => sameCell(x, pl.cell));
@@ -1857,6 +1858,22 @@ export class Session {
     pl.planet.plan = [...plan, key];
     this.touch(this.addLog(`${p.name} ajoute ${R.buildings[key].name} au fil de ${pl.name}.`));
     this.changed();
+  }
+
+  /**
+   * Fil non vide sur cette planète, maintenant (D-420) : une construction lancée à la main
+   * (bâtiment, recherche, vaisseaux) n'y passe pas devant, elle va à la fin du fil. Au rejeu
+   * (`replaying`), un ordre « tout de suite » garde son sens d'avant : les ordres redirigés
+   * sont notés au journal sous leur vrai nom (toPlan), un vieux journal se rejoue pareil.
+   */
+  queuedBehind(pl) {
+    return !this.replaying && stateAt(pl.planet, this.now()).plan.length > 0;
+  }
+
+  /** Renvoie l'ordre vers le fil (`planBuild`, `planResearch`, `planShips`), noté au journal sous ce nom. */
+  toPlan(kind, ...args) {
+    if (this.entry) this.entry.k = kind;
+    return this[kind](...args);
   }
 
   /** Écrit l'état de la planète maintenant, et note au journal ce que le fil a lancé entre-temps. */
@@ -1962,6 +1979,7 @@ export class Session {
     if (!p?.planet) return;
     const pl = this.myPlanet(where);
     if (!pl) return;
+    if (this.queuedBehind(pl)) return this.toPlan('planResearch', key, where);
     const other = this.planetsOf(p).find((x) => x.key !== pl.key && x.planet.research?.key === key);
     if (other) return this.ontoast?.(`Cette technologie est déjà en recherche sur ${other.name}.`);
     // La copie des technologies d'une colonie peut avoir un passage de retard : on part des plus hautes.
@@ -1981,6 +1999,7 @@ export class Session {
     const p = this.state.players[this.me];
     const pl = this.myPlanet(where);
     if (!pl) return;
+    if (this.queuedBehind(pl)) return this.toPlan('planShips', type, count, where);
     const err = startShips(pl.planet, type, count, this.now());
     if (err) return this.ontoast?.(err);
     this.touch(this.addLog(`${p.name} met en chantier ${count} × ${SHIPS[p.race][type].name} sur ${pl.name}.`));
