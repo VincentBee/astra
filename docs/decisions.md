@@ -3480,9 +3480,9 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - Choix :
   - **Trop de joueurs** : `Session.tooMany` (plus de 8 dans `roster`). Tant que c'est vrai,
     `checkStart` et `begin` ne donnent pas le départ, chez tous (IA comprises). Le lobby le dit
-    chez chacun : « 9 joueurs : 8 au plus · retire une de tes IA (touche-la ci-dessous) » sur un
-    téléphone qui fait jouer une IA (seul lui peut la retirer, D-399) ; sinon « attends qu'un
-    joueur retire une IA ». « Ajouter une IA » reste refusé (et caché) dès 8 dans la copie du
+    chez chacun : « 9 joueurs : 8 au plus · il faut retirer une IA : touche une de tes IA ci-dessous
+    pour la retirer » sur un téléphone qui fait jouer une IA (seul lui peut la retirer, D-399) ;
+    sinon « attends qu'un joueur retire une IA ». « Ajouter une IA » reste refusé (et caché) dès 8 dans la copie du
     téléphone.
   - **Noms** : avant le départ, à chaque passage (`think`), une IA calcule le nom qu'elle doit
     porter : dans l'ordre d'arrivée (`rank`, puis l'identifiant), chaque joueur garde son nom

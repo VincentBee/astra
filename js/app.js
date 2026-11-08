@@ -2984,10 +2984,11 @@ function renderLobby(me) {
   } else {
     const waiting = session.notReady.filter((p) => p.id !== session.me);
     const extra = session.roster.length - 8;
+    const n = extra > 1 ? `${extra} IA` : 'une IA';
     // Trop de joueurs (D-480) : seul le téléphone qui fait jouer une IA peut la retirer (D-399).
     const mine = session.roster.some((p) => editableBot(session, p.id));
     text = session.tooMany
-      ? `${ic('warn')} <strong>${session.roster.length} joueurs : 8 au plus</strong> <span class="hint">· ${mine ? `retire ${extra > 1 ? `${extra} de tes IA` : 'une de tes IA'} (touche-la ci-dessous)` : `attends qu’un joueur retire ${extra > 1 ? `${extra} IA` : 'une IA'}`} : la partie ne part pas avant</span>`
+      ? `${ic('alert')} <strong>${session.roster.length} joueurs : 8 au plus</strong> <span class="hint">· ${mine ? `il faut retirer ${n} : touche une de tes IA ci-dessous pour la retirer` : `attends qu’un joueur retire ${n}`}, la partie ne part pas avant</span>`
       : ready
       ? `${ic('check')} <strong>Prêt</strong> <span class="hint">· ${waiting.length ? `on attend ${waiting.map((p) => esc(p.name)).join(', ')}` : 'départ…'}</span>`
       : `${ic('play')} <strong>Prépare-toi</strong> <span class="hint">· la partie part quand tous les joueurs présents sont prêts ; chacun commence avec un seul colonisateur</span>`;
