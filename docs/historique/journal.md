@@ -532,6 +532,12 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 | 22:33 | `3c9e3331` (worker-fil-ordre) | Worker du router, bug signalé par Vincent : « quand j'ai une fil d'action qui attend d'avoir assé de ressource pour construire le prochain item, je peux construire quelque chose de moins chere imediatement et ralonger le temps de construction du prochain item de la fil […] quand on a une fil, toute construction arrive a la fin de la fil » | Issue #194 créée (reproduit : Propulsion au fil, ferme lancée à la main, départ 62 s → 121 s). Fil pas vide : `build` / `research` / `buildShips` vont à la fin du fil (`js/session.js`), noté au journal sous le vrai nom ; vieux journaux rejoués pareil (`replaying`, `js/replay.js`) ; boutons en + dès que le fil n'est pas vide (`js/app.js`) ; IA sans recherche ni vaisseaux fil pas vide (`js/bot.js`). 4 scénarios (`tests/plan.test.mjs`) ; vrai jeu avant / après ; cache v120 | (PR, ferme #194) | D-420 |
 | 22:39 | `3c9e3331` (worker-fil-ordre) | Router : « À CORRIGER — PR #195 : prends l'option B pour les bots […] L'IA met ses recherches et ses vaisseaux au fil, sans doublon […] et ne dépasse jamais PLAN_MAX » | `js/bot.js` : fil pas vide, `planResearch` / `planShips` (une recherche et un lot au plus, technologie pas déjà demandée, `PLAN_MAX`), bâtiment dès que le fil n'en tient pas ; scénario D-151 complété ; parties de 3 IA avant / après (graines 1 à 3) : points −3 à −8 %, recherche 12 → 14 ; 323/323 | (PR #195) | D-421 |
 
+## 8 novembre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 12:11 | `37ab6d84` (worker-techno-horsligne) | Worker du router : corriger l'issue #84, « Hors ligne, technologies.html ne s’ouvre pas (absente du cache) » | Vérifié sur `main` (75a269d) : bug toujours là. `sw.js` : `technologies.html` et `js/techtree.js` ajoutés à `FILES` (les seuls fichiers servis absents) ; `tests/sw-files.test.mjs` suit les liens et imports des trois pages et exige que tout soit dans `FILES` (échoue sur `main`) ; `tests/sw-browser.mjs` : étape « serveur coupé, technologies.html » (Chromium : 5/5, sur `main` 4/5 `net::ERR_FAILED`) ; cache v121 | (PR, ferme #84) | D-500, D-501 |
+
 ### Travaux en cours au 2026-10-29
 
 - **Rythme des parties** (`26f178b9`) : commité sur `claude/swarm-it-game-pacing-1d4502`

@@ -3468,3 +3468,28 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   et des recherches mises au fil. 323/323.
 - Qui : router (option B), Claude (détails). Source : session `3c9e3331`, PR #195. Statut : en
   vigueur. Modifie D-420 (partie IA) et D-151.
+
+**D-500 — Le cache hors ligne contient toutes les pages, contrôlé par un test qui suit les liens**
+- 2026-11-08 12:11 UTC. Contexte : issue #84. `FILES` de `sw.js` oubliait `technologies.html`
+  et `js/techtree.js` : installée puis hors ligne, la page Technologies ne s'ouvrait pas
+  (`net::ERR_FAILED`) si elle n'avait jamais été ouverte en ligne. Vérifié sur `main` (75a269d,
+  après D-230) : toujours vrai. Les autres fichiers servis y sont tous.
+- Choix : ajouter les deux fichiers à `FILES`, et `tests/sw-files.test.mjs` qui part de
+  `index.html`, `replay.html`, `technologies.html` et `manifest.json`, suit les `src` / `href`,
+  les `import … from`, les `import()` et les `new URL('…', import.meta.url)`, et exige que
+  chaque fichier atteint soit dans `FILES` (et que chaque fichier de `FILES` existe, sinon
+  `cache.addAll` casse l'installation). Un nouveau fichier oublié fait échouer le test.
+- Écarté : générer `FILES` à la main par un script (le dépôt n'a pas de build, D-001 et
+  suivantes) ; mettre en cache n'importe quel fichier à la volée (déjà fait par le `fetch`, mais
+  ne couvre pas une page jamais ouverte en ligne).
+- Vérifié : le test échoue sur `main` (`technologies.html`, `js/techtree.js` absents) et passe
+  avec la correction ; `tests/sw-browser.mjs` (Chromium), serveur coupé après une seule visite
+  de l'accueil : `technologies.html` depuis le cache, 20 bulles dans le graphe (sur `main` :
+  `net::ERR_FAILED`).
+- Qui : Claude par défaut (piste donnée par l'issue). Source : worker `worker-techno-horsligne`,
+  session `37ab6d84`, issue #84. Statut : en vigueur.
+
+**D-501 — Cache `astra-p2p-v121`**
+- 2026-11-08 12:11 UTC. Contexte : D-500 change `FILES`. Choix : `VERSION` passe de v120 à
+  v121 pour que les téléphones installés récupèrent la nouvelle liste. Qui : Claude par défaut.
+  Source : session `37ab6d84`, issue #84. Statut : en vigueur.

@@ -318,9 +318,9 @@ Le sens de ce journal pour le rejeu (`seenNews`, `replayIds`) est décrit dans `
 - Un message de plus de 256 Ko dépasserait la limite annoncée par `a=max-message-size` (`invite.js:166`, `peer.js:35`) : passer toujours par `Link.send`, qui découpe.
 - Changer le format du code d'invitation : changer `VERSION` dans `invite.js` (sinon décodage faux).
 - Changer le format des fiches : incrémenter `FORMAT` et compléter son commentaire (l.32-40).
-- `sw.js` : changer `VERSION` (`astra-p2p-v94` au 2026-11-06) à chaque mise en ligne. `cache.addAll` est tout ou rien : un fichier absent de `FILES` qui renvoie 404 casse l'installation.
+- `sw.js` : changer `VERSION` (`astra-p2p-v121` au 2026-11-08) à chaque mise en ligne. `cache.addAll` est tout ou rien : un fichier absent de `FILES` qui renvoie 404 casse l'installation.
 - **`sw.js`, réseau muet (D-230)** : chaque requête fait la course entre le réseau et un délai de 3 s (`NET_WAIT`). Réseau d'abord s'il répond à temps ; sinon la copie en cache (`caches.match`, `ignoreSearch`). Pas de copie en cache : on continue d'attendre le réseau. Après un délai dépassé, le drapeau `mute` fait répondre le cache **tout de suite** aux requêtes suivantes (sans lui, chaque `import` de la chaîne des modules attendait 3 s : l'accueil mettait plus de 10 s dans Chromium) ; la première réponse du réseau le remet à faux. La réponse du réseau, même arrivée après le délai, est écrite dans le cache (`e.waitUntil` appelé tout de suite) : la prochaine ouverture a la nouvelle version. Piège : juste après le retour du réseau, une ouverture peut encore servir le cache une fois (le drapeau tombe à la première réponse) ; `mute` est perdu quand le navigateur arrête le service worker, ce qui revient au comportement normal.
-- **`technologies.html` et `js/techtree.js` ne sont pas dans `FILES`** (`sw.js:5-34`). Ils ne sont pas pré-cachés ; ils ne marchent hors ligne que s'ils ont déjà été ouverts en ligne (le `fetch` met en cache ce qu'il télécharge, `sw.js:67-75`).
+- **`FILES` doit contenir tout ce que les pages demandent** (D-500) : `tests/sw-files.test.mjs` part de `index.html`, `replay.html`, `technologies.html` et `manifest.json`, suit `src` / `href`, `import`, `import()` et `new URL('…', import.meta.url)`, et échoue si un fichier atteint manque. Un nouveau fichier : l'ajouter à `FILES` et changer `VERSION`. (Avant D-500, `technologies.html` et `js/techtree.js` manquaient : hors ligne, la page ne s'ouvrait que si elle avait déjà été ouverte en ligne, issue #84.)
 - Le service worker n'est enregistré qu'en https ou sur `localhost` (`app.js:1964`). La caméra aussi exige https (`scanner.js:25`).
 - `route()` est copié dans `peer.js:125` et `rendezvous.js:23`.
 - Pas de TURN : derrière certains opérateurs (CGNAT), la connexion peut échouer (`config.js:6-8`).
@@ -352,9 +352,14 @@ node --test tests/sw.test.mjs
 Résultat (2026-11-06) : 6 tests, 6 réussis (≈ 10,6 s, le délai de 3 s est le vrai). Avec le `sw.js` d'avant D-230, « serveur muet » et « serveur lent » échouent.
 
 ```bash
+node --test tests/sw-files.test.mjs
+```
+Résultat (2026-11-08) : 3 tests, 3 réussis — chaque fichier demandé par les trois pages est dans `FILES`, et chaque fichier de `FILES` existe (D-500). Sur le `sw.js` d'avant : 2 échecs, `technologies.html` et `js/techtree.js` absents.
+
+```bash
 ASTRA_PLAYWRIGHT=/chemin/vers/node_modules/playwright/index.mjs node tests/sw-browser.mjs capture.png
 ```
-Résultat (2026-11-06, Chromium de Playwright) : 4/4 — serveur muet : accueil depuis le cache en ≈ 3,1 s (avant D-230 : rien après 10 s) ; serveur qui répond : `index.html` modifié servi ; serveur coupé : cache en ≈ 60 ms.
+Résultat (2026-11-08, Chromium de Playwright) : 5/5 — serveur coupé après une seule visite de l'accueil, `technologies.html` depuis le cache avec son graphe (20 bulles ; sur le `sw.js` d'avant D-500 : `net::ERR_FAILED`, issue #84). Résultat (2026-11-06) : 4/4 — serveur muet : accueil depuis le cache en ≈ 3,1 s (avant D-230 : rien après 10 s) ; serveur qui répond : `index.html` modifié servi ; serveur coupé : cache en ≈ 60 ms.
 
 - `tests/harness.mjs` simule `localStorage`, `document`, `window`, fixe l'heure (`clock.t`) et crée `n` sessions. Son `sync(a, b)` est `a.mergeIn(b.snapshot(), {pid: b.me})` : il **contourne** `peer.js` et `rendezvous.js`. Les tests ne vérifient donc ni WebRTC, ni QR, ni Nostr.
 - `tests/hostile.test.mjs` teste les garde-fous de réception (`recordOk`, `normalize`, `backdated`, horloges décalées) ; certains de ses tests touchent aussi aux règles (ex. heure qui recule et production).
@@ -368,4 +373,4 @@ Les numéros D-xxx renvoient à [decisions.md](../decisions.md) ; les demandes d
 - Historique de 10 parties et identité gardée par partie (`astra.saves`, `astra.identities`, `1eeb2c1`, D-066) ; une clé par partie et ménage quand la mémoire est pleine (D-415, issue #41).
 - Garde-fous de réception (`recordOk`, `backdated`, tolérance d'horloge d'un jour au lieu de 10 min) : `061744b`, D-061.
 - Assumé, non corrigé : un joueur qui modifie son code peut inventer un combat dans sa propre fiche ; signer les fiches a été jugé trop lourd (D-057).
-- `technologies.html` non mis en cache par `sw.js` : déjà signalé le 2026-10-28 à 15:12 (session `01be156b`), toujours vrai au commit 1eeb2c1.
+- `technologies.html` non mis en cache par `sw.js` : signalé le 2026-10-28 à 15:12 (session `01be156b`), corrigé le 2026-11-08 (D-500, issue #84).
