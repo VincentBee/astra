@@ -1101,6 +1101,15 @@ export class Session {
     return Object.values(this.state?.players || {}).filter((p) => !Number.isFinite(p.left));
   }
 
+  /**
+   * Plus de 8 joueurs : deux téléphones séparés ont rempli chacun leur lobby, puis se sont
+   * retrouvés (D-480). La partie ne part pas tant qu'il en reste trop : seul le téléphone qui
+   * fait jouer une IA peut la retirer (D-399).
+   */
+  get tooMany() {
+    return this.roster.length > MAX_PLAYERS;
+  }
+
   /** Points de l'empire d'un joueur (toutes ses planètes, ses recherches, ses vaisseaux). */
   scoreOf(p) {
     if (!p?.race) return 0;
@@ -1161,7 +1170,7 @@ export class Session {
   begin() {
     if (!this.canAct) return false;
     const p = this.state.players[this.me];
-    if (!Number.isFinite(p?.ready) || this.startedAt != null) return false;
+    if (!Number.isFinite(p?.ready) || this.startedAt != null || this.tooMany) return false;
     p.go = this.now();
     this.touch(this.addLog('Tous les joueurs présents sont prêts : la partie commence.'));
     this.changed();
@@ -1171,7 +1180,7 @@ export class Session {
   /** Je suis prêt, les joueurs présents aussi, et la partie n'est pas partie : je donne le départ. */
   checkStart() {
     if (this.status !== 'playing' || !this.state || this.startedAt != null) return false;
-    if (!Number.isFinite(this.state.players[this.me]?.ready) || this.notReady.length) return false;
+    if (!Number.isFinite(this.state.players[this.me]?.ready) || this.notReady.length || this.tooMany) return false;
     return this.begin();
   }
 

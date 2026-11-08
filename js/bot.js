@@ -71,6 +71,11 @@ export function think(s, budget = BUDGET) {
     return fn() !== false;
   };
   ctx.order = order;
+  // Même nom qu'un joueur arrivé avant (deux téléphones ont ajouté une IA chacun) : elle en prend un libre (D-480).
+  if (s.beforeStart) {
+    const name = ownName(s, p);
+    if (name !== p.name) order(() => s.rename(name));
+  }
   if (!p.race) {
     order(() => s.chooseRace(pickRace(s)));
     return ctx.done;
@@ -102,6 +107,31 @@ export function think(s, budget = BUDGET) {
   }
   if (ctx.left > 0) attack(ctx, mine);
   return ctx.done;
+}
+
+/**
+ * Nom que doit porter `p` pour que deux joueurs n'aient jamais le même (D-480) : dans l'ordre
+ * d'arrivée (puis l'identifiant), chacun garde son nom s'il est encore libre, sinon prend le
+ * premier nom d'IA libre. Tous les téléphones qui voient les mêmes joueurs font les mêmes choix :
+ * deux IA homonymes ne prennent pas, ensemble, le même nouveau nom.
+ */
+function ownName(s, p) {
+  const all = [...s.roster].sort((a, b) => a.rank - b.rank || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const taken = new Set(); // noms déjà attribués aux joueurs arrivés avant
+  const held = new Set(all.map((o) => o.name)); // noms portés en ce moment : un nouveau nom n'en prend aucun
+  for (const o of all) {
+    const name = taken.has(o.name) ? freeName(new Set([...held, ...taken])) : o.name;
+    taken.add(name);
+    if (o.id === p.id) return name;
+  }
+  return p.name;
+}
+
+/** Premier nom d'IA hors de `used` (« IA Véga »… puis « IA 9 », « IA 10 »…). */
+function freeName(used) {
+  let n = NAMES.length + 1;
+  while (used.has(`IA ${n}`)) n++;
+  return NAMES.find((x) => !used.has(x)) || `IA ${n}`;
 }
 
 /** Race la moins prise par les autres (au hasard entre les ex æquo). */
@@ -617,8 +647,7 @@ function botSession(host, pid, timers, clock) {
 export function addBot(host, { race = null, name = null, timers = true, clock = null } = {}) {
   const st = host.state;
   if (!st || host.roster.length >= 8) return null;
-  const used = new Set(Object.values(st.players).map((o) => o.name));
-  name ||= NAMES.find((n) => !used.has(n)) || `IA ${Object.keys(st.players).length + 1}`;
+  name ||= freeName(new Set(host.roster.map((o) => o.name)));
   const pid = newPid();
   // Personne ne revient jamais avec son secret : n'importe quelle empreinte fait l'affaire.
   host.addPlayer(pid, name, newPid().padEnd(64, '0'));
