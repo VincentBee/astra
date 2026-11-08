@@ -335,23 +335,37 @@ export class Session {
     this.timers = [];
     this.onlost = null; // la partie a été ouverte dans un autre onglet (D-430)
     this.lost = false;
-    this.release = null;
+    this.hold = null; // verrou de la partie dans cet onglet (js/tablock.js)
+    this.ended = false;
   }
 
   /**
-   * Cette partie ne se joue plus que dans cet onglet (D-430) : si un autre onglet l'ouvre
-   * ensuite, celui-ci s'arrête sans plus rien sauver (`lose`).
+   * Cette partie ne se joue que dans cet onglet (D-430). `hold` : poignée de `holdGame`. Un
+   * autre onglet qui demande la main : cet onglet sauve d'abord, puis s'arrête (`lose`) ; le
+   * verrou ne part qu'après. Verrou pris de force (onglet gelé) : il s'arrête sans rien sauver.
    */
+  adopt(hold) {
+    if (this.ended || this.lost) return hold?.release();
+    this.hold?.release();
+    this.hold = hold || null;
+    if (!hold) return;
+    hold.onyield = () => {
+      this.save();
+      this.lose();
+    };
+    hold.onlost = () => this.lose();
+  }
+
+  /** Prend le verrou de la partie en cours sans attendre (partie neuve, arrivée par invitation). */
   claim() {
-    this.release?.();
-    this.release = holdGame(this.state?.gid, () => this.lose());
+    const gid = this.state?.gid;
+    holdGame(gid).then((h) => (this.state?.gid === gid ? this.adopt(h) : h.release()));
   }
 
   /** Un autre onglet a pris la partie : tout s'arrête ici, IA comprises, et plus rien n'est sauvé. */
   lose() {
     if (this.lost) return;
     this.lost = true;
-    this.release = null;
     this.end();
     this.onlost?.(this);
   }
@@ -381,7 +395,7 @@ export class Session {
    * le temps écoulé est rattrapé (production, chantiers terminés) et les
    * autres joueurs se reconnectent tout seuls dès qu'ils sont en ligne.
    */
-  static resume(saved) {
+  static resume(saved, hold = null) {
     const s = new Session(saved.state.players[saved.me]?.name || 'Commandant');
     s.me = saved.me;
     s.state = clean(saved.state);
@@ -389,7 +403,7 @@ export class Session {
     s.loadClock();
     s.intel = saved.intel || {}; // brouillard (D-124) : ce que j'ai vu des planètes des autres
     s.journal = saved.journal || null; // avant le rattrapage : les combats de l'absence s'y inscrivent
-    s.claim(); // avant tout : un autre onglet qui jouait cette partie s'arrête (D-430)
+    s.adopt(hold); // pris avant de lire `saved` : l'autre onglet a sauvé et s'est arrêté (D-430)
     s.botIds = Array.isArray(saved.bots) ? saved.bots.filter((pid) => pidOk(pid) && s.state.players[pid] && !Number.isFinite(s.state.players[pid].left)) : []; // IA jouées par ce téléphone (D-151), réveillées par js/bot.js
     s.refreshOnline();
     s.start();
@@ -3446,8 +3460,9 @@ export class Session {
     clearTimeout(this.saveTimer);
     this.saveTimer = null;
     this.save();
-    this.release?.(); // un autre onglet peut reprendre la partie (D-430)
-    this.release = null;
+    this.ended = true;
+    this.hold?.release(); // un autre onglet peut reprendre la partie (D-430)
+    this.hold = null;
     // Les IA que ce téléphone fait jouer (D-151) s'arrêtent avec lui ; elles reprendront avec la partie.
     for (const bot of this.bots?.values() || []) bot.end();
     this.bots?.clear();

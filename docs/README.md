@@ -59,7 +59,7 @@ Ordre conseillé pour arriver sur le projet : README racine → `reseau.md` §1-
 | `js/scanner.js` | Lecture de QR par la caméra | reseau |
 | `js/rendezvous.js` | Reconnexion par relais Nostr (Trystero) | reseau |
 | `js/save.js` | Sauvegarde locale, historique des 10 parties, identités | reseau |
-| `js/tablock.js` | Une partie dans un seul onglet à la fois (verrou navigator.locks, D-430) | reseau |
+| `js/tablock.js` | Une partie dans un seul onglet à la fois : l'ancien onglet sauve puis rend la main (navigator.locks + BroadcastChannel, D-430) | reseau |
 | `js/session.js` | Cœur d'une partie : messages, synchro des fiches (reseau) et ordres du joueur (regles) | reseau + regles |
 | `js/game.js` | Règles : temps, économie, races, carte, climat, score | regles |
 | `js/tech.js` | Technologies, vaisseaux, coûts et durées | regles |

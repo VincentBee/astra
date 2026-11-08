@@ -1,5 +1,6 @@
 import { Session, threatText } from './session.js';
 import { loadGame, listGames, selectGame, forgetGame, describeSave, onSaveFailed } from './save.js';
+import { holdGame } from './tablock.js';
 import { inviteLink, inviteGid, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
 import {
@@ -213,19 +214,37 @@ function showSaved() {
     .join('');
 }
 
-$('games').addEventListener('click', (e) => {
+let taking = false; // « Reprendre » attend qu'un autre onglet rende la partie (D-430)
+$('games').addEventListener('click', async (e) => {
   const btn = e.target.closest('[data-resume], [data-replay], [data-forget]');
-  if (!btn) return;
+  if (!btn || taking) return;
   const { resume, replay, forget } = btn.dataset;
   if (forget) {
     forgetGame(forget);
     return showSaved();
   }
-  const saved = selectGame(resume || replay);
-  if (!saved) return showSaved();
-  if (replay) return (location.href = 'replay.html');
+  if (replay) {
+    if (!selectGame(replay)) return showSaved();
+    return (location.href = 'replay.html');
+  }
+  // D-430 : si un autre onglet joue cette partie, il sauve et s'arrête d'abord ; la sauvegarde
+  // n'est lue qu'ensuite (au plus WAIT ms si cet onglet-là est gelé).
+  session?.end?.();
+  session = null;
+  taking = true;
+  let hold;
+  try {
+    hold = await holdGame(resume);
+  } finally {
+    taking = false;
+  }
+  const saved = selectGame(resume);
+  if (!saved) {
+    hold.release();
+    return showSaved();
+  }
   $('home-note').hidden = true;
-  session = Session.resume(saved);
+  session = Session.resume(saved, hold);
   session.ontoast = toast;
   session.onchange = onSessionChange;
   session.onlost = onLost;

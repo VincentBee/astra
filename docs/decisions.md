@@ -3469,28 +3469,36 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - Qui : router (option B), Claude (détails). Source : session `3c9e3331`, PR #195. Statut : en
   vigueur. Modifie D-420 (partie IA) et D-151.
 
-**D-430 — Une partie ne se joue que dans un seul onglet : le dernier ouvert prend la main**
-- 2026-11-08 12:15 UTC. Contexte : issue #49 (audit du 2026-11-05). La même partie reprise dans
-  deux onglets (ou l'appli installée et un onglet Chrome sur Android, qui partagent le stockage)
-  avançait deux fois, IA comprises, et le dernier onglet fermé écrasait `astra.save` : tout ce
-  qui avait été fait dans l'autre était perdu, sans message. Rien ne reliait les onglets.
-- Choix : un verrou du navigateur par partie (`navigator.locks`, nom `astra.game.<gid>`,
-  `js/tablock.js`), pris par la `Session` dès qu'elle joue une partie (`create`, `resume`,
-  `onWelcome` ; `claim`). Le **dernier onglet ouvert prend la partie** (`steal`) : l'ancien en
-  est prévenu (sa demande échoue en `AbortError`), s'arrête (`lose` : minuteurs, liens et IA
-  arrêtés) et **ne sauve plus rien** (`save` / `scheduleSave` ne font rien). L'écran revient à
-  l'accueil avec une note qui reste (« Cette partie a été ouverte dans un autre onglet… ») ;
-  « Reprendre » la reprend ici, et c'est alors l'autre onglet qui s'arrête. `end()` rend le
-  verrou (quitter la partie dans un onglet ne gêne pas l'autre).
+**D-430 — Une partie ne se joue que dans un seul onglet : le nouvel onglet prend la main, l'ancien sauve d'abord**
+- 2026-11-08 12:15 UTC (revue 12:24). Contexte : issue #49 (audit du 2026-11-05). La même partie
+  reprise dans deux onglets (ou l'appli installée et un onglet Chrome sur Android, qui partagent
+  le stockage) avançait deux fois, IA comprises, et le dernier onglet fermé écrasait
+  `astra.save` : tout ce qui avait été fait dans l'autre était perdu, sans message. Rien ne
+  reliait les onglets.
+- Choix (A, le nouvel onglet prend la main) : un verrou du navigateur par partie
+  (`navigator.locks`, nom `astra.game.<gid>`, `holdGame`, `js/tablock.js`).
+  - « Reprendre » (`js/app.js`) : le nouvel onglet envoie « rends la main » sur le
+    `BroadcastChannel` `astra.tabs`, puis **attend** le verrou. L'onglet qui joue **sauve son
+    état le plus récent**, s'arrête (`lose` : minuteurs, liens, IA), puis lâche le verrou. Le
+    nouveau ne lit la sauvegarde (`selectGame`) qu'**après** : rien ne se perd.
+  - Délai de secours `WAIT` = 2 s : si l'ancien ne répond pas (gelé en arrière-plan), le
+    verrou est pris de force (`steal`). L'ancien, à son réveil, reçoit `AbortError` et s'arrête
+    **sans rien sauver** : il ne peut pas écrire après le nouveau.
+  - L'onglet arrêté revient à l'accueil avec une note qui reste (« Cette partie a été ouverte
+    dans un autre onglet… ») ; « Reprendre » la reprend ici, et c'est l'autre qui s'arrête.
+  - Partie neuve (`create`) et arrivée par invitation (`onWelcome`) prennent aussi le verrou,
+    sans attendre (`claim`). `end()` rend le verrou.
+  - Sans `navigator.locks` (Safari avant 15.4) ou si le verrou est refusé : comme avant, pas de
+    verrou, sans erreur. Sans `BroadcastChannel` : le nouveau attend le délai de secours.
 - Écarté :
+  - `steal` tout de suite (1ʳᵉ version de la PR #200) : l'ancien pouvait écrire après que le
+    nouveau avait lu la sauvegarde, et sa dernière action (sauvegarde différée de 500 ms) se
+    perdait (router) ;
   - (B) le premier onglet garde la main et le second refuse « Reprendre » : un onglet oublié
-    (appli installée restée en fond) bloquerait la partie jusqu'à ce qu'on le trouve ;
+    (appli installée restée en fond) bloquerait la partie ;
   - fusionner les deux copies : les deux onglets jouent le même joueur, la fusion par `actAt`
-    (D-007) garderait une seule des deux fiches de toute façon ;
-  - `BroadcastChannel` ou relire `astra.save` avant d'écrire : plus de code, et pas de signal
-    sûr quand un onglet se ferme ou gèle.
-- Limites : navigateur sans `navigator.locks` (Safari avant 15.4) : comme avant, pas de verrou.
-  Les changements de l'onglet arrêté faits moins de 0,5 s avant la reprise dans l'autre (sauvegarde
-  différée) peuvent manquer ; l'onglet caché a déjà sauvé en passant en arrière-plan.
-- Qui : Claude, option recommandée au router (question posée, réponse non reçue à l'écriture :
-  non confirmé). Source : session `944b9421`, issue #49. Statut : en vigueur.
+    (D-007) ne garderait qu'une des deux fiches ;
+  - relire `astra.save` avant d'écrire : pas de signal sûr quand un onglet se ferme ou gèle.
+- Qui : Claude par défaut, validé par le router (option A, avec « rien ne doit se perdre » :
+  sauver avant de lâcher, délai de secours, pas de plantage sans `navigator.locks`). Source :
+  session `944b9421`, issue #49, PR #200. Statut : en vigueur.
