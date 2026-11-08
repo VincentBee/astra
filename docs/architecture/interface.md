@@ -432,6 +432,9 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   perdue ». Hors de ma détection (D-190), le menu suit `knownOwner` comme la fiche : planète
   retenue → « Attaquer X (joueur) · hors de portée : défense inconnue », sans estimation ; jamais
   vue → les ordres d'une planète libre (« Coloniser », « Juste y aller »). Une flotte en conquête est dessinée en rouge comme une attaque.
+  Planète **gelée** (D-450, issue #78) : plus d'« Attaquer », de « Conquérir » ni de
+  « Coloniser », même si la fiche de son propriétaire hors ligne la montre encore ; seul reste
+  « Juste y aller (orbite) ». `moveFleet` refuse ces ordres (toast « X est gelée. »).
 - **Bâtiments** : les bâtiments de défense de la race apparaissent dans la liste comme les autres.
   Carte dépliée (toucher le nom) : bouton « Déconstruire un niveau » (`data-demolish`), caché au
   niveau 0, désactivé pendant un chantier ; une confirmation (`confirm`) rappelle qu'on récupère la

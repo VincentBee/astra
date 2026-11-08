@@ -601,3 +601,81 @@ scenario('éliminé et hors ligne : les autres ne voient plus sa flotte, ni ne l
   assert.ok(!Number.isFinite(me(C).out));
   for (const s of [A, B, C]) assert.ok(noDeadOwner(s));
 });
+
+/**
+ * Issue #78 (D-450) : deux joueurs avec le froid. B a sa planète mère au bord, qui gèle tôt, et
+ * une colonie au chaud qui le garde en vie ; il est hors ligne (son téléphone n'applique pas le
+ * gel). A a 30 frégates. Renvoie aussi la planète mère de B (`cell`) et l'heure de son gel.
+ */
+function frozenTarget() {
+  frost();
+  const g = newGame(2, ['human', 'machine']);
+  const { players: [A, B], clock, sync } = g;
+  const cell = { ...me(B).home };
+  const warm = A.planets.filter((w) => w.kind === 'planet' && !A.ownerAt(w)).sort((a, b) => A.frostOf(b) - A.frostOf(a))[0];
+  me(B).colonies = { [warm.id]: { ...game.newPlanet('machine', clock.t, warm), claimAt: clock.t } };
+  me(B).planet.stock.minerals = 5000;
+  B.touch();
+  sync(A, B);
+  me(A).planet.ships = { fighter: 30, colony: 1 };
+  const id = A.takeOff('home', { fighter: 30 }, {}, 0);
+  A.myFleet(id).fuel = 1e6;
+  const colon = A.takeOff('home', { colony: 1 }, {}, 0);
+  A.myFleet(colon).fuel = 1e6;
+  return { ...g, A, B, cell, warm, id, colon, gel: A.frostOf(cell) };
+}
+
+scenario('planète gelée : ni « Attaquer », ni « Conquérir », ni « Coloniser » au menu de la flotte (#78)', (film) => {
+  const { A, B, clock, cell, id, colon, gel } = frozenTarget();
+  // La flotte de A attend juste à côté, un peu plus près du soleil : elle voit la planète mère de B.
+  const near = [{ x: cell.x + 1, y: cell.y + 1 }, { x: cell.x + 1, y: cell.y }, { x: cell.x, y: cell.y + 1 }].sort((a, b) => A.frostOf(b) - A.frostOf(a))[0];
+  Object.assign(A.myFleet(id), { from: { ...near }, to: { ...near } });
+  clock.t = gel + 1000;
+  assert.ok(A.frostOf(near) > clock.t, 'la case de la flotte de A n’a pas encore gelé');
+  assert.ok(A.seesCell(cell, clock.t), 'A voit la planète mère de B');
+  assert.ok(B.ownerAt(cell)?.id === B.me && me(B).home, 'hors ligne, la fiche de B montre encore sa planète mère');
+  const kinds = A.ordersAt(id, cell).map((o) => o.kind);
+  film.look(A, 'la planète mère de B vient de geler ; B est hors ligne. A choisit la planète pour sa flotte', [
+    { show: 'ordres proposés', at: cell, expected: 'move', got: kinds.join(', ') },
+  ]);
+  assert.deepEqual(A.planetsAt(cell), [], 'planetsAt ne renvoie pas une planète gelée');
+  assert.deepEqual(kinds, ['move'], 'ni attaque ni conquête sur une planète gelée');
+  for (const kind of ['attack', 'conquer']) assert.equal(A.moveFleet(id, cell, kind), false, `« ${kind} » est refusé`);
+  // Une planète libre déjà gelée : pas de « Coloniser ».
+  const dead = A.planets.find((w) => !A.ownerAt(w) && A.frostOf(w) <= clock.t);
+  const free = A.ordersAt(colon, dead).map((o) => o.kind);
+  film.look(A, `${dead.name}, libre et déjà gelée : le colonisateur de A ne peut qu’y aller`, [
+    { show: 'ordres proposés', at: dead, expected: 'move', got: free.join(', ') },
+  ]);
+  assert.deepEqual(free, ['move'], 'pas de « Coloniser » sur une planète libre gelée');
+  assert.equal(A.moveFleet(colon, dead, 'colonize'), false, '« colonize » est refusé');
+});
+
+scenario('une attaque qui arrive juste après le gel ne pille rien (#78)', (film) => {
+  const { A, B, clock, cell, id, gel } = frozenTarget();
+  // A lance l'attaque d'une case voisine, plus près du soleil, pour qu'elle arrive une fraction de
+  // seconde après le gel : partie avant, l'ordre est accepté ; le froid ne la prend pas en route.
+  const p = me(A);
+  const from = [{ x: cell.x + 1, y: cell.y + 1 }, { x: cell.x + 1, y: cell.y }, { x: cell.x, y: cell.y + 1 }].sort((a, b) => A.frostOf(b) - A.frostOf(a))[0];
+  const f = A.myFleet(id);
+  Object.assign(f, { from: { ...from }, to: { ...from } });
+  const trip = fleet.tripMs(from, cell, fleet.fleetSpeed(p.race, f.ships, p.planet.tech));
+  const late = Math.max(1, Math.floor((trip % 1000) / 2)); // arrivée entre le dernier contrôle du froid et la suivante
+  clock.t = gel + late - trip;
+  assert.ok(A.moveFleet(id, cell, 'attack'), 'la planète n’a pas encore gelé : l’ordre part');
+  assert.ok(f.arrive > gel && A.fleetFrostAt(f) >= f.arrive, 'elle arrive après le gel, entière');
+  film.look(A, `A lance 30 frégates sur la planète mère de B (5 000 minéraux), qui gèle ${late} ms avant leur arrivée`, [
+    { show: 'stock de B', at: cell, expected: 5000, got: me(B).planet.stock.minerals },
+  ]);
+  clock.t = f.arrive + 1;
+  A.tick();
+  const cargo = (A.myFleet(id)?.cargo || {}).minerals || 0;
+  const raids = (p.effects || []).filter((e) => game.sameCell(e.cell, cell));
+  film.look(A, 'arrivée : la planète est gelée, il n’y a plus rien à piller', [
+    { show: 'combats sur la planète gelée', at: cell, expected: 0, got: raids.length },
+    { show: 'minéraux pillés', expected: 0, got: cargo },
+  ]);
+  assert.equal(raids.length, 0, 'pas de combat contre une planète gelée');
+  assert.ok(!A.state.log.some((e) => /pille/.test(e.text)), 'personne ne pille');
+  assert.ok(A.state.log.some((e) => /est gelée/.test(e.text)), 'le journal dit pourquoi');
+});

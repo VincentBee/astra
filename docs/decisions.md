@@ -3468,3 +3468,29 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   et des recherches mises au fil. 323/323.
 - Qui : router (option B), Claude (détails). Source : session `3c9e3331`, PR #195. Statut : en
   vigueur. Modifie D-420 (partie IA) et D-151.
+
+**D-450 — Une planète gelée n'est plus une cible : ni attaque, ni conquête, ni colonisation, ni pillage**
+- 2026-11-08 12:15 UTC. Contexte : issue #78 (audit du 2026-11-05). Tant que le téléphone de
+  son propriétaire hors ligne n'a pas appliqué le gel, une planète gelée restait dans sa fiche :
+  le menu de flotte proposait « Attaquer » et « Conquérir … victoire probable » (la prise était
+  refusée à l'arrivée), et une attaque arrivée après le gel pillait son stock. « Coloniser »
+  était aussi proposé sur une planète libre gelée (refusé à l'arrivée). Règle déjà écrite
+  (`regles.md` §19.3) : une planète que le froid atteint est perdue.
+- Choix (`js/session.js`) :
+  - `planetsAt(cell, now)` ignore une planète dont `frostOf(case) <= now` (comme `livePlanets`).
+  - `ordersAt` : sur une case gelée, seulement « Juste y aller » (et « Se poser » chez moi, sans
+    objet : ma planète gelée n'y est plus).
+  - `moveFleet` refuse `attack`, `conquer` et `colonize` vers une planète gelée : « X est gelée. »
+  - `arrive` : attaque ou conquête sur une planète gelée avant `f.arrive` → pas de combat, pas
+    de pillage, pas de rapport ; « X est gelée : la flotte de Y reste en orbite. » (comme la
+    colonisation). Le froid la détruit ensuite (D-163).
+  - Le froid est public (calculé de la partie) : le refus ne trahit rien du brouillard (D-190).
+- Écarté : seulement cacher les ordres dans le menu (une flotte déjà en route, ou partie juste
+  avant le gel, pillait encore) ; seulement refuser à l'arrivée (menu trompeur, trajet pour
+  rien).
+- Vérifié : 2 scénarios (`tests/end.test.mjs`, « planète gelée : ni « Attaquer »… » et « une
+  attaque qui arrive juste après le gel ne pille rien »), qui échouent sur `main` (menu
+  « attack, conquer, move » ; 1 combat et pillage) ; 325/325.
+- Qui : Claude, par défaut (la règle « planète gelée = perdue » existait déjà ; l'issue donnait
+  l'attendu). Source : session `12268a43` (worker-gelee-pillee), issue #78. Statut : en vigueur.
+  Cache `astra-p2p-v121`.

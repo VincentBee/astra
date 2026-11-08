@@ -1166,6 +1166,13 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
   `engage`, `pursue`, `threats`, `tradePartners`, carte). `ownerAt` ignore un joueur `out` (il
   ne possède rien) et une prise faite après la mort de l'attaquant (`goneBy`) ; `applyEffects`
   ignore un rapport daté de l'heure de la mort de son auteur ou après.
+- **Une planète gelée n'est plus une cible** (D-450, issue #78), même tant que le téléphone de
+  son propriétaire (hors ligne) n'a pas appliqué le gel : `planetsAt(cell, now)` l'ignore dès
+  `frostOf(case) <= now` ; `ordersAt` ne propose ni attaque, ni conquête, ni colonisation sur une
+  case gelée ; `moveFleet` les refuse (« X est gelée. »). À l'arrivée, une attaque ou une conquête
+  sur une planète gelée avant `f.arrive` ne livre aucun combat et ne pille rien (« X est gelée :
+  la flotte de Y reste en orbite. »), comme la colonisation (`arrive`, `found`). Le froid se
+  calcule pareil sur tous les téléphones : le dire ne trahit rien du brouillard (D-190).
 - Limite connue (non corrigée) : si le téléphone du mort livre l'arrivée de sa flotte **avant**
   d'avoir reçu le rapport qui l'élimine (fiches reçues dans le désordre), ce combat a déjà été
   écrit. Les téléphones qui lisent ce rapport après avoir vu `p.out` l'ignorent ; celui qui l'a

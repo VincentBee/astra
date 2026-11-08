@@ -2032,11 +2032,14 @@ export class Session {
     return { fort, ships: seen ? def.ships : null, odds };
   }
 
-  /** Mes planètes et celles des autres sur une case : [{ owner, key, name }]. */
-  planetsAt(cell) {
+  /**
+   * Mes planètes et celles des autres sur une case : [{ owner, key, name }]. Une planète gelée
+   * n'y est plus (D-450), même si la fiche de son propriétaire hors ligne la montre encore.
+   */
+  planetsAt(cell, now = this.now()) {
     const out = [];
     for (const p of Object.values(this.state.players)) {
-      for (const pl of this.planetsOf(p)) if (sameCell(pl.cell, cell) && this.ownerAt(pl.cell)?.id === p.id) out.push({ owner: p, key: pl.key, name: pl.name });
+      for (const pl of this.planetsOf(p)) if (sameCell(pl.cell, cell) && this.frostOf(pl.cell) > now && this.ownerAt(pl.cell)?.id === p.id) out.push({ owner: p, key: pl.key, name: pl.name });
     }
     return out;
   }
@@ -2056,8 +2059,13 @@ export class Session {
     const known = this.knownOwner(cell);
     const me0 = this.state.players[this.me];
     const out = [];
+    // Gelée (D-450) : plus une cible, ni à attaquer, ni à conquérir, ni à coloniser. Le froid
+    // se calcule pareil sur tous les téléphones : le dire ne trahit rien du brouillard.
+    const frozen = this.frostOf(cell) <= this.now();
     if (here?.owner.id === this.me) out.push({ kind: 'dock', label: `Se poser sur ${here.name}` });
-    else if (!known.live && known.owner) {
+    else if (frozen) {
+      // Rien d'autre que d'y aller (et d'y geler, D-163).
+    } else if (!known.live && known.owner) {
       // Vue autrefois : son propriétaire retenu, pas son état (ni défense, ni estimation).
       const name = w?.name || 'la planète';
       const tail = ' · hors de portée : défense inconnue';
@@ -2124,6 +2132,7 @@ export class Session {
     // ne lit que la partie (`seesCell`), pas mes souvenirs (`intel`) : le replay la refait pareil.
     const live = this.over || this.seesCell(cell, this.now());
     let order = null;
+    if (kind !== 'move' && kind !== 'dock' && w && this.frostOf(w) <= this.now()) return this.refuse(`${w.name} est gelée.`); // D-450
     if (kind === 'dock') {
       if (here?.owner.id !== this.me) return this.refuse('Ce n’est pas une de tes planètes.');
       order = { kind, key: here.key };
@@ -3043,6 +3052,11 @@ export class Session {
       const here = this.planets.find((x) => sameCell(x, f.to))?.name || gone?.name || `[${f.to.x}:${f.to.y}]`;
       if (!pl) {
         this.addLog(`Plus personne n'habite ${here} : la flotte ${de(p.name)} reste en orbite.`);
+        return true;
+      }
+      // Gelée pendant le trajet (D-450) : la planète est perdue, il n'y a plus rien à piller ni à prendre.
+      if (this.frostOf(pl.cell) <= f.arrive) {
+        this.addLog(`${pl.name} est gelée : la flotte ${de(p.name)} reste en orbite.`);
         return true;
       }
       if (enemy.id === this.me) {
