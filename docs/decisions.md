@@ -3469,6 +3469,32 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - Qui : router (option B), Claude (détails). Source : session `3c9e3331`, PR #195. Statut : en
   vigueur. Modifie D-420 (partie IA) et D-151.
 
+**D-470 — Les vaisseaux d'une planète rendue repartent en orbite même au-delà de 16 flottes (issue #80)**
+- 2026-11-08 12:10 UTC. Contexte : quand deux joueurs s'installent sur la même planète, celui
+  arrivé après la rend (`checkClaim`) ; `evacuate` remet ses vaisseaux (colonisateur compris),
+  sa cargaison et son carburant en flotte, en orbite. À 16 flottes (`MAX_FLEETS`), `evacuate`
+  renvoyait `null` et la colonie était effacée quand même : tout ce qui y était posé
+  disparaissait, sans message. Même chose pour une planète mère fondée par le colonisateur de
+  départ (D-120).
+- Choix (option A) : `evacuate` ne regarde plus `MAX_FLEETS`. C'est un retour forcé, pas un
+  ordre : la flotte rendue peut être la 17ᵉ. La limite tient toujours pour les ordres du joueur
+  (`takeOff`, Scinder, IA : `>= MAX_FLEETS`) : il ne relance une flotte qu'une fois revenu sous
+  16. Aucun téléphone ne refuse une fiche qui a plus de 16 flottes (vérifié dans
+  `js/session.js`).
+- Écarté : (B) fusionner avec une de mes flottes arrêtées sur la case, sinon dépasser : plus de
+  code pour un cas rare, et il faut quand même dépasser quand aucune flotte n'est là ; garder la
+  colonie en attente : un état de plus à synchroniser ; un simple message : les vaisseaux
+  restaient perdus.
+- L'évacuation ne peut plus échouer avec des vaisseaux à bord : `evacuate` prend tous les
+  vaisseaux de la colonie, une cargaison et un carburant bornés par les soutes, les réservoirs
+  et le stock ; `launch` (`js/fleet.js`) ne refuse alors qu'une flotte vide (colonie prise au
+  combat sans vaisseau posé, D-200), où il n'y a rien à rendre. Pas de toast à ajouter.
+- Même règle pour la planète mère fondée par le colonisateur de départ (même `evacuate`).
+- Vérifié : 3 scénarios (`tests/end.test.mjs`, « #80 : … ») : colonie, planète mère, et à 17
+  flottes décoller ou scinder est refusé, puis permis de nouveau à 15. Tous échouent sur `main`.
+- Qui : Claude par défaut, validé par le router (option A, réponse du 2026-11-08). Source : session `f5d122f7`, issue #80. Statut :
+  en vigueur. Cache `astra-p2p-v121`.
+
 **D-520 — Les identités suivent l'historique ; « Oublier » efface aussi `astra.identity`**
 - 2026-11-08 12:20 UTC. Contexte : issue #88. « Oublier » retirait la partie et son entrée de
   `astra.identities`, mais laissait `astra.identity` (la partie en cours) ; `identities()` la
@@ -3488,4 +3514,4 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - Vérifié : scénario D-520 (`tests/decisions-reseau.test.mjs`), échoue sur `main` ; vrai
   navigateur (« Oublier », puis `localStorage` avant / après).
 - Qui : Claude par défaut (règle proposée par l'issue). Source : session `1470f4be`
-  (worker-identites), issue #88. Statut : en vigueur. Complète D-066 et D-415. Cache `astra-p2p-v121`.
+  (worker-identites), issue #88. Statut : en vigueur. Complète D-066 et D-415. Cache `astra-p2p-v122` (v121 prise par D-470).
