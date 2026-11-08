@@ -601,3 +601,101 @@ scenario('éliminé et hors ligne : les autres ne voient plus sa flotte, ni ne l
   assert.ok(!Number.isFinite(me(C).out));
   for (const s of [A, B, C]) assert.ok(noDeadOwner(s));
 });
+
+/** Tous les vaisseaux d'un joueur : en vol, à quai sur sa planète mère et sur ses colonies. */
+const allShips = (p) => [...(p.fleets || []).map((f) => f.ships), p.planet?.ships, ...Object.values(p.colonies || {}).map((c) => c.ships)]
+  .reduce((n, s) => n + fleet.countShips(s || {}), 0);
+
+/** A a déjà 16 flottes en vol (la limite) : une frégate chacune, en orbite de sa planète mère. */
+function sixteenFleets(A) {
+  for (let i = 0; i < fleet.MAX_FLEETS; i++) inOrbit(A, { ...me(A).home }, { fighter: 1 });
+  assert.equal(me(A).fleets.length, fleet.MAX_FLEETS);
+}
+
+scenario('#80 : à 16 flottes, une colonie rendue à un joueur installé avant garde ses vaisseaux', (film) => {
+  const { players: [A, B, C], clock, sync } = newGame(3, ['human', 'machine', 'alien']);
+  const w = A.planets.find((x) => !A.ownerAt(x));
+  sixteenFleets(A);
+  // A et C se sont installés sur la même planète ; C est arrivé 300 ms avant, mais A ne le savait pas.
+  me(A).colonies = { [w.id]: { ...game.newPlanet('human', clock.t - 200, w), claimAt: clock.t - 200, ships: { fighter: 8, cargo: 2 } } };
+  me(C).colonies = { [w.id]: { ...game.newPlanet('alien', clock.t - 500, w), claimAt: clock.t - 500 } };
+  C.touch();
+  sync(A, C);
+  const before = allShips(me(A));
+  film.look(A, 'A a 16 flottes et une colonie (8 frégates, 2 cargos) que C a fondée juste avant lui', [
+    { show: 'flottes de A', expected: fleet.MAX_FLEETS, got: me(A).fleets.length },
+  ]);
+  clock.t += 1000;
+  A.tick(); // checkClaim : A rend la planète
+  const back = me(A).fleets.find((f) => f.ships.colony);
+  const log = A.state.log.map((l) => l.text).join('\n');
+  film.look(A, 'A rend la planète : ses vaisseaux et son colonisateur repartent en orbite, même au-delà de 16 flottes', [
+    { show: 'à qui', at: w, expected: 'C', got: A.ownerAt(w)?.id === C.me ? 'C' : 'autre' },
+    { show: 'vaisseaux rendus', at: back && [A, back.id], expected: JSON.stringify({ cargo: 2, fighter: 8, colony: 1 }), got: JSON.stringify(back?.ships) },
+    { show: 'vaisseaux de A (colonisateur rendu en plus)', expected: before + 1, got: allShips(me(A)) },
+    { show: 'flottes de A', expected: fleet.MAX_FLEETS + 1, got: me(A).fleets.length },
+  ]);
+  assert.equal(A.ownerAt(w)?.id, C.me);
+  assert.deepEqual(back?.ships, { fighter: 8, cargo: 2, colony: 1 }, 'aucun vaisseau perdu, colonisateur compris');
+  assert.equal(allShips(me(A)), before + 1);
+  assert.match(log, /J2 a fondé sa colonie sur .* juste avant J0 : la flotte de J0 reste en orbite avec/);
+  // Au-delà de la limite, A ne peut plus lancer de nouvelle flotte (la limite tient pour ses ordres).
+  me(A).planet.ships = { fighter: 1 };
+  assert.equal(A.takeOff('home', { fighter: 1 }, {}, 0), false, 'pas de 18e flotte sur ordre');
+  assert.equal(me(A).fleets.length, fleet.MAX_FLEETS + 1);
+});
+
+scenario('#80 : à 16 flottes, une planète mère rendue rend son colonisateur de départ', (film) => {
+  const { players: [A, B, C], clock, sync } = newGame(3, ['human', 'machine', 'alien']);
+  sixteenFleets(A);
+  const home = { ...me(A).home };
+  const w = A.planets.find((x) => game.sameCell(x, home));
+  me(A).ready = clock.t - 60_000; // planète mère fondée par le colonisateur de départ (partie avec départ)
+  // C s'est installé sur la même planète, avant A.
+  me(C).colonies = { [w.id]: { ...game.newPlanet('alien', (me(A).claimAt || 0) - 500, w), claimAt: (me(A).claimAt || 0) - 500 } };
+  C.touch();
+  sync(A, C);
+  film.look(A, 'A a 16 flottes ; C a fondé sur la planète mère de A juste avant lui');
+  clock.t += 1000;
+  A.tick(); // checkClaim : A rend sa planète mère
+  const back = me(A).fleets.find((f) => f.ships.colony);
+  film.look(A, 'A rend sa planète mère : son colonisateur repart en orbite, même au-delà de 16 flottes', [
+    { show: 'planète mère de A', expected: 'aucune', got: me(A).home ? 'encore là' : 'aucune' },
+    { show: 'colonisateur rendu', at: back && [A, back.id], expected: 1, got: back?.ships?.colony || 0 },
+  ]);
+  assert.equal(me(A).home, null);
+  assert.equal(back?.ships?.colony, 1, 'le colonisateur de départ n’est pas perdu');
+});
+
+scenario('#80 : à 17 flottes après une planète rendue, lancer ou scinder une flotte est refusé', (film) => {
+  const { players: [A, B, C], clock, sync } = newGame(3, ['human', 'machine', 'alien']);
+  const w = A.planets.find((x) => !A.ownerAt(x));
+  sixteenFleets(A);
+  me(A).colonies = { [w.id]: { ...game.newPlanet('human', clock.t - 200, w), claimAt: clock.t - 200, ships: { fighter: 8 } } };
+  me(C).colonies = { [w.id]: { ...game.newPlanet('alien', clock.t - 500, w), claimAt: clock.t - 500 } };
+  C.touch();
+  sync(A, C);
+  clock.t += 1000;
+  A.tick(); // checkClaim : la flotte rendue est la 17e
+  const back = me(A).fleets.find((f) => f.ships.colony);
+  me(A).planet.ships = { fighter: 1 };
+  const launched = A.takeOff('home', { fighter: 1 }, {}, 0);
+  const split = A.splitFleet(back.id, { fighter: 1 });
+  film.look(A, 'A a 17 flottes : décoller ou scinder est refusé', [
+    { show: 'flottes de A', expected: fleet.MAX_FLEETS + 1, got: me(A).fleets.length },
+    { show: 'décollage', expected: 'refusé', got: launched === false ? 'refusé' : 'accepté' },
+    { show: 'scinder la flotte rendue', at: [A, back.id], expected: 'refusé', got: split === false ? 'refusé' : 'accepté' },
+  ]);
+  assert.equal(launched, false, 'pas de 18e flotte sur ordre');
+  assert.equal(split, false, 'pas de 18e flotte en scindant');
+  assert.equal(me(A).fleets.length, fleet.MAX_FLEETS + 1);
+  // Revenu à 15 flottes (moins de 16), A relance une flotte.
+  me(A).fleets.splice(0, 2);
+  const again = A.takeOff('home', { fighter: 1 }, {}, 0);
+  film.look(A, 'deux flottes de moins (15) : A peut de nouveau décoller', [
+    { show: 'décollage', expected: 'accepté', got: again ? 'accepté' : 'refusé' },
+    { show: 'flottes de A', expected: fleet.MAX_FLEETS, got: me(A).fleets.length },
+  ]);
+  assert.ok(again, 'sous la limite, le décollage repart');
+  assert.equal(me(A).fleets.length, fleet.MAX_FLEETS);
+});
