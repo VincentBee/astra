@@ -3493,6 +3493,11 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   5 boutons, deux boutons à la ligne → 37 px (9 px avec le seul `flex: 1 1 0`).
   Demande de Vincent ajoutée en cours de route : « Tu peux aussi réduire le gap entre les
   boutons. » ; le router a choisi de le faire à toutes les largeurs (pas seulement sous 360 px).
+- « Double écart » vu par Vincent (capture sans alerte) entre Réglages et joueurs : c'était la
+  marge `.planet-head #net { margin-left: 8px }`, ajoutée à l'écart du flex. Mesuré sur une
+  vraie planète fondée (« Orion », 360 px) : `main` 10 / 10 / 10 / 10 / 18 px, cette PR 6 px
+  partout (avec et sans alerte). Aucun élément caché ne prend de place : `#alerts-btn` caché et
+  `#alerts-panel` sont en `display: none`.
 - Limite : à 320 px avec les cinq boutons, il ne reste que 37 px pour le nom (« B… »).
 - Écarté : garder `flex: 1 1 auto` et retirer `flex-wrap` (la liste des alertes ne passerait
   plus sous l'en-tête) ; donner au nom une largeur minimale (les boutons repasseraient à la
