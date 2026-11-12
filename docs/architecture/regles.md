@@ -78,7 +78,7 @@ Créée par `addPlayer` (`js/session.js:696-713`), complétée par `normalize`
 | `home`, `claimAt` | case de la planète mère, heure de fondation (arrivée du colonisateur) | `Session.found` (ou `claimPlanet` dans une partie d'avant) |
 | `planet` | planète mère (3.3) | `js/session.js:829` |
 | `colonies` | `{ idPlanèteUnivers: planète }` | `js/session.js:1631` |
-| `fleets` | flottes sur la carte (3.4), 16 au plus | `MAX_FLEETS` `js/fleet.js:25` |
+| `fleets` | flottes sur la carte (3.4), 16 au plus par ordre (une planète rendue peut en ajouter une, D-470) | `MAX_FLEETS` `js/fleet.js:25` |
 | `effects` | mes rapports de combat contre les autres, 300 au plus | `js/session.js:62`, `js/session.js:1170`, `js/session.js:1657` |
 | `applied` | identifiants des rapports des autres déjà appliqués chez moi | `js/session.js:1713` |
 | `engaged` | mes combats de flottes récents (20 au plus), pour ne pas compter deux fois un même combat | `js/session.js:1169`, `js/session.js:1758` |
@@ -470,7 +470,8 @@ Quatre types par race : `cargo`, `colony`, `fighter`, `heavy` (ordre d'affichage
 Retire de la planète les vaisseaux, la cargaison (minéraux, nourriture) et le carburant
 (pris dans l'énergie du stock). Vérifie : nombres entiers, assez de vaisseaux, soutes et
 réservoirs assez grands, stock suffisant. La flotte attend en orbite sur la case de la
-planète. `Session.takeOff` ajoute la limite de 16 flottes (`js/session.js:976-998`).
+planète. `Session.takeOff` ajoute la limite de 16 flottes (`js/session.js:976-998`) ; seul
+`evacuate` la dépasse (D-470).
 `launch` met 0 carburant par défaut (`js/fleet.js:92`) ; c'est l'écran de décollage qui propose
 le plein, dans la limite de l'énergie du stock (`js/app.js:1162`). Vincent a choisi de garder
 ce plein par défaut (voir decisions.md ; `PLAN-VOYAGE.md` le range encore dans « Restent
@@ -864,6 +865,7 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
   en orbite ; une colonie prise au combat (`captured`) ne rend que ses vaisseaux, sans
   colonisateur en plus (D-200) (`js/session.js:840-889`). Pour une planète mère fondée par le colonisateur de
   départ (D-120), `evacuate` le remet de même en orbite : le joueur l'envoie sur une autre.
+  `evacuate` ne regarde pas la limite de 16 flottes : la flotte rendue peut être la 17ᵉ (D-470).
   Dans une partie d'avant, le joueur doit en choisir une autre (`js/session.js:853-862`).
 - **Fiche antidatée** (`backdated`) : une planète mère datée d'avant la fiche qui ne l'avait pas
   est refusée, sauf si cette fiche montrait déjà le colonisateur en route vers cette case avec
@@ -1166,6 +1168,13 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
   `engage`, `pursue`, `threats`, `tradePartners`, carte). `ownerAt` ignore un joueur `out` (il
   ne possède rien) et une prise faite après la mort de l'attaquant (`goneBy`) ; `applyEffects`
   ignore un rapport daté de l'heure de la mort de son auteur ou après.
+- **Une planète gelée n'est plus une cible** (D-450, issue #78), même tant que le téléphone de
+  son propriétaire (hors ligne) n'a pas appliqué le gel : `planetsAt(cell, now)` l'ignore dès
+  `frostOf(case) <= now` ; `ordersAt` ne propose ni attaque, ni conquête, ni colonisation sur une
+  case gelée ; `moveFleet` les refuse (« X est gelée. »). À l'arrivée, une attaque ou une conquête
+  sur une planète gelée avant `f.arrive` ne livre aucun combat et ne pille rien (« X est gelée :
+  la flotte de Y reste en orbite. »), comme la colonisation (`arrive`, `found`). Le froid se
+  calcule pareil sur tous les téléphones : le dire ne trahit rien du brouillard (D-190).
 - Limite connue (non corrigée) : si le téléphone du mort livre l'arrivée de sa flotte **avant**
   d'avoir reçu le rapport qui l'élimine (fiches reçues dans le désordre), ce combat a déjà été
   écrit. Les téléphones qui lisent ce rapport après avoir vu `p.out` l'ignorent ; celui qui l'a
@@ -1260,8 +1269,9 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
   écrit `p.over = { at, winner }` dans sa fiche ; `Session.over` prend la plus ancienne fin
   écrite par un joueur, et lit une vieille fin seule (« gagné ») comme perdue.
 - Écran de fin : `finalBoard(session)` (`js/finish.js`, D-143) donne le classement final
-  (`ranking(over.at)`, points `best`, médailles or / argent / bronze aux trois premiers, aucune
-  sans vainqueur).
+  (le gagnant `over.winner` d'abord, comme le bandeau, puis `ranking(over.at)`, D-460 ; points
+  `best`, médailles or / argent / bronze aux trois premiers, aucune sans vainqueur ; `status` :
+  « gagne » pour le gagnant, même tombé en dernier, D-461).
 - Partie finie : `tick` ne fait plus que lire les derniers rapports de combat ; tous les ordres
   sont refusés (`canAct`).
 

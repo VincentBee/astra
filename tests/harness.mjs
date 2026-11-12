@@ -6,6 +6,9 @@ const store = new Map();
 globalThis.localStorage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) };
 globalThis.document = { addEventListener() {}, removeEventListener() {}, visibilityState: 'visible' };
 globalThis.window = globalThis;
+// Pas de verrou d'onglet (D-430) : Node a un vrai navigator.locks, que les parties de test se
+// prendraient l'une l'autre. Les scénarios D-430 passent leur faux navigateur à holdGame.
+Object.defineProperty(globalThis, 'navigator', { value: {}, configurable: true, writable: true });
 
 export const { Session } = await import('../js/session.js');
 export const game = await import('../js/game.js');
