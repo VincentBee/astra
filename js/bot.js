@@ -14,7 +14,7 @@
 import { Session } from './session.js';
 import { RACES, PLAN_MAX, planAhead, stateAt, upgradeCost, startResearch, startShips, usedPlaces, sameCell, distance, fortOf, POWERS, powerReadyAt, powerCost, liftGain } from './game.js';
 import { TECHS, SHIPS, shipUnlocked } from './tech.js';
-import { fleetTank, fleetBurn, fuelAt, moving, countShips, armed, battle, fleetSpeed, tripMs, MAX_FLEETS } from './fleet.js';
+import { fleetTank, fleetBurn, fuelAt, moving, countShips, armed, battle, fleetSpeed, tripMs, fleetPos, MAX_FLEETS } from './fleet.js';
 
 /** Un passage de réflexion toutes les THINK_MS (le jeu, lui, avance toutes les secondes). */
 export const THINK_MS = 3000;
@@ -86,8 +86,12 @@ export function think(s, budget = BUDGET) {
     return ctx.done;
   }
   // Sans planète mère : envoyer le colonisateur de départ (ou celui qui a trouvé la place prise).
+  // Un colonisateur adverse arrivera avant lui (D-490) : il change de cap tout de suite.
   if (!p.home) {
-    for (const f of p.fleets || []) if (f.ships.colony && !f.order && !moving(f, ctx.now)) sendColonizer(ctx, f, true);
+    for (const f of p.fleets || []) {
+      if (f.ships.colony && !f.order && !moving(f, ctx.now)) sendColonizer(ctx, f, true);
+      else if (f.ships.colony && beaten(ctx, f)) sendColonizer(ctx, f, true);
+    }
     return ctx.done;
   }
   const mine = s.planetsOf(p).filter((pl) => s.frostOf(pl.cell) > ctx.now);
@@ -324,25 +328,63 @@ function evacuate(ctx, pl, st) {
 
 /**
  * Planètes libres qu'un colonisateur parti de `from` peut prendre : pas encore à quelqu'un,
- * pas visées par un autre de mes colonisateurs, et qui ne gèleront pas avant longtemps.
- * Les meilleures d'abord : celles que le froid prendra le plus tard (près du soleil), sans
- * aller trop loin. `home` : planète mère, seulement une vraie planète.
+ * pas visées par un autre de mes colonisateurs, ni par un colonisateur adverse qui y arrivera
+ * avant celui-ci (D-490), et qui ne gèleront pas avant longtemps. Les meilleures d'abord :
+ * celles que le froid prendra le plus tard (près du soleil), sans aller trop loin. `home` :
+ * planète mère, seulement une vraie planète. `ships` : la flotte qui part (sa vitesse).
  */
-function colonyTargets(ctx, from, home = false) {
+function colonyTargets(ctx, from, home = false, ships = { colony: 1 }) {
   const { s, p, now } = ctx;
   const aimed = new Set((p.fleets || []).filter((f) => f.order?.kind === 'colonize').map((f) => f.order.world));
+  const rivals = rivalColonizers(ctx);
+  const speed = fleetSpeed(p.race, ships, p.planet?.tech || {});
   return s.planets
     .filter((w) => (!home || !w.kind || w.kind === 'planet') && !aimed.has(w.id) && !s.ownerAt(w) && s.frostOf(w) - now > 4 * MIN)
+    .filter((w) => !ahead(rivals.get(w.id), now + tripMs(from, w, speed), p.id))
     .map((w) => ({ w, score: Math.min(s.frostOf(w) - now, 60 * MIN) / MIN - 0.6 * distance(from, w) + (w.places || 0) / 4 }))
     .sort((a, b) => b.score - a.score || (a.w.id < b.w.id ? -1 : 1))
     .map((x) => x.w);
 }
 
-/** Envoie une flotte qui porte un colonisateur vers la meilleure planète libre. */
+/**
+ * Colonisateurs adverses en route, par planète visée : le premier arrivé de chaque planète
+ * ({ arrive, pid }). L'IA voit toutes les flottes de la partie (D-152), comme leur ordre.
+ */
+function rivalColonizers(ctx) {
+  const { s, p, now } = ctx;
+  const out = new Map();
+  for (const o of Object.values(s.state.players)) {
+    if (o.id === p.id) continue;
+    for (const f of o.fleets || []) {
+      if (f.order?.kind !== 'colonize' || !moving(f, now)) continue;
+      const r = out.get(f.order.world);
+      if (!r || f.arrive < r.arrive || (f.arrive === r.arrive && o.id < r.pid)) out.set(f.order.world, { arrive: f.arrive, pid: o.id });
+    }
+  }
+  return out;
+}
+
+/**
+ * Le rival `r` arrive-t-il avant moi (`arrive`, joueur `me`) ? À la même milliseconde, le plus
+ * petit identifiant passe : deux IA symétriques ne s'écartent pas toutes les deux (D-490).
+ */
+const ahead = (r, arrive, me) => !!r && (r.arrive < arrive || (r.arrive === arrive && r.pid < me));
+
+/** Mon colonisateur en route sera-t-il devancé sur sa planète par un colonisateur adverse ? */
+function beaten(ctx, f) {
+  if (f.order?.kind !== 'colonize' || !moving(f, ctx.now) || ctx.s.locked(f.id)) return false;
+  return ahead(rivalColonizers(ctx).get(f.order.world), f.arrive, ctx.p.id);
+}
+
+/**
+ * Envoie une flotte qui porte un colonisateur vers la meilleure planète libre, depuis là où
+ * elle est (en route : elle change de cap).
+ */
 function sendColonizer(ctx, f, home = false) {
-  const pos = { x: Math.round(f.to.x), y: Math.round(f.to.y) };
-  for (const w of colonyTargets(ctx, pos, home).slice(0, 3)) {
-    if (fleetBurn(ctx.p.race, f.ships) * distance(pos, w) > fuelAt(f, ctx.p.race, ctx.now) + 1e-9) continue;
+  const at = fleetPos(f, ctx.now);
+  const pos = { x: Math.round(at.x), y: Math.round(at.y) };
+  for (const w of colonyTargets(ctx, pos, home, f.ships).slice(0, 3)) {
+    if (fleetBurn(ctx.p.race, f.ships) * distance(at, w) > fuelAt(f, ctx.p.race, ctx.now) + 1e-9) continue;
     return ctx.order(() => ctx.s.moveFleet(f.id, { x: w.x, y: w.y }, 'colonize'));
   }
   return false;
@@ -371,6 +413,10 @@ function launchColonizer(ctx, pl, st) {
 /** Flotte arrêtée sans ordre : un colonisateur repart chercher une place, les autres rentrent se poser. */
 function steerFleet(ctx, f) {
   const { s, p, now } = ctx;
+  if (f.ships.colony && beaten(ctx, f)) {
+    sendColonizer(ctx, f);
+    return;
+  }
   if (f.order || moving(f, now) || s.locked(f.id)) return;
   if (f.ships.colony) {
     if (!sendColonizer(ctx, f)) dockNearest(ctx, f);
