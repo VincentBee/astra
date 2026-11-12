@@ -1272,7 +1272,7 @@ function renderPlanet(me, now) {
   sampleHistory(now, { ...s.stock, pop: s.pop, grid: f.effE * 100, ...soil }, openKey);
   const q = (sel) => document.querySelector(sel);
 
-  $('planet-title').textContent = openKey === 'home' ? pl.name : `${pl.name} · colonie`;
+  $('planet-title').textContent = $('planet-title').title = openKey === 'home' ? pl.name : `${pl.name} · colonie`;
   $('soil-zone').hidden = !planet.nature;
   if (planet.nature) fillSoil('soil', planet.nature, s.reserve, f.soil);
 

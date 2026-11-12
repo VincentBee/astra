@@ -2716,6 +2716,8 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
 - Qui : Vincent (demande) ; Claude (suppression du code mort, nom qui prend la place). Source :
   session `d9ace210`. Statut : en vigueur. Cache `astra-p2p-v101` (v99 pour #189, v100 pour #186,
   toutes deux fusionnées dans `main` avant cette PR ; `main` fusionné dans la branche à 08:52).
+  Modifiée par D-471 (`flex: 1 1 0` et `width: 0` : un nom long se coupe au lieu de pousser les
+  boutons à la ligne).
 
 **D-312 — La fiche de planète de la carte met aussi les vaisseaux au fil**
 - 2026-11-07 08:27. Demande de Vincent (via le router) : « on devrait pouvoir rajouter la
@@ -3544,3 +3546,41 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   passe à v123). Contexte : D-500 change `FILES`. Choix : `VERSION` monte d'un cran (v123)
   pour que les téléphones installés récupèrent la nouvelle liste. Qui : Claude par défaut.
   Source : session `37ab6d84`, issue #84. Statut : en vigueur.
+
+**D-471 — Un nom de planète long se coupe en « … » ; les boutons de l'en-tête restent sur une ligne, plus serrés** (modifie D-311)
+- 2026-11-08 12:25 UTC. Demande de Vincent (via le router), avec une capture de la vue
+  « Bételgeuse » : « Il y a encore un petit problème d'overflow quand le nom de la planète est
+  trop grand. Il faut ellipsis le nom de la planète. »
+- Cause : `.planet-head` est en `flex-wrap` (pour la liste des alertes, D-111) et le nom avait
+  `flex: 1 1 auto`. Sa base était donc la largeur du texte : quand le nom et les boutons ne
+  tenaient pas, le navigateur passait un bouton à la ligne au lieu de couper le nom. Mesuré dans
+  le vrai jeu : 360 px avec l'alerte ⚠ 1, « Bételgeuse » → le compteur de joueurs passe dessous ;
+  un nom très long (sans espace où couper : `nowrap`) élargissait même la grille de l'écran, donc
+  la page (513 px pour 320 px d'écran).
+- Choix : `.planet-head h2 { flex: 1 1 0; width: 0; min-width: 0 }` (`style.css`). Base 0 : le
+  nom prend seulement la place qui reste et finit en « … » ; `width: 0` : il ne compte plus dans
+  la largeur de la grille. Le nom complet est en `title` du titre (`renderPlanet`, `js/app.js`).
+  Un nom court s'affiche comme avant.
+- Écart entre les boutons réduit, à toutes les largeurs : `.planet-head { gap: 6px }` (10 avant)
+  et `.planet-head #net { margin-left: 0 }` (8 avant). Les boutons gardent leur taille (zones de
+  toucher inchangées : 40 × 40, 44 × 40, ⚠ 54 × 40, joueurs 60 × 40). Place pour le nom, mesurée
+  dans le vrai jeu (avant → après) : 360 px, 4 boutons 112 → 136 px ; 360 px, 5 boutons (avec ⚠)
+  bouton passé à la ligne → 77 px ; 320 px, 4 boutons, bouton à la ligne → 96 px ; 320 px,
+  5 boutons, deux boutons à la ligne → 37 px (9 px avec le seul `flex: 1 1 0`).
+  Demande de Vincent ajoutée en cours de route : « Tu peux aussi réduire le gap entre les
+  boutons. » ; le router a choisi de le faire à toutes les largeurs (pas seulement sous 360 px).
+- « Double écart » vu par Vincent (capture sans alerte) entre Réglages et joueurs : c'était la
+  marge `.planet-head #net { margin-left: 8px }`, ajoutée à l'écart du flex. Mesuré sur une
+  vraie planète fondée (« Orion », 360 px) : `main` 10 / 10 / 10 / 10 / 18 px, cette PR 6 px
+  partout (avec et sans alerte). Aucun élément caché ne prend de place : `#alerts-btn` caché et
+  `#alerts-panel` sont en `display: none`.
+- Limite : à 320 px avec les cinq boutons, il ne reste que 37 px pour le nom (« B… »).
+- Écarté : garder `flex: 1 1 auto` et retirer `flex-wrap` (la liste des alertes ne passerait
+  plus sous l'en-tête) ; donner au nom une largeur minimale (les boutons repasseraient à la
+  ligne sur petit écran).
+- Même défaut ailleurs : non. La carte n'a pas de nom long dans son en-tête (coordonnées et
+  boutons dans `.pi-head-right`).
+- Qui : Vincent (demande, et l'écart réduit) ; router (écart à toutes les largeurs) ; Claude
+  (choix CSS). Source : session `6700d27f`, PR #206. Statut : en vigueur. Cache `astra-p2p-v124`
+  (v121 au départ, v122 après #196, v124 après la fusion de `main` à v123 le 2026-11-12). Numérotée D-422 au départ, renumérotée D-471
+  à la fusion de `main` (D-470).
