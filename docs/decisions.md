@@ -499,7 +499,7 @@ Aucune conversation ne les prouve.
 - 2026-10-28 21:47. Choix : plus de « appuie encore une fois » ; l'ancienne partie va dans
   l'historique (reprendre, revoir, oublier) ; l'identité du joueur est gardée par partie.
 - Qui : Vincent (demande) ; le nombre 10 et les boutons par Claude.
-- Source : `f4afbcd0` 21:47:41, 21:50:00 ; `1eeb2c1`. Statut : en vigueur (`KEEP = 10`) ; stockage modifié par D-415 (une clé par partie, les plus vieilles retirées si la mémoire est pleine).
+- Source : `f4afbcd0` 21:47:41, 21:50:00 ; `1eeb2c1`. Statut : en vigueur (`KEEP = 10`) ; stockage modifié par D-415 (une clé par partie, les plus vieilles retirées si la mémoire est pleine) ; identités complétées par D-520 (elles suivent l'historique).
 
 **D-067 — Parallaxe : pas au doigt, mais à l'accéléromètre**
 - 2026-10-28 22:15–22:16. Choix : le glissé du doigt ne bouge pas les étoiles (sinon elles
@@ -3497,6 +3497,56 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - Qui : Claude par défaut, validé par le router (option A, réponse du 2026-11-08). Source : session `f5d122f7`, issue #80. Statut :
   en vigueur. Cache `astra-p2p-v121`.
 
+**D-520 — Les identités suivent l'historique ; « Oublier » efface aussi `astra.identity`**
+- 2026-11-08 12:20 UTC. Contexte : issue #88. « Oublier » retirait la partie et son entrée de
+  `astra.identities`, mais laissait `astra.identity` (la partie en cours) ; `identities()` la
+  remettait dans l'historique à la sauvegarde suivante, secret compris. Et rien n'élaguait
+  `astra.identities` : 12 identités pour 10 parties gardées après 12 créations.
+- Choix (`js/save.js`) :
+  - `forgetGame(gid)` efface `astra.identity` si c'est l'identité de `gid` (pas sinon).
+  - Quand l'historique change de partie (`archiveSave`, appelée par `saveGame` et `selectGame`),
+    `pruneIdentities` ne garde que les identités des parties de l'index `astra.games`, de la
+    partie en cours, et de l'identité en cours (une partie rejointe ou créée pas encore sauvée :
+    `Session.create` et `onWelcome` appellent `saveIdentity` avant la première sauvegarde).
+  - Une partie retirée par manque de mémoire (`fit()`, D-415) garde son identité jusqu'au
+    prochain changement de partie (≈ 70 caractères) : accepté, pour ne pas toucher `fit()`.
+- Écarté : élaguer dans `saveIdentity` seulement (rien n'écrit `astra.identities` quand une
+  partie sort de l'historique : on resterait à 11 pour 10) ; élaguer dans `drop()` (aussi appelé
+  quand une partie passe de l'historique à la partie en cours, dont l'identité doit rester).
+- Vérifié : scénario D-520 (`tests/decisions-reseau.test.mjs`), échoue sur `main` ; vrai
+  navigateur (« Oublier », puis `localStorage` avant / après).
+- Qui : Claude par défaut (règle proposée par l'issue). Source : session `1470f4be`
+  (worker-identites), issue #88. Statut : en vigueur. Complète D-066 et D-415. Cache `astra-p2p-v122` (v121 prise par D-470).
+
+**D-500 — Le cache hors ligne contient toutes les pages, contrôlé par un test qui suit les liens**
+- 2026-11-08 12:11 UTC. Contexte : issue #84. `FILES` de `sw.js` oubliait `technologies.html`
+  et `js/techtree.js` : installée puis hors ligne, la page Technologies ne s'ouvrait pas
+  (`net::ERR_FAILED`) si elle n'avait jamais été ouverte en ligne. Vérifié sur `main` (75a269d,
+  après D-230) : toujours vrai. Les autres fichiers servis y sont tous.
+- Choix : ajouter les deux fichiers à `FILES`, et `tests/sw-files.test.mjs` qui part de
+  `index.html`, `replay.html`, `technologies.html` et `manifest.json`, suit les `src` / `href`,
+  les `import … from`, les `import()` et les `new URL('…', import.meta.url)`, et exige que
+  chaque fichier atteint soit dans `FILES` (et que chaque fichier de `FILES` existe, sinon
+  `cache.addAll` casse l'installation), ainsi que `location.href = '…'`, `.src = '…'` et
+  `fetch('…')`. Un nouveau fichier oublié fait échouer le test. Vérifié à la main le
+  2026-11-08 : aucun `url(…)` local dans `style.css` ni dans le `<style>` de
+  `technologies.html`, aucun `fetch` d'un fichier local dans `js/`.
+- Écarté : générer `FILES` à la main par un script (le dépôt n'a pas de build, D-001 et
+  suivantes) ; mettre en cache n'importe quel fichier à la volée (déjà fait par le `fetch`, mais
+  ne couvre pas une page jamais ouverte en ligne).
+- Vérifié : le test échoue sur `main` (`technologies.html`, `js/techtree.js` absents) et passe
+  avec la correction ; `tests/sw-browser.mjs` (Chromium), serveur coupé après une seule visite
+  de l'accueil : `technologies.html` depuis le cache, 20 bulles dans le graphe (sur `main` :
+  `net::ERR_FAILED`).
+- Qui : Claude par défaut (piste donnée par l'issue). Source : worker `worker-techno-horsligne`,
+  session `37ab6d84`, issue #84. Statut : en vigueur.
+
+**D-501 — Cache `astra-p2p-v123`**
+- 2026-11-08 12:11 UTC (mise à jour 12:45 : `main` était passé à v122 avec #196 et #202, la PR
+  passe à v123). Contexte : D-500 change `FILES`. Choix : `VERSION` monte d'un cran (v123)
+  pour que les téléphones installés récupèrent la nouvelle liste. Qui : Claude par défaut.
+  Source : session `37ab6d84`, issue #84. Statut : en vigueur.
+
 **D-471 — Un nom de planète long se coupe en « … » ; les boutons de l'en-tête restent sur une ligne, plus serrés** (modifie D-311)
 - 2026-11-08 12:25 UTC. Demande de Vincent (via le router), avec une capture de la vue
   « Bételgeuse » : « Il y a encore un petit problème d'overflow quand le nom de la planète est
@@ -3531,6 +3581,6 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - Même défaut ailleurs : non. La carte n'a pas de nom long dans son en-tête (coordonnées et
   boutons dans `.pi-head-right`).
 - Qui : Vincent (demande, et l'écart réduit) ; router (écart à toutes les largeurs) ; Claude
-  (choix CSS). Source : session `6700d27f`, PR #206. Statut : en vigueur. Cache `astra-p2p-v122`
-  (v121 au départ ; `main` passé à v121 par #196). Numérotée D-422 au départ, renumérotée D-471
+  (choix CSS). Source : session `6700d27f`, PR #206. Statut : en vigueur. Cache `astra-p2p-v124`
+  (v121 au départ, v122 après #196, v124 après la fusion de `main` à v123 le 2026-11-12). Numérotée D-422 au départ, renumérotée D-471
   à la fusion de `main` (D-470).

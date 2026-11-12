@@ -96,7 +96,7 @@ Clés `localStorage` (l.13-18, format D-415) :
 | `astra.games` | index de l'historique `{ gid: savedAt }` (sans la partie en cours) ; au plus `KEEP - 1` = 9 parties, 10 avec celle en cours (`KEEP`, l.19) |
 | `astra.saves` | **ancien format** (avant D-415) : tout l'historique d'un bloc, partie en cours comprise. Repris puis effacé au premier accès (`migrate()`) |
 | `astra.identity` | mon identité dans la partie en cours `{ gid, pid, secret }` |
-| `astra.identities` | historique `{ gid: identité }` |
+| `astra.identities` | historique `{ gid: identité }` : seulement les parties gardées, la partie en cours et l'identité en cours (D-520) |
 
 Autres clés lues ailleurs : `astra.relays` (`js/config.js:18`), `astra.name` (`js/app.js:133`), `astra.sky` (réglage « Fond », `js/galaxy.js`, D-112).
 
@@ -104,6 +104,7 @@ Autres clés lues ailleurs : `astra.relays` (`js/config.js:18`), `astra.name` (`
 - **Mémoire pleine (D-415)** : toute écriture d'une partie passe par `fit()` (l.105). Si le navigateur lève `QuotaExceededError` (`isFull`), on retire la plus ancienne partie de l'historique (jamais la partie en cours, ni celle qu'on range) et on réessaie, jusqu'à ce que ça passe. Si rien n'y fait (partie en cours plus grosse que toute la mémoire, ou stockage bloqué : autre erreur, sans rien retirer), les parties retirées sont remises, `astra.save` garde la dernière sauvegarde réussie, et `onSaveFailed` prévient `app.js`, qui montre un toast (au plus une fois par minute, `RETELL` l.52 ; appli cachée : pas de toast, et le prochain échec préviendra).
 - Reprise d'une partie (`selectGame`) ou partie en cours qui a encore une vieille copie dans l'historique : si la place manque, cette copie (qui ne servira plus) part la première, avant toute autre partie.
 - Changement de partie (`saveGame` avec un autre `gid`, `selectGame`) : la nouvelle partie est écrite d'abord dans `astra.save`, puis l'ancienne est rangée dans `astra.save.<gid>` (`archiveSave`, l.129), en retirant les plus vieilles au-delà de 9. Une action ordinaire n'écrit que `astra.save` (≈ la taille de la partie : règle aussi #91).
+- **Identités (D-520)** : `archiveSave` finit par `pruneIdentities` : `astra.identities` ne garde que les parties de l'index, la partie en cours et l'identité en cours (partie créée ou rejointe pas encore sauvée). `forgetGame(gid)` efface aussi `astra.identity` si c'est celle de `gid`, sinon `identities()` la remettrait. Une partie retirée par `fit()` garde son identité jusqu'au prochain changement de partie.
 - Ancien format (`migrate()`, l.143) : `astra.saves` est lu en mémoire, effacé d'abord (sinon la place manque pour recopier), puis chaque partie reçoit sa clé, la plus récente d'abord ; la copie de la partie en cours n'est pas recopiée (si elle était plus récente que `astra.save`, elle la remplace). JS synchrone : rien ne peut s'intercaler entre l'effacement et la recopie. Si une partie ne peut pas être recopiée, les suivantes sont quand même essayées et `onSaveFailed('history', n)` prévient (toast).
 - Stockage abîmé (D-170, modifié par D-415) : seules les entrées qui passent `valid()` sont reprises de l'ancien `astra.saves` ; un index `astra.games` abîmé (pas un objet simple) est ignoré ; une clé `astra.save.<gid>` abîmée est sautée par `listGames` et `selectGame`. L'index est complété par les clés `astra.save.*` présentes (`keys()`, l.85, si le navigateur sait les énumérer) : un index perdu ou en retard ne cache aucune partie. Idem `identities()` pour `astra.identities`.
 - `js/replay-view.js:5` lit `loadGame()` : c'est pourquoi « Revoir » fait d'abord `selectGame(gid)` puis ouvre `replay.html` (`app.js:182-184`).
@@ -318,9 +319,9 @@ Le sens de ce journal pour le rejeu (`seenNews`, `replayIds`) est décrit dans `
 - Un message de plus de 256 Ko dépasserait la limite annoncée par `a=max-message-size` (`invite.js:166`, `peer.js:35`) : passer toujours par `Link.send`, qui découpe.
 - Changer le format du code d'invitation : changer `VERSION` dans `invite.js` (sinon décodage faux).
 - Changer le format des fiches : incrémenter `FORMAT` et compléter son commentaire (l.32-40).
-- `sw.js` : changer `VERSION` (`astra-p2p-v94` au 2026-11-06) à chaque mise en ligne. `cache.addAll` est tout ou rien : un fichier absent de `FILES` qui renvoie 404 casse l'installation.
+- `sw.js` : changer `VERSION` (`astra-p2p-v123` au 2026-11-08) à chaque mise en ligne. `cache.addAll` est tout ou rien : un fichier absent de `FILES` qui renvoie 404 casse l'installation.
 - **`sw.js`, réseau muet (D-230)** : chaque requête fait la course entre le réseau et un délai de 3 s (`NET_WAIT`). Réseau d'abord s'il répond à temps ; sinon la copie en cache (`caches.match`, `ignoreSearch`). Pas de copie en cache : on continue d'attendre le réseau. Après un délai dépassé, le drapeau `mute` fait répondre le cache **tout de suite** aux requêtes suivantes (sans lui, chaque `import` de la chaîne des modules attendait 3 s : l'accueil mettait plus de 10 s dans Chromium) ; la première réponse du réseau le remet à faux. La réponse du réseau, même arrivée après le délai, est écrite dans le cache (`e.waitUntil` appelé tout de suite) : la prochaine ouverture a la nouvelle version. Piège : juste après le retour du réseau, une ouverture peut encore servir le cache une fois (le drapeau tombe à la première réponse) ; `mute` est perdu quand le navigateur arrête le service worker, ce qui revient au comportement normal.
-- **`technologies.html` et `js/techtree.js` ne sont pas dans `FILES`** (`sw.js:5-34`). Ils ne sont pas pré-cachés ; ils ne marchent hors ligne que s'ils ont déjà été ouverts en ligne (le `fetch` met en cache ce qu'il télécharge, `sw.js:67-75`).
+- **`FILES` doit contenir tout ce que les pages demandent** (D-500) : `tests/sw-files.test.mjs` part de `index.html`, `replay.html`, `technologies.html` et `manifest.json`, suit `src` / `href`, `import`, `import()` et `new URL('…', import.meta.url)`, et échoue si un fichier atteint manque. Un nouveau fichier : l'ajouter à `FILES` et changer `VERSION`. (Avant D-500, `technologies.html` et `js/techtree.js` manquaient : hors ligne, la page ne s'ouvrait que si elle avait déjà été ouverte en ligne, issue #84.)
 - Le service worker n'est enregistré qu'en https ou sur `localhost` (`app.js:1964`). La caméra aussi exige https (`scanner.js:25`).
 - `route()` est copié dans `peer.js:125` et `rendezvous.js:23`.
 - Pas de TURN : derrière certains opérateurs (CGNAT), la connexion peut échouer (`config.js:6-8`).
@@ -352,9 +353,14 @@ node --test tests/sw.test.mjs
 Résultat (2026-11-06) : 6 tests, 6 réussis (≈ 10,6 s, le délai de 3 s est le vrai). Avec le `sw.js` d'avant D-230, « serveur muet » et « serveur lent » échouent.
 
 ```bash
+node --test tests/sw-files.test.mjs
+```
+Résultat (2026-11-08) : 3 tests, 3 réussis — chaque fichier demandé par les trois pages est dans `FILES`, et chaque fichier de `FILES` existe (D-500). Sur le `sw.js` d'avant : 2 échecs, `technologies.html` et `js/techtree.js` absents.
+
+```bash
 ASTRA_PLAYWRIGHT=/chemin/vers/node_modules/playwright/index.mjs node tests/sw-browser.mjs capture.png
 ```
-Résultat (2026-11-06, Chromium de Playwright) : 4/4 — serveur muet : accueil depuis le cache en ≈ 3,1 s (avant D-230 : rien après 10 s) ; serveur qui répond : `index.html` modifié servi ; serveur coupé : cache en ≈ 60 ms.
+Résultat (2026-11-08, Chromium de Playwright) : 5/5 — serveur coupé après une seule visite de l'accueil, `technologies.html` depuis le cache avec son graphe (20 bulles ; sur le `sw.js` d'avant D-500 : `net::ERR_FAILED`, issue #84). Résultat (2026-11-06) : 4/4 — serveur muet : accueil depuis le cache en ≈ 3,1 s (avant D-230 : rien après 10 s) ; serveur qui répond : `index.html` modifié servi ; serveur coupé : cache en ≈ 60 ms.
 
 - `tests/harness.mjs` simule `localStorage`, `document`, `window`, fixe l'heure (`clock.t`) et crée `n` sessions. Son `sync(a, b)` est `a.mergeIn(b.snapshot(), {pid: b.me})` : il **contourne** `peer.js` et `rendezvous.js`. Les tests ne vérifient donc ni WebRTC, ni QR, ni Nostr.
 - `tests/hostile.test.mjs` teste les garde-fous de réception (`recordOk`, `normalize`, `backdated`, horloges décalées) ; certains de ses tests touchent aussi aux règles (ex. heure qui recule et production).
@@ -368,4 +374,4 @@ Les numéros D-xxx renvoient à [decisions.md](../decisions.md) ; les demandes d
 - Historique de 10 parties et identité gardée par partie (`astra.saves`, `astra.identities`, `1eeb2c1`, D-066) ; une clé par partie et ménage quand la mémoire est pleine (D-415, issue #41).
 - Garde-fous de réception (`recordOk`, `backdated`, tolérance d'horloge d'un jour au lieu de 10 min) : `061744b`, D-061.
 - Assumé, non corrigé : un joueur qui modifie son code peut inventer un combat dans sa propre fiche ; signer les fiches a été jugé trop lourd (D-057).
-- `technologies.html` non mis en cache par `sw.js` : déjà signalé le 2026-10-28 à 15:12 (session `01be156b`), toujours vrai au commit 1eeb2c1.
+- `technologies.html` non mis en cache par `sw.js` : signalé le 2026-10-28 à 15:12 (session `01be156b`), corrigé le 2026-11-08 (D-500, issue #84).
