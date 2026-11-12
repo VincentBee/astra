@@ -401,3 +401,105 @@ scenario('D-370 : 7 IA, même graine : même partie qu’avec la copie complète
   assert.ok(!full.result.rejeu.startsWith('erreur'), full.result.rejeu);
   assert.ok(kFast < 100 && kFast * 5 <= kFull, `${kFast} Ko/s contre ${kFull}`);
 });
+
+/** Planète que vise l'IA `b` vue chez l'hôte : celle de son ordre « coloniser », ou sa planète mère. */
+function aim(h, b) {
+  const p = h.state.players[b.me];
+  const f = (p.fleets || []).find((x) => x.order?.kind === 'colonize');
+  if (f) return f.order.world;
+  return p.home ? h.planets.find((w) => w.x === p.home.x && w.y === p.home.y)?.id : null;
+}
+
+/**
+ * Une partie « Contre l'IA » : l'hôte et `n` IA sur la carte `gid`, avec un hasard fixé par
+ * `seed` (identifiants des joueurs), jouée `ms` après le départ. Renvoie la cible du premier
+ * ordre « coloniser » de chaque IA et le temps (min) qu'elle a mis à fonder sa planète mère.
+ */
+async function race(gid, seed, n, ms) {
+  let a = seed >>> 0;
+  const rnd = () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), a | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const { random } = Math;
+  const values = crypto.getRandomValues;
+  Math.random = rnd;
+  crypto.getRandomValues = (arr) => {
+    for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(rnd() * 256);
+    return arr;
+  };
+  try {
+    const clock = { t: 10_000_000 };
+    const h = host(clock);
+    h.state.gid = gid;
+    const races = ['machine', 'alien', 'human'];
+    const bots = Array.from({ length: n }, (_, i) => addBot(h, { race: races[(i + seed) % 3], timers: false, clock: () => clock.t }));
+    await flush();
+    h.ready();
+    h.checkStart();
+    await flush();
+    const first = new Map();
+    let aims = [];
+    // Comme `run` : un pas de 1 s, une réflexion toutes les 3 s.
+    for (let t = 0; t < ms; t += 1000) {
+      clock.t += 1000;
+      h.tick();
+      h.checkStart();
+      for (const b of bots) {
+        b.tick();
+        b.checkStart();
+        if (t % 3000 === 0) think(b);
+      }
+      await flush();
+      for (const b of bots) if (!first.has(b.me) && me(b).fleets?.[0]?.order) first.set(b.me, me(b).fleets[0].order.world);
+      if (t === 12_000) aims = bots.map((b) => aim(h, b));
+    }
+    const homes = bots.map((b) => {
+      const p = h.state.players[b.me];
+      return p.claimAt ? (p.claimAt - h.startedAt) / MIN : Infinity;
+    });
+    for (const b of bots) b.end();
+    return { h, first: [...first.values()], aims, homes };
+  } finally {
+    Math.random = random;
+    crypto.getRandomValues = values;
+  }
+}
+
+scenario('D-490 : au départ, deux IA ne gardent pas le cap sur la même planète mère ; à 8 joueurs, chacune fonde la sienne en moins de 1,5 min', async (film) => {
+  // Le froid du jeu : il fait préférer à toutes les IA les mêmes planètes, près du soleil.
+  game.FROST.delayMs = 12 * MIN;
+  // 20 parties à 3 IA : cible de chaque colonisateur de départ 10 s après le départ (le temps
+  // de voir les ordres des autres et de changer de cap), puis la planète mère de chacune.
+  const twins = [];
+  const blind = [];
+  let slow = [];
+  let last;
+  for (let g = 1; g <= 20; g++) {
+    const r = await race(`g${g}`, g * 7919, 3, MIN);
+    last = r;
+    // Premier ordre : chacune choisit sans voir celui des autres, deux peuvent tomber pareil.
+    if (r.first.length !== new Set(r.first).size) blind.push(`g${g} : ${r.first.join(', ')}`);
+    if (r.aims.length !== new Set(r.aims).size) twins.push(`g${g} : ${r.aims.join(', ')}`);
+    if (r.homes.some((x) => x > 1)) slow.push(`g${g} : ${r.homes.map((x) => x.toFixed(2)).join(' ')}`);
+  }
+  film.look(last.h, '20 parties à 3 IA', [
+    { show: `premiers ordres sur la même planète (vus, puis corrigés) : ${blind.length}`, expected: true, got: true },
+    { show: '12 s après le départ : deux IA visent la même planète mère', expected: [], got: twins },
+    { show: 'parties où une IA n’a pas fondé en 1 min', expected: [], got: slow },
+  ]);
+  assert.deepEqual(twins, [], 'deux IA sur la même planète mère');
+  assert.deepEqual(slow, [], 'une IA fonde tard');
+
+  // À 8 joueurs (l'hôte et 7 IA), sur 4 cartes : chaque IA fonde en moins de 1,5 min.
+  slow = [];
+  for (let g = 1; g <= 4; g++) {
+    const r = await race(`carte-8-${g}`, 100 + g, 7, 2 * MIN);
+    last = r;
+    if (r.homes.some((x) => x > 1.5)) slow.push(`carte-8-${g} : ${r.homes.map((x) => x.toFixed(2)).join(' ')}`);
+  }
+  film.look(last.h, '4 parties à 8 joueurs : planète mère de chaque IA', [{ show: 'parties où une IA fonde après 1,5 min', expected: [], got: slow }]);
+  assert.deepEqual(slow, [], 'une IA fonde après 1,5 min');
+});
