@@ -1187,12 +1187,12 @@ function showFinish(over, again = false) {
   const board = finalBoard(session);
   if (!board) return;
   $('finish-board').innerHTML = board.rows
-    .map((r) => `<li class="finish-row${r.me ? ' me' : ''}${r.dead ? ' dead' : ''}" data-place="${r.place}">
+    .map((r) => `<li class="finish-row${r.me ? ' me' : ''}${r.dead && !r.winner ? ' dead' : ''}" data-place="${r.place}">
         <span class="medal${r.medal ? ' ' + r.medal : ''}" title="${r.medal ? { gold: 'Or', silver: 'Argent', bronze: 'Bronze' }[r.medal] : ''}">${r.place}</span>
         <span class="dot" style="background:${esc(r.color)}"></span>
         <div class="f-main">
           <div class="f-name">${esc(r.name)}${r.me ? ' <span class="you">toi</span>' : ''}</div>
-          <div class="f-sub">${r.race ? `${raceIcon(r.race)} ${RACES[r.race].name} · ` : ''}${r.dead ? 'éliminé' : 'en vie'}</div>
+          <div class="f-sub">${r.race ? `${raceIcon(r.race)} ${RACES[r.race].name} · ` : ''}${esc(r.status)}</div>
         </div>
         <span class="f-pts">${fmt(r.pts)} pts</span>
       </li>`)
@@ -1312,7 +1312,7 @@ function renderPlanet(me, now) {
   sampleHistory(now, { ...s.stock, pop: s.pop, grid: f.effE * 100, ...soil }, openKey);
   const q = (sel) => document.querySelector(sel);
 
-  $('planet-title').textContent = openKey === 'home' ? pl.name : `${pl.name} · colonie`;
+  $('planet-title').textContent = $('planet-title').title = openKey === 'home' ? pl.name : `${pl.name} · colonie`;
   $('soil-zone').hidden = !planet.nature;
   if (planet.nature) fillSoil('soil', planet.nature, s.reserve, f.soil);
 

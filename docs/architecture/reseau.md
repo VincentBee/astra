@@ -36,7 +36,7 @@ Comme personne n'écrit la fiche d'un autre, deux copies ne peuvent pas entrer e
 ```
 
 Deux sortes de liens, **même interface** (`send`, `onmessage`, `onclose`, `close`, `route`,
-`closed`) : `Link` (`js/peer.js:44`) et `RoomLink` (`js/rendezvous.js:39`). `Session` ne fait
+`closed`) : `Link` (`js/peer.js:44`) et `RoomLink` (`js/rendezvous.js:48`). `Session` ne fait
 pas la différence, sauf `link.viaRoom` (voir §6, `attach`).
 
 ## 3. Rôle de chaque fichier
@@ -46,14 +46,16 @@ pas la différence, sauf `link.viaRoom` (voir §6, `attach`).
 | `js/config.js` | `ICE_SERVERS` (STUN Cloudflare seul, TURN en commentaire) l.9 ; `relayUrls()` l.16 lit `localStorage['astra.relays']` (relais Nostr perso, sinon `null` = relais publics de Trystero) ; `ICE_GATHER_TIMEOUT_MS = 3500` l.26. |
 | `js/peer.js` | WebRTC brut sans serveur de signalisation. `Link` (enveloppe d'un data channel, JSON, découpage en morceaux). Invitations par QR : `createInvite` l.153 / `answerInvite` l.217. Connexions relayées : `makeOffer` l.251 / `makeAnswer` l.269. |
 | `js/invite.js` | Compresse un SDP en code court `o2.<base64url>` (offre) ou `a2.<base64url>` (réponse), ~150 caractères, et le reconstruit. `encode` l.187, `decode` l.195, `inviteLink` l.210, `drawQr` l.215. |
-| `js/scanner.js` | `scanQr(video, {signal})` l.25 : caméra arrière + jsQR chargé à la demande (`loadJsQR` l.6). Chaque attente (jsQR, `getUserMedia`, `play`, lecture) fait la course avec l'annulation : rejet `AbortError` immédiat, pistes arrêtées, flux tardif éteint à son arrivée (D-250, #42). |
-| `js/rendezvous.js` | Reconnexion automatique sans rescanner : salon Trystero/Nostr propre à la partie, chiffré par la clé de la partie. Classe `Rendezvous` l.82. |
+| `js/scanner.js` | `scanQr(video, {signal})` l.30 : caméra arrière + jsQR chargé à la demande (`loadJsQR` l.6). Un chargement raté est oublié : le prochain scan refait la requête (D-510, #86). Chaque attente (jsQR, `getUserMedia`, `play`, lecture) fait la course avec l'annulation : rejet `AbortError` immédiat, pistes arrêtées, flux tardif éteint à son arrivée (D-250, #42). |
+| `js/rendezvous.js` | Reconnexion automatique sans rescanner : salon Trystero/Nostr propre à la partie, chiffré par la clé de la partie. Classe `Rendezvous` l.91. |
 | `js/session.js` | Classe `Session` l.197 : création/arrivée, messages, fusion des copies, maillage, sauvegarde. Contient aussi toutes les règles (l.696-1771, voir `regles.md`). |
 | `js/save.js` | Copie locale de la partie et identité dans `localStorage` ; historique de 10 parties ; `mergeStates` (fusion de deux copies). |
 | `js/tablock.js` | `holdGame(gid)` (async) : demande « rends la main » (`BroadcastChannel`), attend le verrou `navigator.locks` `astra.game.<gid>`, `steal` après `WAIT` ; poignée `{ onyield, onlost, release }` (D-430). |
 | `sw.js` | Service worker : cache hors ligne, « réseau d'abord », cache si le réseau ne répond pas en 3 s (D-230). |
 | `tests/sw.test.mjs` | Test de `sw.js` (vrai fichier dans un `vm`, cache en mémoire, serveur local qui répond, lent, muet ou coupé). |
 | `tests/sw-browser.mjs` | Même parcours dans un vrai Chromium (Playwright pris hors du dépôt), hors de `node --test`. |
+| `tests/chargement.test.mjs` | Chargement raté de jsQR ou de Trystero, puis réseau revenu : nouvel essai réussi ; rendez-vous « failed » retenté par la partie (D-510, D-511). Trystero remplacé par un faux module via `module.registerHooks`. |
+| `tests/chargement-browser.mjs` | Même chose dans un vrai Chromium avec l'appli (Rejoindre → Scanner ; `Rendezvous`), réseau coupé puis rétabli par `page.route`, hors de `node --test`. |
 | `manifest.json` | Appli installable (PWA) : nom Astra, `display: standalone`, portrait, icônes 192/512/svg. |
 | `vendor/` | Bibliothèques tierces copiées telles quelles (pas de build, voir `vendor/README.txt`) : `qrcode.mjs` (qrcode-generator 2.0.4, dessin des QR), `jsQR.js` (jsQR 1.4.0, lecture des QR), `trystero-nostr.mjs` (Trystero 0.26.0 stratégie Nostr + @noble/secp256k1, empaqueté par esbuild). |
 | `tests/peer.test.mjs` | Test du découpage des gros messages de `Link`. |
@@ -82,9 +84,10 @@ pas la différence, sauf `link.viaRoom` (voir §6, `attach`).
 - `inviteLink(code, gid)` : `origin + pathname + '?g=' + gid + '#' + code` (D-260). Le `#` n'est jamais envoyé à l'hébergeur. `?g=` dit de quelle partie vient l'invitation ; un ancien téléphone l'ignore (`decode` ne lit que ce qui suit le `#`). `inviteGid(texte)` relit ce `gid` (ou `null` : ancien lien, code seul) ; `boot()` (`app.js`) le passe avec le code à l'écran « rejoindre ».
 
 ### js/rendezvous.js
-- `APP_ID = 'astra-vincentbee-p2p'` l.17, salon `g-<gid>` l.118, `password: state.key` l.114 (Trystero chiffre les offres avec), action `'astra'` l.18.
-- `Rendezvous` l.82 : `join()` l.98 (charge Trystero à la demande, état `off | joining | on | failed`), `refresh()` l.180 (quitte et rejoint, au réveil), `leave()` l.186, `drop(peerId)` l.171.
-- `onPeerJoin` l.132 : crée un `RoomLink` et envoie `rdv-hello` chaque seconde jusqu'à recevoir celui de l'autre. `onData` l.149 : un `rdv-hello` d'une autre partie ou avec mon propre pid ferme le lien ; sinon `onLink(link, pid)`. Les messages ne passent au `RoomLink` qu'une fois le pid connu.
+- `APP_ID = 'astra-vincentbee-p2p'` l.17, salon `g-<gid>` l.127, `password: state.key` l.123 (Trystero chiffre les offres avec), action `'astra'` l.18.
+- `Rendezvous` l.91 : `join()` l.107 (charge Trystero à la demande, état `off | joining | on | failed`), `refresh()` l.189 (quitte et rejoint, au réveil), `leave()` l.195, `drop(peerId)` l.180.
+- `loadLib` l.25 : un chargement raté de Trystero est oublié ; l'essai suivant prend une autre adresse (`?r=1`, `?r=2`…), car Chromium garde l'échec d'un `import()` par adresse (D-510, #86). `Session.retryRendezvous()` relance un rendez-vous « failed » toutes les 15 s au plus (battement de cœur) ; au réveil, `refresh()` aussi si le rendez-vous est « failed » (D-511).
+- `onPeerJoin` l.141 : crée un `RoomLink` et envoie `rdv-hello` chaque seconde jusqu'à recevoir celui de l'autre. `onData` l.158 : un `rdv-hello` d'une autre partie ou avec mon propre pid ferme le lien ; sinon `onLink(link, pid)`. Les messages ne passent au `RoomLink` qu'une fois le pid connu.
 - `routeOf(pc)` l.23 est une copie de `Link.route()`.
 
 ### js/save.js
@@ -97,7 +100,7 @@ Clés `localStorage` (l.13-18, format D-415) :
 | `astra.games` | index de l'historique `{ gid: savedAt }` (sans la partie en cours) ; au plus `KEEP - 1` = 9 parties, 10 avec celle en cours (`KEEP`, l.19) |
 | `astra.saves` | **ancien format** (avant D-415) : tout l'historique d'un bloc, partie en cours comprise. Repris puis effacé au premier accès (`migrate()`) |
 | `astra.identity` | mon identité dans la partie en cours `{ gid, pid, secret }` |
-| `astra.identities` | historique `{ gid: identité }` |
+| `astra.identities` | historique `{ gid: identité }` : seulement les parties gardées, la partie en cours et l'identité en cours (D-520) |
 
 Autres clés lues ailleurs : `astra.relays` (`js/config.js:18`), `astra.name` (`js/app.js:133`), `astra.sky` (réglage « Fond », `js/galaxy.js`, D-112).
 
@@ -105,6 +108,7 @@ Autres clés lues ailleurs : `astra.relays` (`js/config.js:18`), `astra.name` (`
 - **Mémoire pleine (D-415)** : toute écriture d'une partie passe par `fit()` (l.105). Si le navigateur lève `QuotaExceededError` (`isFull`), on retire la plus ancienne partie de l'historique (jamais la partie en cours, ni celle qu'on range) et on réessaie, jusqu'à ce que ça passe. Si rien n'y fait (partie en cours plus grosse que toute la mémoire, ou stockage bloqué : autre erreur, sans rien retirer), les parties retirées sont remises, `astra.save` garde la dernière sauvegarde réussie, et `onSaveFailed` prévient `app.js`, qui montre un toast (au plus une fois par minute, `RETELL` l.52 ; appli cachée : pas de toast, et le prochain échec préviendra).
 - Reprise d'une partie (`selectGame`) ou partie en cours qui a encore une vieille copie dans l'historique : si la place manque, cette copie (qui ne servira plus) part la première, avant toute autre partie.
 - Changement de partie (`saveGame` avec un autre `gid`, `selectGame`) : la nouvelle partie est écrite d'abord dans `astra.save`, puis l'ancienne est rangée dans `astra.save.<gid>` (`archiveSave`, l.129), en retirant les plus vieilles au-delà de 9. Une action ordinaire n'écrit que `astra.save` (≈ la taille de la partie : règle aussi #91).
+- **Identités (D-520)** : `archiveSave` finit par `pruneIdentities` : `astra.identities` ne garde que les parties de l'index, la partie en cours et l'identité en cours (partie créée ou rejointe pas encore sauvée). `forgetGame(gid)` efface aussi `astra.identity` si c'est celle de `gid`, sinon `identities()` la remettrait. Une partie retirée par `fit()` garde son identité jusqu'au prochain changement de partie.
 - Ancien format (`migrate()`, l.143) : `astra.saves` est lu en mémoire, effacé d'abord (sinon la place manque pour recopier), puis chaque partie reçoit sa clé, la plus récente d'abord ; la copie de la partie en cours n'est pas recopiée (si elle était plus récente que `astra.save`, elle la remplace). JS synchrone : rien ne peut s'intercaler entre l'effacement et la recopie. Si une partie ne peut pas être recopiée, les suivantes sont quand même essayées et `onSaveFailed('history', n)` prévient (toast).
 - Stockage abîmé (D-170, modifié par D-415) : seules les entrées qui passent `valid()` sont reprises de l'ancien `astra.saves` ; un index `astra.games` abîmé (pas un objet simple) est ignoré ; une clé `astra.save.<gid>` abîmée est sautée par `listGames` et `selectGame`. L'index est complété par les clés `astra.save.*` présentes (`keys()`, l.85, si le navigateur sait les énumérer) : un index perdu ou en retard ne cache aucune partie. Idem `identities()` pour `astra.identities`.
 - `js/replay-view.js:5` lit `loadGame()` : c'est pourquoi « Revoir » fait d'abord `selectGame(gid)` puis ouvre `replay.html` (`app.js:182-184`).
@@ -156,7 +160,7 @@ Tous en JSON. Au niveau transport :
 | Type | Émis par | Contenu | Où |
 |---|---|---|---|
 | `part` | `Link.send` | `id, i, n, data` (morceau de texte JSON) | `peer.js:113`, recollé l.57-67 |
-| `rdv-hello` | `Rendezvous` | `gid, pid` | `rendezvous.js:138`, `:158` |
+| `rdv-hello` | `Rendezvous` | `gid, pid` | `rendezvous.js:147`, `:167` |
 
 Au niveau partie (`session.js:399-442`) :
 
@@ -320,11 +324,11 @@ Le sens de ce journal pour le rejeu (`seenNews`, `replayIds`) est décrit dans `
 - Un message de plus de 256 Ko dépasserait la limite annoncée par `a=max-message-size` (`invite.js:166`, `peer.js:35`) : passer toujours par `Link.send`, qui découpe.
 - Changer le format du code d'invitation : changer `VERSION` dans `invite.js` (sinon décodage faux).
 - Changer le format des fiches : incrémenter `FORMAT` et compléter son commentaire (l.32-40).
-- `sw.js` : changer `VERSION` (`astra-p2p-v94` au 2026-11-06) à chaque mise en ligne. `cache.addAll` est tout ou rien : un fichier absent de `FILES` qui renvoie 404 casse l'installation.
+- `sw.js` : changer `VERSION` (`astra-p2p-v123` au 2026-11-08) à chaque mise en ligne. `cache.addAll` est tout ou rien : un fichier absent de `FILES` qui renvoie 404 casse l'installation.
 - **`sw.js`, réseau muet (D-230)** : chaque requête fait la course entre le réseau et un délai de 3 s (`NET_WAIT`). Réseau d'abord s'il répond à temps ; sinon la copie en cache (`caches.match`, `ignoreSearch`). Pas de copie en cache : on continue d'attendre le réseau. Après un délai dépassé, le drapeau `mute` fait répondre le cache **tout de suite** aux requêtes suivantes (sans lui, chaque `import` de la chaîne des modules attendait 3 s : l'accueil mettait plus de 10 s dans Chromium) ; la première réponse du réseau le remet à faux. La réponse du réseau, même arrivée après le délai, est écrite dans le cache (`e.waitUntil` appelé tout de suite) : la prochaine ouverture a la nouvelle version. Piège : juste après le retour du réseau, une ouverture peut encore servir le cache une fois (le drapeau tombe à la première réponse) ; `mute` est perdu quand le navigateur arrête le service worker, ce qui revient au comportement normal.
-- **`technologies.html` et `js/techtree.js` ne sont pas dans `FILES`** (`sw.js:5-34`). Ils ne sont pas pré-cachés ; ils ne marchent hors ligne que s'ils ont déjà été ouverts en ligne (le `fetch` met en cache ce qu'il télécharge, `sw.js:67-75`).
-- Le service worker n'est enregistré qu'en https ou sur `localhost` (`app.js:1964`). La caméra aussi exige https (`scanner.js:25`).
-- `route()` est copié dans `peer.js:125` et `rendezvous.js:23`.
+- **`FILES` doit contenir tout ce que les pages demandent** (D-500) : `tests/sw-files.test.mjs` part de `index.html`, `replay.html`, `technologies.html` et `manifest.json`, suit `src` / `href`, `import`, `import()` et `new URL('…', import.meta.url)`, et échoue si un fichier atteint manque. Un nouveau fichier : l'ajouter à `FILES` et changer `VERSION`. (Avant D-500, `technologies.html` et `js/techtree.js` manquaient : hors ligne, la page ne s'ouvrait que si elle avait déjà été ouverte en ligne, issue #84.)
+- Le service worker n'est enregistré qu'en https ou sur `localhost` (`app.js:1964`). La caméra aussi exige https (`scanner.js:30`).
+- `route()` est copié dans `peer.js:125` et `rendezvous.js:32`.
 - Pas de TURN : derrière certains opérateurs (CGNAT), la connexion peut échouer (`config.js:6-8`).
 
 ## 9. Comment tester
@@ -354,9 +358,14 @@ node --test tests/sw.test.mjs
 Résultat (2026-11-06) : 6 tests, 6 réussis (≈ 10,6 s, le délai de 3 s est le vrai). Avec le `sw.js` d'avant D-230, « serveur muet » et « serveur lent » échouent.
 
 ```bash
+node --test tests/sw-files.test.mjs
+```
+Résultat (2026-11-08) : 3 tests, 3 réussis — chaque fichier demandé par les trois pages est dans `FILES`, et chaque fichier de `FILES` existe (D-500). Sur le `sw.js` d'avant : 2 échecs, `technologies.html` et `js/techtree.js` absents.
+
+```bash
 ASTRA_PLAYWRIGHT=/chemin/vers/node_modules/playwright/index.mjs node tests/sw-browser.mjs capture.png
 ```
-Résultat (2026-11-06, Chromium de Playwright) : 4/4 — serveur muet : accueil depuis le cache en ≈ 3,1 s (avant D-230 : rien après 10 s) ; serveur qui répond : `index.html` modifié servi ; serveur coupé : cache en ≈ 60 ms.
+Résultat (2026-11-08, Chromium de Playwright) : 5/5 — serveur coupé après une seule visite de l'accueil, `technologies.html` depuis le cache avec son graphe (20 bulles ; sur le `sw.js` d'avant D-500 : `net::ERR_FAILED`, issue #84). Résultat (2026-11-06) : 4/4 — serveur muet : accueil depuis le cache en ≈ 3,1 s (avant D-230 : rien après 10 s) ; serveur qui répond : `index.html` modifié servi ; serveur coupé : cache en ≈ 60 ms.
 
 - `tests/harness.mjs` simule `localStorage`, `document`, `window`, fixe l'heure (`clock.t`) et crée `n` sessions. Son `sync(a, b)` est `a.mergeIn(b.snapshot(), {pid: b.me})` : il **contourne** `peer.js` et `rendezvous.js`. Les tests ne vérifient donc ni WebRTC, ni QR, ni Nostr.
 - `tests/hostile.test.mjs` teste les garde-fous de réception (`recordOk`, `normalize`, `backdated`, horloges décalées) ; certains de ses tests touchent aussi aux règles (ex. heure qui recule et production).
@@ -370,4 +379,4 @@ Les numéros D-xxx renvoient à [decisions.md](../decisions.md) ; les demandes d
 - Historique de 10 parties et identité gardée par partie (`astra.saves`, `astra.identities`, `1eeb2c1`, D-066) ; une clé par partie et ménage quand la mémoire est pleine (D-415, issue #41).
 - Garde-fous de réception (`recordOk`, `backdated`, tolérance d'horloge d'un jour au lieu de 10 min) : `061744b`, D-061.
 - Assumé, non corrigé : un joueur qui modifie son code peut inventer un combat dans sa propre fiche ; signer les fiches a été jugé trop lourd (D-057).
-- `technologies.html` non mis en cache par `sw.js` : déjà signalé le 2026-10-28 à 15:12 (session `01be156b`), toujours vrai au commit 1eeb2c1.
+- `technologies.html` non mis en cache par `sw.js` : signalé le 2026-10-28 à 15:12 (session `01be156b`), corrigé le 2026-11-08 (D-500, issue #84).

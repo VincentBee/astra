@@ -91,6 +91,8 @@ const JOURNAL_MAX = 100;
 /** Pas (ms) auquel on regarde si le froid atteint une flotte en vol (D-163). */
 const FROST_STEP = 1000;
 const HEARTBEAT_MS = 1500;
+/** Délai entre deux essais d'un rendez-vous raté (D-511). */
+export const RDV_RETRY_MS = 15000;
 /**
  * Changement d'heure (D-166, choix de Claude) : si l'heure commune d'un joueur s'écarte de plus de
  * 10 s de la mienne (ou de l'écart de référence, s'il n'a pas encore l'heure commune), son heure a
@@ -481,7 +483,7 @@ export class Session {
       if (document.visibilityState === 'hidden') return this.save();
       if (document.visibilityState !== 'visible' || !this.state) return;
       // Au réveil, les connexions ont pu tomber : on se réannonce tout de suite.
-      if (this.alone) this.rdv?.refresh();
+      if (this.alone || this.rdv?.state === 'failed') this.rdv?.refresh();
       this.changed();
     };
     document.addEventListener('visibilitychange', this.onVisible);
@@ -730,6 +732,14 @@ export class Session {
     }
     if (this.firstLink && !this.firstLink.closed && now - this.firstLink.lastSeen > SILENCE_MS) this.firstLink.close();
     if (this.status === 'playing' && this.state) this.checkClock(); // un votant parti : le consensus a pu changer
+    this.retryRendezvous(now);
+  }
+
+  /** Rendez-vous raté (réseau coupé au chargement…) : on réessaie toutes les 15 s (#86, D-511). */
+  retryRendezvous(now = performance.now()) {
+    if (this.rdv?.state !== 'failed' || now - (this.rdvRetryAt ?? -Infinity) < RDV_RETRY_MS) return;
+    this.rdvRetryAt = now;
+    this.rdv.refresh();
   }
 
   onLinkClosed(link) {
@@ -1823,12 +1833,14 @@ export class Session {
    * Colonie perdue au profit d'un joueur arrivé avant moi : comme si ma
    * flotte de colonisation l'avait trouvée prise en arrivant, ses
    * vaisseaux (colonisateur compris), ce qui tient dans leurs soutes et
-   * leurs réservoirs repartent en flotte, en orbite. Renvoie cette flotte.
+   * leurs réservoirs repartent en flotte, en orbite, même au-delà de
+   * MAX_FLEETS (D-470). Renvoie cette flotte.
    */
   evacuate(p, colony, w) {
     const now = this.now();
     p.fleets ||= [];
-    if (!colony || p.fleets.length >= MAX_FLEETS) return null;
+    // Pas de limite de flottes ici : c'est un retour forcé, pas un ordre ; sinon les vaisseaux disparaîtraient (#80, D-470).
+    if (!colony) return null;
     settle(colony, now);
     // Le colonisateur qui l'a fondée repart avec la flotte ; une colonie prise au combat n'en a pas consommé (D-200).
     colony.ships = { ...(colony.ships || {}) };

@@ -499,7 +499,7 @@ Aucune conversation ne les prouve.
 - 2026-10-28 21:47. Choix : plus de « appuie encore une fois » ; l'ancienne partie va dans
   l'historique (reprendre, revoir, oublier) ; l'identité du joueur est gardée par partie.
 - Qui : Vincent (demande) ; le nombre 10 et les boutons par Claude.
-- Source : `f4afbcd0` 21:47:41, 21:50:00 ; `1eeb2c1`. Statut : en vigueur (`KEEP = 10`) ; stockage modifié par D-415 (une clé par partie, les plus vieilles retirées si la mémoire est pleine).
+- Source : `f4afbcd0` 21:47:41, 21:50:00 ; `1eeb2c1`. Statut : en vigueur (`KEEP = 10`) ; stockage modifié par D-415 (une clé par partie, les plus vieilles retirées si la mémoire est pleine) ; identités complétées par D-520 (elles suivent l'historique).
 
 **D-067 — Parallaxe : pas au doigt, mais à l'accéléromètre**
 - 2026-10-28 22:15–22:16. Choix : le glissé du doigt ne bouge pas les étoiles (sinon elles
@@ -2716,6 +2716,8 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
 - Qui : Vincent (demande) ; Claude (suppression du code mort, nom qui prend la place). Source :
   session `d9ace210`. Statut : en vigueur. Cache `astra-p2p-v101` (v99 pour #189, v100 pour #186,
   toutes deux fusionnées dans `main` avant cette PR ; `main` fusionné dans la branche à 08:52).
+  Modifiée par D-471 (`flex: 1 1 0` et `width: 0` : un nom long se coupe au lieu de pousser les
+  boutons à la ligne).
 
 **D-312 — La fiche de planète de la carte met aussi les vaisseaux au fil**
 - 2026-11-07 08:27. Demande de Vincent (via le router) : « on devrait pouvoir rajouter la
@@ -3502,3 +3504,190 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - Qui : Claude par défaut, validé par le router (option A, avec « rien ne doit se perdre » :
   sauver avant de lâcher, délai de secours, pas de plantage sans `navigator.locks`). Source :
   session `944b9421`, issue #49, PR #200. Statut : en vigueur.
+**D-460 — Écran de fin : le gagnant du bandeau en tête, avec l'or**
+- 2026-11-08 12:15 UTC. Contexte : issue #79 (audit du 2026-11-05, code-fin-07). `finalBoard`
+  rangeait les joueurs par `ranking(over.at)` et donnait l'or au premier, sans lire
+  `over.winner`. Quand la fin a été écrite sur une vue périmée, ou que les fiches ont changé
+  depuis, le bandeau disait « J2 gagne. » et l'écran de fin mettait J0 1er, en or, « en vie ».
+- Choix : `finalBoard` (`js/finish.js`) met `over.winner` à la place 1, puis les autres dans
+  l'ordre de `ranking(over.at)` ; places et médailles suivent ce nouvel ordre. Le bandeau et
+  l'écran de fin disent la même chose.
+- Écarté : figer le classement dans `p.over` au moment de la fin (change la fiche et le réseau,
+  pour un écran) ; corriger seulement les causes en amont (code-fin-03 à 05, d'autres issues) :
+  l'écran resterait fragile.
+- Vérifié : `tests/finish.test.mjs` « #79 : la fin écrite nomme un gagnant… » (échoue sur
+  `main`) ; `tests/end.test.mjs` vérifie le 1er de l'écran de fin dans deux parties à gagnant.
+- Qui : Claude, par défaut (piste de l'issue). Source : session `066d0da8`, issue #79.
+  Statut : en vigueur. Modifie D-143.
+
+**D-461 — Écran de fin : la ligne du gagnant dit « gagne », jamais « éliminé »**
+- 2026-11-08 12:15 UTC. Contexte : issue #79 (jeu-solo-04). Quand le froid prend tout le monde,
+  le dernier tombé gagne (§19.4) ; sa ligne disait « éliminé », comme celles des perdants.
+- Choix : `finalBoard` donne `winner` (vrai pour `over.winner`) et `status`, le texte sous le
+  nom : « en vie · gagne » ou « tombé en dernier · gagne » pour le gagnant, « éliminé » ou
+  « en vie » pour les autres. `js/app.js` affiche `status` ; la ligne du gagnant n'a pas la
+  classe `.dead` (nom pas grisé).
+- Écarté : « dernier en vie » (faux : il est tombé aussi) ; ne rien écrire sous le gagnant.
+- Vérifié : `tests/finish.test.mjs` « #79 : le froid prend tout le monde… » (échoue sur
+  `main`) ; vrai jeu, captures avant / après dans la PR.
+- Qui : Claude, par défaut (libellés). Source : session `066d0da8`, issue #79. Statut : en
+  vigueur. Modifie D-143.
+
+**D-462 — Cache `astra-p2p-v121`, puis `astra-p2p-v124`**
+- 2026-11-08. Contexte : `main` est en v120 ; `js/finish.js` et `js/app.js` changent.
+- Choix : `VERSION` passe à `astra-p2p-v121` pour que les téléphones prennent les nouveaux
+  fichiers. À la fusion de `main` (2026-11-12, #196, #202 et #197, v123) : `astra-p2p-v124`.
+- Qui : Claude, par défaut. Source : session `066d0da8`. Statut : en vigueur.
+**D-470 — Les vaisseaux d'une planète rendue repartent en orbite même au-delà de 16 flottes (issue #80)**
+- 2026-11-08 12:10 UTC. Contexte : quand deux joueurs s'installent sur la même planète, celui
+  arrivé après la rend (`checkClaim`) ; `evacuate` remet ses vaisseaux (colonisateur compris),
+  sa cargaison et son carburant en flotte, en orbite. À 16 flottes (`MAX_FLEETS`), `evacuate`
+  renvoyait `null` et la colonie était effacée quand même : tout ce qui y était posé
+  disparaissait, sans message. Même chose pour une planète mère fondée par le colonisateur de
+  départ (D-120).
+- Choix (option A) : `evacuate` ne regarde plus `MAX_FLEETS`. C'est un retour forcé, pas un
+  ordre : la flotte rendue peut être la 17ᵉ. La limite tient toujours pour les ordres du joueur
+  (`takeOff`, Scinder, IA : `>= MAX_FLEETS`) : il ne relance une flotte qu'une fois revenu sous
+  16. Aucun téléphone ne refuse une fiche qui a plus de 16 flottes (vérifié dans
+  `js/session.js`).
+- Écarté : (B) fusionner avec une de mes flottes arrêtées sur la case, sinon dépasser : plus de
+  code pour un cas rare, et il faut quand même dépasser quand aucune flotte n'est là ; garder la
+  colonie en attente : un état de plus à synchroniser ; un simple message : les vaisseaux
+  restaient perdus.
+- L'évacuation ne peut plus échouer avec des vaisseaux à bord : `evacuate` prend tous les
+  vaisseaux de la colonie, une cargaison et un carburant bornés par les soutes, les réservoirs
+  et le stock ; `launch` (`js/fleet.js`) ne refuse alors qu'une flotte vide (colonie prise au
+  combat sans vaisseau posé, D-200), où il n'y a rien à rendre. Pas de toast à ajouter.
+- Même règle pour la planète mère fondée par le colonisateur de départ (même `evacuate`).
+- Vérifié : 3 scénarios (`tests/end.test.mjs`, « #80 : … ») : colonie, planète mère, et à 17
+  flottes décoller ou scinder est refusé, puis permis de nouveau à 15. Tous échouent sur `main`.
+- Qui : Claude par défaut, validé par le router (option A, réponse du 2026-11-08). Source : session `f5d122f7`, issue #80. Statut :
+  en vigueur. Cache `astra-p2p-v121`.
+
+**D-520 — Les identités suivent l'historique ; « Oublier » efface aussi `astra.identity`**
+- 2026-11-08 12:20 UTC. Contexte : issue #88. « Oublier » retirait la partie et son entrée de
+  `astra.identities`, mais laissait `astra.identity` (la partie en cours) ; `identities()` la
+  remettait dans l'historique à la sauvegarde suivante, secret compris. Et rien n'élaguait
+  `astra.identities` : 12 identités pour 10 parties gardées après 12 créations.
+- Choix (`js/save.js`) :
+  - `forgetGame(gid)` efface `astra.identity` si c'est l'identité de `gid` (pas sinon).
+  - Quand l'historique change de partie (`archiveSave`, appelée par `saveGame` et `selectGame`),
+    `pruneIdentities` ne garde que les identités des parties de l'index `astra.games`, de la
+    partie en cours, et de l'identité en cours (une partie rejointe ou créée pas encore sauvée :
+    `Session.create` et `onWelcome` appellent `saveIdentity` avant la première sauvegarde).
+  - Une partie retirée par manque de mémoire (`fit()`, D-415) garde son identité jusqu'au
+    prochain changement de partie (≈ 70 caractères) : accepté, pour ne pas toucher `fit()`.
+- Écarté : élaguer dans `saveIdentity` seulement (rien n'écrit `astra.identities` quand une
+  partie sort de l'historique : on resterait à 11 pour 10) ; élaguer dans `drop()` (aussi appelé
+  quand une partie passe de l'historique à la partie en cours, dont l'identité doit rester).
+- Vérifié : scénario D-520 (`tests/decisions-reseau.test.mjs`), échoue sur `main` ; vrai
+  navigateur (« Oublier », puis `localStorage` avant / après).
+- Qui : Claude par défaut (règle proposée par l'issue). Source : session `1470f4be`
+  (worker-identites), issue #88. Statut : en vigueur. Complète D-066 et D-415. Cache `astra-p2p-v122` (v121 prise par D-470).
+
+**D-500 — Le cache hors ligne contient toutes les pages, contrôlé par un test qui suit les liens**
+- 2026-11-08 12:11 UTC. Contexte : issue #84. `FILES` de `sw.js` oubliait `technologies.html`
+  et `js/techtree.js` : installée puis hors ligne, la page Technologies ne s'ouvrait pas
+  (`net::ERR_FAILED`) si elle n'avait jamais été ouverte en ligne. Vérifié sur `main` (75a269d,
+  après D-230) : toujours vrai. Les autres fichiers servis y sont tous.
+- Choix : ajouter les deux fichiers à `FILES`, et `tests/sw-files.test.mjs` qui part de
+  `index.html`, `replay.html`, `technologies.html` et `manifest.json`, suit les `src` / `href`,
+  les `import … from`, les `import()` et les `new URL('…', import.meta.url)`, et exige que
+  chaque fichier atteint soit dans `FILES` (et que chaque fichier de `FILES` existe, sinon
+  `cache.addAll` casse l'installation), ainsi que `location.href = '…'`, `.src = '…'` et
+  `fetch('…')`. Un nouveau fichier oublié fait échouer le test. Vérifié à la main le
+  2026-11-08 : aucun `url(…)` local dans `style.css` ni dans le `<style>` de
+  `technologies.html`, aucun `fetch` d'un fichier local dans `js/`.
+- Écarté : générer `FILES` à la main par un script (le dépôt n'a pas de build, D-001 et
+  suivantes) ; mettre en cache n'importe quel fichier à la volée (déjà fait par le `fetch`, mais
+  ne couvre pas une page jamais ouverte en ligne).
+- Vérifié : le test échoue sur `main` (`technologies.html`, `js/techtree.js` absents) et passe
+  avec la correction ; `tests/sw-browser.mjs` (Chromium), serveur coupé après une seule visite
+  de l'accueil : `technologies.html` depuis le cache, 20 bulles dans le graphe (sur `main` :
+  `net::ERR_FAILED`).
+- Qui : Claude par défaut (piste donnée par l'issue). Source : worker `worker-techno-horsligne`,
+  session `37ab6d84`, issue #84. Statut : en vigueur.
+
+**D-501 — Cache `astra-p2p-v123`**
+- 2026-11-08 12:11 UTC (mise à jour 12:45 : `main` était passé à v122 avec #196 et #202, la PR
+  passe à v123). Contexte : D-500 change `FILES`. Choix : `VERSION` monte d'un cran (v123)
+  pour que les téléphones installés récupèrent la nouvelle liste. Qui : Claude par défaut.
+  Source : session `37ab6d84`, issue #84. Statut : en vigueur.
+
+**D-471 — Un nom de planète long se coupe en « … » ; les boutons de l'en-tête restent sur une ligne, plus serrés** (modifie D-311)
+- 2026-11-08 12:25 UTC. Demande de Vincent (via le router), avec une capture de la vue
+  « Bételgeuse » : « Il y a encore un petit problème d'overflow quand le nom de la planète est
+  trop grand. Il faut ellipsis le nom de la planète. »
+- Cause : `.planet-head` est en `flex-wrap` (pour la liste des alertes, D-111) et le nom avait
+  `flex: 1 1 auto`. Sa base était donc la largeur du texte : quand le nom et les boutons ne
+  tenaient pas, le navigateur passait un bouton à la ligne au lieu de couper le nom. Mesuré dans
+  le vrai jeu : 360 px avec l'alerte ⚠ 1, « Bételgeuse » → le compteur de joueurs passe dessous ;
+  un nom très long (sans espace où couper : `nowrap`) élargissait même la grille de l'écran, donc
+  la page (513 px pour 320 px d'écran).
+- Choix : `.planet-head h2 { flex: 1 1 0; width: 0; min-width: 0 }` (`style.css`). Base 0 : le
+  nom prend seulement la place qui reste et finit en « … » ; `width: 0` : il ne compte plus dans
+  la largeur de la grille. Le nom complet est en `title` du titre (`renderPlanet`, `js/app.js`).
+  Un nom court s'affiche comme avant.
+- Écart entre les boutons réduit, à toutes les largeurs : `.planet-head { gap: 6px }` (10 avant)
+  et `.planet-head #net { margin-left: 0 }` (8 avant). Les boutons gardent leur taille (zones de
+  toucher inchangées : 40 × 40, 44 × 40, ⚠ 54 × 40, joueurs 60 × 40). Place pour le nom, mesurée
+  dans le vrai jeu (avant → après) : 360 px, 4 boutons 112 → 136 px ; 360 px, 5 boutons (avec ⚠)
+  bouton passé à la ligne → 77 px ; 320 px, 4 boutons, bouton à la ligne → 96 px ; 320 px,
+  5 boutons, deux boutons à la ligne → 37 px (9 px avec le seul `flex: 1 1 0`).
+  Demande de Vincent ajoutée en cours de route : « Tu peux aussi réduire le gap entre les
+  boutons. » ; le router a choisi de le faire à toutes les largeurs (pas seulement sous 360 px).
+- « Double écart » vu par Vincent (capture sans alerte) entre Réglages et joueurs : c'était la
+  marge `.planet-head #net { margin-left: 8px }`, ajoutée à l'écart du flex. Mesuré sur une
+  vraie planète fondée (« Orion », 360 px) : `main` 10 / 10 / 10 / 10 / 18 px, cette PR 6 px
+  partout (avec et sans alerte). Aucun élément caché ne prend de place : `#alerts-btn` caché et
+  `#alerts-panel` sont en `display: none`.
+- Limite : à 320 px avec les cinq boutons, il ne reste que 37 px pour le nom (« B… »).
+- Écarté : garder `flex: 1 1 auto` et retirer `flex-wrap` (la liste des alertes ne passerait
+  plus sous l'en-tête) ; donner au nom une largeur minimale (les boutons repasseraient à la
+  ligne sur petit écran).
+- Même défaut ailleurs : non. La carte n'a pas de nom long dans son en-tête (coordonnées et
+  boutons dans `.pi-head-right`).
+- Qui : Vincent (demande, et l'écart réduit) ; router (écart à toutes les largeurs) ; Claude
+  (choix CSS). Source : session `6700d27f`, PR #206. Statut : en vigueur. Cache `astra-p2p-v124`
+  (v121 au départ, v122 après #196, v124 après la fusion de `main` à v123 le 2026-11-12). Numérotée D-422 au départ, renumérotée D-471
+  à la fusion de `main` (D-470).
+
+**D-510 — Un chargement raté (jsQR, Trystero) ne reste pas raté**
+- 2026-11-08 12:15 UTC. Contexte : issue #86 (audit du 2026-11-05). `loadJsQR()`
+  (`js/scanner.js`) et `loadLib()` (`js/rendezvous.js`) gardaient la promesse de chargement, même
+  rejetée : après une coupure réseau au premier chargement, « Lecteur de QR introuvable » et
+  rendez-vous « failed » jusqu'au rechargement de la page, sans nouvelle requête. Surtout à la
+  toute première visite (page pas encore contrôlée par le service worker) ou cache vidé.
+- Choix : une promesse ratée est oubliée. jsQR : `jsQRLoading = null` et la balise `<script>`
+  ratée est retirée ; le prochain « Scanner » refait la requête. Trystero : `lib = null`, et
+  l'essai suivant change d'adresse (`vendor/trystero-nostr.mjs?r=1`, `?r=2`…), car Chromium
+  garde l'échec d'un `import()` pour une même adresse (constaté par l'audit). Le service worker
+  répond à ces adresses avec la copie en cache (`ignoreSearch`).
+- Écarté : recharger toute la page (perd l'écran en cours) ; garder la même adresse (Chromium
+  ne refait pas la requête).
+- Vérifié : `tests/chargement.test.mjs` (3 tests, échouent sur `main`) ; vrai Chromium
+  (`tests/chargement-browser.mjs`, réseau coupé puis rétabli par `page.route`) : sur `main`
+  1 requête jsQR et caméra jamais ouverte, 1 requête Trystero et « failed » ; avec la correction
+  2 requêtes, caméra ouverte, rendez-vous « on ».
+- Qui : Claude, par défaut (piste de l'issue). Source : session `fa58f866`
+  (worker-chargement-rate), issue #86. Statut : en vigueur.
+
+**D-511 — Un rendez-vous raté est retenté toutes les 15 s, et au réveil**
+- 2026-11-08 12:15 UTC. Contexte : issue #86. `Session.meet()` ne refait rien si le salon est
+  le même, même en état « failed » ; seul le réveil du téléphone relançait le rendez-vous, et
+  seulement si on était seul.
+- Choix : `Session.retryRendezvous()` (`js/session.js`), appelé par le battement de cœur (1,5 s) :
+  rendez-vous « failed » → `refresh()`, au plus une fois toutes les `RDV_RETRY_MS` = 15 s. Au
+  réveil, un rendez-vous « failed » est relancé même si on n'est pas seul.
+- Écarté : réessayer à chaque battement (une requête toutes les 1,5 s tant que le réseau est
+  coupé) ; ne réessayer qu'au réveil (une partie ouverte sans mise en veille ne se
+  reconnecterait jamais).
+- Qui : Claude, par défaut (délai de 15 s). Source : session `fa58f866`, issue #86. Statut : en
+  vigueur.
+
+**D-512 — Cache `astra-p2p-v121`, puis `astra-p2p-v125`**
+- 2026-11-08. Contexte : v120 est dans `main`.
+- Choix : `VERSION` passe à `astra-p2p-v121` pour que les téléphones prennent les nouveaux
+  `js/scanner.js`, `js/rendezvous.js` et `js/session.js`. À la fusion de `main` (2026-11-12,
+  v124) : `astra-p2p-v125`.
+- Qui : Claude, par défaut. Source : session `fa58f866`. Statut : en vigueur.
