@@ -134,6 +134,19 @@ function archiveSave(save, idx, keep) {
   if (!(gid in idx)) return; // la plus vieille de toutes : elle sort
   if (!fit(GAME_KEY + gid, JSON.stringify(save), idx, [...keep, gid])) drop(gid, idx);
   fit(INDEX_KEY, JSON.stringify(idx), idx, keep);
+  pruneIdentities(idx, keep);
+}
+
+/**
+ * Les identités suivent l'historique (D-520) : on ne garde que celles des parties de l'index,
+ * de `keep` (la partie en cours) et de l'identité en cours (partie rejointe pas encore sauvée).
+ */
+function pruneIdentities(idx, keep) {
+  const ids = identities();
+  const live = new Set([...Object.keys(idx), ...keep, read(ID_KEY, null)?.gid]);
+  let gone = false;
+  for (const gid of Object.keys(ids)) if (!live.has(gid)) gone = delete ids[gid];
+  if (gone) write(IDS_KEY, ids);
 }
 
 /**
@@ -273,6 +286,7 @@ export function forgetGame(gid) {
   const ids = identities();
   delete ids[gid];
   write(IDS_KEY, ids);
+  if (read(ID_KEY, null)?.gid === gid) remove(ID_KEY); // sinon identities() la remettrait (D-520)
 }
 
 function identities() {

@@ -194,3 +194,60 @@ scenario('#77 : C perd une colonie puis sa planète mère, hors ligne, à la mê
   assert.equal(me(C).deathPts, pC(B).best, 'C écrit les points que les autres avaient déjà calculés');
   for (const s of [A, B, C]) assert.deepEqual(rowsOf(s, L), before.B, `même écran de fin chez ${L[s.me]}`);
 });
+
+/** Quatre joueurs dont le froid prend les planètes mères aux heures `at` (ms après t0) ; tout le monde se lit. */
+function frozenFour(at) {
+  const { players, clock, sync } = newGame(4, ['human', 'machine', 'alien', 'human']);
+  const t0 = clock.t;
+  const homes = players.map((s, i) => ({ cell: { ...me(s).home }, at: t0 + at[i] }));
+  const frostOf = (cell) => homes.find((h) => game.sameCell(h.cell, cell))?.at ?? Infinity;
+  for (const s of players) s.frostOf = frostOf;
+  clock.t = t0 + Math.max(...at.filter(Number.isFinite)) + 1;
+  for (const s of players) s.tick();
+  for (let k = 0; k < 2; k++) {
+    for (const a of players) for (const b of players) if (a !== b) sync(a, b);
+    for (const s of players) s.tick();
+  }
+  return players;
+}
+
+scenario('#79 : la fin écrite nomme un gagnant que le classement ne met pas devant : il est 1er, en or, comme dans le bandeau', (film) => {
+  const players = frozenFour([Infinity, 180_000, 120_000, 60_000]);
+  const [A, B, C, D] = players;
+  const L = { [A.me]: 'A', [B.me]: 'B', [C.me]: 'C', [D.me]: 'D' };
+  assert.equal(B.over?.winner, A.me);
+  // La fin a été décidée sur une vue périmée (code-fin-04) : chaque fiche dit « C gagne ».
+  for (const s of players) for (const p of Object.values(s.state.players)) if (p.over) p.over = { ...p.over, winner: C.me };
+  const board = finalBoard(B);
+  film.look(B, 'les fiches disent « C gagne » ; le classement met A (en vie) devant', [
+    { show: 'gagnant du bandeau', expected: 'C', got: L[B.over?.winner] },
+    { show: 'ordre du classement (ranking)', expected: ['A', 'B', 'C', 'D'], got: B.ranking(B.over.at).map((r) => L[r.id]) },
+    { show: 'écran de fin', expected: ['C', 'A', 'B', 'D'], got: board.rows.map((r) => L[r.id]) },
+    { show: 'médailles', expected: ['gold', 'silver', 'bronze', null], got: board.rows.map((r) => r.medal) },
+  ]);
+  assert.equal(board.rows[0].id, B.over.winner, 'le 1er de l’écran de fin est le gagnant du bandeau');
+  assert.deepEqual(board.rows.map((r) => r.id), [C.me, A.me, B.me, D.me], 'le gagnant, puis l’ordre du classement');
+  assert.deepEqual(board.rows.map((r) => r.medal), ['gold', 'silver', 'bronze', null]);
+  assert.deepEqual(board.rows.map((r) => r.place), [1, 2, 3, 4]);
+  assert.deepEqual(board.rows.map((r) => r.winner), [true, false, false, false]);
+  assert.ok(!/éliminé/.test(board.rows[0].status), 'le gagnant n’est pas « éliminé »');
+});
+
+scenario('#79 : le froid prend tout le monde : le dernier tombé gagne, sa ligne dit « gagne », pas « éliminé »', (film) => {
+  const players = frozenFour([240_000, 180_000, 120_000, 60_000]);
+  const [A, B, C, D] = players;
+  const L = { [A.me]: 'A', [B.me]: 'B', [C.me]: 'C', [D.me]: 'D' };
+  const board = finalBoard(B);
+  film.look(B, 'tout a gelé ; A, tombé en dernier, gagne', [
+    { show: 'gagnant', expected: 'A', got: L[B.over?.winner] },
+    { show: 'classement', expected: ['A', 'B', 'C', 'D'], got: board?.rows.map((r) => L[r.id]) },
+    { show: 'tous tombés', expected: [true, true, true, true], got: board?.rows.map((r) => r.dead) },
+    { show: 'textes sous les noms', expected: ['tombé en dernier · gagne', 'éliminé', 'éliminé', 'éliminé'], got: board?.rows.map((r) => r.status) },
+  ]);
+  assert.equal(B.over.winner, A.me);
+  assert.equal(board.rows[0].id, B.over.winner);
+  assert.deepEqual(board.rows.map((r) => r.dead), [true, true, true, true]);
+  assert.deepEqual(board.rows.map((r) => r.winner), [true, false, false, false], 'la ligne du gagnant se distingue');
+  assert.deepEqual(board.rows.map((r) => r.status), ['tombé en dernier · gagne', 'éliminé', 'éliminé', 'éliminé']);
+  assert.equal(board.rows[0].medal, 'gold');
+});
