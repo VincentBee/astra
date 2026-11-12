@@ -80,7 +80,7 @@ son prix). Pour grandir, il faut **coloniser** d'autres planètes.
 | Joueurs par partie | 8 | `MAX_PLAYERS`, `js/session.js` |
 | Planètes sur la carte | 14, plus 4 astéroïdes et 3 comètes | `PLANET_COUNT`, `SMALL_BODIES` |
 | Carte | 20 × 20 cases | `UNIVERSE` |
-| Flottes en même temps | 16 | `MAX_FLEETS`, `js/fleet.js` |
+| Flottes en même temps | 16 (une planète rendue peut en ajouter une 17ᵉ, D-470) | `MAX_FLEETS`, `js/fleet.js` |
 | Fil de construction | 12 éléments par planète | `PLAN_MAX`, `js/game.js` |
 | Vaisseaux par lot | 1 à 50 | `startShips` |
 | Chantiers en même temps | 1 bâtiment, 1 recherche, 1 lot de vaisseaux par planète | `stateAt` |

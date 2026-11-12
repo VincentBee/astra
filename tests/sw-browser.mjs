@@ -96,6 +96,24 @@ try {
   await new Promise((ok) => server.close(ok));
   r = await open();
   check('serveur coupé', r.ok && r.ms < 2000, r.ok ? `accueil « ${r.title} » depuis le cache en ${r.ms} ms` : `${r.err} après ${r.ms} ms`);
+
+  // 5. Serveur coupé, page Technologies jamais ouverte en ligne (#84, D-500) : elle
+  // vient du cache rempli à l'installation, avec son graphe.
+  const tech = await ctx.newPage();
+  const t0 = Date.now();
+  try {
+    await tech.goto(url + 'technologies.html', { waitUntil: 'domcontentloaded', timeout: 10000 });
+    await tech.waitForSelector('#graph .gnode', { timeout: 10000 });
+    const nodes = await tech.locator('#graph .gnode').count();
+    check('serveur coupé, technologies.html', nodes > 0, `« ${await tech.title()} » depuis le cache en ${Date.now() - t0} ms, ${nodes} bulles dans le graphe`);
+    if (shot) {
+      const techShot = shot.replace(/(\.png)?$/, '-technologies.png');
+      await tech.screenshot({ path: techShot, fullPage: false });
+      console.log(`capture : ${techShot}`);
+    }
+  } catch (err) {
+    check('serveur coupé, technologies.html', false, `${err.message.split('\n')[0]} après ${Date.now() - t0} ms`);
+  }
 } finally {
   await browser.close();
   for (const s of sockets) s.destroy();

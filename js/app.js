@@ -1,5 +1,6 @@
 import { Session, threatText } from './session.js';
 import { loadGame, listGames, selectGame, forgetGame, describeSave, onSaveFailed } from './save.js';
+import { holdGame } from './tablock.js';
 import { inviteLink, inviteGid, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
 import {
@@ -213,20 +214,40 @@ function showSaved() {
     .join('');
 }
 
-$('games').addEventListener('click', (e) => {
+let taking = false; // « Reprendre » attend qu'un autre onglet rende la partie (D-430)
+$('games').addEventListener('click', async (e) => {
   const btn = e.target.closest('[data-resume], [data-replay], [data-forget]');
-  if (!btn) return;
+  if (!btn || taking) return;
   const { resume, replay, forget } = btn.dataset;
   if (forget) {
     forgetGame(forget);
     return showSaved();
   }
-  const saved = selectGame(resume || replay);
-  if (!saved) return showSaved();
-  if (replay) return (location.href = 'replay.html');
-  session = Session.resume(saved);
+  if (replay) {
+    if (!selectGame(replay)) return showSaved();
+    return (location.href = 'replay.html');
+  }
+  // D-430 : si un autre onglet joue cette partie, il sauve et s'arrête d'abord ; la sauvegarde
+  // n'est lue qu'ensuite (au plus WAIT ms si cet onglet-là est gelé).
+  session?.end?.();
+  session = null;
+  taking = true;
+  let hold;
+  try {
+    hold = await holdGame(resume);
+  } finally {
+    taking = false;
+  }
+  const saved = selectGame(resume);
+  if (!saved) {
+    hold.release();
+    return showSaved();
+  }
+  $('home-note').hidden = true;
+  session = Session.resume(saved, hold);
   session.ontoast = toast;
   session.onchange = onSessionChange;
+  session.onlost = onLost;
   wakeBots(session); // les IA que ce téléphone faisait jouer reprennent (D-151)
   startGame();
   toast('Partie reprise.');
@@ -236,6 +257,22 @@ $('games').addEventListener('click', (e) => {
   showAbsence(Date.now() - saved.savedAt);
 });
 
+/**
+ * La partie a été ouverte dans un autre onglet (ou l'appli installée, D-430) : elle continue
+ * là-bas, celui-ci s'est arrêté sans rien sauver. Retour à l'accueil, avec un message qui reste
+ * (l'onglet est souvent caché à ce moment : un toast ne serait pas vu).
+ */
+function onLost(lost) {
+  if (lost !== session) return; // une ancienne session de cet onglet, déjà remplacée
+  stopGame();
+  for (const el of document.querySelectorAll('.sheet')) el.hidden = true;
+  session = null;
+  show('home');
+  showSaved();
+  $('home-note').textContent = 'Cette partie a été ouverte dans un autre onglet : elle continue là-bas. Pour la jouer ici, appuie sur « Reprendre ».';
+  $('home-note').hidden = false;
+}
+
 window.addEventListener('pagehide', () => session?.save?.()); // en lecture seule (D-139), `save` ne fait rien
 
 $('btn-create').onclick = async () => {
@@ -244,6 +281,7 @@ $('btn-create').onclick = async () => {
   session = await Session.create(name);
   session.ontoast = toast;
   session.onchange = onSessionChange;
+  session.onlost = onLost;
   startGame();
 };
 
@@ -255,6 +293,7 @@ $('btn-solo').onclick = async () => {
   session = await Session.create(name);
   session.ontoast = toast;
   session.onchange = onSessionChange;
+  session.onlost = onLost;
   addBot(session);
   startGame();
 };
@@ -318,6 +357,7 @@ async function useOffer(text) {
     session = new Session(name);
     session.ontoast = toast;
     session.onchange = onSessionChange;
+    session.onlost = onLost;
   }
   try {
     $('join-status').textContent = 'Préparation de ta réponse…';
@@ -1147,12 +1187,12 @@ function showFinish(over, again = false) {
   const board = finalBoard(session);
   if (!board) return;
   $('finish-board').innerHTML = board.rows
-    .map((r) => `<li class="finish-row${r.me ? ' me' : ''}${r.dead ? ' dead' : ''}" data-place="${r.place}">
+    .map((r) => `<li class="finish-row${r.me ? ' me' : ''}${r.dead && !r.winner ? ' dead' : ''}" data-place="${r.place}">
         <span class="medal${r.medal ? ' ' + r.medal : ''}" title="${r.medal ? { gold: 'Or', silver: 'Argent', bronze: 'Bronze' }[r.medal] : ''}">${r.place}</span>
         <span class="dot" style="background:${esc(r.color)}"></span>
         <div class="f-main">
           <div class="f-name">${esc(r.name)}${r.me ? ' <span class="you">toi</span>' : ''}</div>
-          <div class="f-sub">${r.race ? `${raceIcon(r.race)} ${RACES[r.race].name} · ` : ''}${r.dead ? 'éliminé' : 'en vie'}</div>
+          <div class="f-sub">${r.race ? `${raceIcon(r.race)} ${RACES[r.race].name} · ` : ''}${esc(r.status)}</div>
         </div>
         <span class="f-pts">${fmt(r.pts)} pts</span>
       </li>`)
@@ -1272,7 +1312,7 @@ function renderPlanet(me, now) {
   sampleHistory(now, { ...s.stock, pop: s.pop, grid: f.effE * 100, ...soil }, openKey);
   const q = (sel) => document.querySelector(sel);
 
-  $('planet-title').textContent = openKey === 'home' ? pl.name : `${pl.name} · colonie`;
+  $('planet-title').textContent = $('planet-title').title = openKey === 'home' ? pl.name : `${pl.name} · colonie`;
   $('soil-zone').hidden = !planet.nature;
   if (planet.nature) fillSoil('soil', planet.nature, s.reserve, f.soil);
 
