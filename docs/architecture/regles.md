@@ -1262,8 +1262,9 @@ l'heure et les fiches : chaque téléphone trouve le même résultat, sans arbit
   écrit `p.over = { at, winner }` dans sa fiche ; `Session.over` prend la plus ancienne fin
   écrite par un joueur, et lit une vieille fin seule (« gagné ») comme perdue.
 - Écran de fin : `finalBoard(session)` (`js/finish.js`, D-143) donne le classement final
-  (`ranking(over.at)`, points `best`, médailles or / argent / bronze aux trois premiers, aucune
-  sans vainqueur).
+  (le gagnant `over.winner` d'abord, comme le bandeau, puis `ranking(over.at)`, D-460 ; points
+  `best`, médailles or / argent / bronze aux trois premiers, aucune sans vainqueur ; `status` :
+  « gagne » pour le gagnant, même tombé en dernier, D-461).
 - Partie finie : `tick` ne fait plus que lire les derniers rapports de combat ; tous les ordres
   sont refusés (`canAct`).
 
