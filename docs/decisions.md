@@ -499,7 +499,7 @@ Aucune conversation ne les prouve.
 - 2026-10-28 21:47. Choix : plus de « appuie encore une fois » ; l'ancienne partie va dans
   l'historique (reprendre, revoir, oublier) ; l'identité du joueur est gardée par partie.
 - Qui : Vincent (demande) ; le nombre 10 et les boutons par Claude.
-- Source : `f4afbcd0` 21:47:41, 21:50:00 ; `1eeb2c1`. Statut : en vigueur (`KEEP = 10`) ; stockage modifié par D-415 (une clé par partie, les plus vieilles retirées si la mémoire est pleine).
+- Source : `f4afbcd0` 21:47:41, 21:50:00 ; `1eeb2c1`. Statut : en vigueur (`KEEP = 10`) ; stockage modifié par D-415 (une clé par partie, les plus vieilles retirées si la mémoire est pleine) ; identités complétées par D-520 (elles suivent l'historique).
 
 **D-067 — Parallaxe : pas au doigt, mais à l'accéléromètre**
 - 2026-10-28 22:15–22:16. Choix : le glissé du doigt ne bouge pas les étoiles (sinon elles
@@ -3498,8 +3498,83 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - Qui : Claude, par défaut (libellés). Source : session `066d0da8`, issue #79. Statut : en
   vigueur. Modifie D-143.
 
-**D-462 — Cache `astra-p2p-v121`**
+**D-462 — Cache `astra-p2p-v121`, puis `astra-p2p-v124`**
 - 2026-11-08. Contexte : `main` est en v120 ; `js/finish.js` et `js/app.js` changent.
 - Choix : `VERSION` passe à `astra-p2p-v121` pour que les téléphones prennent les nouveaux
-  fichiers.
+  fichiers. À la fusion de `main` (2026-11-12, #196, #202 et #197, v123) : `astra-p2p-v124`.
 - Qui : Claude, par défaut. Source : session `066d0da8`. Statut : en vigueur.
+**D-470 — Les vaisseaux d'une planète rendue repartent en orbite même au-delà de 16 flottes (issue #80)**
+- 2026-11-08 12:10 UTC. Contexte : quand deux joueurs s'installent sur la même planète, celui
+  arrivé après la rend (`checkClaim`) ; `evacuate` remet ses vaisseaux (colonisateur compris),
+  sa cargaison et son carburant en flotte, en orbite. À 16 flottes (`MAX_FLEETS`), `evacuate`
+  renvoyait `null` et la colonie était effacée quand même : tout ce qui y était posé
+  disparaissait, sans message. Même chose pour une planète mère fondée par le colonisateur de
+  départ (D-120).
+- Choix (option A) : `evacuate` ne regarde plus `MAX_FLEETS`. C'est un retour forcé, pas un
+  ordre : la flotte rendue peut être la 17ᵉ. La limite tient toujours pour les ordres du joueur
+  (`takeOff`, Scinder, IA : `>= MAX_FLEETS`) : il ne relance une flotte qu'une fois revenu sous
+  16. Aucun téléphone ne refuse une fiche qui a plus de 16 flottes (vérifié dans
+  `js/session.js`).
+- Écarté : (B) fusionner avec une de mes flottes arrêtées sur la case, sinon dépasser : plus de
+  code pour un cas rare, et il faut quand même dépasser quand aucune flotte n'est là ; garder la
+  colonie en attente : un état de plus à synchroniser ; un simple message : les vaisseaux
+  restaient perdus.
+- L'évacuation ne peut plus échouer avec des vaisseaux à bord : `evacuate` prend tous les
+  vaisseaux de la colonie, une cargaison et un carburant bornés par les soutes, les réservoirs
+  et le stock ; `launch` (`js/fleet.js`) ne refuse alors qu'une flotte vide (colonie prise au
+  combat sans vaisseau posé, D-200), où il n'y a rien à rendre. Pas de toast à ajouter.
+- Même règle pour la planète mère fondée par le colonisateur de départ (même `evacuate`).
+- Vérifié : 3 scénarios (`tests/end.test.mjs`, « #80 : … ») : colonie, planète mère, et à 17
+  flottes décoller ou scinder est refusé, puis permis de nouveau à 15. Tous échouent sur `main`.
+- Qui : Claude par défaut, validé par le router (option A, réponse du 2026-11-08). Source : session `f5d122f7`, issue #80. Statut :
+  en vigueur. Cache `astra-p2p-v121`.
+
+**D-520 — Les identités suivent l'historique ; « Oublier » efface aussi `astra.identity`**
+- 2026-11-08 12:20 UTC. Contexte : issue #88. « Oublier » retirait la partie et son entrée de
+  `astra.identities`, mais laissait `astra.identity` (la partie en cours) ; `identities()` la
+  remettait dans l'historique à la sauvegarde suivante, secret compris. Et rien n'élaguait
+  `astra.identities` : 12 identités pour 10 parties gardées après 12 créations.
+- Choix (`js/save.js`) :
+  - `forgetGame(gid)` efface `astra.identity` si c'est l'identité de `gid` (pas sinon).
+  - Quand l'historique change de partie (`archiveSave`, appelée par `saveGame` et `selectGame`),
+    `pruneIdentities` ne garde que les identités des parties de l'index `astra.games`, de la
+    partie en cours, et de l'identité en cours (une partie rejointe ou créée pas encore sauvée :
+    `Session.create` et `onWelcome` appellent `saveIdentity` avant la première sauvegarde).
+  - Une partie retirée par manque de mémoire (`fit()`, D-415) garde son identité jusqu'au
+    prochain changement de partie (≈ 70 caractères) : accepté, pour ne pas toucher `fit()`.
+- Écarté : élaguer dans `saveIdentity` seulement (rien n'écrit `astra.identities` quand une
+  partie sort de l'historique : on resterait à 11 pour 10) ; élaguer dans `drop()` (aussi appelé
+  quand une partie passe de l'historique à la partie en cours, dont l'identité doit rester).
+- Vérifié : scénario D-520 (`tests/decisions-reseau.test.mjs`), échoue sur `main` ; vrai
+  navigateur (« Oublier », puis `localStorage` avant / après).
+- Qui : Claude par défaut (règle proposée par l'issue). Source : session `1470f4be`
+  (worker-identites), issue #88. Statut : en vigueur. Complète D-066 et D-415. Cache `astra-p2p-v122` (v121 prise par D-470).
+
+**D-500 — Le cache hors ligne contient toutes les pages, contrôlé par un test qui suit les liens**
+- 2026-11-08 12:11 UTC. Contexte : issue #84. `FILES` de `sw.js` oubliait `technologies.html`
+  et `js/techtree.js` : installée puis hors ligne, la page Technologies ne s'ouvrait pas
+  (`net::ERR_FAILED`) si elle n'avait jamais été ouverte en ligne. Vérifié sur `main` (75a269d,
+  après D-230) : toujours vrai. Les autres fichiers servis y sont tous.
+- Choix : ajouter les deux fichiers à `FILES`, et `tests/sw-files.test.mjs` qui part de
+  `index.html`, `replay.html`, `technologies.html` et `manifest.json`, suit les `src` / `href`,
+  les `import … from`, les `import()` et les `new URL('…', import.meta.url)`, et exige que
+  chaque fichier atteint soit dans `FILES` (et que chaque fichier de `FILES` existe, sinon
+  `cache.addAll` casse l'installation), ainsi que `location.href = '…'`, `.src = '…'` et
+  `fetch('…')`. Un nouveau fichier oublié fait échouer le test. Vérifié à la main le
+  2026-11-08 : aucun `url(…)` local dans `style.css` ni dans le `<style>` de
+  `technologies.html`, aucun `fetch` d'un fichier local dans `js/`.
+- Écarté : générer `FILES` à la main par un script (le dépôt n'a pas de build, D-001 et
+  suivantes) ; mettre en cache n'importe quel fichier à la volée (déjà fait par le `fetch`, mais
+  ne couvre pas une page jamais ouverte en ligne).
+- Vérifié : le test échoue sur `main` (`technologies.html`, `js/techtree.js` absents) et passe
+  avec la correction ; `tests/sw-browser.mjs` (Chromium), serveur coupé après une seule visite
+  de l'accueil : `technologies.html` depuis le cache, 20 bulles dans le graphe (sur `main` :
+  `net::ERR_FAILED`).
+- Qui : Claude par défaut (piste donnée par l'issue). Source : worker `worker-techno-horsligne`,
+  session `37ab6d84`, issue #84. Statut : en vigueur.
+
+**D-501 — Cache `astra-p2p-v123`**
+- 2026-11-08 12:11 UTC (mise à jour 12:45 : `main` était passé à v122 avec #196 et #202, la PR
+  passe à v123). Contexte : D-500 change `FILES`. Choix : `VERSION` monte d'un cran (v123)
+  pour que les téléphones installés récupèrent la nouvelle liste. Qui : Claude par défaut.
+  Source : session `37ab6d84`, issue #84. Statut : en vigueur.
