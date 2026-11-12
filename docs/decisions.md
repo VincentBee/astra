@@ -3618,3 +3618,43 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   (choix CSS). Source : session `6700d27f`, PR #206. Statut : en vigueur. Cache `astra-p2p-v124`
   (v121 au départ, v122 après #196, v124 après la fusion de `main` à v123 le 2026-11-12). Numérotée D-422 au départ, renumérotée D-471
   à la fusion de `main` (D-470).
+
+**D-510 — Un chargement raté (jsQR, Trystero) ne reste pas raté**
+- 2026-11-08 12:15 UTC. Contexte : issue #86 (audit du 2026-11-05). `loadJsQR()`
+  (`js/scanner.js`) et `loadLib()` (`js/rendezvous.js`) gardaient la promesse de chargement, même
+  rejetée : après une coupure réseau au premier chargement, « Lecteur de QR introuvable » et
+  rendez-vous « failed » jusqu'au rechargement de la page, sans nouvelle requête. Surtout à la
+  toute première visite (page pas encore contrôlée par le service worker) ou cache vidé.
+- Choix : une promesse ratée est oubliée. jsQR : `jsQRLoading = null` et la balise `<script>`
+  ratée est retirée ; le prochain « Scanner » refait la requête. Trystero : `lib = null`, et
+  l'essai suivant change d'adresse (`vendor/trystero-nostr.mjs?r=1`, `?r=2`…), car Chromium
+  garde l'échec d'un `import()` pour une même adresse (constaté par l'audit). Le service worker
+  répond à ces adresses avec la copie en cache (`ignoreSearch`).
+- Écarté : recharger toute la page (perd l'écran en cours) ; garder la même adresse (Chromium
+  ne refait pas la requête).
+- Vérifié : `tests/chargement.test.mjs` (3 tests, échouent sur `main`) ; vrai Chromium
+  (`tests/chargement-browser.mjs`, réseau coupé puis rétabli par `page.route`) : sur `main`
+  1 requête jsQR et caméra jamais ouverte, 1 requête Trystero et « failed » ; avec la correction
+  2 requêtes, caméra ouverte, rendez-vous « on ».
+- Qui : Claude, par défaut (piste de l'issue). Source : session `fa58f866`
+  (worker-chargement-rate), issue #86. Statut : en vigueur.
+
+**D-511 — Un rendez-vous raté est retenté toutes les 15 s, et au réveil**
+- 2026-11-08 12:15 UTC. Contexte : issue #86. `Session.meet()` ne refait rien si le salon est
+  le même, même en état « failed » ; seul le réveil du téléphone relançait le rendez-vous, et
+  seulement si on était seul.
+- Choix : `Session.retryRendezvous()` (`js/session.js`), appelé par le battement de cœur (1,5 s) :
+  rendez-vous « failed » → `refresh()`, au plus une fois toutes les `RDV_RETRY_MS` = 15 s. Au
+  réveil, un rendez-vous « failed » est relancé même si on n'est pas seul.
+- Écarté : réessayer à chaque battement (une requête toutes les 1,5 s tant que le réseau est
+  coupé) ; ne réessayer qu'au réveil (une partie ouverte sans mise en veille ne se
+  reconnecterait jamais).
+- Qui : Claude, par défaut (délai de 15 s). Source : session `fa58f866`, issue #86. Statut : en
+  vigueur.
+
+**D-512 — Cache `astra-p2p-v121`, puis `astra-p2p-v125`**
+- 2026-11-08. Contexte : v120 est dans `main`.
+- Choix : `VERSION` passe à `astra-p2p-v121` pour que les téléphones prennent les nouveaux
+  `js/scanner.js`, `js/rendezvous.js` et `js/session.js`. À la fusion de `main` (2026-11-12,
+  v124) : `astra-p2p-v125`.
+- Qui : Claude, par défaut. Source : session `fa58f866`. Statut : en vigueur.

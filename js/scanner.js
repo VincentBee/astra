@@ -9,7 +9,12 @@ function loadJsQR() {
     const s = document.createElement('script');
     s.src = new URL('../vendor/jsQR.js', import.meta.url).href;
     s.onload = () => resolve(window.jsQR);
-    s.onerror = () => reject(new Error('Lecteur de QR introuvable.'));
+    s.onerror = () => {
+      // Pas de promesse ratée gardée en mémoire (#86) : le prochain Scanner refait la requête.
+      jsQRLoading = null;
+      s.remove?.();
+      reject(new Error('Lecteur de QR introuvable.'));
+    };
     document.head.append(s);
   });
   return jsQRLoading;
