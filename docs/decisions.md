@@ -3515,3 +3515,32 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   navigateur (« Oublier », puis `localStorage` avant / après).
 - Qui : Claude par défaut (règle proposée par l'issue). Source : session `1470f4be`
   (worker-identites), issue #88. Statut : en vigueur. Complète D-066 et D-415. Cache `astra-p2p-v122` (v121 prise par D-470).
+
+**D-500 — Le cache hors ligne contient toutes les pages, contrôlé par un test qui suit les liens**
+- 2026-11-08 12:11 UTC. Contexte : issue #84. `FILES` de `sw.js` oubliait `technologies.html`
+  et `js/techtree.js` : installée puis hors ligne, la page Technologies ne s'ouvrait pas
+  (`net::ERR_FAILED`) si elle n'avait jamais été ouverte en ligne. Vérifié sur `main` (75a269d,
+  après D-230) : toujours vrai. Les autres fichiers servis y sont tous.
+- Choix : ajouter les deux fichiers à `FILES`, et `tests/sw-files.test.mjs` qui part de
+  `index.html`, `replay.html`, `technologies.html` et `manifest.json`, suit les `src` / `href`,
+  les `import … from`, les `import()` et les `new URL('…', import.meta.url)`, et exige que
+  chaque fichier atteint soit dans `FILES` (et que chaque fichier de `FILES` existe, sinon
+  `cache.addAll` casse l'installation), ainsi que `location.href = '…'`, `.src = '…'` et
+  `fetch('…')`. Un nouveau fichier oublié fait échouer le test. Vérifié à la main le
+  2026-11-08 : aucun `url(…)` local dans `style.css` ni dans le `<style>` de
+  `technologies.html`, aucun `fetch` d'un fichier local dans `js/`.
+- Écarté : générer `FILES` à la main par un script (le dépôt n'a pas de build, D-001 et
+  suivantes) ; mettre en cache n'importe quel fichier à la volée (déjà fait par le `fetch`, mais
+  ne couvre pas une page jamais ouverte en ligne).
+- Vérifié : le test échoue sur `main` (`technologies.html`, `js/techtree.js` absents) et passe
+  avec la correction ; `tests/sw-browser.mjs` (Chromium), serveur coupé après une seule visite
+  de l'accueil : `technologies.html` depuis le cache, 20 bulles dans le graphe (sur `main` :
+  `net::ERR_FAILED`).
+- Qui : Claude par défaut (piste donnée par l'issue). Source : worker `worker-techno-horsligne`,
+  session `37ab6d84`, issue #84. Statut : en vigueur.
+
+**D-501 — Cache `astra-p2p-v123`**
+- 2026-11-08 12:11 UTC (mise à jour 12:45 : `main` était passé à v122 avec #196 et #202, la PR
+  passe à v123). Contexte : D-500 change `FILES`. Choix : `VERSION` monte d'un cran (v123)
+  pour que les téléphones installés récupèrent la nouvelle liste. Qui : Claude par défaut.
+  Source : session `37ab6d84`, issue #84. Statut : en vigueur.
