@@ -99,11 +99,11 @@ function soloNow(gid) {
 }
 
 /** Reprend la sauvegarde `saved` comme au lancement de l'appli, sans minuteurs ni rendez-vous. */
-function resumeQuiet(saved) {
+function resumeQuiet(saved, hold) {
   const start = Session.prototype.start;
   Session.prototype.start = () => {};
   try {
-    return Session.resume(saved);
+    return Session.resume(saved, hold);
   } finally {
     Session.prototype.start = start;
   }
@@ -353,6 +353,65 @@ scenario('D-066 : l’identité est gardée par partie ; reprendre et oublier', 
       { show: 'identité de A oubliée', expected: true, got: forgotten },
     ]);
   });
+});
+
+// ----- D-520 : les identités suivent l'historique (issue #88)
+
+scenario('D-520 : « Oublier » efface l’identité, et une partie sortie de l’historique n’en garde pas', async (film) => {
+  // Les images : une vraie partie reprise. Le contenu de localStorage est vérifié par les asserts.
+  const real = soloNow('gident');
+  film.look(real, 'une partie en cours');
+  const ids = () => JSON.parse(localStorage.getItem('astra.identities') || '{}');
+  const cur = () => JSON.parse(localStorage.getItem('astra.identity') || 'null');
+  const st = (gid) => ({ gid, players: { me: { id: 'me', name: 'Moi', rank: 0 } }, log: [] });
+  let back, other, kept;
+  await withStore(() => {
+    // 1. Oublier la partie en cours, puis jouer une autre partie : A ne revient pas.
+    save.saveGame('me', st('A'));
+    save.saveIdentity({ gid: 'A', pid: 'pa', secret: 'sa' });
+    save.forgetGame('A');
+    assert.equal(cur(), null, 'astra.identity n’est plus A');
+    save.saveIdentity({ gid: 'B', pid: 'pb', secret: 'sb' });
+    save.saveGame('me', st('B'));
+    back = 'A' in ids();
+    assert.equal(back, false, 'A ne revient pas dans astra.identities');
+    // 2. Oublier une autre partie que celle en cours ne touche pas astra.identity.
+    save.saveIdentity({ gid: 'C', pid: 'pc', secret: 'sc' });
+    save.saveGame('me', st('C'));
+    save.forgetGame('B');
+    other = cur()?.gid;
+    assert.equal(other, 'C', 'identité en cours gardée');
+    assert.equal('B' in ids(), false);
+  });
+  await withStore(() => {
+    // 3. 12 parties créées : 10 sauvegardes, 10 identités, les mêmes gid.
+    const now = Date.now;
+    let t = 1_000;
+    Date.now = () => (t += 1_000);
+    try {
+      for (let i = 0; i < 12; i++) {
+        save.saveIdentity({ gid: `g${i}`, pid: 'me', secret: `s${i}` }); // comme Session.create : identité d'abord
+        save.saveGame('me', st(`g${i}`));
+      }
+    } finally {
+      Date.now = now;
+    }
+    const games = save.listGames().map((x) => x.state.gid).sort();
+    kept = Object.keys(ids()).sort();
+    assert.equal(games.length, 10);
+    assert.deepEqual(kept, games, 'une identité par partie gardée, pas plus');
+    // Une partie rejointe pas encore sauvée garde son identité, même si l'historique bouge.
+    save.saveIdentity({ gid: 'J', pid: 'pj', secret: 'sj' });
+    save.selectGame('g5');
+    save.selectGame('g11');
+    assert.equal(save.identityFor('g5')?.pid, 'me');
+  });
+  save.saveGame(real.me, real.state);
+  film.look(resumeQuiet(save.selectGame('gident')), 'la partie reprise ; en haut, ce que localStorage garde des identités', [
+    { show: 'A revient après une autre partie', expected: false, got: back },
+    { show: 'identité en cours après avoir oublié B', expected: 'C', got: other },
+    { show: 'identités gardées après 12 parties', expected: 10, got: kept.length },
+  ]);
 });
 
 // ----- D-170 : un historique abîmé est ignoré (issue #87)
@@ -676,6 +735,159 @@ scenario('D-415 : les sauvegardes de l’ancien format sont reprises sans perte'
     got: r.got ?? r.after.join(' · '),
   })));
 });
+
+// ----- D-430 : une partie ne se joue que dans un seul onglet (issue #49)
+
+const { holdGame } = await import('../js/tablock.js');
+
+/**
+ * Faux navigateur à onglets : un navigator.locks (file d'attente, `signal`, `steal`) et un
+ * BroadcastChannel partagés par les « onglets » du test, comme deux onglets d'une même origine.
+ * `gel` : l'onglet `i` ne reçoit plus les messages (gelé en arrière-plan).
+ */
+function fakeBrowser() {
+  const held = new Map(); // nom -> { reject, done }
+  const queue = new Map(); // nom -> [demandes]
+  const grant = (name, req) => {
+    const me = { reject: req.reject };
+    held.set(name, me);
+    Promise.resolve(req.cb({ name })).then((v) => {
+      if (held.get(name) !== me) return;
+      held.delete(name);
+      req.resolve(v);
+      const next = queue.get(name)?.shift();
+      if (next) grant(name, next);
+    }, req.reject);
+  };
+  const locks = {
+    request(name, opts, cb) {
+      return new Promise((resolve, reject) => {
+        const req = { cb, resolve, reject };
+        if (opts?.steal) {
+          const prev = held.get(name);
+          held.delete(name);
+          prev?.reject(new DOMException('pris par un autre onglet', 'AbortError'));
+          return grant(name, req);
+        }
+        if (!held.has(name)) return grant(name, req);
+        const q = queue.get(name) || [];
+        q.push(req);
+        queue.set(name, q);
+        opts?.signal?.addEventListener('abort', () => {
+          const i = q.indexOf(req);
+          if (i >= 0) q.splice(i, 1);
+          reject(new DOMException('abandon', 'AbortError'));
+        });
+      });
+    },
+  };
+  const chans = new Set();
+  const frozen = new Set();
+  class Channel {
+    constructor() {
+      this.onmessage = null;
+      chans.add(this);
+    }
+    postMessage(data) {
+      for (const c of chans) if (c !== this && !frozen.has(c)) setTimeout(() => chans.has(c) && c.onmessage?.({ data }), 0);
+    }
+    close() {
+      chans.delete(this);
+    }
+  }
+  return { locks, Channel, freezeAll: () => chans.forEach((c) => frozen.add(c)) };
+}
+
+scenario('D-430 : même partie dans deux onglets — le nouveau prend la main, l’ancien sauve d’abord puis s’arrête', (film) =>
+  withStore(async () => {
+    const nav = fakeBrowser();
+    const s = soloNow('g49');
+    P(s).planet.stock = { minerals: 1e6, food: 1e6, energy: 1e6 };
+    s.save();
+    // Onglet 1 : reprend la partie et lance un chantier.
+    const one = resumeQuiet(save.loadGame(), await holdGame('g49', nav));
+    let lost = 0;
+    one.onlost = (x) => x === one && lost++;
+    one.build(firstBuilding(one));
+    // Sa toute dernière action n'est pas encore écrite (sauvegarde différée de 500 ms).
+    const write = one.save;
+    one.save = () => {};
+    const [, key2] = Object.keys(game.RACES[P(one).race].buildings);
+    one.build(key2);
+    one.save = write;
+    const fromOne = P(one).orders.length;
+    assert.ok(save.loadGame().state.players.p0.orders.length < fromOne, 'la dernière action de l’onglet 1 n’est pas encore sauvée');
+    // Onglet 2 : reprend la même partie, l'onglet 1 resté ouvert.
+    const hold = await holdGame('g49', nav);
+    assert.equal(one.lost, true, 'l’onglet 1 s’est arrêté avant que l’onglet 2 ait la partie');
+    const two = resumeQuiet(save.loadGame(), hold);
+    film.look(two, 'onglet 2 : la partie reprise, avec la dernière action de l’onglet 1', [
+      { show: 'onglet 1 arrêté', expected: true, got: one.lost },
+      { show: 'onglet 1 prévenu', expected: 1, got: lost },
+      { show: 'ordres repris de l’onglet 1', expected: fromOne, got: P(two).orders.length },
+    ]);
+    assert.equal(lost, 1, 'l’onglet 1 est prévenu une fois (message à l’écran)');
+    assert.equal(P(two).orders.length, fromOne, 'rien de l’onglet 1 ne se perd');
+    // L'onglet 2 joue, puis est fermé d'abord ; l'onglet 1 ensuite (le dernier fermé écrasait tout, #49).
+    two.build(Object.keys(game.RACES[P(two).race].buildings)[2]);
+    const fromTwo = P(two).orders.length;
+    two.end();
+    one.build(firstBuilding(one)); // un appui resté dans l'onglet 1 : il n'est plus sauvé
+    one.end();
+    const back = save.loadGame();
+    film.look(resumeQuiet(back), 'reprise après fermeture des deux onglets : tout est là', [{ show: 'ordres sauvés', expected: fromTwo, got: back.state.players.p0.orders.length }]);
+    assert.ok(fromTwo > fromOne, 'l’onglet 2 a joué');
+    assert.equal(back.state.players.p0.orders.length, fromTwo, 'la sauvegarde garde tout');
+  }),
+);
+
+scenario('D-430 : onglet gelé — après le délai de secours, le nouveau prend la main ; l’ancien, réveillé, ne sauve plus', () =>
+  withStore(async () => {
+    const nav = fakeBrowser();
+    const s = soloNow('g49c');
+    s.save();
+    const one = resumeQuiet(save.loadGame(), await holdGame('g49c', nav));
+    nav.freezeAll(); // l'onglet 1 ne répond plus
+    const t = Date.now();
+    const two = resumeQuiet(save.loadGame(), await holdGame('g49c', { ...nav, wait: 30 }));
+    assert.ok(Date.now() - t >= 25, 'le nouveau a attendu le délai de secours');
+    await tick();
+    assert.equal(one.lost, true, 'l’onglet 1, verrou pris de force, s’est arrêté');
+    const before = localStorage.getItem('astra.save');
+    one.build(firstBuilding(one));
+    one.end();
+    assert.equal(localStorage.getItem('astra.save'), before, 'l’onglet 1 n’écrit plus rien');
+    two.end();
+  }),
+);
+
+scenario('D-430 : la partie quittée dans un onglet se reprend dans un autre, sans attente', () =>
+  withStore(async () => {
+    const nav = fakeBrowser();
+    const s = soloNow('g49b');
+    s.save();
+    const one = resumeQuiet(save.loadGame(), await holdGame('g49b', nav));
+    one.end(); // l'onglet 1 quitte la partie : il rend le verrou
+    const t = Date.now();
+    const two = resumeQuiet(save.loadGame(), await holdGame('g49b', { ...nav, wait: 1000 }));
+    assert.ok(Date.now() - t < 500, 'pas de délai de secours');
+    assert.ok(!one.lost && !two.lost);
+    two.end();
+  }),
+);
+
+scenario('D-430 : sans navigator.locks, la reprise marche comme avant', () =>
+  withStore(async () => {
+    const s = soloNow('g49d');
+    s.save();
+    const h = await holdGame('g49d', { locks: undefined, Channel: undefined });
+    const one = resumeQuiet(save.loadGame(), h);
+    assert.ok(!one.lost);
+    assert.doesNotThrow(() => one.end());
+  }),
+);
+
+const tick = () => new Promise((r) => setTimeout(r, 0));
 
 // ----- D-045 / D-049 / D-050 : journal des ordres
 

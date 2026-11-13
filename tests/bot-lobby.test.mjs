@@ -122,3 +122,84 @@ scenario('D-400 : la race changée dans le lobby est celle de l’IA en partie ;
   film.look(h, 'la copie de l’hôte rejouée : chaque fiche retombe à l’identique, IA renommée et IA retirée comprises', Object.values(state.players).map((p) => ({ show: `fiche de ${p.name} rejouée`, expected: true, got: r.faithful[p.id] })));
   for (const p of Object.values(state.players)) assert.equal(r.faithful[p.id], true, `fiche de ${p.name}`);
 });
+
+/** Fait réfléchir les IA des deux téléphones, puis échange les copies, `n` fois. */
+async function settle(h, g, sync, n = 3) {
+  for (let k = 0; k < n; k++) {
+    await flush();
+    for (const s of [h, g]) for (const b of s.bots.values()) think(b);
+    await flush();
+    sync(g, h);
+    sync(h, g);
+  }
+}
+
+scenario('#81 / D-480 : deux téléphones séparés remplissent chacun leur lobby d’IA ; réunis, aucun nom en double et pas de départ à plus de 8', async (film) => {
+  const { players: [h, g], clock, sync, online } = newLobby(2);
+  const opts = { timers: false, clock: () => clock.t };
+  online.clear(); // le lien entre les deux tombe dans le lobby
+  for (let i = 0; i < 6; i++) {
+    clock.t += 10;
+    addBot(h, opts);
+    clock.t += 10;
+    addBot(g, opts);
+  }
+  await flush();
+  assert.equal(addBot(h, opts), null, 'à 8 dans sa copie, « Ajouter une IA » est refusé');
+  assert.equal(h.roster.length, 8);
+  assert.equal(g.roster.length, 8);
+
+  online.add('p0').add('p1'); // le lien revient
+  sync(g, h);
+  sync(h, g);
+  await settle(h, g, sync);
+  const dup = (s) => s.roster.length - new Set(s.roster.map((p) => p.name)).size;
+  film.look(g, 'réunis : 14 joueurs, chaque IA a un nom à elle, la partie ne part pas', [
+    { show: 'joueurs chez A / chez B', expected: '14 / 14', got: `${h.roster.length} / ${g.roster.length}` },
+    { show: 'noms en double chez A', expected: 0, got: dup(h) },
+    { show: 'noms en double chez B', expected: 0, got: dup(g) },
+    { show: 'mêmes noms chez A et B', expected: true, got: names(h).join() === names(g).join() },
+    { show: 'trop de joueurs (chez A et chez B)', expected: true, got: h.tooMany && g.tooMany },
+    { show: 'nouvelle IA acceptée', expected: false, got: !!addBot(g, opts) },
+  ]);
+  assert.equal(h.roster.length, 14);
+  assert.equal(dup(h), 0, `noms chez A : ${names(h).join(', ')}`);
+  assert.equal(dup(g), 0, `noms chez B : ${names(g).join(', ')}`);
+  assert.deepEqual(names(h), names(g));
+  assert.ok(h.tooMany && g.tooMany);
+
+  // Tout le monde est prêt : le départ ne part pas tant qu'il y a plus de 8 joueurs.
+  assert.ok(h.ready() && g.ready());
+  await settle(h, g, sync);
+  for (const s of [h, g, ...h.bots.values(), ...g.bots.values()]) s.checkStart();
+  await settle(h, g, sync);
+  assert.equal(h.startedAt, null, 'pas de départ à 14');
+  assert.equal(g.startedAt, null);
+
+  // Chacun retire trois de ses IA (seul le téléphone qui la fait jouer le peut) : 8 joueurs, départ.
+  clock.t += 1000;
+  for (const s of [h, g]) for (const pid of [...s.bots.keys()].slice(0, 3)) assert.ok(removeBot(s, pid));
+  await settle(h, g, sync);
+  for (const s of [h, g, ...h.bots.values(), ...g.bots.values()]) s.checkStart();
+  await settle(h, g, sync);
+  film.look(g, 'trois IA retirées de chaque côté : 8 joueurs, la partie part', [
+    { show: 'joueurs', expected: 8, got: g.roster.length },
+    { show: 'départ', expected: true, got: g.startedAt != null },
+  ]);
+  assert.equal(g.roster.length, 8);
+  assert.ok(h.startedAt != null && g.startedAt != null);
+});
+
+scenario('#81 / D-480 : deux « Ajouter une IA » sur deux téléphones reliés, dans la même fraction de seconde : deux noms différents', async () => {
+  const { players: [h, g], clock, sync } = newLobby(2);
+  const opts = { timers: false, clock: () => clock.t };
+  const a = addBot(h, opts);
+  const b = addBot(g, opts); // g ne sait pas encore que h vient d'ajouter « IA Véga »
+  assert.equal(a.name, b.name, 'chacun a choisi le même premier nom libre');
+  await flush();
+  sync(g, h);
+  sync(h, g);
+  await settle(h, g, sync);
+  assert.notEqual(h.state.players[a.me].name, h.state.players[b.me].name);
+  assert.deepEqual(names(h), names(g));
+});
