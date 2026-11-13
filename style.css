@@ -216,6 +216,8 @@ button.close-btn svg { width: 18px; height: 18px; }
 .tile .amount .cap { font-size: 0.8rem; font-weight: 500; color: var(--muted); }
 .tile .rate { font-size: 0.78rem; color: var(--muted); }
 .tile .rate.neg { color: var(--warn); }
+/* Prix plus grand que l'entrepôt (#50) : « il faut Entrepôt niv 1 » sur la carte. */
+.building .cost .neg { color: var(--warn); }
 /* Coefficient du climat dans la carte d'une ressource (D-221) : vert au-dessus de 1, orange en dessous. */
 .tile .label .clim { position: relative; z-index: 1; padding: 0 0.2em; background: var(--panel); margin-left: 0.1em; font-size: 0.68rem; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--muted); vertical-align: 0.05em; }
 .tile .label .clim.up { color: var(--ok); }

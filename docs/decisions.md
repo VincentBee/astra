@@ -3786,3 +3786,59 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - 2026-11-08 12:20 UTC. Choix : `VERSION` de `sw.js` passe de v120 (`main`) à v121 pour la
   PR de l'issue #83 (D-490) ; remontée si `main` bouge avant la fusion. 2026-11-12 16:33 UTC : `main` à v127 (#196 à
   #202), passe à v128. Qui : Claude (règle du router). Source : session `844ebf3c`. Statut : en vigueur.
+
+## 8 novembre 2026 — fil bloqué par un bâtiment trop cher pour l'entrepôt (#50)
+
+**D-440 — Le fil dit ce qu'attend un élément coincé derrière un autre, et quel entrepôt il faut**
+- 2026-11-08 12:20 UTC. Contexte : issue #50 (audit du 2026-11-05). Un élément du fil plus cher
+  que l'entrepôt affichait « Entrepôt trop petit » et bloquait, comme voulu (D-158), les éléments
+  de son chantier mis après lui ; ceux-là s'affichaient « plus de 6 h », sans dire pourquoi. Un
+  joueur qui met 7 mines puis une ferme et une centrale tombe en panne d'énergie et ne comprend
+  pas que la centrale ne partira jamais.
+- Choix : `planForecast` (`js/game.js`) garde, pour chaque chantier, le premier élément sans
+  départ qui a une raison de bloquer (`planNeed` : place, labo, prérequis, chantier naval,
+  entrepôt). Les éléments suivants du même chantier, sans départ et sans raison à eux, disent
+  « Attend Mine niv 8 » (`planName`) ; un élément qui a sa propre raison (« Plus de place »…) la
+  garde. Les autres chantiers ne sont pas touchés. Un élément qui attend une ressource qui
+  ne rentre plus (D-270) ne bloque personne et ne compte pas. La raison « Entrepôt trop petit »
+  dit maintenant le niveau qu'il faut : « Entrepôt trop petit : il faut Entrepôt niv 1 »
+  (`storeFor`, `storeShort`). La règle du fil ne change pas (D-158).
+- Écarté : laisser l'élément bloqué ne bloquer personne, comme D-270 (change la règle du fil :
+  l'ordre d'un chantier ne serait plus gardé).
+- Qui : Claude par défaut, validé par le router (« Garde aussi la partie commune »). Source :
+  session `b0b71c59`, issue #50. Statut :
+  en vigueur.
+
+**D-441 — On ne peut plus mettre au fil un bâtiment plus cher que l'entrepôt (fil compris)**
+- 2026-11-08 12:20 UTC. Contexte : issue #50. L'ajout était accepté sans avertissement (« il se
+  lancera dès que possible »), puis l'élément ne partait jamais. Question posée au router : (A)
+  refuser l'ajout ; (B) l'accepter et le marquer.
+- Choix (A) : `Session.planBuild` refuse si le prix du niveau suivant dépasse ce que tiendra
+  l'entrepôt une fois fini le chantier en cours et le fil (`planAhead`, `tooBig`) : toast
+  « Entrepôt trop petit : il faut Entrepôt niv 1 (fil compris). ». Le bouton + du bâtiment est
+  grisé, et sa carte dit « il faut Entrepôt niv 1 » à la place de la durée (le titre du bouton ne
+  se voit pas au doigt). Un entrepôt mis au fil avant compte : « entrepôt, puis mine niv 8 » se
+  met au fil d'un coup, comme les prérequis des recherches (D-158). Seulement les bâtiments : un
+  fil d'avant qui tient déjà un tel élément est affiché par D-440. L'IA n'est pas touchée : elle
+  monte l'entrepôt avant (`chooseBuilding`, marge de 5 %). Au rejeu (`replaying`), un vieux
+  journal garde son sens : le refus ne joue pas, comme D-420.
+- Écarté : (B) accepter et marquer (le joueur peut encore se piéger). Recherches et vaisseaux :
+  non traités ici (aucun cas vu ; à voir si besoin).
+- Qui : router (option A : « on refuse, comme pour les prérequis des recherches, fil
+  compris »). L'entrepôt ne compte que s'il est en chantier ou placé avant dans le fil : c'est
+  toujours le cas, car `planBuild` ajoute en fin de fil.
+  Source : session `b0b71c59`, issue #50. Statut : en vigueur.
+
+**D-442 — Le plafond de l'entrepôt se lit sur la carte Entrepôt**
+- 2026-11-08 12:20 UTC. Contexte : issue #50. Le plafond des stocks est caché sur les tuiles de
+  ressources (trop étroites, `style.css` `.resources .tile .amount .cap`), seule la jauge le
+  suggère.
+- Choix : l'étiquette de niveau de la carte Entrepôt dit « niv 0 · max 1 000 » (`storageCap`).
+  Les tuiles ne changent pas.
+- Écarté : réafficher le plafond sur les tuiles (la place manque à 375 px, D-157 et suivantes).
+- Qui : Claude (par défaut). Source : session `b0b71c59`, issue #50. Statut : en vigueur.
+
+**D-443 — Cache `astra-p2p-v121`, puis `astra-p2p-v130`**
+- 2026-11-08 12:20 UTC. `sw.js` : `VERSION` passe à `astra-p2p-v121` pour que les téléphones
+  prennent le nouveau code (#50). 2026-11-13 : `main` a bougé (#196 à #204, v129), passe à
+  v130. Qui : Claude (règle du dépôt, router). Statut : en vigueur.

@@ -5,7 +5,7 @@ import { inviteLink, inviteGid, drawQr, decode } from './invite.js';
 import { scanQr } from './scanner.js';
 import {
   RACES, RACE_KEYS, RES_INFO, resIcon, raceIcon, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
-  powerReadyAt, powerCost, liftGain, secs, fmt, UNIVERSE, SOIL, sameCell, sunFor, climateName, kindLabel, usedPlaces, TEMPO, frostLine, planForecast, PLAN_MAX, planAhead, planId,
+  powerReadyAt, powerCost, liftGain, secs, fmt, UNIVERSE, SOIL, sameCell, sunFor, climateName, kindLabel, usedPlaces, TEMPO, frostLine, planForecast, PLAN_MAX, planAhead, planId, tooBig, storageCap, storeFor,
   shipsAffordable, planetAlerts, FROST,
 } from './game.js';
 import { drawSun } from './sky.js';
@@ -1394,6 +1394,8 @@ function renderPlanet(me, now) {
   // Places une fois tout fini : chantier en cours et bâtiments du fil compris.
   const taken = used + (s.queue ? (s.queue.demolish ? -1 : 1) : 0) + planBuilds;
   const noRoom = !!planet.places && taken >= planet.places;
+  // Niveaux une fois tout fini (chantier et fil compris) : l'entrepôt qui tiendra le prix (#50).
+  const ahead = planAhead(s);
   for (const k of Object.keys(R.buildings)) {
     const level = s.levels[k] || 0;
     // Niveau du prochain ajout : celui en chantier et ceux qui attendent déjà dans le fil.
@@ -1401,20 +1403,28 @@ function renderPlanet(me, now) {
     const cost = upgradeCost(me.race, k, next);
     const ok = covers(s.stock, cost) && !full;
     const direct = !busy && ok;
+    // Prix plus grand que l'entrepôt, même une fois le fil fini : refusé, on dit quel entrepôt il faut (#50, D-441).
+    const big = tooBig(me.race, ahead.levels, cost);
     const job = s.queue?.key === k ? s.queue : null;
-    q(`[data-level="${k}"]`).textContent = job ? `niv ${level} → ${job.level} · ${clock(Math.max(0, job.end - now))}` : `niv ${level}`;
-    setHtml(q(`[data-cost="${k}"]`), `${costText(cost)} · ${buildDuration(me.race, s.levels, cost) / 1000} s`);
+    // Entrepôt : son plafond se lit sur sa carte (la tuile de stock, étroite, le cache) (#50, D-442).
+    const capText = k === 'store' ? ` · max ${fmt(storageCap(level))}` : '';
+    q(`[data-level="${k}"]`).textContent = job ? `niv ${level} → ${job.level} · ${clock(Math.max(0, job.end - now))}${capText}` : `niv ${level}${capText}`;
+    // Trop cher pour l'entrepôt : la raison se lit sur la carte (le titre du bouton ne se voit pas au doigt).
+    const tail = big ? `<span class="neg">il faut ${esc(R.buildings.store.short)} niv ${storeFor(cost)}</span>` : `${buildDuration(me.race, s.levels, cost) / 1000} s`;
+    setHtml(q(`[data-cost="${k}"]`), `${costText(cost)} · ${tail}`);
     const card = q(`[data-card="${k}"]`);
     card.classList.toggle('affordable', direct);
     card.classList.toggle('building-now', !!job);
     const btn = q(`[data-build="${k}"]`);
     btn.dataset.mode = direct ? 'now' : 'plan';
-    btn.disabled = noRoom || plan.length >= PLAN_MAX || session.status !== 'playing';
+    btn.disabled = noRoom || !!big || plan.length >= PLAN_MAX || session.status !== 'playing';
     cardProgress(card, job, now);
     setHtml(btn, direct ? `${ic('up')}${next + 1}` : `${ic('plus')}${next + 1}`);
     btn.title = noRoom
       ? 'Plus de place sur cette planète'
-      : plan.length >= PLAN_MAX
+      : big
+        ? `${big} pour le niveau ${next + 1}`
+        : plan.length >= PLAN_MAX
         ? `Fil plein (${PLAN_MAX} au plus)`
         : direct
           ? `Passer au niveau ${next + 1}`
@@ -1447,7 +1457,6 @@ function renderPlanet(me, now) {
     }
   }
 
-  const ahead = planAhead(s);
   renderResearch(me, pl, s, now, ahead);
   renderYard(me, pl, s, now, ahead);
   renderFleets(me, pl, s, now);

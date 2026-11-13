@@ -209,3 +209,8 @@ que fait le code.
 | D-510 | Un chargement raté (jsQR, Trystero) ne reste pas raté (issue #86) | nouveau test | `chargement.test.mjs` « Rendez-vous : raté réseau coupé, réussi au nouvel essai, à une autre adresse », « Lecteur de QR : jsQR raté réseau coupé, rechargé… » (échouent sur `main`) | vrai navigateur : `tests/chargement-browser.mjs` (Chromium), hors `node --test` |
 | D-511 | Un rendez-vous raté est retenté toutes les 15 s, et au réveil | nouveau test | `chargement.test.mjs` « Partie : un rendez-vous raté est retenté tout seul… » (échoue sur `main`) | réveil du téléphone : non testé |
 | D-512 | Cache `astra-p2p-v125` (v121 au départ) | non testable |  | version du service worker |
+
+| D-440 | Le fil dit « Attend Mine niv 8 » et quel entrepôt il faut | nouveau test | `plan.test.mjs` « #50 : derrière un bâtiment trop cher pour l’entrepôt… » (échoue sur `main`) | affichage du fil : vérifié dans le vrai jeu (Chrome, 375 px) |
+| D-441 | Pas de bâtiment plus cher que l'entrepôt au fil (fil compris) | nouveau test | `plan.test.mjs` « #50 : le joueur ne peut pas mettre au fil… » (refus, puis entrepôt au fil d'abord : accepté) | bouton grisé et carte : vérifiés dans le vrai jeu (Chrome, 375 px) |
+| D-442 | Plafond de l'entrepôt sur la carte Entrepôt | non testable |  | DOM : vérifié dans le vrai jeu (« niv 0 · max 1 000 ») |
+| D-443 | Cache `astra-p2p-v130` (v121 au départ) | non testable |  | `sw.test.mjs` vérifie la liste des fichiers |

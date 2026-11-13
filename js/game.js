@@ -728,8 +728,22 @@ function planNeed(race, places, s, item) {
     const cost = shipsCost(race, item.ship, item.n);
     out = { cost, job: (at) => ({ type: item.ship, count: item.n, start: at, end: at + shipDuration(race, item.ship, item.n, yard) }) };
   }
-  return fits(out.cost) ? out : { why: 'Entrepôt trop petit' };
+  return fits(out.cost) ? out : { why: storeShort(race, out.cost) };
 }
+
+/** Niveau d'entrepôt qu'il faut pour stocker le prix `cost` en entier (#50, D-440). */
+export function storeFor(cost) {
+  const top = Math.max(0, ...Object.values(cost));
+  let n = 0;
+  while (storageCap(n) < top) n++;
+  return n;
+}
+
+/** « Entrepôt trop petit : il faut Entrepôt niv 1 » (#50, D-440). */
+export const storeShort = (race, cost) => `Entrepôt trop petit : il faut ${RACES[race].buildings.store.short} niv ${storeFor(cost)}`;
+
+/** Ce qui ne rentre pas dans l'entrepôt `levels` (fil compris), ou null (#50, D-441). */
+export const tooBig = (race, levels, cost) => (Object.values(cost).every((v) => v <= storageCap(lv(levels, 'store'))) ? null : storeShort(race, cost));
 
 /** Ce qu'on affiche pour un élément qui attend une ressource qui ne rentre plus (D-270). */
 const NO_INCOME = { minerals: 'Pas de minéraux qui rentrent', food: 'Pas de nourriture qui rentre', energy: 'Pas d’énergie qui rentre' };
@@ -885,6 +899,13 @@ export function stateAt(planet, now) {
   return { stock: s.stock, pop: s.pop, levels: s.levels, reserve: s.reserve, tech: s.tech, ships: s.ships, ...q, plan: plan.map((x) => x.item), done, prod };
 }
 
+/** « Mine niv 8 », « Armes niv 2 », « 5 × Chasseur » : un élément du fil, pour un message. */
+function planName(race, item, out) {
+  if (typeof item === 'string') return `${RACES[race].buildings[item].short || RACES[race].buildings[item].name} niv ${out.level}`;
+  if (item.tech) return `${TECHS[race][item.tech].name} niv ${out.level}`;
+  return `${out.count} × ${SHIPS[race][item.ship].name}`;
+}
+
 /**
  * Estimation du fil, pour l'affichage seulement : quand chaque élément du fil
  * devrait commencer et finir, si la production reste celle d'aujourd'hui
@@ -905,6 +926,9 @@ export function planForecast(planet, now) {
   // Niveaux, prix et places tels qu'au lancement de chaque élément, si tout passe dans l'ordre.
   const ahead = planAhead({ ...s, plan: [] });
   const race = planet.race;
+  // Chantier bloqué par un élément qui ne peut pas partir (prérequis, place, entrepôt) : ceux de
+  // son chantier qui le suivent l'attendent, et le disent (#50, D-440).
+  const stuck = {};
   return s.plan.map((item, i) => {
     const lane = planLane(item);
     const hit = passes.map((p) => p.find((d) => d.i === i)).find(Boolean) || null;
@@ -920,7 +944,13 @@ export function planForecast(planet, now) {
       out = { key: item.tech, level: (ahead.tech[item.tech] || 0) + 1, cost: techCost(race, item.tech, ahead.tech[item.tech] || 0) };
       ahead.tech[item.tech] = out.level;
     } else out = { key: item.ship, count: item.n, cost: shipsCost(race, item.ship, item.n) };
-    return { item, lane, ...out, start: hit?.start ?? null, end: hit?.end ?? null, why: hit ? null : need.why || (dry && NO_INCOME[dry]) || null };
+    let why = null;
+    if (!hit) {
+      // Sa propre raison d'abord (« Plus de place »…), sinon l'élément qui bloque son chantier.
+      why = need.why || (stuck[lane] && `Attend ${stuck[lane]}`) || (dry && NO_INCOME[dry]) || null;
+      if (need.why && !stuck[lane]) stuck[lane] = planName(race, item, out);
+    }
+    return { item, lane, ...out, start: hit?.start ?? null, end: hit?.end ?? null, why };
   });
 }
 
