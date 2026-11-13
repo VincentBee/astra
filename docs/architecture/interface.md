@@ -613,6 +613,10 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   téléphones voient une ligne simple. Partie partie (ou IA disparue), `renderLobby` ferme la
   fenêtre. Les listes de joueurs (lobby, fenêtre Joueurs, choix de race, historique, rejeu)
   passent par `session.roster` : une IA retirée n'y est plus.
+- **Plus de 8 joueurs (D-480, #81)** : deux téléphones séparés ont rempli chacun leur lobby.
+  `renderLobby` remplace le texte par « N joueurs : 8 au plus » (icône `alert`) : « il faut
+  retirer une IA : touche une de tes IA ci-dessous pour la retirer » sur un téléphone qui fait
+  jouer une IA, « attends qu'un joueur retire une IA » sinon (« N IA » s'il en faut plusieurs). La partie ne part pas avant.
 - Reprise depuis l'historique : `wakeBots(session)` juste après `Session.resume` (`app.js`).
 - Fenêtre Joueurs : pour une IA, la ligne dit « IA sur ce téléphone » (`routeLabel('bot')`) au
   lieu de la latence.

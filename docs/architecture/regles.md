@@ -818,6 +818,10 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
   vide ou inchangé → refusé, l'ancien reste) et `leave()` (champ `left` = heure ; `ready` et `go`
   retirés). Après `leave`, `canAct` est faux. Un joueur parti n'est ni montré, ni compté
   (`Session.roster` : les fiches sans `left`), ni attendu au départ (`notReady`), ni classé.
+- **8 joueurs au plus au départ (D-480)** : `Session.tooMany` (plus de 8 dans `roster`, possible
+  quand deux téléphones séparés ont rempli leur lobby) bloque `checkStart` et `begin`. Une IA
+  qui porte le nom d'un joueur arrivé avant elle se renomme (ordre `rename`) avec le premier
+  nom d'IA libre, avant le départ seulement (`think`, `js/bot.js`).
 - **Départ commun (D-120)** : après sa race, chaque joueur se dit prêt (ordre `ready`, champ
   `ready` = heure ; `ready(false)` le retire tant que la partie n'est pas partie). Un joueur qui
   n'a pas encore choisi sa race n'est pas prêt. `checkStart` (hors ordre, appelé par le minuteur

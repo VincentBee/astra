@@ -3471,6 +3471,40 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - Qui : router (option B), Claude (détails). Source : session `3c9e3331`, PR #195. Statut : en
   vigueur. Modifie D-420 (partie IA) et D-151.
 
+## 8 novembre 2026 — IA en double et plus de 8 joueurs (#81)
+
+**D-480 — Plus de 8 joueurs : pas de départ ; une IA homonyme prend un nom libre**
+- 2026-11-08 12:15 UTC. Contexte : issue #81. Le plafond de 8 joueurs et le nom libre d'une IA
+  (« IA Véga », « IA Orion »…) n'étaient vérifiés que sur le téléphone qui l'ajoute (`addBot`).
+  Deux téléphones séparés dans le lobby montaient chacun à 8 ; réunis : 14 joueurs, six noms en
+  double, et la partie partait. Deux « Ajouter une IA » dans la même fraction de seconde : deux
+  « IA Véga ». La fusion (`mergeIn`, `onRecord`) accepte jusqu'à 16 fiches.
+- Choix :
+  - **Trop de joueurs** : `Session.tooMany` (plus de 8 dans `roster`). Tant que c'est vrai,
+    `checkStart` et `begin` ne donnent pas le départ, chez tous (IA comprises). Le lobby le dit
+    chez chacun : « 9 joueurs : 8 au plus · il faut retirer une IA : touche une de tes IA ci-dessous
+    pour la retirer » sur un téléphone qui fait jouer une IA (seul lui peut la retirer, D-399) ;
+    sinon « attends qu'un joueur retire une IA ». « Ajouter une IA » reste refusé (et caché) dès 8 dans la copie du
+    téléphone.
+  - **Noms** : avant le départ, à chaque passage (`think`), une IA calcule le nom qu'elle doit
+    porter : dans l'ordre d'arrivée (`rank`, puis l'identifiant), chaque joueur garde son nom
+    s'il est encore libre, sinon prend le premier nom d'IA que personne ne porte (« IA Véga »…
+    « IA Castor », puis « IA 9 », « IA 10 »…). Si ce n'est pas le sien, elle se renomme (ordre
+    `rename`, D-400, noté au journal et rejoué). Tous les téléphones qui voient les mêmes joueurs
+    font les mêmes choix : deux IA homonymes ne prennent pas le même nouveau nom. Un humain
+    n'est jamais renommé ; seule l'IA arrivée après lui change.
+- Écarté : retirer tout seul les IA arrivées après la 8ᵉ (une IA disparaît sans prévenir ; un
+  téléphone mal informé en retire une de trop ; ne règle pas deux humains en trop) ; noms d'IA
+  tirés de l'identifiant (moins lisibles, collisions quand même possibles) ; doublons
+  seulement à l'affichage (les journaux et le classement garderaient deux fois le même nom).
+- Vérifié : 2 scénarios dans `tests/bot-lobby.test.mjs` (échouent sur `main`) : deux lobbys
+  séparés à 8 réunis → 14 joueurs, 0 nom en double, mêmes noms des deux côtés, pas de départ ;
+  trois IA retirées de chaque côté → 8, la partie part ; deux ajouts simultanés → deux noms.
+- Qui : Claude par défaut, validé par le router (option 1, renommage automatique). Source :
+  session `ed9b4b86` (worker-ia-doublons), issue #81. Statut : en vigueur. Complète D-151,
+  D-399, D-400. Cache `astra-p2p-v121`, puis `astra-p2p-v129` (fusion de `main` à v128,
+  2026-11-12).
+
 **D-450 — Une planète gelée n'est plus une cible : ni attaque, ni conquête, ni colonisation, ni pillage**
 - 2026-11-08 12:15 UTC. Contexte : issue #78 (audit du 2026-11-05). Tant que le téléphone de
   son propriétaire hors ligne n'a pas appliqué le gel, une planète gelée restait dans sa fiche :

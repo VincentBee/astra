@@ -280,6 +280,14 @@ Il n'y a **pas de message « je pars »**. Un départ = un lien qui se ferme : s
   l'emporte sur toutes les copies et chacun la cache (`Session.roster`). `Session.resume` ne
   réveille pas une IA partie. Une place libérée resservira : le compte des 8 joueurs
   (`onHello`, `addBot`, bouton) se fait sur `roster`.
+- **Deux téléphones, plus de 8 joueurs, noms en double (D-480, #81)** : le plafond d'`addBot`
+  et d'`onHello` ne voit que la copie du téléphone ; deux lobbys remplis séparément se
+  réunissent à plus de 8 (la fusion accepte jusqu'à 16 fiches). `Session.tooMany` (plus de 8
+  dans `roster`) : `checkStart` et `begin` refusent le départ, chez tous. Noms : avant le départ,
+  `think` (`js/bot.js`) appelle `ownName` : dans l'ordre d'arrivée (`rank`, puis pid), chacun
+  garde son nom s'il est libre, sinon prend le premier nom d'IA libre (`freeName` : « IA Véga »…
+  « IA Castor », puis « IA 9 »…). Si ce n'est pas le sien, l'IA se donne l'ordre `rename`.
+  Calcul identique sur chaque téléphone : deux IA homonymes ne prennent pas le même nouveau nom.
 
 ### 6.8 Heure commune et changement d'heure (D-165, D-166)
 - `now()` est l'**heure commune** : `clock()` = heure du téléphone à l'ouverture de la page +
