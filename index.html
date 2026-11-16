@@ -175,6 +175,14 @@
           <section id="pi-yard" class="pi-yard" hidden>
             <h3 class="section-title"><i data-ic="fleet"></i> Chantier</h3>
             <p id="pi-yard-hint" class="hint"></p>
+            <div id="pi-auto" class="pi-auto" role="group" aria-label="Achat automatique" hidden>
+              <p id="pi-auto-text" class="pi-auto-text"></p>
+              <div class="pi-auto-actions">
+                <button id="btn-pi-auto-less" class="secondary small icon-only" title="Lot plus petit" aria-label="Lot plus petit"><i data-ic="minus"></i></button>
+                <button id="btn-pi-auto-more" class="secondary small icon-only" title="Lot plus grand" aria-label="Lot plus grand"><i data-ic="plus"></i></button>
+                <button id="btn-pi-auto-stop" class="secondary small" title="Arrêter l’achat automatique" aria-label="Arrêter l’achat automatique"><i data-ic="stop"></i>Arrêter</button>
+              </div>
+            </div>
             <div id="pi-ships" class="pi-ships"></div>
             <button id="btn-pi-takeoff" class="secondary" hidden><i data-ic="fleet"></i>Décoller</button>
           </section>
@@ -231,6 +239,7 @@
       <section id="yard-zone" data-pane="fleet">
         <h3 class="section-title"><i data-ic="fleet"></i> Chantier</h3>
         <p id="yard-hint" class="hint"></p>
+        <p id="yard-auto" class="hint" hidden></p>
         <div id="ships" class="buildings"></div>
       </section>
 

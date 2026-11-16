@@ -392,6 +392,14 @@ button.danger { color: var(--danger); border-color: color-mix(in srgb, var(--dan
 .pi-ship .ship-actions { gap: 4px; flex-wrap: nowrap; }
 .pi-ship.affordable .cost { color: var(--ok); }
 .pi-ship [data-pinote] { flex-basis: 100%; }
+/* Achat automatique (D-530) : la règle en cours, et le bouton « Auto » enfoncé du vaisseau réglé. */
+.pi-auto { display: grid; gap: 6px; padding: 8px 10px; border: 1px solid var(--ok); }
+.pi-auto-text { margin: 0; font-size: 0.88rem; }
+.pi-auto-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.pi-auto-actions button { min-height: 34px; padding: 0 10px; font-size: 0.85rem; }
+[data-pi-auto][aria-pressed='true'], [data-auto-ship][aria-pressed='true'] { border-color: var(--ok); color: var(--ok); }
+.mp-auto { display: inline-flex; align-items: center; gap: 1px; margin-left: 4px; color: var(--ok); font-size: 0.75rem; }
+.mf-top .mp-auto .ic { width: 12px; height: 12px; color: var(--ok); }
 .pi-ship .ship-actions button { min-height: 34px; padding: 0 10px; font-size: 0.85rem; }
 #planet-info.sheet-panel { gap: 14px; }
 .climate { margin: 0; font: 0.8rem var(--mono); color: var(--muted); }
