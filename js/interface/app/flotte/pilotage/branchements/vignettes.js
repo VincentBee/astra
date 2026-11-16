@@ -11,7 +11,7 @@ import { renderMapFleets } from '../render-map-fleets.js';
 $('map-fleets').addEventListener('click', (e) => {
   if (!etat.session?.state) return;
   const me = etat.session.state.players[etat.session.me];
-  // Construire : la fiche de la planète s'ouvre sur son chantier (×1, ×5, ×N, D-106).
+  // Construire : la fiche de la planète s'ouvre sur son chantier (×1, ×∞, Max, D-106, D-534).
   const build = e.target.closest('[data-mp-build]')?.dataset.mpBuild;
   if (build) {
     const pl = etat.session.planetOf(me, build);

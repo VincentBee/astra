@@ -6,7 +6,7 @@
 //
 // Serveur local à trois humeurs : « répond », « muet » (accepte la connexion,
 // ne répond jamais), « coupé » (serveur arrêté). Affiche les durées mesurées.
-// Par défaut, sert dist/ (le site mis en ligne, D-535), construit dans un dossier temporaire ;
+// Par défaut, sert dist/ (le site mis en ligne, D-545), construit dans un dossier temporaire ;
 // ASTRA_ROOT=<dossier> sert un autre dossier (les sources : ASTRA_ROOT=.).
 import { createServer } from 'node:http';
 import { readFileSync, mkdtempSync } from 'node:fs';

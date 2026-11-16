@@ -212,5 +212,7 @@ que fait le code.
 
 | D-440 | Le fil dit « Attend Mine niv 8 » et quel entrepôt il faut | nouveau test | `plan.test.mjs` « #50 : derrière un bâtiment trop cher pour l’entrepôt… » (échoue sur `main`) | affichage du fil : vérifié dans le vrai jeu (Chrome, 375 px) |
 | D-441 | Pas de bâtiment plus cher que l'entrepôt au fil (fil compris) | nouveau test | `plan.test.mjs` « #50 : le joueur ne peut pas mettre au fil… » (refus, puis entrepôt au fil d'abord : accepté) | bouton grisé et carte : vérifiés dans le vrai jeu (Chrome, 375 px) |
+| D-530 | Achat automatique de vaisseaux : une règle par planète, dans le moteur, après le fil | nouveau test | `auto-ships.test.mjs` (10 scénarios : lots achetés seuls et sur 8 h d'absence, jamais sans les fonds, fil d'abord, arrêt et remplacement, règle invalide refusée ou nettoyée, rejeu fidèle, `AUTO_MAX`, frein `AUTO_SETTLE` quand le fil attend, aucun lot perdu au retour, une ligne de journal par vaisseau) | bouton Auto, cadre de la règle et marque sur la carte : vérifiés dans le vrai jeu (Chrome, 375 px) |
+| D-534 | ×∞ (achat automatique) à la place de ×5, sur la carte et dans l'onglet | non testable |  | boutons DOM : vérifiés dans le vrai jeu (Chrome, 375 px) ; l'ordre `setAutoShips` est testé par `auto-ships.test.mjs` |
 | D-442 | Plafond de l'entrepôt sur la carte Entrepôt | non testable |  | DOM : vérifié dans le vrai jeu (« niv 0 · max 1 000 ») |
 | D-443 | Cache `astra-p2p-v130` (v121 au départ) | non testable |  | `sw.test.mjs` vérifie la liste des fichiers |

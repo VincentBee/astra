@@ -4,7 +4,7 @@
 //
 //   ASTRA_PLAYWRIGHT=/chemin/vers/node_modules/playwright/index.mjs node tests/chargement-browser.mjs [dossier-captures]
 //
-// Par défaut, sert dist/ (le site mis en ligne, D-535), construit dans un dossier temporaire.
+// Par défaut, sert dist/ (le site mis en ligne, D-545), construit dans un dossier temporaire.
 // ASTRA_ROOT=<dossier> sert un autre dossier (les sources : ASTRA_ROOT=., ou une copie de main).
 // Sans service worker (page jamais contrôlée, comme à la toute première visite) ; le réseau est
 // coupé pour vendor/jsQR.js et vendor/trystero-nostr.mjs (page.route), puis rétabli.

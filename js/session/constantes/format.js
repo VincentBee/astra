@@ -13,4 +13,4 @@
  * 10 : recherches et lots de vaisseaux dans le fil d'attente (`plan`, D-158).
  * 11 : heure commune et resynchronisation d'une fiche (`clockFix`, D-165, D-166).
  */
-export const FORMAT = 11;
+export const FORMAT = 12; // 12 : achat automatique `planet.auto` (D-530)

@@ -1,4 +1,4 @@
-// Build (D-535, D-536) : `node build.mjs` fabrique dist/, le site mis en ligne. Chaque page y
+// Build (D-545, D-546) : `node build.mjs` fabrique dist/, le site mis en ligne. Chaque page y
 // charge un seul fichier JS assemblé et minifié ; sw.js y est rempli (FILES, VERSION).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

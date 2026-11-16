@@ -16,6 +16,7 @@ import { aimRead } from './visee/aim-read.js';
 import { drawAim } from './visee/draw-aim.js';
 import { drawRange } from './visee/draw-range.js';
 import { zoom } from './zoom/zoom.js';
+import { drawAutoMark } from '../alertes/draw-auto-mark.js';
 
 export function drawMap() {
   etat.mapFrame = null;
@@ -134,6 +135,7 @@ export function drawMap() {
       ctx.fillText(label, cx, Math.max(cell * 0.4, cy - cell * 0.5));
     }
     if (mine) drawAlertDot(ctx, w, cx, cy, cell, pulse);
+    if (mine && w.pl?.planet?.auto) drawAutoMark(ctx, cx, cy, cell, dpr);
   }
   ctx.globalAlpha = 1;
 

@@ -30,13 +30,9 @@ export function renderMapFleets(me = etat.session?.state?.players[etat.session.m
       const s = stateAt(pl.planet, now);
       const yard = s.levels.yard || 0;
       const docked = countShips(s.ships);
-      const status = s.yard
-        ? `Chantier : +${s.yard.count} ${SHIPS[me.race][s.yard.type].name}`
-        : !yard
-          ? `🔒 ${RACES[me.race].buildings.yard.name}`
-          : docked
-            ? `${docked} à quai`
-            : 'Aucun vaisseau à quai';
+      const auto = s.auto
+        ? `<span class="mp-auto" title="Achat auto : ${s.auto.n} × ${esc(SHIPS[me.race][s.auto.ship].name)}" aria-label="Achat auto : ${s.auto.n} × ${esc(SHIPS[me.race][s.auto.ship].name)}">${ic('replay')}${s.auto.n > 1 ? s.auto.n : ''}${ic(s.auto.ship)}</span>`
+        : '';
       const build = yard
         ? `<button class="secondary small icon-only" data-mp-build="${esc(pl.key)}" title="Construire des vaisseaux ${esc(de(pl.name))}" aria-label="Construire des vaisseaux ${esc(de(pl.name))}">${ic('plus')}</button>`
         : '';
@@ -48,10 +44,10 @@ export function renderMapFleets(me = etat.session?.state?.players[etat.session.m
         .map((g) => `<i class="mp-g" data-g="${g.res}" style="--c: var(--${g.res})"><b></b></i>`)
         .join('');
       return `<div class="mf mp" role="group" aria-label="${esc(pl.name)}" data-planet="${esc(pl.key)}">
-        <span class="mf-top"><strong>${ic('planet')}${esc(pl.name)}</strong><span class="mf-clock"></span></span>
+        <span class="mf-top"><strong>${ic('planet')}${esc(pl.name)}${auto}</strong><span class="mf-clock"></span></span>
         <span class="mp-gauges" role="img">${gauges}</span>
-        <span class="mf-ships">${shipIcons(s.ships)}</span>
-        <span class="mf-status">${esc(status)}</span>
+        <span class="mf-ships"></span>
+        <span class="mf-status"></span>
         <span class="mp-actions">${build}${go}</span></div>`;
     })
     .join('');
@@ -76,6 +72,28 @@ export function renderMapFleets(me = etat.session?.state?.players[etat.session.m
       const s = pl && stateAt(pl.planet, now);
       const job = s?.yard;
       b.querySelector('.mf-clock').textContent = job ? clock(Math.max(0, job.end - now)) : '';
+      // Vaisseaux à quai et statut en place : l'achat automatique (D-530) les change à chaque lot,
+      // réécrire la case ferait rater le toucher sur ses boutons.
+      if (s) {
+        const ships = b.querySelector('.mf-ships');
+        const html = shipIcons(s.ships);
+        if (ships.dataset.html !== html) {
+          ships.innerHTML = html;
+          ships.dataset.html = html;
+        }
+        const docked = countShips(s.ships);
+        const status = s.auto && (!s.yard || s.yard.auto)
+          ? `Auto : ${s.auto.n} × ${SHIPS[me.race][s.auto.ship].name}${docked ? ` · ${docked} à quai` : ''}`
+          : s.yard
+            ? `Chantier : +${s.yard.count} ${SHIPS[me.race][s.yard.type].name}`
+            : !s.levels.yard
+              ? `🔒 ${RACES[me.race].buildings.yard.name}`
+              : docked
+                ? `${docked} à quai`
+                : 'Aucun vaisseau à quai';
+        const st = b.querySelector('.mf-status');
+        if (st.textContent !== status) st.textContent = status;
+      }
       const gbox = b.querySelector('.mp-gauges');
       if (s && gbox) {
         const gs = stockFill(me.race, s);

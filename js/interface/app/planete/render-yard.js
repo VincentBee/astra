@@ -9,10 +9,13 @@ import { cardProgress } from './card-progress.js';
 import { costText } from './cost-text.js';
 import { setHtml } from './set-html.js';
 import { statText } from './stat-text.js';
+import { autoWait } from '../carte/fiche/auto-wait.js';
+import { autoButton } from './auto-button.js';
 
 /**
- * Chantier naval de la planète ouverte. Chantier libre, fil vide et stock suffisant : ×1 et ×5
- * lancent le lot ; sinon ils l'ajoutent à la fin du fil (+1, +5, D-158, D-420).
+ * Chantier naval de la planète ouverte. Chantier libre, fil vide et stock suffisant : ×1 lance
+ * le lot ; sinon il l'ajoute à la fin du fil (+1, D-158, D-420). ×∞ règle ou arrête l'achat
+ * automatique de ce vaisseau (D-530, D-534).
  */
 export function renderYard(me, pl, s, now, ahead) {
   const yard = s.levels.yard || 0;
@@ -20,6 +23,9 @@ export function renderYard(me, pl, s, now, ahead) {
   const yardName = RACES[me.race].buildings.yard.name;
   $('yard-hint').textContent = yard ? '' : ahead.levels.yard ? `🔒 Il faut un ${yardName} : il est au fil, les vaisseaux peuvent l’y suivre.` : `🔒 Il faut un ${yardName}.`;
   $('yard-hint').hidden = !!yard;
+  // Achat automatique (D-530, D-534) : ×∞ le règle ici aussi ; la taille du lot se règle sur la carte.
+  $('yard-auto').hidden = !s.auto;
+  $('yard-auto').textContent = s.auto ? `⟳ Achat automatique : ${s.auto.n} × ${S[s.auto.ship].name}, dès que les fonds sont là · ${autoWait(me, s, s.plan || [])}. Taille du lot : fiche de la planète sur la carte.` : '';
   const q = (sel) => document.querySelector(sel);
   for (const k of SHIP_KEYS) {
     const unlocked = shipUnlocked(me.race, k, ahead.tech); // recherche au fil comprise : le lot peut l'y suivre
@@ -48,5 +54,6 @@ export function renderYard(me, pl, s, now, ahead) {
       btn.title = direct ? `Construire ${n} ${S[k].name}` : plan.length >= PLAN_MAX ? `Fil plein (${PLAN_MAX} au plus)` : `Ajouter ${n} ${S[k].name} au fil : le lot partira dès que possible`;
       btn.setAttribute('aria-label', btn.title);
     }
+    autoButton(q(`[data-auto-ship="${k}"]`), me, s, k, unlocked);
   }
 }

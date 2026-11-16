@@ -1,4 +1,4 @@
-# Mise en ligne sur GitHub Pages (D-535) : à chaque push sur main, les tests passent, puis
+# Mise en ligne sur GitHub Pages (D-545) : à chaque push sur main, les tests passent, puis
 # build.mjs fabrique dist/ (pages assemblées et minifiées, sw.js rempli), qui est publié.
 # Sur une pull request : tests et build seulement (rien n'est publié).
 # Prérequis (réglage du dépôt, fait à la main une fois) : Settings → Pages → Build and deployment

@@ -1,4 +1,4 @@
-import { PLAN_MAX, planItem, RACES, SOIL, RES } from '../../regles/game/index.js';
+import { PLAN_MAX, planItem, RACES, SOIL, RES, autoRule } from '../../regles/game/index.js';
 import { amount } from './amount.js';
 import { isObj } from './is-obj.js';
 
@@ -31,6 +31,13 @@ export function planetOk(race, pl, floor = -Infinity) {
   if (pl.queue && !(isObj(pl.queue) && race && Object.hasOwn(RACES[race].buildings, pl.queue.key))) pl.queue = null;
   // Fil d'attente : bâtiments, recherches et lots de vaisseaux de la race (D-158), PLAN_MAX au plus.
   if (pl.plan !== undefined) pl.plan = Array.isArray(pl.plan) && race ? pl.plan.map((x) => planItem(race, x)).filter(Boolean).slice(0, PLAN_MAX) : [];
+  // Achat automatique (D-530) : { ship, n } d'un vaisseau de la race, n de 1 à 50 ; sinon, plus de règle.
+  if (pl.auto !== undefined) {
+    const rule = race ? autoRule(race, pl.auto) : null;
+    if (rule) pl.auto = rule;
+    else delete pl.auto;
+  }
+  if (isObj(pl.yard) && pl.yard.auto !== undefined && pl.yard.auto !== true) delete pl.yard.auto;
   // Niveaux : seulement les bâtiments de la race, en entiers positifs (un niveau négatif libérerait des places).
   if (race) pl.levels = Object.fromEntries(Object.keys(RACES[race].buildings).map((k) => [k, Math.max(0, Math.floor(Number(pl.levels[k]) || 0))]));
   return true;

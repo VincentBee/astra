@@ -8,6 +8,7 @@ import { $ } from '../../outils/dollar.js';
 import { canBuildShips } from '../../planete/can-build-ships.js';
 import { costText } from '../../planete/cost-text.js';
 import { setHtml } from '../../planete/set-html.js';
+import { renderPickAuto } from './render-pick-auto.js';
 
 /**
  * Chantier et décollage dans la fiche d'une de mes planètes, sur la carte. Même logique que
@@ -61,6 +62,7 @@ export function renderPickYard(me, pl, s, now) {
       btn.setAttribute('aria-label', btn.title);
     }
   }
+  renderPickAuto(me, s, plan, ahead);
   if (yard && !busy && !SHIP_KEYS.some((k) => shipUnlocked(me.race, k, ahead.tech))) {
     $('pi-yard-hint').textContent = 'Aucun vaisseau recherché pour l’instant : lance une recherche.';
     $('pi-yard-hint').hidden = false;

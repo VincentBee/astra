@@ -5,7 +5,7 @@
 // connexion mais ne répond jamais) et « coupé » (serveur arrêté).
 // Le même parcours dans un vrai navigateur : tests/sw-browser.mjs.
 // On teste le sw.js du site mis en ligne : celui de dist/, que build.mjs remplit (FILES, VERSION ;
-// D-535, D-536), servi avec les fichiers de dist/.
+// D-545, D-546), servi avec les fichiers de dist/.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';

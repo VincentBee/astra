@@ -1,8 +1,11 @@
 import { shipsAffordable, stateAt } from '../../../../../regles/game/index.js';
 import { etat } from '../../../etat.js';
 import { $ } from '../../../outils/dollar.js';
+import { toggleAuto } from '../../../planete/toggle-auto.js';
 
 $('pi-ships').addEventListener('click', (e) => {
+  const auto = e.target.closest('[data-pi-auto]');
+  if (auto && !auto.disabled && etat.session?.state) return toggleAuto($('btn-open-planet').dataset.key, auto.dataset.piAuto);
   const btn = e.target.closest('[data-pi-ship]');
   const key = $('btn-open-planet').dataset.key;
   if (!btn || btn.disabled || !etat.session?.state) return;

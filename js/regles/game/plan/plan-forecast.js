@@ -9,24 +9,18 @@ import { stateAt } from '../economie/state-at.js';
 import { planName } from './plan-name.js';
 import { settle } from '../economie/settle.js';
 import { upgradeCost } from '../construction/upgrade-cost.js';
+import { FORECAST_AUTO } from './forecast-auto.js';
 
-/**
- * Estimation du fil, pour l'affichage seulement : quand chaque élément du fil
- * devrait commencer et finir, si la production reste celle d'aujourd'hui
- * (ce qui est déjà lancé compris). Deux passes : 10 min à la seconde près,
- * puis 6 h, plus grossière. Renvoie, dans l'ordre du fil,
- * [{ item, lane, key, level, count, cost, start, end, why }] : `key` est le
- * bâtiment, la technologie ou le vaisseau ; `level` le niveau visé (bâtiment,
- * recherche) ; `count` le nombre de vaisseaux. `start` vaut null si rien
- * n'arrive dans les 6 h, et `why` dit ce qui bloque quand on le sait.
- */
 export function planForecast(planet, now) {
   // Ce qui s'est déjà lancé avant `now` (pas encore écrit dans la fiche) ne compte plus.
   const here = JSON.parse(JSON.stringify(planet));
   settle(here, now);
   const s = stateAt(here, now);
   if (!s.plan.length) return [];
-  const passes = [10 * 60_000, 6 * 3_600_000].map((h) => stateAt(here, now + h).done.filter((d) => d.kind === 'start'));
+  // L'achat automatique (D-530) compte au plus FORECAST_AUTO lots par passe : la prévision repart
+  // chaque seconde, 6 h de lots (des milliers) la rendraient lourde. Au-delà, elle ne voit plus
+  // ce que la règle dépense : un élément qui attend un prérequis peut partir un peu plus tard.
+  const passes = [10 * 60_000, 6 * 3_600_000].map((h) => stateAt(here, now + h, FORECAST_AUTO).done.filter((d) => d.kind === 'start'));
   // Niveaux, prix et places tels qu'au lancement de chaque élément, si tout passe dans l'ordre.
   const ahead = planAhead({ ...s, plan: [] });
   const race = planet.race;

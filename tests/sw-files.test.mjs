@@ -1,7 +1,7 @@
 // Liste du cache hors ligne (FILES de sw.js, D-500) : tout fichier dont une page a
 // besoin doit y être, sinon la page ne s'ouvre pas hors ligne si elle n'a jamais été
 // ouverte en ligne (#84 : technologies.html et js/techtree.js manquaient).
-// Depuis le build (D-535, D-536), c'est le sw.js de dist/ qui part en ligne : build.mjs le
+// Depuis le build (D-545, D-546), c'est le sw.js de dist/ qui part en ligne : build.mjs le
 // remplit avec les fichiers de dist/. On vérifie ici qu'il couvre ce que demandent les pages de
 // dist/, et que les sources, elles, ne demandent que des fichiers qui existent.
 // On part des trois pages (index.html, replay.html, technologies.html) et de

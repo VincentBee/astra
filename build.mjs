@@ -1,4 +1,4 @@
-// Build d'Astra (D-535) : fabrique dist/, le site mis en ligne.
+// Build d'Astra (D-545) : fabrique dist/, le site mis en ligne.
 //
 //   npm ci            (une fois : installe esbuild)
 //   node build.mjs    (ou npm run build) → dist/
@@ -12,7 +12,7 @@
 //   - style.css minifié ; manifest.json, icônes et bibliothèques chargées à la demande
 //     (vendor/jsQR.js, vendor/trystero-nostr.mjs) copiés tels quels ;
 //   - sw.js avec FILES = la liste réelle des fichiers de dist/ et VERSION = empreinte de leur
-//     contenu (D-536) : plus personne ne touche FILES ni VERSION à la main.
+//     contenu (D-546) : plus personne ne touche FILES ni VERSION à la main.
 // Importer ce fichier ne lance rien : `build({ out })` est exporté (les tests construisent
 // chacun dans leur dossier temporaire).
 

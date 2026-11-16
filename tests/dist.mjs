@@ -1,4 +1,4 @@
-// dist/ construit pour un fichier de test (D-535) : chaque fichier de test a son propre dossier
+// dist/ construit pour un fichier de test (D-545) : chaque fichier de test a son propre dossier
 // temporaire, car `node --test` lance les fichiers en parallèle. Construit une seule fois par
 // processus.
 import { mkdtempSync } from 'node:fs';

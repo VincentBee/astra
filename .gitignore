@@ -2,6 +2,6 @@
 # Rapports des scénarios (tests/scenario.mjs) : écrits à chaque échec, refaits à la demande.
 tests/reports/
 
-# Build (D-535) : dépendances npm et site assemblé, refaits par `npm ci` et `node build.mjs`.
+# Build (D-545) : dépendances npm et site assemblé, refaits par `npm ci` et `node build.mjs`.
 node_modules/
 dist/

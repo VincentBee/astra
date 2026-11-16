@@ -175,6 +175,8 @@ import { getOutdated } from './methodes/etat/get-outdated.js';
 import { getPeerCount } from './methodes/etat/get-peer-count.js';
 import { getAlone } from './methodes/etat/get-alone.js';
 import { end } from './methodes/onglet/end.js';
+import { settleLog } from './methodes/chantiers/settle-log.js';
+import { setAutoShips } from './methodes/chantiers/set-auto-ships.js';
 
 export class Session {
   constructor(name) {
@@ -320,8 +322,10 @@ Object.defineProperties(Session.prototype, {
   queuedBehind: { value: queuedBehind, writable: true, configurable: true },
   toPlan: { value: toPlan, writable: true, configurable: true },
   settlePlan: { value: settlePlan, writable: true, configurable: true },
+  settleLog: { value: settleLog, writable: true, configurable: true },
   planResearch: { value: planResearch, writable: true, configurable: true },
   planShips: { value: planShips, writable: true, configurable: true },
+  setAutoShips: { value: setAutoShips, writable: true, configurable: true },
   unplan: { value: unplan, writable: true, configurable: true },
   demolish: { value: demolish, writable: true, configurable: true },
   research: { value: research, writable: true, configurable: true },

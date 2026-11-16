@@ -69,7 +69,7 @@ export function buildStatic() {
       <p class="cost mono"><span data-scost="${k}"></span> <span class="req" data-sreq="${k}" hidden></span></p>
       <div class="ship-actions">
         <button class="secondary small" data-ship="${k}" data-n="1" aria-label="Construire 1 ${esc(S.name)}">×1</button>
-        <button class="secondary small" data-ship="${k}" data-n="5" aria-label="Construire 5 ${esc(S.name)}">×5</button>
+        <button class="secondary small" data-auto-ship="${k}" aria-pressed="false" aria-label="Acheter des ${esc(S.name)} en automatique">×∞</button>
       </div>
       <p class="ship-stats b-desc" data-sstats="${k}"></p>
       <div class="card-bar" hidden><div class="bar-fill"></div></div>
@@ -83,7 +83,7 @@ export function buildStatic() {
       <div class="pi-ship-main"><span class="p-name">${esc(S.name)}</span> <span class="cost mono" data-picost="${k}"></span> <span class="hint mono" data-pinote="${k}"></span></div>
       <div class="ship-actions">
         <button class="secondary small" data-pi-ship="${k}" data-n="1" aria-label="Construire 1 ${esc(S.name)}">×1</button>
-        <button class="secondary small" data-pi-ship="${k}" data-n="5" aria-label="Construire 5 ${esc(S.name)}">×5</button>
+        <button class="secondary small" data-pi-auto="${k}" aria-pressed="false" aria-label="Acheter des ${esc(S.name)} en automatique">×∞</button>
         <button class="secondary small" data-pi-ship="${k}" data-n="max" aria-label="Construire autant de ${esc(S.name)} que possible">Max</button>
       </div>
     </div>`;

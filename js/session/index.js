@@ -31,6 +31,16 @@
 // ----- échanges entre joueurs ---------------------------------------------
 
 import './main.js';
+import { FORMAT } from './constantes/format.js';
+import { RDV_RETRY_MS } from './constantes/rdv-retry-ms.js';
+import { CLOCK_DRIFT_MS } from './constantes/clock-drift-ms.js';
+import { MAX_ORDERS } from './constantes/max-orders.js';
+import { normalize } from './fiches/normalize.js';
+import { pidOk } from './fiches/pid-ok.js';
+import { threatText } from './textes/threat-text.js';
+import { Session } from './session.js';
+import { ORDER_KINDS } from './constantes/order-kinds.js';
+import { AUTO_SETTLE } from './textes/auto-settle.js';
 export { FORMAT } from './constantes/format.js';
 export { RDV_RETRY_MS } from './constantes/rdv-retry-ms.js';
 export { CLOCK_DRIFT_MS } from './constantes/clock-drift-ms.js';
@@ -40,3 +50,4 @@ export { pidOk } from './fiches/pid-ok.js';
 export { threatText } from './textes/threat-text.js';
 export { Session } from './session.js';
 export { ORDER_KINDS } from './constantes/order-kinds.js';
+export { AUTO_SETTLE } from './textes/auto-settle.js';

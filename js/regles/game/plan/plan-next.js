@@ -18,7 +18,7 @@ import { starved } from './starved.js';
  * le premier de la liste que le stock couvre. Sans famine ni panne, la liste
  * n'a qu'un élément : le calcul est celui d'avant. null si rien n'est prêt.
  */
-export function planNext(race, places, s, q, plan) {
+export function planNext(race, places, s, q, plan, auto = null) {
   const waiting = new Set();
   const late = [];
   const f = () => flows(race, s.levels, s.pop, s.stock, 1 / 3600, 1, s.nature, s.reserve, s.tech, s.climate);
@@ -39,6 +39,15 @@ export function planNext(race, places, s, q, plan) {
       continue;
     }
     return [...late, pick];
+  }
+  // La règle automatique (D-530), après tout le fil : chantier naval libre et aucun lot au fil.
+  if (auto && !q.yard && !plan.some((x) => planLane(x.item) === 'yard')) {
+    const need = planNeed(race, places, s, auto);
+    if (!need.why) {
+      const pick = { lane: 'yard', auto: true, ...need };
+      if (!starved(need.cost, s.stock, f)) return [...late, pick];
+      late.push(pick);
+    }
   }
   return late.length ? late : null;
 }

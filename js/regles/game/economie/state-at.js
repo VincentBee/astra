@@ -3,6 +3,8 @@ import { simulate } from './simulate.js';
 import { planItem } from '../plan/plan-item.js';
 import { planNext } from '../plan/plan-next.js';
 import { until } from './until.js';
+import { AUTO_MAX } from '../plan/auto-max.js';
+import { autoRule } from '../plan/auto-rule.js';
 
 /**
  * État d'une planète à l'instant `now`, sans la modifier.
@@ -17,7 +19,7 @@ import { until } from './until.js';
  * une place). Même calcul pour tous : chez le propriétaire, au rattrapage
  * après une absence, et pour les estimations (voir planForecast).
  */
-export function stateAt(planet, now) {
+export function stateAt(planet, now, autoMax = AUTO_MAX) {
   const race = planet.race;
   let s = {
     stock: planet.stock,
@@ -33,13 +35,16 @@ export function stateAt(planet, now) {
   const q = { queue: planet.queue || null, research: planet.research || null, yard: planet.yard || null };
   // Le fil, avec la place de chaque élément dans le fil de départ (pour planForecast).
   const plan = (Array.isArray(planet.plan) ? planet.plan : []).map((item, i) => ({ item: planItem(race, item), i })).filter((x) => x.item);
+  const auto = autoRule(race, planet.auto);
+  let autoLeft = autoMax;
+  let autoFull = null; // heure du dernier lot que la règle a pu lancer, si elle a atteint autoMax
   const done = [];
   for (;;) {
     const next = Object.entries(q)
       .filter(([, v]) => v && v.end <= now)
       .sort((x, y) => x[1].end - y[1].end || (x[0] < y[0] ? -1 : 1))[0];
     // Un chantier libre : le fil attend que le stock couvre le prix, au plus jusqu'au prochain événement.
-    const picks = planNext(race, planet.places, s, q, plan);
+    const picks = planNext(race, planet.places, s, q, plan, autoLeft > 0 ? auto : null);
     if (picks) {
       const limit = next ? Math.max(at, next[1].end) : now;
       const r = until(race, s, at, limit, picks.map((p) => p.cost), planet.trance || 0);
@@ -50,6 +55,13 @@ export function stateAt(planet, now) {
         const stock = { ...s.stock };
         for (const [k, v] of Object.entries(pick.cost)) stock[k] -= v;
         s = { ...s, stock };
+        if (pick.auto) {
+          // La règle ne quitte pas la planète : elle relancera un lot au prochain chantier libre.
+          q.yard = { ...pick.job(at), auto: true };
+          if (--autoLeft === 0) autoFull = at;
+          done.push({ kind: 'start', lane: 'yard', auto: true, ...q.yard });
+          continue;
+        }
         q[pick.lane] = pick.job(at);
         const [{ i }] = plan.splice(pick.pos, 1);
         done.push({ kind: 'start', lane: pick.lane, i, ...q[pick.lane] });
@@ -69,5 +81,5 @@ export function stateAt(planet, now) {
   s = simulate(race, s, at, now, planet.trance);
   // Rythme actuel, pour l'affichage (sur une seconde de jeu).
   const prod = flows(race, s.levels, s.pop, s.stock, 1 / 3600, (planet.trance || 0) > now ? 2 : 1, s.nature, s.reserve, s.tech, s.climate);
-  return { stock: s.stock, pop: s.pop, levels: s.levels, reserve: s.reserve, tech: s.tech, ships: s.ships, ...q, plan: plan.map((x) => x.item), done, prod };
+  return { stock: s.stock, pop: s.pop, levels: s.levels, reserve: s.reserve, tech: s.tech, ships: s.ships, ...q, plan: plan.map((x) => x.item), auto, autoFull, done, prod };
 }

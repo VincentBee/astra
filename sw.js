@@ -1,6 +1,6 @@
 // Cache hors ligne : une fois l'appli ouverte une fois, elle se lance sans réseau.
 //
-// FILES et VERSION sont écrits par build.mjs dans dist/sw.js (D-536) : FILES = la liste réelle
+// FILES et VERSION sont écrits par build.mjs dans dist/sw.js (D-546) : FILES = la liste réelle
 // des fichiers de dist/, VERSION = l'empreinte de leur contenu (elle change dès qu'un fichier
 // change, et le cache se renouvelle). Ne pas les remplir à la main. Ici, dans les sources
 // (servies sans build, pour développer), la liste est vide : rien n'est mis en cache à
