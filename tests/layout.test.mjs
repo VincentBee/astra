@@ -121,7 +121,10 @@ test('la page garde la largeur du téléphone (320, 375, 430 px) : lobby, partie
     for (const w of WIDTHS) {
       const page = await phone(cdp, w, url);
       const lobby = await page.js(`${HELPERS}
-        await until(() => $('btn-solo') && $('btn-solo').offsetParent, 'accueil');
+        // Le bouton est visible dès le HTML ; il ne marche qu'une fois les modules JS exécutés
+        // (avant l'événement load : readyState « complete »). Sans le build (D-545), les sources
+        // font plusieurs centaines de petits fichiers : sur une machine lente, 500 ms ne suffisent pas.
+        await until(() => $('btn-solo') && $('btn-solo').offsetParent && document.readyState === 'complete', 'accueil');
         await sleep(500);
         $('name').value = 'Alice'; $('name').dispatchEvent(new Event('input', { bubbles: true }));
         $('btn-solo').click();
