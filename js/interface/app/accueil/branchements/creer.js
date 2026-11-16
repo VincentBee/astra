@@ -1,4 +1,4 @@
-import { Session } from '../../../../session.js';
+import { Session } from '../../../../session/index.js';
 import { etat } from '../../etat.js';
 import { $ } from '../../outils/dollar.js';
 import { playerName } from '../../outils/player-name.js';

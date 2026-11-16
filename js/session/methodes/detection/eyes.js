@@ -1,5 +1,5 @@
-import { sightRange } from '../../../tech.js';
-import { fleetPos } from '../../../fleet.js';
+import { sightRange } from '../../../regles/tech/index.js';
+import { fleetPos } from '../../../regles/fleet/index.js';
 import { techOf } from '../../outils/tech-of.js';
 
 /**

@@ -1,5 +1,5 @@
-import { drawQr } from '../../../invite.js';
-import { Session } from '../../../session.js';
+import { drawQr } from '../../../reseau/invite/index.js';
+import { Session } from '../../../session/index.js';
 import { onLost } from '../accueil/on-lost.js';
 import { etat } from '../etat.js';
 import { $ } from '../outils/dollar.js';

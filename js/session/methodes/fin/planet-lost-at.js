@@ -1,4 +1,4 @@
-import { sameCell } from '../../../game.js';
+import { sameCell } from '../../../regles/game/index.js';
 
 /**
  * Heure à laquelle le joueur `p` a perdu sa planète `pl` (un élément de planetsOf), vue par

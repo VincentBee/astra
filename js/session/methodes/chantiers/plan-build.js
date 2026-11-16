@@ -1,4 +1,4 @@
-import { stateAt, PLAN_MAX, planAhead, tooBig, upgradeCost, RACES, sameCell, usedPlaces } from '../../../game.js';
+import { stateAt, PLAN_MAX, planAhead, tooBig, upgradeCost, RACES, sameCell, usedPlaces } from '../../../regles/game/index.js';
 
 /**
  * Ajoute un bâtiment au fil de construction de la planète (D-105) : il se

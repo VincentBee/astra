@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { newGame, newLobby, game, fleet } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
 
-const { replay } = await import('../js/replay.js');
+const { replay } = await import('../js/regles/replay/index.js');
 const scenario = scenarios(import.meta.url);
 
 afterEach(() => {

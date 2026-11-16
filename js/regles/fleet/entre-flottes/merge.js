@@ -1,5 +1,5 @@
-import { SOIL } from '../../../game.js';
-import { SHIP_KEYS } from '../../../tech.js';
+import { SOIL } from '../../game/index.js';
+import { SHIP_KEYS } from '../../tech/index.js';
 import { fuelAt } from '../caracteristiques/fuel-at.js';
 import { freeze } from './freeze.js';
 

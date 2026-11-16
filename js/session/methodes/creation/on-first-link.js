@@ -1,4 +1,4 @@
-import { loadGame, loadIdentity, identityFor, savedGame } from '../../../save.js';
+import { loadGame, loadIdentity, identityFor, savedGame } from '../../../reseau/save/index.js';
 import { rid } from '../../outils/rid.js';
 import { sha256 } from '../../outils/sha256.js';
 

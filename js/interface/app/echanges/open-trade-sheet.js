@@ -1,5 +1,5 @@
-import { fmt } from '../../../game.js';
-import { TRADE_NAMES, TRADE_RES } from '../../../trade.js';
+import { fmt } from '../../../regles/game/index.js';
+import { TRADE_NAMES, TRADE_RES } from '../../../regles/trade/index.js';
 import { etat } from '../etat.js';
 import { $ } from '../outils/dollar.js';
 import { toast } from '../outils/toast.js';

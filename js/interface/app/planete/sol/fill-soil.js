@@ -1,4 +1,4 @@
-import { fmt, SOIL, TEMPO } from '../../../../game.js';
+import { fmt, SOIL, TEMPO } from '../../../../regles/game/index.js';
 import { rateText } from '../rate-text.js';
 import { withCap } from '../with-cap.js';
 

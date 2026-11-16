@@ -1,7 +1,7 @@
 import { TRADE_RES } from './trade-res.js';
 import { TRADE_NAMES } from './trade-names.js';
 import { holdings } from './holdings.js';
-import { settle } from '../../game.js';
+import { settle } from '../game/index.js';
 
 /** La partie a-t-elle de quoi donner `amt` ? Erreur ou null. */
 export function lacks(side, race, amt, now) {

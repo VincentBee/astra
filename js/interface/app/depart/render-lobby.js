@@ -1,6 +1,6 @@
-import { editableBot } from '../../../bot.js';
-import { raceIcon } from '../../../game.js';
-import { ic } from '../../../icons.js';
+import { editableBot } from '../../../ia/bot/index.js';
+import { raceIcon } from '../../../regles/game/index.js';
+import { ic } from '../../icons/index.js';
 import { mapVeiled } from '../carte/map-veiled.js';
 import { etat } from '../etat.js';
 import { $ } from '../outils/dollar.js';

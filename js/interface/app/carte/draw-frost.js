@@ -1,4 +1,4 @@
-import { frostLine } from '../../../game.js';
+import { frostLine } from '../../../regles/game/index.js';
 import { etat } from '../etat.js';
 
 /** Le froid : tout ce qui est hors du cercle autour du soleil est gelé. */

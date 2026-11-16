@@ -1,4 +1,4 @@
-import { fmt, resIcon } from '../../../game.js';
+import { fmt, resIcon } from '../../../regles/game/index.js';
 
 /** « 1 234 ◆ · 30 ⚡ », en HTML : chaque quantité suivie de l'icône de sa ressource. */
 export function costText(cost) {

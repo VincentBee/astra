@@ -1,4 +1,4 @@
-import { resIcon } from '../../../game.js';
+import { resIcon } from '../../../regles/game/index.js';
 import { num } from './num.js';
 
 export const cost = (c) =>

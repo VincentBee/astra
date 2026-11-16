@@ -1,5 +1,5 @@
-import { stateAt, distance, fortOf } from '../../../game.js';
-import { fleetTank, fleetBurn, countShips, armed, battle, fleetSpeed, tripMs, MAX_FLEETS } from '../../../fleet.js';
+import { stateAt, distance, fortOf } from '../../../regles/game/index.js';
+import { fleetTank, fleetBurn, countShips, armed, battle, fleetSpeed, tripMs, MAX_FLEETS } from '../../../regles/fleet/index.js';
 import { MIN } from '../donnees/min.js';
 import { PEACE_MS } from '../donnees/peace-ms.js';
 import { aimedTargets } from './aimed-targets.js';

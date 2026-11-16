@@ -1,4 +1,4 @@
-import { planetAlerts, stateAt } from '../../../game.js';
+import { planetAlerts, stateAt } from '../../../regles/game/index.js';
 import { etat } from '../etat.js';
 import { $ } from '../outils/dollar.js';
 import { esc } from '../outils/esc.js';

@@ -1,5 +1,5 @@
-import { distance } from '../../../game.js';
-import { tripMs } from '../../../fleet.js';
+import { distance } from '../../../regles/game/index.js';
+import { tripMs } from '../../../regles/fleet/index.js';
 
 /**
  * Des vaisseaux partis de `base` peuvent rejoindre la flotte de conquête `g` : assez de

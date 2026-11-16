@@ -1,6 +1,6 @@
-import { distance } from '../../../game.js';
-import { SHIPS } from '../../../tech.js';
-import { fleetTank, fleetBurn, MAX_FLEETS } from '../../../fleet.js';
+import { distance } from '../../../regles/game/index.js';
+import { SHIPS } from '../../../regles/tech/index.js';
+import { fleetTank, fleetBurn, MAX_FLEETS } from '../../../regles/fleet/index.js';
 import { colonyTargets } from './colony-targets.js';
 
 /** Un colonisateur posé sur une planète : il décolle avec une cargaison de départ, puis part. */

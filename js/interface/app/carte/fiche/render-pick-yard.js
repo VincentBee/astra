@@ -1,7 +1,7 @@
-import { countShips } from '../../../../fleet.js';
-import { PLAN_MAX, planAhead, RACES, shipsAffordable } from '../../../../game.js';
-import { ic } from '../../../../icons.js';
-import { SHIP_KEYS, shipDuration, SHIPS, shipUnlocked } from '../../../../tech.js';
+import { countShips } from '../../../../regles/fleet/index.js';
+import { PLAN_MAX, planAhead, RACES, shipsAffordable } from '../../../../regles/game/index.js';
+import { ic } from '../../../icons/index.js';
+import { SHIP_KEYS, shipDuration, SHIPS, shipUnlocked } from '../../../../regles/tech/index.js';
 import { etat } from '../../etat.js';
 import { clock } from '../../outils/clock.js';
 import { $ } from '../../outils/dollar.js';

@@ -1,4 +1,4 @@
-import { fleetPos, moving } from '../../../../fleet.js';
+import { fleetPos, moving } from '../../../../regles/fleet/index.js';
 import { etat } from '../../etat.js';
 
 /**

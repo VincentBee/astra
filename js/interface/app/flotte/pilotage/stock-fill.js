@@ -1,4 +1,4 @@
-import { RACES } from '../../../../game.js';
+import { RACES } from '../../../../regles/game/index.js';
 import { fill } from './fill.js';
 
 /** Une jauge par ressource de la race, puis les habitants (plafond : les logements), s'il y en a. */

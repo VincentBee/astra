@@ -1,5 +1,5 @@
-import { TECHS, SHIP_KEYS, shipUnlock } from '../../../tech.js';
-import { RACES, POWER_KEYS } from '../../../game.js';
+import { TECHS, SHIP_KEYS, shipUnlock } from '../../../regles/tech/index.js';
+import { RACES, POWER_KEYS } from '../../../regles/game/index.js';
 import { GX } from '../donnees/gx.js';
 import { GY } from '../donnees/gy.js';
 import { H } from '../donnees/h.js';

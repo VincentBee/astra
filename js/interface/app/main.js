@@ -5,24 +5,24 @@
 
 // Les autres modules d'abord, dans l'ordre des imports de l'ancien app.js : ils s'évaluent
 // avant tout le reste, comme avant.
-import '../../session.js';
-import '../../save.js';
-import '../../tablock.js';
-import '../../invite.js';
-import '../../scanner.js';
-import '../../game.js';
-import '../../sky.js';
-import '../../spark.js';
-import '../../aim.js';
-import '../../icons.js';
-import '../../galaxy.js';
-import '../../tech.js';
-import '../../trade.js';
-import '../../report.js';
-import '../../finish.js';
-import '../../back.js';
-import '../../bot.js';
-import '../../fleet.js';
+import '../../session/index.js';
+import '../../reseau/save/index.js';
+import '../../reseau/tablock/index.js';
+import '../../reseau/invite/index.js';
+import '../../reseau/scanner/index.js';
+import '../../regles/game/index.js';
+import '../sky/index.js';
+import '../spark/index.js';
+import '../aim/index.js';
+import '../icons/index.js';
+import '../galaxy/index.js';
+import '../../regles/tech/index.js';
+import '../../regles/trade/index.js';
+import '../../regles/report/index.js';
+import '../finish/index.js';
+import '../back/index.js';
+import '../../ia/bot/index.js';
+import '../../regles/fleet/index.js';
 
 import './outils/branchements/icones.js';
 import './outils/branchements/galaxie.js';

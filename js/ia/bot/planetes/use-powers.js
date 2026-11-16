@@ -1,4 +1,4 @@
-import { POWERS, powerReadyAt, powerCost, liftGain } from '../../../game.js';
+import { POWERS, powerReadyAt, powerCost, liftGain } from '../../../regles/game/index.js';
 
 /** Pouvoirs des aliens : arrachement et transe, dès qu'ils sont prêts et utiles. */
 export function usePowers(ctx, pl, st) {

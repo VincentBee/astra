@@ -1,4 +1,4 @@
-import { sameCell } from '../../../game.js';
+import { sameCell } from '../../../regles/game/index.js';
 import { isCell } from '../../fiches/is-cell.js';
 
 /**

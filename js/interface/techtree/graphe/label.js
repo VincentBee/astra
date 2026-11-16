@@ -1,5 +1,5 @@
-import { TECHS, SHIPS } from '../../../tech.js';
-import { RACES, POWERS } from '../../../game.js';
+import { TECHS, SHIPS } from '../../../regles/tech/index.js';
+import { RACES, POWERS } from '../../../regles/game/index.js';
 import { ROLES } from '../donnees/roles.js';
 import { etat } from '../etat.js';
 import { dur } from '../outils/dur.js';

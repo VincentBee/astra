@@ -1,4 +1,4 @@
-import { together } from '../../../fleet.js';
+import { together } from '../../../regles/fleet/index.js';
 
 /** Deux de mes flottes arrêtées ensemble, pour une opération entre elles ; sinon un message. */
 export function pairOf(fromId, toId) {

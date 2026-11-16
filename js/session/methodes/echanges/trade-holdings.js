@@ -1,5 +1,5 @@
-import { stateAt } from '../../../game.js';
-import { holdings } from '../../../trade.js';
+import { stateAt } from '../../../regles/game/index.js';
+import { holdings } from '../../../regles/trade/index.js';
 
 /** Ce que possède une partie, vu de mon téléphone (pour remplir la fenêtre d'échange). */
 export function tradeHoldings(pid, ref) {

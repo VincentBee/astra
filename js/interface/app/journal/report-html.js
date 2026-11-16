@@ -1,4 +1,4 @@
-import { explainBattle, sideTable } from '../../../report.js';
+import { explainBattle, sideTable } from '../../../regles/report/index.js';
 import { de } from '../carte/de.js';
 import { esc } from '../outils/esc.js';
 

@@ -1,6 +1,6 @@
-import { fleetSpeed, slowestShip } from '../../../fleet.js';
-import { TEMPO } from '../../../game.js';
-import { SHIP_KEYS, SHIPS } from '../../../tech.js';
+import { fleetSpeed, slowestShip } from '../../../regles/fleet/index.js';
+import { TEMPO } from '../../../regles/game/index.js';
+import { SHIP_KEYS, SHIPS } from '../../../regles/tech/index.js';
 
 /** « vitesse 7,0 cases/min, celle du Cargo » : la flotte va au pas de son vaisseau le plus lent. */
 export function speedText(race, ships, tech) {

@@ -1,5 +1,5 @@
-import { fleetBurn, fleetPos, fuelAt } from '../../../../fleet.js';
-import { UNIVERSE } from '../../../../game.js';
+import { fleetBurn, fleetPos, fuelAt } from '../../../../regles/fleet/index.js';
+import { UNIVERSE } from '../../../../regles/game/index.js';
 import { etat } from '../../etat.js';
 import { gesture } from '../zoom/gesture.js';
 

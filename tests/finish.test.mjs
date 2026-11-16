@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { newGame, game } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
 
-const { finalBoard } = await import('../js/finish.js');
+const { finalBoard } = await import('../js/interface/finish/index.js');
 const scenario = scenarios(import.meta.url);
 
 afterEach(() => {

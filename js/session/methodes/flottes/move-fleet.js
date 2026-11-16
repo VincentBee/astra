@@ -1,6 +1,6 @@
-import { sameCell, UNIVERSE } from '../../../game.js';
-import { SHIPS } from '../../../tech.js';
-import { moveTo, ORDERS, armed } from '../../../fleet.js';
+import { sameCell, UNIVERSE } from '../../../regles/game/index.js';
+import { SHIPS } from '../../../regles/tech/index.js';
+import { moveTo, ORDERS, armed } from '../../../regles/fleet/index.js';
 import { techOf } from '../../outils/tech-of.js';
 import { de } from '../../textes/de.js';
 

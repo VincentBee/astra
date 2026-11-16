@@ -1,4 +1,4 @@
-import { empireScore } from '../../../game.js';
+import { empireScore } from '../../../regles/game/index.js';
 
 /** Points de l'empire d'un joueur (toutes ses planètes, ses recherches, ses vaisseaux). */
 export function scoreOf(p) {

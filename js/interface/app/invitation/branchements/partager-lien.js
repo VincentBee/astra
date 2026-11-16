@@ -1,4 +1,4 @@
-import { inviteLink } from '../../../../invite.js';
+import { inviteLink } from '../../../../reseau/invite/index.js';
 import { etat } from '../../etat.js';
 import { $ } from '../../outils/dollar.js';
 import { share } from '../../outils/share.js';

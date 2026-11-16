@@ -1,4 +1,4 @@
-import { createInvite } from '../../../peer.js';
+import { createInvite } from '../../../reseau/peer/index.js';
 
 /**
  * Prépare une invitation et renvoie son code, ou null si elle a été abandonnée pendant sa

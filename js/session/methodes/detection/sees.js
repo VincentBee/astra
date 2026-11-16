@@ -1,4 +1,4 @@
-import { fleetPos } from '../../../fleet.js';
+import { fleetPos } from '../../../regles/fleet/index.js';
 
 /** Une flotte est-elle visible de mon téléphone ? (les miennes, toujours) */
 export function sees(owner, f, now, eyes = this.eyes(now)) {

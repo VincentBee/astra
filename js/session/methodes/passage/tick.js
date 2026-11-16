@@ -1,6 +1,6 @@
-import { settle, stateAt, RACES } from '../../../game.js';
-import { TECHS, SHIPS } from '../../../tech.js';
-import { moving } from '../../../fleet.js';
+import { settle, stateAt, RACES } from '../../../regles/game/index.js';
+import { TECHS, SHIPS } from '../../../regles/tech/index.js';
+import { moving } from '../../../regles/fleet/index.js';
 import { maxTech } from '../../outils/max-tech.js';
 import { sameTech } from '../../outils/same-tech.js';
 import { techOf } from '../../outils/tech-of.js';

@@ -1,5 +1,5 @@
-import { sameCell } from '../../../game.js';
-import { amounts, isEmpty, lacks, noRoom, take, OFFER_MS, MAX_OFFERS } from '../../../trade.js';
+import { sameCell } from '../../../regles/game/index.js';
+import { amounts, isEmpty, lacks, noRoom, take, OFFER_MS, MAX_OFFERS } from '../../../regles/trade/index.js';
 
 /**
  * Propose un échange : ce que je donne part sous séquestre tout de suite,

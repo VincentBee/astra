@@ -1,4 +1,4 @@
-import { cleanReport } from '../../report.js';
+import { cleanReport } from '../../regles/report/index.js';
 import { cleanAmounts } from './clean-amounts.js';
 import { cleanCell } from './clean-cell.js';
 

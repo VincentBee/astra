@@ -1,4 +1,4 @@
-import { armed } from '../../../fleet.js';
+import { armed } from '../../../regles/fleet/index.js';
 import { techOf } from '../../outils/tech-of.js';
 import { de } from '../../textes/de.js';
 

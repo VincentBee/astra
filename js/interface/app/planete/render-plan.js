@@ -1,6 +1,6 @@
-import { planForecast, planId, RACES } from '../../../game.js';
-import { ic } from '../../../icons.js';
-import { SHIPS, TECHS } from '../../../tech.js';
+import { planForecast, planId, RACES } from '../../../regles/game/index.js';
+import { ic } from '../../icons/index.js';
+import { SHIPS, TECHS } from '../../../regles/tech/index.js';
 import { etat } from '../etat.js';
 import { clock } from '../outils/clock.js';
 import { $ } from '../outils/dollar.js';

@@ -1,4 +1,4 @@
-import { TECHS, SHIPS, shipUnlock, TEMPO } from '../../../tech.js';
+import { TECHS, SHIPS, shipUnlock, TEMPO } from '../../../regles/tech/index.js';
 import { ROLES } from '../donnees/roles.js';
 import { etat } from '../etat.js';
 import { cost } from '../outils/cost.js';

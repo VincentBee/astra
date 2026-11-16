@@ -1,5 +1,5 @@
-import { shipsAffordable } from '../../../game.js';
-import { shipUnlocked } from '../../../tech.js';
+import { shipsAffordable } from '../../../regles/game/index.js';
+import { shipUnlocked } from '../../../regles/tech/index.js';
 import { etat } from '../etat.js';
 
 /** Lot de `n` vaisseaux `k` qu'on peut lancer maintenant sur cette planète (état `s`) ? */

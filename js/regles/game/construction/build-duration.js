@@ -1,4 +1,4 @@
-import { TEMPO } from '../../../tech.js';
+import { TEMPO } from '../../tech/index.js';
 
 /** Durée de construction en ms (accélérée). */
 export function buildDuration(race, levels, cost) {

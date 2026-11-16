@@ -1,5 +1,5 @@
-import { newPlanet, settle, sameCell, SOIL, fortOf } from '../../../game.js';
-import { battle, plunder, moving, countShips, fuelAt, together, merge, applyLosses, fleetCargo } from '../../../fleet.js';
+import { newPlanet, settle, sameCell, SOIL, fortOf } from '../../../regles/game/index.js';
+import { battle, plunder, moving, countShips, fuelAt, together, merge, applyLosses, fleetCargo } from '../../../regles/fleet/index.js';
 import { MAX_EFFECTS } from '../../constantes/max-effects.js';
 import { RAID_COOLDOWN_MS } from '../../constantes/raid-cooldown-ms.js';
 import { techOf } from '../../outils/tech-of.js';

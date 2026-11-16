@@ -7,7 +7,7 @@
 // son cercle, au zoom du test, vérifié par `film.look`. Ailleurs, le doigt, le zoom et le menu ne
 // se voient pas : ils ne sont vérifiés que par les assert.
 import assert from 'node:assert/strict';
-import { reach, underFinger, contenders, readTap, menuPlace, FINGER, MIN_REACH } from '../js/aim.js';
+import { reach, underFinger, contenders, readTap, menuPlace, FINGER, MIN_REACH } from '../js/interface/aim/index.js';
 import { newGame, game } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
 

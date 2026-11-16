@@ -1,5 +1,5 @@
-import { settle, startResearch } from '../../../game.js';
-import { TECHS } from '../../../tech.js';
+import { settle, startResearch } from '../../../regles/game/index.js';
+import { TECHS } from '../../../regles/tech/index.js';
 import { maxTech } from '../../outils/max-tech.js';
 import { techOf } from '../../outils/tech-of.js';
 

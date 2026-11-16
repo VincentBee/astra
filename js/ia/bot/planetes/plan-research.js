@@ -1,4 +1,4 @@
-import { PLAN_MAX, startResearch } from '../../../game.js';
+import { PLAN_MAX, startResearch } from '../../../regles/game/index.js';
 import { copy } from '../donnees/copy.js';
 import { chooseTech } from './choose-tech.js';
 

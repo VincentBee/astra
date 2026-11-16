@@ -1,4 +1,4 @@
-import { sameCell } from '../../../game.js';
+import { sameCell } from '../../../regles/game/index.js';
 import { mapPlanets } from '../carte/map-planets.js';
 
 /** Nom d'une case : la planète qui s'y trouve, sinon ses coordonnées. */

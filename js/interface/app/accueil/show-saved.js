@@ -1,5 +1,5 @@
-import { ic } from '../../../icons.js';
-import { describeSave, listGames } from '../../../save.js';
+import { ic } from '../../icons/index.js';
+import { describeSave, listGames } from '../../../reseau/save/index.js';
 import { $ } from '../outils/dollar.js';
 import { esc } from '../outils/esc.js';
 import { whenText } from './when-text.js';

@@ -1,4 +1,4 @@
-import { saveIdentity } from '../../../save.js';
+import { saveIdentity } from '../../../reseau/save/index.js';
 import { rid } from '../../outils/rid.js';
 import { sha256 } from '../../outils/sha256.js';
 import { Session } from '../../session.js';

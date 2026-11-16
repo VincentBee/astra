@@ -1,4 +1,4 @@
-import { transfer } from '../../../fleet.js';
+import { transfer } from '../../../regles/fleet/index.js';
 
 /** Fait passer vaisseaux, cargaison et carburant d'une de mes flottes à une autre. */
 export function transferFleet(fromId, toId, part) {

@@ -14,7 +14,7 @@
 // n'a pas de formule fermée : on l'intègre par petits pas (2 h de jeu au plus
 // chacun, et MAX_STEPS au plus par calcul quelle que soit l'absence, D-175).
 
-export { TEMPO } from '../../tech.js';
+export { TEMPO } from '../tech/index.js';
 export { SPEED } from './temps/speed.js';
 export { RES } from './ressources/res.js';
 export { SOIL } from './ressources/soil.js';

@@ -1,5 +1,5 @@
-import { SHIPS } from '../../../tech.js';
-import { MAX_FLEETS } from '../../../fleet.js';
+import { SHIPS } from '../../../regles/tech/index.js';
+import { MAX_FLEETS } from '../../../regles/fleet/index.js';
 
 /**
  * Partie partie, moi prêt et pas encore dans la course : ma flotte de départ, un seul

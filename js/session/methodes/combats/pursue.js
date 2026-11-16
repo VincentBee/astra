@@ -1,4 +1,4 @@
-import { moveTo, moving, intercept, inContact, firstContact } from '../../../fleet.js';
+import { moveTo, moving, intercept, inContact, firstContact } from '../../../regles/fleet/index.js';
 import { techOf } from '../../outils/tech-of.js';
 import { de } from '../../textes/de.js';
 

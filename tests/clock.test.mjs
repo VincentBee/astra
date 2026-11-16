@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { newGame, newLobby, game } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
 
-const { CLOCK_DRIFT_MS } = await import('../js/session.js');
+const { CLOCK_DRIFT_MS } = await import('../js/session/index.js');
 
 const scenario = scenarios(import.meta.url);
 const P = (s) => s.state.players[s.me];

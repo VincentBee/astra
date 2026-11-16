@@ -1,5 +1,5 @@
-import { fortOf } from '../../../game.js';
-import { battle, countShips } from '../../../fleet.js';
+import { fortOf } from '../../../regles/game/index.js';
+import { battle, countShips } from '../../../regles/fleet/index.js';
 
 /**
  * Ce que ma flotte `id` trouverait sur la planète `key` de `enemy` si elle

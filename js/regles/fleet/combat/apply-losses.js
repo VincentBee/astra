@@ -1,5 +1,5 @@
-import { SOIL } from '../../../game.js';
-import { SHIP_KEYS } from '../../../tech.js';
+import { SOIL } from '../../game/index.js';
+import { SHIP_KEYS } from '../../tech/index.js';
 import { countShips } from '../caracteristiques/count-ships.js';
 import { fleetCargo } from '../caracteristiques/fleet-cargo.js';
 import { fleetTank } from '../caracteristiques/fleet-tank.js';

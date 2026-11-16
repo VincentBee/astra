@@ -80,7 +80,7 @@ try {
   // 2. Rendez-vous (Trystero), réseau coupé, puis revenu.
   down = true;
   const first = await page.evaluate(async () => {
-    const { Rendezvous } = await import('./js/rendezvous.js');
+    const { Rendezvous } = await import('./js/reseau/rendezvous/index.js');
     window.rdv = new Rendezvous({ gid: 'preuve-86', key: 'k', me: 'moi', onLink() {} });
     await window.rdv.join();
     return window.rdv.state;

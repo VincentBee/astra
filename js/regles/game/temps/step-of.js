@@ -1,4 +1,4 @@
-import { TEMPO } from '../../../tech.js';
+import { TEMPO } from '../../tech/index.js';
 import { MAX_STEPS } from './max-steps.js';
 
 /**

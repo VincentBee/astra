@@ -1,5 +1,5 @@
-import { FROST } from '../../../game.js';
-import { fleetPos } from '../../../fleet.js';
+import { FROST } from '../../../regles/game/index.js';
+import { fleetPos } from '../../../regles/fleet/index.js';
 import { FROST_STEP } from '../../constantes/frost-step.js';
 
 /**

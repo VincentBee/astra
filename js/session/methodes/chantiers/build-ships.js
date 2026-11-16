@@ -1,5 +1,5 @@
-import { startShips } from '../../../game.js';
-import { SHIPS } from '../../../tech.js';
+import { startShips } from '../../../regles/game/index.js';
+import { SHIPS } from '../../../regles/tech/index.js';
 
 /** Lot de vaisseaux au chantier naval d'une de mes planètes. */
 export function buildShips(type, count, where = 'home') {

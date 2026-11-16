@@ -5,9 +5,9 @@ import assert from 'node:assert/strict';
 import { newLobby, game } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
 
-const { think, addBot, removeBot, renameBot, setBotRace, editableBot } = await import('../js/bot.js');
-const { replay, replayable } = await import('../js/replay.js');
-const { describeSave } = await import('../js/save.js');
+const { think, addBot, removeBot, renameBot, setBotRace, editableBot } = await import('../js/ia/bot/index.js');
+const { replay, replayable } = await import('../js/regles/replay/index.js');
+const { describeSave } = await import('../js/reseau/save/index.js');
 
 const scenario = scenarios(import.meta.url);
 const flush = () => new Promise((r) => setTimeout(r, 0));

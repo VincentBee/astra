@@ -1,5 +1,5 @@
-import { seeded } from '../../../game.js';
-import { fleetTank } from '../../../fleet.js';
+import { seeded } from '../../../regles/game/index.js';
+import { fleetTank } from '../../../regles/fleet/index.js';
 
 /**
  * Flotte de départ d'un joueur prêt (D-163) : un colonisateur, le plein fait, sur sa case de

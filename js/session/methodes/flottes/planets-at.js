@@ -1,4 +1,4 @@
-import { sameCell } from '../../../game.js';
+import { sameCell } from '../../../regles/game/index.js';
 
 /**
  * Mes planètes et celles des autres sur une case : [{ owner, key, name }]. Une planète gelée

@@ -1,6 +1,6 @@
-import { fleetTank } from '../../../../fleet.js';
-import { fmt, RES_INFO, SOIL, stateAt } from '../../../../game.js';
-import { SHIP_KEYS, SHIPS } from '../../../../tech.js';
+import { fleetTank } from '../../../../regles/fleet/index.js';
+import { fmt, RES_INFO, SOIL, stateAt } from '../../../../regles/game/index.js';
+import { SHIP_KEYS, SHIPS } from '../../../../regles/tech/index.js';
 import { etat } from '../../etat.js';
 import { $ } from '../../outils/dollar.js';
 import { esc } from '../../outils/esc.js';

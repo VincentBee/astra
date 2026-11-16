@@ -1,4 +1,4 @@
-import { techBonus } from '../../../tech.js';
+import { techBonus } from '../../tech/index.js';
 import { RACES } from '../races/races.js';
 import { num } from '../outils/num.js';
 import { extract } from './extract.js';

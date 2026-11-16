@@ -1,5 +1,5 @@
-import { settle } from '../../game.js';
-import { freeze } from '../../fleet.js';
+import { settle } from '../game/index.js';
+import { freeze } from '../fleet/index.js';
 
 /** Retire `amt` d'une partie (vérifié avant). */
 export function take(side, race, amt, now) {

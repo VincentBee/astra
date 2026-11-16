@@ -1,5 +1,5 @@
-import { FROST, UNIVERSE } from '../../../game.js';
-import { Session } from '../../../session.js';
+import { FROST, UNIVERSE } from '../../../regles/game/index.js';
+import { Session } from '../../../session/index.js';
 import { clampZoom } from '../carte/zoom/clamp-zoom.js';
 import { zoom } from '../carte/zoom/zoom.js';
 import { etat } from '../etat.js';

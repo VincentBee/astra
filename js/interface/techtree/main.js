@@ -2,7 +2,7 @@
 // chaque race (bâtiments, technologies, vaisseaux, pouvoirs), lu dans les
 // données du jeu.
 
-import { RACE_KEYS } from '../../game.js';
+import { RACE_KEYS } from '../../regles/game/index.js';
 import { etat } from './etat.js';
 import { render } from './graphe/render.js';
 import { select } from './graphe/select.js';

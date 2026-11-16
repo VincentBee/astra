@@ -1,4 +1,4 @@
-import { sunFor } from '../../../game.js';
+import { sunFor } from '../../../regles/game/index.js';
 import { etat } from '../etat.js';
 import { noise } from './noise.js';
 

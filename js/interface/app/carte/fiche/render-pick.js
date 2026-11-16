@@ -1,6 +1,6 @@
-import { countShips } from '../../../../fleet.js';
-import { kindLabel, RACES, sameCell, stateAt, usedPlaces } from '../../../../game.js';
-import { ic } from '../../../../icons.js';
+import { countShips } from '../../../../regles/fleet/index.js';
+import { kindLabel, RACES, sameCell, stateAt, usedPlaces } from '../../../../regles/game/index.js';
+import { ic } from '../../../icons/index.js';
 import { myColonizer } from '../../depart/my-colonizer.js';
 import { renderLobby } from '../../depart/render-lobby.js';
 import { etat } from '../../etat.js';

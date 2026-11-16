@@ -1,4 +1,4 @@
-import { TEMPO } from '../../../tech.js';
+import { TEMPO } from '../../tech/index.js';
 import { secs } from '../temps/secs.js';
 
 /**

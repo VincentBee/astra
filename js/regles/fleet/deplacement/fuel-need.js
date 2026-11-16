@@ -1,4 +1,4 @@
-import { distance } from '../../../game.js';
+import { distance } from '../../game/index.js';
 import { fleetBurn } from '../caracteristiques/fleet-burn.js';
 import { fleetPos } from './fleet-pos.js';
 

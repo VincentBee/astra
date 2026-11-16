@@ -1,4 +1,4 @@
-import { fmt } from '../../../game.js';
+import { fmt } from '../../../regles/game/index.js';
 
 /** Solde par minute réelle, signé (un débit par heure de jeu se multiplie par TEMPO). */
 export function rateText(v) {

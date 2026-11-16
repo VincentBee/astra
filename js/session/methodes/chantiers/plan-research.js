@@ -1,5 +1,5 @@
-import { stateAt, PLAN_MAX, planAhead } from '../../../game.js';
-import { TECHS, techMissing } from '../../../tech.js';
+import { stateAt, PLAN_MAX, planAhead } from '../../../regles/game/index.js';
+import { TECHS, techMissing } from '../../../regles/tech/index.js';
 import { maxTech } from '../../outils/max-tech.js';
 import { techOf } from '../../outils/tech-of.js';
 

@@ -1,4 +1,4 @@
-import { countShips, applyLosses } from '../../../fleet.js';
+import { countShips, applyLosses } from '../../../regles/fleet/index.js';
 import { techOf } from '../../outils/tech-of.js';
 import { de } from '../../textes/de.js';
 import { lootText } from '../../textes/loot-text.js';

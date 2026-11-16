@@ -1,4 +1,4 @@
-import { addSample, ownHistory } from '../../../../spark.js';
+import { addSample, ownHistory } from '../../../spark/index.js';
 import { etat } from '../../etat.js';
 import { drawSparks } from './draw-sparks.js';
 import { HISTORY_KEY } from './history-key.js';

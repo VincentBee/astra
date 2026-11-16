@@ -1,4 +1,4 @@
-import { amounts, holdings, take, put, GRACE_MS } from '../../../trade.js';
+import { amounts, holdings, take, put, GRACE_MS } from '../../../regles/trade/index.js';
 
 /**
  * Offres que j'ai reprises sans réponse (l'autre ne donnait plus de

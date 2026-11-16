@@ -1,4 +1,4 @@
-import { moving, refuel, parkedCell } from '../../../fleet.js';
+import { moving, refuel, parkedCell } from '../../../regles/fleet/index.js';
 
 /** Plein d'une de mes flottes, arrêtée sur une de mes planètes, avec l'énergie de celle-ci. */
 export function refuelFleet(id) {

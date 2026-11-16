@@ -1,5 +1,5 @@
-import { countShips } from '../../../fleet.js';
-import { fmt, RACES, resIcon, stateAt } from '../../../game.js';
+import { countShips } from '../../../regles/fleet/index.js';
+import { fmt, RACES, resIcon, stateAt } from '../../../regles/game/index.js';
 import { renderAlerts } from '../alertes/render-alerts.js';
 import { renderPick } from '../carte/fiche/render-pick.js';
 import { renderTrades } from '../echanges/render-trades.js';

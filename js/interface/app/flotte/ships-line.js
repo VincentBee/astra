@@ -1,4 +1,4 @@
-import { SHIP_KEYS, SHIPS } from '../../../tech.js';
+import { SHIP_KEYS, SHIPS } from '../../../regles/tech/index.js';
 import { esc } from '../outils/esc.js';
 import { costText } from '../planete/cost-text.js';
 

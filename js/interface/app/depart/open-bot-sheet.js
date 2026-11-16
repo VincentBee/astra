@@ -1,5 +1,5 @@
-import { editableBot } from '../../../bot.js';
-import { RACE_KEYS, raceIcon, RACES } from '../../../game.js';
+import { editableBot } from '../../../ia/bot/index.js';
+import { RACE_KEYS, raceIcon, RACES } from '../../../regles/game/index.js';
 import { etat } from '../etat.js';
 import { $ } from '../outils/dollar.js';
 

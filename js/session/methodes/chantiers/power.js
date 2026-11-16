@@ -1,4 +1,4 @@
-import { usePower, POWERS } from '../../../game.js';
+import { usePower, POWERS } from '../../../regles/game/index.js';
 
 /** Pouvoir psychique (aliens), sur une de mes planètes. */
 export function power(key, where = 'home') {

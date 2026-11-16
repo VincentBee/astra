@@ -1,4 +1,4 @@
-import { shipStats } from '../../../tech.js';
+import { shipStats } from '../../tech/index.js';
 
 /** Type du vaisseau le plus lent de la flotte (celui qui fixe sa vitesse), ou null si elle est vide. */
 export function slowestShip(race, ships, tech) {

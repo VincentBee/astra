@@ -1,3 +1,3 @@
-import { startGalaxy } from '../../../../galaxy.js';
+import { startGalaxy } from '../../../galaxy/index.js';
 
 startGalaxy();

@@ -1,4 +1,4 @@
-import { SHIPS } from '../../../tech.js';
+import { SHIPS } from '../../tech/index.js';
 import { own } from '../outils/own.js';
 
 /** Plus grand lot de vaisseaux `type` que le stock `stock` peut payer (0 à 50, la taille maximale d'un lot). */

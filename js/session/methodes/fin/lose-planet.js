@@ -1,4 +1,4 @@
-import { settle, sameCell } from '../../../game.js';
+import { settle, sameCell } from '../../../regles/game/index.js';
 
 /**
  * Je perds une de mes planètes (gel ou prise) à l'heure `at`. Ma planète

@@ -1,4 +1,4 @@
-import { inContact, firstContact, fleetPos, aggressive, armed } from '../../../fleet.js';
+import { inContact, firstContact, fleetPos, aggressive, armed } from '../../../regles/fleet/index.js';
 import { techOf } from '../../outils/tech-of.js';
 
 /**

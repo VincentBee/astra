@@ -1,4 +1,4 @@
-import { TECHS, techMissing, techCost, researchDuration, shipUnlocked, shipDuration } from '../../../tech.js';
+import { TECHS, techMissing, techCost, researchDuration, shipUnlocked, shipDuration } from '../../tech/index.js';
 import { lv } from '../outils/lv.js';
 import { capsFor } from '../ressources/caps-for.js';
 import { shipsCost } from './ships-cost.js';

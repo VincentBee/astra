@@ -1,4 +1,4 @@
-import { sparkPath } from '../../../../spark.js';
+import { sparkPath } from '../../../spark/index.js';
 import { etat } from '../../etat.js';
 
 /** Courbe de chaque tuile pour la planète `key`, vide s'il y a moins de 2 relevés. */

@@ -1,4 +1,4 @@
-import { empireScore } from '../../game.js';
+import { empireScore } from '../game/index.js';
 
 /**
  * Points de l'empire d'une fiche, comme `Session.scoreOf` : la planète mère (si le joueur en a

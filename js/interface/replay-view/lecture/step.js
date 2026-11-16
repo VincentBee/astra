@@ -1,4 +1,4 @@
-import { moving } from '../../../fleet.js';
+import { moving } from '../../../regles/fleet/index.js';
 import { QUIET_S } from '../constantes/quiet-s.js';
 import { etat } from '../etat.js';
 import { frameAt } from '../film/frame-at.js';

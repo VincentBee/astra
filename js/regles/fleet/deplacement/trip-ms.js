@@ -1,5 +1,5 @@
-import { distance } from '../../../game.js';
-import { TEMPO } from '../../../tech.js';
+import { distance } from '../../game/index.js';
+import { TEMPO } from '../../tech/index.js';
 import { MIN_TRIP } from './min-trip.js';
 
 /** Durée du trajet en ms, à la vitesse de la flotte. */

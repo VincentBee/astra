@@ -1,4 +1,4 @@
-import { PLAN_MAX, planItem, RACES, SOIL, RES } from '../../game.js';
+import { PLAN_MAX, planItem, RACES, SOIL, RES } from '../../regles/game/index.js';
 import { amount } from './amount.js';
 import { isObj } from './is-obj.js';
 

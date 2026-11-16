@@ -3,8 +3,8 @@
 import { scenarios } from './scenario.mjs';
 import assert from 'node:assert/strict';
 import { isDeepStrictEqual } from 'node:util';
-import { battle } from '../js/fleet.js';
-import { explainBattle, sideTable, cleanReport } from '../js/report.js';
+import { battle } from '../js/regles/fleet/index.js';
+import { explainBattle, sideTable, cleanReport } from '../js/regles/report/index.js';
 import { newGame } from './harness.mjs';
 
 const scenario = scenarios(import.meta.url);

@@ -39,10 +39,10 @@ export async function measure({ bots: N = 7, minutes = 25, seed = 1, quiet = tru
   globalThis.document ||= { addEventListener() {}, removeEventListener() {}, visibilityState: 'visible' };
   globalThis.window ||= globalThis;
 
-  const { Session } = await import('../js/session.js');
-  const { addBot, think } = await import('../js/bot.js');
-  const { replay } = await import('../js/replay.js');
-  const game = await import('../js/game.js');
+  const { Session } = await import('../js/session/index.js');
+  const { addBot, think } = await import('../js/ia/bot/index.js');
+  const { replay } = await import('../js/regles/replay/index.js');
+  const game = await import('../js/regles/game/index.js');
   const frost = { ...game.FROST };
   game.FROST.delayMs = 12 * 60_000; // le froid du jeu (un fichier de test a pu le couper)
 

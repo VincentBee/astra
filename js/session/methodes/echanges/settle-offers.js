@@ -1,4 +1,4 @@
-import { amounts, put, outcome } from '../../../trade.js';
+import { amounts, put, outcome } from '../../../regles/trade/index.js';
 import { de } from '../../textes/de.js';
 
 /**

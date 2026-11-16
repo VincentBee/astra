@@ -1,4 +1,4 @@
-import { countShips, fleetPos } from '../../../fleet.js';
+import { countShips, fleetPos } from '../../../regles/fleet/index.js';
 import { de } from '../../textes/de.js';
 import { shipsText } from '../../textes/ships-text.js';
 

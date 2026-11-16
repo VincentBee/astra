@@ -1,4 +1,4 @@
-import { mergeStates } from '../../../save.js';
+import { mergeStates } from '../../../reseau/save/index.js';
 import { MAX_PLAYERS } from '../../constantes/max-players.js';
 import { clean } from '../../fiches/clean.js';
 import { normalize } from '../../fiches/normalize.js';

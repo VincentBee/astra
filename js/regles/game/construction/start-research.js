@@ -1,4 +1,4 @@
-import { TECHS, techMissing, techCost, researchDuration } from '../../../tech.js';
+import { TECHS, techMissing, techCost, researchDuration } from '../../tech/index.js';
 import { lv } from '../outils/lv.js';
 import { own } from '../outils/own.js';
 import { settle } from '../economie/settle.js';

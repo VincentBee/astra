@@ -1,5 +1,5 @@
-import { countShips } from '../../../fleet.js';
-import { ic } from '../../../icons.js';
+import { countShips } from '../../../regles/fleet/index.js';
+import { ic } from '../../icons/index.js';
 import { etat } from '../etat.js';
 import { fleetName } from '../flotte/fleet-name.js';
 import { fuelText } from '../flotte/fuel-text.js';

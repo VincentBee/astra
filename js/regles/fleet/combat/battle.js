@@ -1,4 +1,4 @@
-import { SHIP_KEYS, shipStats, techBonus } from '../../../tech.js';
+import { SHIP_KEYS, shipStats, techBonus } from '../../tech/index.js';
 
 /**
  * Combat, sans hasard : les deux téléphones qui le calculent trouvent le

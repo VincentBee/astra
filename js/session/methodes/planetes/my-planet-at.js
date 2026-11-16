@@ -1,4 +1,4 @@
-import { sameCell } from '../../../game.js';
+import { sameCell } from '../../../regles/game/index.js';
 
 /**
  * Ma planète (mère ou colonie) sur la case `cell`, ou null : la fiche de la

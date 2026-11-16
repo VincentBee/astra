@@ -1,4 +1,4 @@
-import { saveGame } from '../../../save.js';
+import { saveGame } from '../../../reseau/save/index.js';
 
 export function save() {
   if (this.lost) return; // un autre onglet joue cette partie (D-430) : il a la bonne copie

@@ -1,4 +1,4 @@
-import { startDemolish, RACES } from '../../../game.js';
+import { startDemolish, RACES } from '../../../regles/game/index.js';
 
 /** Déconstruit un niveau d'un bâtiment, pour libérer sa place. */
 export function demolish(key, where = 'home') {

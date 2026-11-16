@@ -1,6 +1,6 @@
-import { POWER_KEYS, POWERS, RACES, RES_INFO, resIcon } from '../../../game.js';
-import { ic } from '../../../icons.js';
-import { SHIP_KEYS, SHIPS, TECHS } from '../../../tech.js';
+import { POWER_KEYS, POWERS, RACES, RES_INFO, resIcon } from '../../../regles/game/index.js';
+import { ic } from '../../icons/index.js';
+import { SHIP_KEYS, SHIPS, TECHS } from '../../../regles/tech/index.js';
 import { etat } from '../etat.js';
 import { $ } from '../outils/dollar.js';
 import { esc } from '../outils/esc.js';

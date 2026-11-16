@@ -1,4 +1,4 @@
-import { climateName, resIcon } from '../../../../game.js';
+import { climateName, resIcon } from '../../../../regles/game/index.js';
 import { climX } from './clim-x.js';
 
 /** « Chaud · production ×1,2 ⚡ · ×1,1 ◆ · ×0,9 🍃 » : le climat et son effet sur la production, en HTML. */

@@ -1,4 +1,4 @@
-import { RACE_KEYS, raceIcon, RACES } from '../../../game.js';
+import { RACE_KEYS, raceIcon, RACES } from '../../../regles/game/index.js';
 import { etat } from '../etat.js';
 import { $ } from '../outils/dollar.js';
 import { show } from '../outils/show.js';

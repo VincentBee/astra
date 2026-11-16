@@ -1,4 +1,4 @@
-import { STANCES, armed } from '../../../fleet.js';
+import { STANCES, armed } from '../../../regles/fleet/index.js';
 import { techOf } from '../../outils/tech-of.js';
 
 /** Comportement en voyage d'une de mes flottes : 'passive' ou 'aggressive' (STANCES). */

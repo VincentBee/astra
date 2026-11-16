@@ -1,4 +1,4 @@
-import { RACES, resIcon, POWERS } from '../../../game.js';
+import { RACES, resIcon, POWERS } from '../../../regles/game/index.js';
 import { dur } from '../outils/dur.js';
 import { esc } from '../outils/esc.js';
 import { num } from '../outils/num.js';

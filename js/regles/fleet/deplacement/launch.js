@@ -1,5 +1,5 @@
-import { covers, settle, SOIL } from '../../../game.js';
-import { SHIPS, SHIP_KEYS } from '../../../tech.js';
+import { covers, settle, SOIL } from '../../game/index.js';
+import { SHIPS, SHIP_KEYS } from '../../tech/index.js';
 import { countShips } from '../caracteristiques/count-ships.js';
 import { fleetCargo } from '../caracteristiques/fleet-cargo.js';
 import { fleetTank } from '../caracteristiques/fleet-tank.js';

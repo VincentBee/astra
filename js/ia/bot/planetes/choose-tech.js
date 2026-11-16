@@ -1,4 +1,4 @@
-import { TECHS } from '../../../tech.js';
+import { TECHS } from '../../../regles/tech/index.js';
 import { PLAYBOOK } from '../donnees/playbook.js';
 
 /**

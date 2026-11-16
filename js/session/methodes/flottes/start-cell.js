@@ -1,4 +1,4 @@
-import { sameCell, UNIVERSE, sunFor, seeded } from '../../../game.js';
+import { sameCell, UNIVERSE, sunFor, seeded } from '../../../regles/game/index.js';
 import { START_RING } from '../../constantes/start-ring.js';
 
 /**

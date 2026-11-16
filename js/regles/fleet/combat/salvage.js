@@ -1,4 +1,4 @@
-import { SOIL } from '../../../game.js';
+import { SOIL } from '../../game/index.js';
 import { fleetCargo } from '../caracteristiques/fleet-cargo.js';
 
 /**

@@ -1,4 +1,4 @@
-import { SHIPS } from '../../../tech.js';
+import { SHIPS } from '../../tech/index.js';
 
 /** Contenance totale des réservoirs. */
 export function fleetTank(race, ships) {

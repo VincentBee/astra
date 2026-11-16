@@ -1,4 +1,4 @@
-import { RES_INFO, resIcon, SOIL } from '../../../../game.js';
+import { RES_INFO, resIcon, SOIL } from '../../../../regles/game/index.js';
 import { spark } from '../courbes/spark.js';
 import { SOIL_NAMES } from './soil-names.js';
 

@@ -1,7 +1,7 @@
-import { fuelAt } from '../../../fleet.js';
-import { fmt, RES_INFO, SOIL } from '../../../game.js';
-import { ic } from '../../../icons.js';
-import { SHIP_KEYS, SHIPS } from '../../../tech.js';
+import { fuelAt } from '../../../regles/fleet/index.js';
+import { fmt, RES_INFO, SOIL } from '../../../regles/game/index.js';
+import { ic } from '../../icons/index.js';
+import { SHIP_KEYS, SHIPS } from '../../../regles/tech/index.js';
 import { etat } from '../etat.js';
 import { fleetName } from '../flotte/fleet-name.js';
 import { $ } from '../outils/dollar.js';

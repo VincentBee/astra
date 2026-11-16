@@ -1,4 +1,4 @@
-import { moving } from '../../../fleet.js';
+import { moving } from '../../../regles/fleet/index.js';
 import { ahead } from './ahead.js';
 import { rivalColonizers } from './rival-colonizers.js';
 

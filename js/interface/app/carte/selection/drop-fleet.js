@@ -1,4 +1,4 @@
-import { readTap, underFinger } from '../../../../aim.js';
+import { readTap, underFinger } from '../../../aim/index.js';
 import { etat } from '../../etat.js';
 import { cellCss } from '../zoom/cell-css.js';
 import { mapItems } from './map-items.js';

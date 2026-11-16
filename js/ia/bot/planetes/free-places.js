@@ -1,4 +1,4 @@
-import { usedPlaces } from '../../../game.js';
+import { usedPlaces } from '../../../regles/game/index.js';
 
 // ----- planètes ---------------------------------------------------------------
 

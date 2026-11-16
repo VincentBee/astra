@@ -1,5 +1,5 @@
-import { answerInvite } from '../../../peer.js';
-import { inviteGid } from '../../../invite.js';
+import { answerInvite } from '../../../reseau/peer/index.js';
+import { inviteGid } from '../../../reseau/invite/index.js';
 
 /** Invité : lit l'invitation et renvoie la réponse à montrer à l'hôte. */
 export async function answer(offer) {

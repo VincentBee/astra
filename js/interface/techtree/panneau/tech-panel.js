@@ -1,5 +1,5 @@
-import { TECHS, SHIPS, techCost, researchDuration } from '../../../tech.js';
-import { RACES } from '../../../game.js';
+import { TECHS, SHIPS, techCost, researchDuration } from '../../../regles/tech/index.js';
+import { RACES } from '../../../regles/game/index.js';
 import { BONUS } from '../donnees/bonus.js';
 import { etat } from '../etat.js';
 import { cost } from '../outils/cost.js';

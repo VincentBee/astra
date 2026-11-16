@@ -1,4 +1,4 @@
-import { newPlanet, RACES } from '../../../game.js';
+import { newPlanet, RACES } from '../../../regles/game/index.js';
 
 /**
  * Choix de race. Il devient définitif quand la partie part (ou dès qu'on a une planète) ;

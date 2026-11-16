@@ -1,5 +1,5 @@
-import { RACES, RES_INFO, resIcon } from '../../../game.js';
-import { ic } from '../../../icons.js';
+import { RACES, RES_INFO, resIcon } from '../../../regles/game/index.js';
+import { ic } from '../../icons/index.js';
 import { etat } from '../etat.js';
 import { $ } from '../outils/dollar.js';
 import { esc } from '../outils/esc.js';

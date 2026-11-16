@@ -1,4 +1,4 @@
-import { Session } from '../../../session.js';
+import { Session } from '../../../session/index.js';
 import { think } from '../cerveau/think.js';
 import { copy } from '../donnees/copy.js';
 import { THINK_MS } from '../donnees/think-ms.js';

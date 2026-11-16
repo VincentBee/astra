@@ -1,4 +1,4 @@
-import { RACES } from '../../../game.js';
+import { RACES } from '../../../regles/game/index.js';
 
 /** Race la moins prise par les autres (au hasard entre les ex æquo). */
 export function pickRace(s) {

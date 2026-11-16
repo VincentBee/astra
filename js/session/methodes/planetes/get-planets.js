@@ -1,4 +1,4 @@
-import { planetsFor } from '../../../game.js';
+import { planetsFor } from '../../../regles/game/index.js';
 
 /** Planètes de l'univers (les mêmes sur tous les téléphones, tirées de l'identifiant de la partie). */
 export function getPlanets() {

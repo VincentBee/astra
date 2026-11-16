@@ -1,4 +1,4 @@
-import { countShips, together } from '../../../../fleet.js';
+import { countShips, together } from '../../../../regles/fleet/index.js';
 import { etat } from '../../etat.js';
 import { fleetName } from '../../flotte/fleet-name.js';
 import { renderFleetInfo } from '../../flotte/pilotage/render-fleet-info.js';

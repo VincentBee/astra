@@ -1,4 +1,4 @@
-import { fuelAt, fleetCargo, fleetTank } from '../../fleet.js';
+import { fuelAt, fleetCargo, fleetTank } from '../fleet/index.js';
 
 /**
  * La partie a-t-elle la place de recevoir `amt`, une fois parti ce qu'elle

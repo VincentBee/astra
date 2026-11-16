@@ -1,5 +1,5 @@
 import { ficheScore } from './fiche-score.js';
-import { planetsFor } from '../../game.js';
+import { planetsFor } from '../game/index.js';
 
 /**
  * Courbe des points de chaque joueur pendant la partie : { pid: [{ t, pts }] }, un point à

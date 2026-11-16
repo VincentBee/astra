@@ -1,4 +1,4 @@
-import { addBot } from '../../../../bot.js';
+import { addBot } from '../../../../ia/bot/index.js';
 import { renderPick } from '../../carte/fiche/render-pick.js';
 import { etat } from '../../etat.js';
 import { $ } from '../../outils/dollar.js';

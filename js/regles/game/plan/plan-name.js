@@ -1,4 +1,4 @@
-import { TECHS, SHIPS } from '../../../tech.js';
+import { TECHS, SHIPS } from '../../tech/index.js';
 import { RACES } from '../races/races.js';
 
 /** « Mine niv 8 », « Armes niv 2 », « 5 × Chasseur » : un élément du fil, pour un message. */

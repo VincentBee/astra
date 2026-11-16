@@ -1,5 +1,5 @@
-import { newPlanet, SOIL } from '../../../game.js';
-import { countShips, fuelAt } from '../../../fleet.js';
+import { newPlanet, SOIL } from '../../../regles/game/index.js';
+import { countShips, fuelAt } from '../../../regles/fleet/index.js';
 import { techOf } from '../../outils/tech-of.js';
 import { lootText } from '../../textes/loot-text.js';
 

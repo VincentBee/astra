@@ -1,4 +1,4 @@
-import { newPlanet } from '../../../game.js';
+import { newPlanet } from '../../../regles/game/index.js';
 
 /** M'installer sur une planète libre : une fois la race choisie, au début de la partie. */
 export function claimPlanet(id) {

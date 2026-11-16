@@ -1,4 +1,4 @@
-import { SHIPS } from '../../../tech.js';
+import { SHIPS } from '../../tech/index.js';
 
 /** Carburant brûlé par case parcourue. */
 export function fleetBurn(race, ships) {

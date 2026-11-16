@@ -1,4 +1,4 @@
-import { moving, split, MAX_FLEETS } from '../../../fleet.js';
+import { moving, split, MAX_FLEETS } from '../../../regles/fleet/index.js';
 
 /** Scinde une de mes flottes arrêtées : `part` forme une nouvelle flotte, au même endroit. */
 export function splitFleet(id, part) {

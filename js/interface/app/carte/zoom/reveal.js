@@ -1,4 +1,4 @@
-import { UNIVERSE } from '../../../../game.js';
+import { UNIVERSE } from '../../../../regles/game/index.js';
 import { clampZoom } from './clamp-zoom.js';
 import { zoom } from './zoom.js';
 

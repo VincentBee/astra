@@ -1,4 +1,4 @@
-import { aggressive, armed, countShips, fleetBurn, fleetPos, fleetTank, fuelAt, moving } from '../../../../fleet.js';
+import { aggressive, armed, countShips, fleetBurn, fleetPos, fleetTank, fuelAt, moving } from '../../../../regles/fleet/index.js';
 import { closeMenu } from '../../carte/menu/close-menu.js';
 import { refreshMoveSheet } from '../../echanges/refresh-move-sheet.js';
 import { renderBeside } from '../../echanges/render-beside.js';

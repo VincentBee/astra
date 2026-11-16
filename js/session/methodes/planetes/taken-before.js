@@ -1,4 +1,4 @@
-import { sameCell } from '../../../game.js';
+import { sameCell } from '../../../regles/game/index.js';
 
 /**
  * La planète `w` est-elle déjà à un autre joueur installé avant l'heure

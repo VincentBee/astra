@@ -1,5 +1,5 @@
-import { countShips, fleetBurn, fleetCargo, fleetTank } from '../../../../fleet.js';
-import { fmt } from '../../../../game.js';
+import { countShips, fleetBurn, fleetCargo, fleetTank } from '../../../../regles/fleet/index.js';
+import { fmt } from '../../../../regles/game/index.js';
 import { etat } from '../../etat.js';
 import { $ } from '../../outils/dollar.js';
 import { speedText } from '../speed-text.js';

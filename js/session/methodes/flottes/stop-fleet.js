@@ -1,4 +1,4 @@
-import { stopAt } from '../../../fleet.js';
+import { stopAt } from '../../../regles/fleet/index.js';
 import { techOf } from '../../outils/tech-of.js';
 
 /** Arrête une de mes flottes sur la case la plus proche. */

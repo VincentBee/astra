@@ -1,4 +1,4 @@
-import { shipsAffordable, stateAt } from '../../../../../game.js';
+import { shipsAffordable, stateAt } from '../../../../../regles/game/index.js';
 import { etat } from '../../../etat.js';
 import { $ } from '../../../outils/dollar.js';
 

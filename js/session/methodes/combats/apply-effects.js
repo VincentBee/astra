@@ -1,5 +1,5 @@
-import { settle, sameCell } from '../../../game.js';
-import { countShips } from '../../../fleet.js';
+import { settle, sameCell } from '../../../regles/game/index.js';
+import { countShips } from '../../../regles/fleet/index.js';
 import { lootText } from '../../textes/loot-text.js';
 
 /**

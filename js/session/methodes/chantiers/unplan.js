@@ -1,4 +1,4 @@
-import { planId } from '../../../game.js';
+import { planId } from '../../../regles/game/index.js';
 import { planName } from '../../textes/plan-name.js';
 
 /**

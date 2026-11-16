@@ -1,4 +1,4 @@
-import { aggressive } from '../../../../../fleet.js';
+import { aggressive } from '../../../../../regles/fleet/index.js';
 import { etat } from '../../../etat.js';
 import { $ } from '../../../outils/dollar.js';
 import { toast } from '../../../outils/toast.js';

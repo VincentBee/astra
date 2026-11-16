@@ -1,4 +1,4 @@
-import { RACES } from '../../../game.js';
+import { RACES } from '../../../regles/game/index.js';
 import { freeName } from '../cerveau/free-name.js';
 import { think } from '../cerveau/think.js';
 import { botSession } from './bot-session.js';

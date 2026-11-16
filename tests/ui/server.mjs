@@ -90,8 +90,8 @@ const server = createServer((req, res) => {
     return existsSync(p) ? send(res, 200, 'text/html; charset=utf-8', readFileSync(p)) : send(res, 404, 'text/plain; charset=utf-8', 'Pas de rapport.');
   }
   // Le vrai jeu, que les rapports embarquent en lecture seule (index.html?view, D-139) : seulement
-  // ses fichiers, par une liste fermée de noms (pas de « .. » possible).
-  const game = url.pathname.match(/^\/(index\.html|style\.css|manifest\.json|(?:js|vendor|icons)\/[\w-]+\.(?:js|mjs|svg|png))$/);
+  // ses fichiers, par une liste fermée de noms (pas de « .. » possible ; js/ et ses sous-dossiers).
+  const game = url.pathname.match(/^\/(index\.html|style\.css|manifest\.json|(?:js(?:\/[\w-]+)*|vendor|icons)\/[\w-]+\.(?:js|mjs|svg|png))$/);
   if (req.method === 'GET' && game) {
     const p = join(root, game[1]);
     return existsSync(p) ? send(res, 200, TYPES[extname(p)], readFileSync(p)) : send(res, 404, 'text/plain; charset=utf-8', 'Introuvable.');

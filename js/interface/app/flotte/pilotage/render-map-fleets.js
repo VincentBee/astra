@@ -1,7 +1,7 @@
-import { countShips, fuelAt, moving } from '../../../../fleet.js';
-import { RACES, stateAt } from '../../../../game.js';
-import { ic } from '../../../../icons.js';
-import { SHIP_KEYS, SHIPS } from '../../../../tech.js';
+import { countShips, fuelAt, moving } from '../../../../regles/fleet/index.js';
+import { RACES, stateAt } from '../../../../regles/game/index.js';
+import { ic } from '../../../icons/index.js';
+import { SHIP_KEYS, SHIPS } from '../../../../regles/tech/index.js';
 import { de } from '../../carte/de.js';
 import { etat } from '../../etat.js';
 import { clock } from '../../outils/clock.js';

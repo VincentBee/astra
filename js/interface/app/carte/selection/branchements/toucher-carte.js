@@ -1,4 +1,4 @@
-import { readTap } from '../../../../../aim.js';
+import { readTap } from '../../../../aim/index.js';
 import { etat } from '../../../etat.js';
 import { $ } from '../../../outils/dollar.js';
 import { renderPick } from '../../fiche/render-pick.js';

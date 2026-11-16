@@ -1,4 +1,4 @@
-import { shipStats } from '../../../tech.js';
+import { shipStats } from '../../tech/index.js';
 import { slowestShip } from './slowest-ship.js';
 
 /** Vitesse d'une flotte : celle de son vaisseau le plus lent (cases par minute). */

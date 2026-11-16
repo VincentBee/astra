@@ -1,4 +1,4 @@
-import { RACES } from '../../../../game.js';
+import { RACES } from '../../../../regles/game/index.js';
 import { etat } from '../../etat.js';
 import { $ } from '../../outils/dollar.js';
 

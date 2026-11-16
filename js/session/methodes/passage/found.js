@@ -1,4 +1,4 @@
-import { newPlanet, SOIL } from '../../../game.js';
+import { newPlanet, SOIL } from '../../../regles/game/index.js';
 import { de } from '../../textes/de.js';
 
 /**

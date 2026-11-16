@@ -1,4 +1,4 @@
-import { TECHS, techCost, SHIPS } from '../../../tech.js';
+import { TECHS, techCost, SHIPS } from '../../tech/index.js';
 import { RACES } from '../races/races.js';
 import { score } from './score.js';
 

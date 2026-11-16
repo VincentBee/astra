@@ -1,4 +1,4 @@
-import { RACES } from '../../game.js';
+import { RACES } from '../../regles/game/index.js';
 import { COLORS } from '../constantes/colors.js';
 import { cleanAmounts } from './clean-amounts.js';
 import { cleanEffect } from './clean-effect.js';

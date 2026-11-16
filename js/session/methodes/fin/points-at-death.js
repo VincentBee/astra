@@ -1,4 +1,4 @@
-import { empireScore } from '../../../game.js';
+import { empireScore } from '../../../regles/game/index.js';
 
 /**
  * Points du joueur `p`, tombé à l'heure `dead`, juste avant sa chute (D-416). Sa fiche le dit

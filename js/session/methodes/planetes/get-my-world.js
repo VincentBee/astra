@@ -1,4 +1,4 @@
-import { sameCell } from '../../../game.js';
+import { sameCell } from '../../../regles/game/index.js';
 
 /** Ma planète de l'univers (avec ses gisements de départ), ou null. */
 export function getMyWorld() {

@@ -1,4 +1,4 @@
-import { scanQr } from '../../../scanner.js';
+import { scanQr } from '../../../reseau/scanner/index.js';
 import { etat } from '../etat.js';
 import { $ } from './dollar.js';
 

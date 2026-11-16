@@ -1,5 +1,5 @@
-import { aggressive, fuelAt, moving, ORDERS } from '../../../fleet.js';
-import { sameCell } from '../../../game.js';
+import { aggressive, fuelAt, moving, ORDERS } from '../../../regles/fleet/index.js';
+import { sameCell } from '../../../regles/game/index.js';
 import { de } from '../carte/de.js';
 import { mapPlanets } from '../carte/map-planets.js';
 import { etat } from '../etat.js';

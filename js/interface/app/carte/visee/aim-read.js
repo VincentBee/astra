@@ -1,4 +1,4 @@
-import { readTap } from '../../../../aim.js';
+import { readTap } from '../../../aim/index.js';
 import { etat } from '../../etat.js';
 import { actionsFor } from '../selection/actions-for.js';
 import { cellOf } from '../selection/cell-of.js';

@@ -1,4 +1,4 @@
-import { fmt, TEMPO } from '../../../game.js';
+import { fmt, TEMPO } from '../../../regles/game/index.js';
 
 /** « ⚔ 12 · ◇ 30 · ▣ 50 · » 7,0 » : attaque, coque, soute, vitesse (cases/min). */
 export const statText = (st) =>

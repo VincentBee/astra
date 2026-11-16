@@ -2,7 +2,7 @@
 // besoin doit y être, sinon la page ne s'ouvre pas hors ligne si elle n'a jamais été
 // ouverte en ligne (#84 : technologies.html et js/techtree.js manquaient).
 // On part des trois pages (index.html, replay.html, technologies.html) et de
-// manifest.json, puis on suit les liens : src/href des balises, `import … from`,
+// manifest.json, puis on suit les liens : src/href des balises, `import … from`, `export … from`,
 // `import()` (chargement à la demande), `new URL('…', import.meta.url)`,
 // `location.href = '…'`, `.src = '…'` et `fetch('…')`.
 import { test } from 'node:test';
@@ -43,6 +43,10 @@ function refsOf(file, text) {
   if (/\.(m?js|html)$/.test(file)) {
     grab(/\bimport\s[^'"`;]*?from\s*['"]([^'"]+)['"]/g);
     grab(/\bimport\s*['"]([^'"]+)['"]/g);
+    grab(/\bexport\s[^'"`;]*?from\s*['"]([^'"]+)['"]/g); // export { a } from '…', export * from '…' (index.js des modules)
+    // Tout chemin relatif vers vendor/ dans une chaîne, même dans un import() conditionnel
+    // (`import(n ? \`../vendor/x.mjs?r=${n}\` : '../vendor/x.mjs')`, que les lignes au-dessus ne voient pas).
+    grab(/['"`]((?:\.\.?\/)+vendor\/[\w.-]+)/g);
     grab(/\bimport\(\s*['"]([^'"]+)['"]\s*\)/g);
     grab(/new URL\(\s*['"]([^'"]+)['"]\s*,\s*import\.meta\.url/g);
     grab(/\b(?:location\.href|\.src)\s*=\s*['"]([^'"]+)['"]/g, true); // ex. location.href = 'replay.html'
@@ -74,10 +78,10 @@ test('FILES contient chaque fichier demandé par index.html, replay.html et tech
   assert.deepEqual(missing, [], 'fichiers absents du cache hors ligne');
 });
 
-test('technologies.html et son module techtree.js sont dans FILES (#84)', () => {
+test('technologies.html et son module techtree (point d’entrée main.js) sont dans FILES (#84)', () => {
   const files = swFiles();
   assert.ok(files.includes('technologies.html'));
-  assert.ok(files.includes('js/techtree.js'));
+  assert.ok(files.includes('js/interface/techtree/main.js'));
 });
 
 test('chaque fichier de FILES existe (sinon l’installation du cache échoue)', () => {

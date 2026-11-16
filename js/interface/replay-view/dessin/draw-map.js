@@ -1,6 +1,6 @@
-import { UNIVERSE, planetsFor, sameCell, sunFor } from '../../../game.js';
+import { UNIVERSE, planetsFor, sameCell, sunFor } from '../../../regles/game/index.js';
 import { drawSun } from '../../sky/index.js';
-import { fleetPos, moving } from '../../../fleet.js';
+import { fleetPos, moving } from '../../../regles/fleet/index.js';
 import { etat } from '../etat.js';
 import { $ } from '../outils/dom.js';
 

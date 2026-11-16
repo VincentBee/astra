@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { game, fleet, clone, newGame } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
 
-const { normalize } = await import('../js/session.js');
+const { normalize } = await import('../js/session/index.js');
 const scenario = scenarios(import.meta.url);
 
 const T0 = 10_000_000;
@@ -283,7 +283,7 @@ scenario('déconstruire un niveau rend la moitié de son prix et libère sa plac
 
 scenario('D-106 : le plus grand lot de vaisseaux suit le stock, et le chantier l’accepte', async (film) => {
   const { show } = stage(film, 'human');
-  const { SHIPS, shipUnlock } = await import('../js/tech.js');
+  const { SHIPS, shipUnlock } = await import('../js/regles/tech/index.js');
   const { shipsAffordable, startShips, newPlanet } = game;
   const p = newPlanet('human', T0);
   p.levels.yard = 1;

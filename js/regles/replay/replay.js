@@ -1,7 +1,7 @@
 import { copy } from './copy.js';
 import { firstFiche } from './first-fiche.js';
 import { comparable } from './comparable.js';
-import { Session, normalize } from '../../session.js';
+import { Session, normalize } from '../../session/index.js';
 
 /**
  * Rejoue la partie `state` (une copie complète, celle de la sauvegarde).

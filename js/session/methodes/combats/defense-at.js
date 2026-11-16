@@ -1,4 +1,4 @@
-import { stateAt, sameCell } from '../../../game.js';
+import { stateAt, sameCell } from '../../../regles/game/index.js';
 
 /**
  * Planète d'un autre joueur telle que je la vois à `at`, moins mes

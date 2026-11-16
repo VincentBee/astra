@@ -1,5 +1,5 @@
-import { distance } from '../../../game.js';
-import { fleetSpeed, tripMs } from '../../../fleet.js';
+import { distance } from '../../../regles/game/index.js';
+import { fleetSpeed, tripMs } from '../../../regles/fleet/index.js';
 import { ahead } from './ahead.js';
 import { rivalColonizers } from './rival-colonizers.js';
 import { MIN } from '../donnees/min.js';

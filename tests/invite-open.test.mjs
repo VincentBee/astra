@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Session } from './harness.mjs';
 
-const { encode } = await import('../js/invite.js');
+const { encode } = await import('../js/reseau/invite/index.js');
 
 const FP = Array.from({ length: 32 }, (_, i) => i.toString(16).padStart(2, '0')).join(':');
 const sdp = (ufrag) =>

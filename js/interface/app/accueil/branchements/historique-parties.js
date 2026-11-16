@@ -1,7 +1,7 @@
-import { wakeBots } from '../../../../bot.js';
-import { forgetGame, selectGame } from '../../../../save.js';
-import { Session } from '../../../../session.js';
-import { holdGame } from '../../../../tablock.js';
+import { wakeBots } from '../../../../ia/bot/index.js';
+import { forgetGame, selectGame } from '../../../../reseau/save/index.js';
+import { Session } from '../../../../session/index.js';
+import { holdGame } from '../../../../reseau/tablock/index.js';
 import { etat } from '../../etat.js';
 import { showAbsence } from '../../journal/show-absence.js';
 import { $ } from '../../outils/dollar.js';

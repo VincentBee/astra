@@ -1,4 +1,4 @@
-import { TECHS, SHIPS } from '../../../tech.js';
+import { TECHS, SHIPS } from '../../tech/index.js';
 import { own } from '../outils/own.js';
 import { RACES } from '../races/races.js';
 

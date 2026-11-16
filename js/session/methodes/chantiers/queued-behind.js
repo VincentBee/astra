@@ -1,4 +1,4 @@
-import { stateAt } from '../../../game.js';
+import { stateAt } from '../../../regles/game/index.js';
 
 /**
  * Fil non vide sur cette planète, maintenant (D-420) : une construction lancée à la main

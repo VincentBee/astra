@@ -1,4 +1,4 @@
-import { Rendezvous } from '../../../rendezvous.js';
+import { Rendezvous } from '../../../reseau/rendezvous/index.js';
 
 /** Rejoint le salon de la partie, ou en change si on a changé de partie. */
 export function meet() {

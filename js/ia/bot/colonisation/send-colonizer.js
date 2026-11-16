@@ -1,5 +1,5 @@
-import { distance } from '../../../game.js';
-import { fleetBurn, fuelAt, fleetPos } from '../../../fleet.js';
+import { distance } from '../../../regles/game/index.js';
+import { fleetBurn, fuelAt, fleetPos } from '../../../regles/fleet/index.js';
 import { colonyTargets } from './colony-targets.js';
 
 /**

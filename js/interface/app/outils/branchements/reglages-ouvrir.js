@@ -1,4 +1,4 @@
-import { skyMode } from '../../../../galaxy.js';
+import { skyMode } from '../../../galaxy/index.js';
 import { $ } from '../dollar.js';
 
 // Réglages de l'appareil : une fenêtre, ouverte par la roue crantée (accueil et jeu).

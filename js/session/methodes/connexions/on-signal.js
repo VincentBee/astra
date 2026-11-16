@@ -1,4 +1,4 @@
-import { makeAnswer } from '../../../peer.js';
+import { makeAnswer } from '../../../reseau/peer/index.js';
 
 export async function onSignal(link, msg) {
   if (typeof msg.sdp !== 'string' || msg.sdp.length > 8000 || !link.pid) return;

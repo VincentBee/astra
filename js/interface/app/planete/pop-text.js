@@ -1,4 +1,4 @@
-import { fmt, RACES, resIcon } from '../../../game.js';
+import { fmt, RACES, resIcon } from '../../../regles/game/index.js';
 
 /** Résumé d'une planète pour la liste des commandants. */
 export function popText(race, pop) {

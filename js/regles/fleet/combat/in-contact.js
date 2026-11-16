@@ -1,4 +1,4 @@
-import { distance } from '../../../game.js';
+import { distance } from '../../game/index.js';
 import { CONTACT } from './contact.js';
 import { fleetPos } from '../deplacement/fleet-pos.js';
 

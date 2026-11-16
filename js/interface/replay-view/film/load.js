@@ -1,5 +1,5 @@
-import { loadGame } from '../../../save.js';
-import { replay, replayable, scoreSeries } from '../../../replay.js';
+import { loadGame } from '../../../reseau/save/index.js';
+import { replay, replayable, scoreSeries } from '../../../regles/replay/index.js';
 import { MIN } from '../constantes/min.js';
 import { etat } from '../etat.js';
 import { seek } from '../lecture/seek.js';

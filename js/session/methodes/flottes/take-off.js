@@ -1,4 +1,4 @@
-import { launch, countShips, MAX_FLEETS } from '../../../fleet.js';
+import { launch, countShips, MAX_FLEETS } from '../../../regles/fleet/index.js';
 import { de } from '../../textes/de.js';
 import { shipsText } from '../../textes/ships-text.js';
 

@@ -1,4 +1,4 @@
-import { startBuild, RACES, sameCell, usedPlaces } from '../../../game.js';
+import { startBuild, RACES, sameCell, usedPlaces } from '../../../regles/game/index.js';
 
 export function build(key, where = 'home') {
   if (!this.canAct) return;

@@ -1,4 +1,4 @@
-import { settle } from '../../../game.js';
+import { settle } from '../../game/index.js';
 import { fleetTank } from '../caracteristiques/fleet-tank.js';
 import { fuelAt } from '../caracteristiques/fuel-at.js';
 

@@ -1,4 +1,4 @@
-import { frostAt, sunFor } from '../../../game.js';
+import { frostAt, sunFor } from '../../../regles/game/index.js';
 
 /** Heure à laquelle le froid prend la case `cell` (Infinity : partie sans froid). */
 export function frostOf(cell) {

@@ -1,4 +1,4 @@
-import { playing } from '../../../back.js';
+import { playing } from '../../back/index.js';
 import { etat } from '../etat.js';
 import { VIEW } from '../lecture/view.js';
 import { $ } from '../outils/dollar.js';

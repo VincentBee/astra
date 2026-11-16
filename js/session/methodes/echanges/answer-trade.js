@@ -1,5 +1,5 @@
-import { sameCell } from '../../../game.js';
-import { amounts, lacks, noRoom, take, put } from '../../../trade.js';
+import { sameCell } from '../../../regles/game/index.js';
+import { amounts, lacks, noRoom, take, put } from '../../../regles/trade/index.js';
 import { de } from '../../textes/de.js';
 
 /**

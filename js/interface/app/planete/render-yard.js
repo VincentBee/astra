@@ -1,6 +1,6 @@
-import { PLAN_MAX, RACES } from '../../../game.js';
-import { ic } from '../../../icons.js';
-import { SHIP_KEYS, shipDuration, SHIPS, shipStats, shipUnlock, shipUnlocked, TECHS } from '../../../tech.js';
+import { PLAN_MAX, RACES } from '../../../regles/game/index.js';
+import { ic } from '../../icons/index.js';
+import { SHIP_KEYS, shipDuration, SHIPS, shipStats, shipUnlock, shipUnlocked, TECHS } from '../../../regles/tech/index.js';
 import { etat } from '../etat.js';
 import { clock } from '../outils/clock.js';
 import { $ } from '../outils/dollar.js';

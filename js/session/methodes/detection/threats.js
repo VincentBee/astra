@@ -1,5 +1,5 @@
-import { sameCell } from '../../../game.js';
-import { countShips, fleetPos, armed } from '../../../fleet.js';
+import { sameCell } from '../../../regles/game/index.js';
+import { countShips, fleetPos, armed } from '../../../regles/fleet/index.js';
 
 /**
  * Flottes armées adverses que je vois (D-133). Celles qui visent une de mes

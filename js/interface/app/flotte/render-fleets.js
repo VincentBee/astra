@@ -1,5 +1,5 @@
-import { moving } from '../../../fleet.js';
-import { SHIP_KEYS, SHIPS } from '../../../tech.js';
+import { moving } from '../../../regles/fleet/index.js';
+import { SHIP_KEYS, SHIPS } from '../../../regles/tech/index.js';
 import { clock } from '../outils/clock.js';
 import { $ } from '../outils/dollar.js';
 import { esc } from '../outils/esc.js';

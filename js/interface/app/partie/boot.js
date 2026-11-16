@@ -1,4 +1,4 @@
-import { decode, inviteGid } from '../../../invite.js';
+import { decode, inviteGid } from '../../../reseau/invite/index.js';
 import { etat } from '../etat.js';
 import { $ } from '../outils/dollar.js';
 import { show } from '../outils/show.js';

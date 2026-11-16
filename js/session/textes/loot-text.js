@@ -1,4 +1,4 @@
-import { RES_INFO } from '../../game.js';
+import { RES_INFO } from '../../regles/game/index.js';
 
 /** « 173 minéraux et 37 nourriture » (vide si rien). */
 export function lootText(take) {

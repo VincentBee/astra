@@ -1,5 +1,5 @@
-import { RACES } from '../../game.js';
-import { TECHS, SHIPS } from '../../tech.js';
+import { RACES } from '../../regles/game/index.js';
+import { TECHS, SHIPS } from '../../regles/tech/index.js';
 
 /** Journal : ce que le fil vient de lancer tout seul (événement `start` de stateAt). */
 export function planStartText(p, d, where) {

@@ -1,4 +1,4 @@
-import { sameCell } from '../../../game.js';
+import { sameCell } from '../../../regles/game/index.js';
 import { etat } from '../etat.js';
 import { de } from './de.js';
 import { mapVeiled } from './map-veiled.js';

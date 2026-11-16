@@ -147,14 +147,14 @@ test('serveur qui répond : la version du réseau est servie, et une modificatio
 test('serveur muet : la copie en cache est servie en moins de 5 s', async () => {
   mode = 'stall';
   // L'accueil et quelques fichiers de FILES, demandés ensemble comme le ferait la page.
-  const [r, ...rest] = await Promise.all(['/index.html', '/', '/style.css', '/js/app.js'].map(get));
+  const [r, ...rest] = await Promise.all(['/index.html', '/', '/style.css', '/js/interface/app/main.js'].map(get));
   assert.ok(r.ms < 5000, `servie en ${r.ms} ms`);
   assert.ok(r.ms >= 2900, `pas avant le délai de 3 s (${r.ms} ms) : le réseau garde sa chance`);
   assert.match(r.text, /NOUVELLE VERSION/);
   for (const x of rest) assert.ok(x.res && x.ms < 5000, `${x.ms} ms`);
   // Le réseau est muet : les fichiers suivants (les `import` en chaîne des modules)
   // viennent du cache tout de suite, sans attendre 3 s chacun.
-  const next = await get('/js/game.js');
+  const next = await get('/js/regles/game/index.js');
   assert.ok(next.res && next.ms < 500, `fichier suivant en ${next.ms} ms`);
 });
 

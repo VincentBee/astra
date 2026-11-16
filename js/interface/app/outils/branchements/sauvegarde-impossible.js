@@ -1,4 +1,4 @@
-import { onSaveFailed } from '../../../../save.js';
+import { onSaveFailed } from '../../../../reseau/save/index.js';
 import { toast } from '../toast.js';
 
 // Mémoire du téléphone pleine malgré le ménage de l'historique (D-415) : le joueur est prévenu.

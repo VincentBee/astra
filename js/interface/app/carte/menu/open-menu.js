@@ -1,5 +1,5 @@
-import { menuPlace } from '../../../../aim.js';
-import { ic } from '../../../../icons.js';
+import { menuPlace } from '../../../aim/index.js';
+import { ic } from '../../../icons/index.js';
 import { etat } from '../../etat.js';
 import { $ } from '../../outils/dollar.js';
 import { esc } from '../../outils/esc.js';

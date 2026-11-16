@@ -1,4 +1,4 @@
-import { contenders, underFinger } from '../../../../aim.js';
+import { contenders, underFinger } from '../../../aim/index.js';
 import { etat } from '../../etat.js';
 import { mapItems } from '../selection/map-items.js';
 import { cellCss } from './cell-css.js';

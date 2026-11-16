@@ -1,4 +1,4 @@
-import { fuelAt } from '../../fleet.js';
+import { fuelAt } from '../fleet/index.js';
 
 /** Ce que possède une partie. */
 export function holdings(side, race, now) {

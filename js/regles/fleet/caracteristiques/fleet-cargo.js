@@ -1,4 +1,4 @@
-import { SHIPS } from '../../../tech.js';
+import { SHIPS } from '../../tech/index.js';
 
 /** Capacité totale des soutes. */
 export function fleetCargo(race, ships) {

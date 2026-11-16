@@ -1,4 +1,4 @@
-import { RACES, upgradeCost, buildDuration } from '../../../game.js';
+import { RACES, upgradeCost, buildDuration } from '../../../regles/game/index.js';
 import { etat } from '../etat.js';
 import { cost } from '../outils/cost.js';
 import { dur } from '../outils/dur.js';

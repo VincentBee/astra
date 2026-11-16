@@ -1,4 +1,4 @@
-import { moving } from '../../../fleet.js';
+import { moving } from '../../../regles/fleet/index.js';
 
 /**
  * Colonisateurs adverses en route, par planète visée : le premier arrivé de chaque planète

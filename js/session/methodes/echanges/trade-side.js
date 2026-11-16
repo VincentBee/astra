@@ -1,4 +1,4 @@
-import { moving, parkedCell } from '../../../fleet.js';
+import { moving, parkedCell } from '../../../regles/fleet/index.js';
 import { de } from '../../textes/de.js';
 
 /**

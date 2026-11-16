@@ -1,5 +1,5 @@
-import { settle, SOIL } from '../../../game.js';
-import { launch, fleetCargo, fleetTank } from '../../../fleet.js';
+import { settle, SOIL } from '../../../regles/game/index.js';
+import { launch, fleetCargo, fleetTank } from '../../../regles/fleet/index.js';
 
 /**
  * Colonie perdue au profit d'un joueur arrivé avant moi : comme si ma

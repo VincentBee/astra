@@ -1,4 +1,4 @@
-import { techCost } from '../../../tech.js';
+import { techCost } from '../../tech/index.js';
 import { planLane } from './plan-lane.js';
 import { planAhead } from './plan-ahead.js';
 import { shipsCost } from './ships-cost.js';

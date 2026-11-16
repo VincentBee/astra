@@ -1,5 +1,5 @@
-import { settle } from '../../game.js';
-import { freeze, fleetCargo, fleetTank } from '../../fleet.js';
+import { settle } from '../game/index.js';
+import { freeze, fleetCargo, fleetTank } from '../fleet/index.js';
 
 /**
  * Ajoute `amt` à une partie. Une flotte ne garde que ce qui tient dans ses

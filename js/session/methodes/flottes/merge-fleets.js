@@ -1,4 +1,4 @@
-import { merge } from '../../../fleet.js';
+import { merge } from '../../../regles/fleet/index.js';
 
 /** Fusionne une de mes flottes dans une autre, sur la même case. */
 export function mergeFleets(fromId, intoId) {

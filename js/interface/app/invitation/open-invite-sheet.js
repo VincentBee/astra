@@ -1,4 +1,4 @@
-import { drawQr, inviteLink } from '../../../invite.js';
+import { drawQr, inviteLink } from '../../../reseau/invite/index.js';
 import { etat } from '../etat.js';
 import { $ } from '../outils/dollar.js';
 

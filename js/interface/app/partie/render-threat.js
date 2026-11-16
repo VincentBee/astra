@@ -1,5 +1,5 @@
-import { ic } from '../../../icons.js';
-import { threatText } from '../../../session.js';
+import { ic } from '../../icons/index.js';
+import { threatText } from '../../../session/index.js';
 import { etat } from '../etat.js';
 import { $ } from '../outils/dollar.js';
 import { esc } from '../outils/esc.js';

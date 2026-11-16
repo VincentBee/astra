@@ -1,4 +1,4 @@
-import { PLAN_MAX } from '../../../game.js';
+import { PLAN_MAX } from '../../../regles/game/index.js';
 import { MIN } from '../donnees/min.js';
 import { chooseBuilding } from './choose-building.js';
 import { freePlaces } from './free-places.js';

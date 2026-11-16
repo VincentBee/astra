@@ -1,4 +1,4 @@
-import { SHIPS, shipUnlocked, shipDuration } from '../../../tech.js';
+import { SHIPS, shipUnlocked, shipDuration } from '../../tech/index.js';
 import { lv } from '../outils/lv.js';
 import { own } from '../outils/own.js';
 import { settle } from '../economie/settle.js';

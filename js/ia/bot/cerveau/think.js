@@ -1,5 +1,5 @@
-import { stateAt } from '../../../game.js';
-import { moving } from '../../../fleet.js';
+import { stateAt } from '../../../regles/game/index.js';
+import { moving } from '../../../regles/fleet/index.js';
 import { ownName } from './own-name.js';
 import { pickRace } from './pick-race.js';
 import { beaten } from '../colonisation/beaten.js';

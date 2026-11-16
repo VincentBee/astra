@@ -1,4 +1,4 @@
-import { upgradeCost } from '../../../game.js';
+import { upgradeCost } from '../../../regles/game/index.js';
 import { PLAYBOOK } from '../donnees/playbook.js';
 
 /**

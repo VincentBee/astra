@@ -1,4 +1,4 @@
-import { mergeStates, saveIdentity, identityFor, savedGame } from '../../../save.js';
+import { mergeStates, saveIdentity, identityFor, savedGame } from '../../../reseau/save/index.js';
 import { clean } from '../../fiches/clean.js';
 
 export function onWelcome(link, msg) {

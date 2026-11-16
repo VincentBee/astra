@@ -1,4 +1,4 @@
-import { moving } from '../../../fleet.js';
+import { moving } from '../../../regles/fleet/index.js';
 import { beaten } from '../colonisation/beaten.js';
 import { sendColonizer } from '../colonisation/send-colonizer.js';
 import { dockNearest } from './dock-nearest.js';

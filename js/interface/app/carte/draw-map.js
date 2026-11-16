@@ -1,6 +1,6 @@
-import { countShips, fleetTank, fuelAt } from '../../../fleet.js';
-import { sameCell, sunFor, UNIVERSE } from '../../../game.js';
-import { drawSun } from '../../../sky.js';
+import { countShips, fleetTank, fuelAt } from '../../../regles/fleet/index.js';
+import { sameCell, sunFor, UNIVERSE } from '../../../regles/game/index.js';
+import { drawSun } from '../../sky/index.js';
 import { drawAlertDot } from '../alertes/draw-alert-dot.js';
 import { myColonizer } from '../depart/my-colonizer.js';
 import { etat } from '../etat.js';

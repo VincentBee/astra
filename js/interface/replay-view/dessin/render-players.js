@@ -1,5 +1,5 @@
-import { RACES, raceIcon, stateAt } from '../../../game.js';
-import { countShips } from '../../../fleet.js';
+import { RACES, raceIcon, stateAt } from '../../../regles/game/index.js';
+import { countShips } from '../../../regles/fleet/index.js';
 import { etat } from '../etat.js';
 import { ptsAt } from '../film/pts-at.js';
 import { $ } from '../outils/dom.js';

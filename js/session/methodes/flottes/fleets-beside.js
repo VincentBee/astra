@@ -1,4 +1,4 @@
-import { together } from '../../../fleet.js';
+import { together } from '../../../regles/fleet/index.js';
 
 /** Mes autres flottes arrêtées sur la même case que celle-ci. */
 export function fleetsBeside(id) {

@@ -1,4 +1,4 @@
-import { sameCell } from '../../../game.js';
+import { sameCell } from '../../../regles/game/index.js';
 
 /**
  * Toutes les planètes d'un joueur : sa planète mère (clé « home ») et ses

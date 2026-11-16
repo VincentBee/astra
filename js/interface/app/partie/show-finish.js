@@ -1,5 +1,5 @@
-import { finalBoard } from '../../../finish.js';
-import { fmt, raceIcon, RACES } from '../../../game.js';
+import { finalBoard } from '../../finish/index.js';
+import { fmt, raceIcon, RACES } from '../../../regles/game/index.js';
 import { etat } from '../etat.js';
 import { $ } from '../outils/dollar.js';
 import { esc } from '../outils/esc.js';

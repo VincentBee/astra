@@ -1,4 +1,4 @@
-import { ic } from '../../../icons.js';
+import { ic } from '../../icons/index.js';
 import { etat } from '../etat.js';
 import { clock } from '../outils/clock.js';
 import { $ } from '../outils/dollar.js';

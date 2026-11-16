@@ -1,5 +1,5 @@
-import { PLAN_MAX, planAhead, startShips } from '../../../game.js';
-import { SHIPS, shipUnlocked } from '../../../tech.js';
+import { PLAN_MAX, planAhead, startShips } from '../../../regles/game/index.js';
+import { SHIPS, shipUnlocked } from '../../../regles/tech/index.js';
 import { colonyTargets } from '../colonisation/colony-targets.js';
 import { copy } from '../donnees/copy.js';
 import { MIN } from '../donnees/min.js';

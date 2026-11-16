@@ -1,15 +1,15 @@
 // Les modules du jeu sont chargés d'abord, dans le même ordre qu'avant ; puis les ordres
 // sont notés pour le rejeu (enveloppe posée sur les méthodes du prototype).
-import '../peer.js';
-import '../rendezvous.js';
-import '../save.js';
-import '../invite.js';
-import '../tablock.js';
-import '../game.js';
-import '../tech.js';
-import '../report.js';
-import '../fleet.js';
-import '../trade.js';
+import '../reseau/peer/index.js';
+import '../reseau/rendezvous/index.js';
+import '../reseau/save/index.js';
+import '../reseau/invite/index.js';
+import '../reseau/tablock/index.js';
+import '../regles/game/index.js';
+import '../regles/tech/index.js';
+import '../regles/report/index.js';
+import '../regles/fleet/index.js';
+import '../regles/trade/index.js';
 import { Session } from './session.js';
 import { ORDER_KINDS } from './constantes/order-kinds.js';
 import { seenNews } from './outils/seen-news.js';

@@ -1,4 +1,4 @@
-import { makeOffer } from '../../../peer.js';
+import { makeOffer } from '../../../reseau/peer/index.js';
 
 export async function dial(peer, via) {
   if (typeof peer !== 'string' || this.links.has(peer) || this.dialing.has(peer) || peer === this.me) return;

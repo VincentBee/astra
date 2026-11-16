@@ -1,4 +1,4 @@
-import { fleetTank, countShips, MAX_FLEETS } from '../../../fleet.js';
+import { fleetTank, countShips, MAX_FLEETS } from '../../../regles/fleet/index.js';
 
 /** Le froid est presque là : les vaisseaux posés partent se poser sur la planète qui tiendra le plus longtemps. */
 export function evacuate(ctx, pl, st) {

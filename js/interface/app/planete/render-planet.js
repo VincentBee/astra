@@ -1,5 +1,5 @@
-import { buildDuration, covers, fmt, liftGain, PLAN_MAX, planAhead, power, POWER_KEYS, powerCost, powerReadyAt, POWERS, RACES, resIcon, secs, SOIL, stateAt, storageCap, storeFor, TEMPO, tooBig, upgradeCost, usedPlaces } from '../../../game.js';
-import { ic } from '../../../icons.js';
+import { buildDuration, covers, fmt, liftGain, PLAN_MAX, planAhead, power, POWER_KEYS, powerCost, powerReadyAt, POWERS, RACES, resIcon, secs, SOIL, stateAt, storageCap, storeFor, TEMPO, tooBig, upgradeCost, usedPlaces } from '../../../regles/game/index.js';
+import { ic } from '../../icons/index.js';
 import { renderPartners } from '../echanges/render-partners.js';
 import { etat } from '../etat.js';
 import { renderFleets } from '../flotte/render-fleets.js';

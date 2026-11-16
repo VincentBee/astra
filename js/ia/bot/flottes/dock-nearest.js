@@ -1,5 +1,5 @@
-import { distance } from '../../../game.js';
-import { fleetBurn, fuelAt } from '../../../fleet.js';
+import { distance } from '../../../regles/game/index.js';
+import { fleetBurn, fuelAt } from '../../../regles/fleet/index.js';
 import { MIN } from '../donnees/min.js';
 
 /** Se poser sur la plus proche de mes planètes que le froid ne prend pas tout de suite. */
