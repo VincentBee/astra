@@ -7,8 +7,8 @@ import assert from 'node:assert/strict';
 import { newGame, game, clone } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
 
-const { replay, replayable, playersAt, comparable, scoreSeries } = await import('../js/replay.js');
-const { TECHS, SHIPS } = await import('../js/tech.js');
+const { replay, replayable, playersAt, comparable, scoreSeries } = await import('../js/regles/replay/index.js');
+const { TECHS, SHIPS } = await import('../js/regles/tech/index.js');
 
 const scenario = scenarios(import.meta.url);
 

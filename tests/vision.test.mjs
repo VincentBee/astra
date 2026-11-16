@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { newGame, game } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
 
-const { sightRange } = await import('../js/tech.js');
+const { sightRange } = await import('../js/regles/tech/index.js');
 const scenario = scenarios(import.meta.url);
 
 const P = (s) => s.state.players[s.me];

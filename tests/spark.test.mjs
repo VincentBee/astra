@@ -1,7 +1,7 @@
 // Mini-graphes des tuiles (#71) : un historique par planète.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { emptyHistory, ownHistory, addSample, sparkPath, SAMPLE_MS, HISTORY_MS } from '../js/spark.js';
+import { emptyHistory, ownHistory, addSample, sparkPath, SAMPLE_MS, HISTORY_MS } from '../js/interface/spark/index.js';
 
 const fill = (h, key, t0, n, f) => {
   for (let i = 0; i < n; i++) addSample(h, key, t0 + i * SAMPLE_MS, { metal: f(i) });

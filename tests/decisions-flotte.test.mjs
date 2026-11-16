@@ -9,9 +9,9 @@ import { newGame, game, fleet, clone } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
 
 // Après le harness : les globals du navigateur sont déjà en place.
-const { normalize, ORDER_KINDS, Session } = await import('../js/session.js');
-const { SHIPS, TECHS, sightRange } = await import('../js/tech.js');
-const { OFFER_MS, ABANDON_MS, TRADE_RES } = await import('../js/trade.js');
+const { normalize, ORDER_KINDS, Session } = await import('../js/session/index.js');
+const { SHIPS, TECHS, sightRange } = await import('../js/regles/tech/index.js');
+const { OFFER_MS, ABANDON_MS, TRADE_RES } = await import('../js/regles/trade/index.js');
 const scenario = scenarios(import.meta.url);
 
 const P = (s) => s.state.players[s.me];

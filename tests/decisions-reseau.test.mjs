@@ -11,11 +11,11 @@ import { readFileSync } from 'node:fs';
 import { newGame, game, Session } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
 
-const { MAX_ORDERS } = await import('../js/session.js');
-const save = await import('../js/save.js');
-const { Rendezvous } = await import('../js/rendezvous.js');
-const { ic } = await import('../js/icons.js');
-const { startGalaxy } = await import('../js/galaxy.js');
+const { MAX_ORDERS } = await import('../js/session/index.js');
+const save = await import('../js/reseau/save/index.js');
+const { Rendezvous } = await import('../js/reseau/rendezvous/index.js');
+const { ic } = await import('../js/interface/icons/index.js');
+const { startGalaxy } = await import('../js/interface/galaxy/index.js');
 const scenario = scenarios(import.meta.url);
 
 const P = (s) => s.state.players[s.me];
@@ -738,7 +738,7 @@ scenario('D-415 : les sauvegardes de l’ancien format sont reprises sans perte'
 
 // ----- D-430 : une partie ne se joue que dans un seul onglet (issue #49)
 
-const { holdGame } = await import('../js/tablock.js');
+const { holdGame } = await import('../js/reseau/tablock/index.js');
 
 /**
  * Faux navigateur à onglets : un navigator.locks (file d'attente, `signal`, `steal`) et un

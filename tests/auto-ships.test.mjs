@@ -9,9 +9,9 @@ import assert from 'node:assert/strict';
 import { newGame, game, clone } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
 
-const { replay, replayable, comparable } = await import('../js/replay.js');
-const { normalize, AUTO_SETTLE } = await import('../js/session.js');
-const { TECHS, SHIPS, shipUnlock } = await import('../js/tech.js');
+const { replay, replayable, comparable } = await import('../js/regles/replay/index.js');
+const { normalize, AUTO_SETTLE } = await import('../js/session/index.js');
+const { TECHS, SHIPS, shipUnlock } = await import('../js/regles/tech/index.js');
 const scenario = scenarios(import.meta.url);
 
 const T0 = 10_000_000;

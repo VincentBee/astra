@@ -10,8 +10,8 @@ import { newGame, Session } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
 
 globalThis.location ||= { origin: 'https://astra.test', pathname: '/astra/', href: 'https://astra.test/astra/', search: '', hash: '' };
-const save = await import('../js/save.js');
-const { inviteLink, inviteGid } = await import('../js/invite.js');
+const save = await import('../js/reseau/save/index.js');
+const { inviteLink, inviteGid } = await import('../js/reseau/invite/index.js');
 const scenario = scenarios(import.meta.url);
 
 const SECRET_A = 'secret-de-ma-fiche-dans-A';

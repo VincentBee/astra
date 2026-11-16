@@ -7,9 +7,9 @@ import assert from 'node:assert/strict';
 import { Session, newGame, newLobby, game, clone } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
 
-const { think, addBot, wakeBots, PEACE_MS } = await import('../js/bot.js');
-const { loadGame } = await import('../js/save.js');
-const { replay, replayable } = await import('../js/replay.js');
+const { think, addBot, wakeBots, PEACE_MS } = await import('../js/ia/bot/index.js');
+const { loadGame } = await import('../js/reseau/save/index.js');
+const { replay, replayable } = await import('../js/regles/replay/index.js');
 
 const scenario = scenarios(import.meta.url);
 const MIN = 60_000;
@@ -383,7 +383,7 @@ scenario('D-280 : deux IA machines jouent jusqu’au bout ; une IA n’a jamais 
 // copie complète en JSON ; et beaucoup moins de JSON écrit pendant la livraison des messages.
 scenario('D-370 : 7 IA, même graine : même partie qu’avec la copie complète, cinq fois moins de JSON', async (film) => {
   const { measure } = await import('./perf-ia.mjs');
-  const { LINK } = await import('../js/bot.js');
+  const { LINK } = await import('../js/ia/bot/index.js');
   LINK.fullCopy = true;
   const full = await measure({ bots: 7, minutes: 22, seed: 3 }).finally(() => (LINK.fullCopy = false));
   const fast = await measure({ bots: 7, minutes: 22, seed: 3 });
