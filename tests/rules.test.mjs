@@ -315,8 +315,10 @@ scenario('une planète datée de l’an 1970 ou d’il y a 30 jours se calcule v
   const { show } = stage(film, 'human');
   const now = Date.now();
   for (const [label, at] of [['at = 0', 0], ['30 jours', now - 30 * DAY]]) {
-    // Pas plus de MAX_STEPS pas pour l'économie entière…
-    assert.ok(Math.ceil((now - at) / game.stepOf(now - at)) <= game.MAX_STEPS, label);
+    // Pas plus de MAX_STEPS pas pour l'économie entière… (à l'arrondi des flottants près : au-delà
+    // de 26,7 h, pas = écart / MAX_STEPS, et le quotient vaut parfois 2000.0000000000002, ce qui
+    // faisait échouer le test un jour sur quatorze selon la milliseconde de Date.now()).
+    assert.ok(Math.ceil((now - at) / game.stepOf(now - at) - 1e-9) <= game.MAX_STEPS, label);
     // … et stateAt entier (fil d'attente plein, chantier en cours) finit en quelques millisecondes.
     for (const race of ['human', 'machine', 'alien']) {
       const p = game.newPlanet(race, at, game.planetsFor('gtest')[0]);
