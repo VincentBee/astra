@@ -2053,6 +2053,9 @@ export class Session {
     const ahead = planAhead(stateAt(pl.planet, pl.planet.at));
     if (!ahead.levels.yard) return this.ontoast?.('Il faut un chantier naval (ou en mettre un au fil).');
     if (!shipUnlocked(p.race, type, ahead.tech)) return this.ontoast?.('Ce vaisseau n’est pas encore recherché (fil compris).');
+    // Lot plus cher que l'entrepôt (fil compris) : il ne partirait jamais (comme D-441). Au rejeu, un vieux journal garde son sens.
+    const big = !this.replaying && tooBig(p.race, ahead.levels, Object.fromEntries(Object.entries(S[type].cost).map(([r, v]) => [r, v * count])));
+    if (big) return this.ontoast?.(`${big} pour un lot de ${count} (fil compris).`);
     const old = pl.planet.auto;
     if (old?.ship === type && old?.n === count) return this.ontoast?.('Cet achat automatique est déjà réglé.');
     pl.planet.auto = { ship: type, n: count };
@@ -3057,7 +3060,8 @@ export class Session {
       // L'achat automatique (D-530) n'écrit la planète qu'au plus toutes les AUTO_SETTLE : un passage
       // par lot remplirait le journal d'ordres (MAX_ORDERS) et la partie ne se rejouerait plus.
       const auto = !!pl.planet.auto && now - pl.planet.at >= AUTO_SETTLE;
-      const ended = (k) => pl.planet[k] && pl.planet[k].end <= now && (k !== 'yard' || !pl.planet.yard.auto || auto);
+      // Règle arrêtée : son dernier lot finit comme un lot ordinaire (sinon il resterait en chantier dans la fiche).
+      const ended = (k) => pl.planet[k] && pl.planet[k].end <= now && (k !== 'yard' || !pl.planet.yard.auto || !pl.planet.auto || auto);
       const due = ['queue', 'research', 'yard'].some(ended) || ((auto || (!pl.planet.queue && pl.planet.plan?.length)) && stateAt(pl.planet, now).done.length > 0);
       if (due) {
         const done = settle(pl.planet, now);

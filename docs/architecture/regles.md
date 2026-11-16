@@ -340,8 +340,16 @@ Tests : `tests/alerts.test.mjs`. L'affichage est dans [interface.md](interface.m
     (lot automatique fini, ou lot à lancer) qu'au plus toutes les 5 min, sinon un passage par lot
     (toutes les 3 s) remplirait le journal d'ordres (`MAX_ORDERS` = 1500) et la partie ne se
     rejouerait plus depuis le début. Les lots se calculent quand même entre-temps (`stateAt`).
+    Une règle arrêtée laisse finir son dernier lot comme un lot ordinaire (écrit au passage
+    suivant). Conséquence : la fiche (et donc le score, `empireScore`, qui lit `ships` sans
+    `stateAt`) peut avoir jusqu'à 5 min de retard sur les vaisseaux de la règle.
+  - Lot plus cher que l'entrepôt (fil compris) : refusé par l'ordre (`tooBig`, comme D-441) ;
+    le bouton + de la fiche ne propose pas une taille qui ne rentrerait pas.
   - Journal de partie : une ligne par vaisseau et par écriture, « J0 reçoit 18 × Cargo Hermès
     sur Aldébaran (achat auto). » (`autoLog`), pas une par lot.
+  - Limite connue (D-531) : `AUTO_MAX` peut jouer après environ 1 h d'absence sur une planète
+    riche avec des lots de 1 (mesuré : 403 lots de 1 cargo en 1 h) ; la planète d'un autre joueur
+    resté longtemps hors ligne coûte jusqu'à ~10 ms par `stateAt`.
   - **Limite connue (D-530)** : pas de réserve de ressources. Une règle qui se déclenche dépense ;
     seul le fil passe avant elle. Un élément du fil qui attend un prérequis (labo, chantier en
     cours) ne retient pas le stock : la règle peut le dépenser entre-temps.

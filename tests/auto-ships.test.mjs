@@ -141,14 +141,23 @@ scenario('arrêter la règle arrête les achats ; un nouveau réglage remplace l
   assert.ok(before > 0);
   A.setAutoShips('cargo', 5);
   assert.deepEqual(P.planet.auto, { ship: 'cargo', n: 5 }, 'une seule règle : la nouvelle remplace l’ancienne');
+  // On arrête pendant qu'un lot de la règle est en chantier.
+  for (let i = 0; i < 600 && !game.stateAt(P.planet, clock.t).yard?.auto; i++) clock.t += 1000;
+  assert.ok(game.stateAt(P.planet, clock.t).yard?.auto, 'un lot automatique en chantier');
   A.setAutoShips(null, 0);
   assert.equal(P.planet.auto, undefined);
   const stopped = game.stateAt(P.planet, clock.t);
   const busy = stopped.yard ? stopped.yard.count : 0; // un lot déjà payé finit quand même
+  assert.ok(busy > 0);
   const after = game.stateAt(P.planet, clock.t + 4 * HOUR).ships.cargo || 0;
   film.look(A, 'A arrête la règle : plus aucun cargo acheté', [{ show: 'cargos 4 h plus tard', expected: (stopped.ships.cargo || 0) + busy, got: after }]);
   assert.equal(after, (stopped.ships.cargo || 0) + busy);
   assert.ok(A.state.log.some((l) => /arrête l’achat automatique/.test(l.text)));
+  // Le dernier lot de la règle arrêtée finit comme un lot ordinaire : la fiche le reçoit au passage suivant.
+  clock.t += 10 * MIN;
+  A.tick();
+  assert.equal(P.planet.yard, null, 'plus de lot coincé en chantier dans la fiche');
+  assert.equal(P.planet.ships.cargo || 0, (stopped.ships.cargo || 0) + busy);
 });
 
 scenario('règle invalide : refusée par l’ordre, nettoyée dans une fiche reçue', () => {
@@ -180,7 +189,16 @@ scenario('règle invalide : refusée par l’ordre, nettoyée dans une fiche re�
     A.setAutoShips('cargo', n);
     assert.match(toasts.at(-1), /Entre 1 et 50/);
   }
+  // Un lot plus cher que l'entrepôt ne partirait jamais : refusé (comme D-441).
+  const u = shipUnlock('human', 'cargo');
+  P.planet.tech = { ...P.planet.tech, [u.key]: u.level };
+  P.planet.levels.store = 0;
+  A.setAutoShips('cargo', 50);
+  assert.match(toasts.at(-1), /Entrepôt trop petit/);
   assert.equal(P.planet.auto, undefined);
+  A.setAutoShips('cargo', 2);
+  assert.deepEqual(P.planet.auto, { ship: 'cargo', n: 2 }, 'un petit lot passe');
+  delete P.planet.auto;
 
   // Une fiche reçue : règle trafiquée retirée, règle valide recopiée sans le reste.
   const rec = clone(P);

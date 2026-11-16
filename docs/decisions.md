@@ -3892,6 +3892,13 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
     (achat auto) »), pas une par lot ; pas de ligne « met en chantier » pour la règle.
   - `FORMAT` 11 → 12 : un téléphone d'avant ne connaît pas la règle et calculerait mal la planète
     d'un autre ; il est prévenu de recharger (`outdated`).
+  - Règle arrêtée : son dernier lot (déjà payé) finit comme un lot ordinaire, écrit au passage
+    suivant (sans ça, il restait en chantier dans la fiche ; trouvé en revue, scénario ajouté).
+  - Lot plus cher que l'entrepôt (fil compris) : refusé (`tooBig`, comme D-441), il ne partirait
+    jamais.
+  - Limites connues : la fiche, et le score qu'on en tire (`empireScore`), peuvent avoir 5 min de
+    retard sur les vaisseaux de la règle ; `AUTO_MAX` peut jouer après ~1 h d'absence sur une
+    planète riche avec des lots de 1.
 - Écarté : un passage par lot (journal plein) ; aucune limite de lots (page figée sur une vieille
   fiche) ; garder FORMAT 11 (calculs faux en silence chez un joueur pas à jour).
 - Qui : Claude par défaut. Source : session `a7e3826e`. Statut : en vigueur.
