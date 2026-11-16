@@ -1,7 +1,7 @@
 import { fromB64url } from './base64/from-b64url.js';
 import { unpack } from './binaire/unpack.js';
-import { VERSION } from './constantes.js';
 import { buildSdp } from './sdp/build-sdp.js';
+import { VERSION } from './version.js';
 
 /**
  * Accepte un code brut ou un lien complet contenant "#…".

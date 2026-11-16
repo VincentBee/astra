@@ -1,4 +1,7 @@
-import { ADDR_V4, ADDR_V6, ADDR_MDNS, ADDR_TEXT } from '../constantes.js';
+import { ADDR_MDNS } from '../addr-mdns.js';
+import { ADDR_TEXT } from '../addr-text.js';
+import { ADDR_V4 } from '../addr-v4.js';
+import { ADDR_V6 } from '../addr-v6.js';
 
 export function packAddr(w, addr) {
   if (/^\d+\.\d+\.\d+\.\d+$/.test(addr)) {

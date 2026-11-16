@@ -1,5 +1,5 @@
-import { SAVE_KEY } from '../constantes.js';
 import { migrate } from '../historique/migrate.js';
+import { SAVE_KEY } from '../save-key.js';
 import { read } from '../stockage/read.js';
 import { valid } from '../stockage/valid.js';
 

@@ -1,5 +1,6 @@
 import { ICE_SERVERS, relayUrls } from '../config/index.js';
-import { APP_ID, ACTION } from './constantes.js';
+import { ACTION } from './action.js';
+import { APP_ID } from './app-id.js';
 import { loadLib } from './load-lib.js';
 import { RoomLink } from './room-link.js';
 

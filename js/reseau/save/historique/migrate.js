@@ -1,5 +1,9 @@
-import { SAVE_KEY, GAME_KEY, INDEX_KEY, OLD_KEY, KEEP } from '../constantes.js';
 import { etat } from '../etat.js';
+import { GAME_KEY } from '../game-key.js';
+import { INDEX_KEY } from '../index-key.js';
+import { KEEP } from '../keep.js';
+import { OLD_KEY } from '../old-key.js';
+import { SAVE_KEY } from '../save-key.js';
 import { isMap } from '../stockage/is-map.js';
 import { read } from '../stockage/read.js';
 import { remove } from '../stockage/remove.js';

@@ -1,5 +1,6 @@
-import { ID_KEY, IDS_KEY } from '../constantes.js';
+import { ID_KEY } from '../id-key.js';
 import { identities } from '../identite/identities.js';
+import { IDS_KEY } from '../ids-key.js';
 import { read } from '../stockage/read.js';
 import { write } from '../stockage/write.js';
 

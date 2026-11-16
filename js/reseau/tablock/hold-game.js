@@ -1,4 +1,5 @@
-import { CHANNEL, WAIT } from './constantes.js';
+import { CHANNEL } from './channel.js';
+import { WAIT } from './wait.js';
 
 /**
  * Prend la partie `gid` pour cet onglet ; la promesse se résout quand cet onglet l'a (l'ancien a

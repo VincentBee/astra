@@ -1,5 +1,5 @@
-import { RETELL } from '../constantes.js';
 import { etat } from '../etat.js';
+import { RETELL } from '../retell.js';
 
 export function report(ok) {
   if (ok) etat.told = -Infinity;

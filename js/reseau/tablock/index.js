@@ -15,5 +15,5 @@
 //
 // Navigateur sans navigator.locks (Safari avant 15.4) : pas de verrou, comme avant.
 
-export { WAIT } from './constantes.js';
+export { WAIT } from './wait.js';
 export { holdGame } from './hold-game.js';

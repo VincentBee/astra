@@ -1,4 +1,5 @@
-import { PART, MAX_PARTS } from './constantes.js';
+import { MAX_PARTS } from './max-parts.js';
+import { PART } from './part.js';
 
 /** Enveloppe un canal de données : messages JSON, état de connexion. */
 export class Link {

@@ -1,7 +1,11 @@
-import { SAVE_KEY, GAME_KEY, INDEX_KEY, ID_KEY, IDS_KEY } from '../constantes.js';
+import { GAME_KEY } from '../game-key.js';
 import { drop } from '../historique/drop.js';
 import { index } from '../historique/index-historique.js';
+import { ID_KEY } from '../id-key.js';
 import { identities } from '../identite/identities.js';
+import { IDS_KEY } from '../ids-key.js';
+import { INDEX_KEY } from '../index-key.js';
+import { SAVE_KEY } from '../save-key.js';
 import { read } from '../stockage/read.js';
 import { remove } from '../stockage/remove.js';
 import { write } from '../stockage/write.js';

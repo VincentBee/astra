@@ -1,4 +1,4 @@
-import { GAME_KEY } from '../constantes.js';
+import { GAME_KEY } from '../game-key.js';
 import { read } from '../stockage/read.js';
 import { valid } from '../stockage/valid.js';
 

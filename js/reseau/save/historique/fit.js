@@ -1,4 +1,5 @@
-import { GAME_KEY, INDEX_KEY } from '../constantes.js';
+import { GAME_KEY } from '../game-key.js';
+import { INDEX_KEY } from '../index-key.js';
 import { put } from '../stockage/put.js';
 import { write } from '../stockage/write.js';
 import { drop } from './drop.js';

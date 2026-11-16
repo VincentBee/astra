@@ -1,4 +1,4 @@
-import { INDEX_KEY } from '../constantes.js';
+import { INDEX_KEY } from '../index-key.js';
 import { isMap } from '../stockage/is-map.js';
 import { read } from '../stockage/read.js';
 import { keys } from './keys.js';

@@ -1,4 +1,6 @@
-import { GAME_KEY, INDEX_KEY, KEEP } from '../constantes.js';
+import { GAME_KEY } from '../game-key.js';
+import { INDEX_KEY } from '../index-key.js';
+import { KEEP } from '../keep.js';
 import { drop } from './drop.js';
 import { fit } from './fit.js';
 import { oldestFirst } from './oldest-first.js';

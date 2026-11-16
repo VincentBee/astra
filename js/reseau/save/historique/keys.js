@@ -1,4 +1,4 @@
-import { GAME_KEY } from '../constantes.js';
+import { GAME_KEY } from '../game-key.js';
 
 /** Les gid des clés `astra.save.<gid>` présentes (si le navigateur sait les énumérer). */
 export function keys() {
