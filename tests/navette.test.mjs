@@ -1,12 +1,12 @@
-// Navette (D-540 à D-546) : une flotte de cargos fait seule des allers-retours entre deux de mes
+// Navette (D-550 à D-556) : une flotte de cargos fait seule des allers-retours entre deux de mes
 // planètes. Elle charge sur A ce que ses soutes peuvent prendre, le pose sur B, revient à vide.
 // Écrits en scénarios (D-129) : en cas d'échec, tests/reports/navette.test.html montre la carte.
 import assert from 'node:assert/strict';
 import { newGame, game, fleet, clone } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
 
-const { replay, replayable, comparable } = await import('../js/replay.js');
-const { normalize } = await import('../js/session.js');
+const { replay, replayable, comparable } = await import('../js/regles/replay/index.js');
+const { normalize } = await import('../js/session/index.js');
 
 const scenario = scenarios(import.meta.url);
 const P = (s) => s.state.players[s.me];

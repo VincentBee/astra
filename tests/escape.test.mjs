@@ -1,12 +1,13 @@
 // Échap ferme la fenêtre du dessus, et seulement elle (issue #72, D-192).
 //
-// js/app.js tourne dans le navigateur (il touche le DOM dès son chargement) : on ne peut pas
-// l'importer dans Node. Ce test vérifie donc, sur les vrais fichiers, les trois choses dont la
+// L'interface (js/interface/app/) tourne dans le navigateur (elle touche le DOM dès son
+// chargement) : on ne peut pas l'importer dans Node. Ce test vérifie donc, sur les vrais fichiers, les trois choses dont la
 // règle a besoin :
 //   1. toutes les fenêtres (`.sheet`) ont le même z-index, sans autre réglage : celle qui se voit
 //      devant est la dernière visible dans l'ordre du HTML ;
 //   2. chaque fenêtre a sa croix (`.close-btn`), que Échap clique ;
-//   3. le gestionnaire d'Échap de js/app.js prend la dernière visible (`findLast`), pas la première.
+//   3. le gestionnaire d'Échap (js/interface/app/fenetres/branchements/echap.js) prend la dernière
+//      visible (`topSheet`, js/interface/app/outils/top-sheet.js : `findLast`), pas la première.
 // Puis il rejoue la règle sur l'ordre réel des fenêtres d'index.html (fiche de planète puis
 // journal, l'exemple de l'issue). La preuve dans le vrai jeu est dans la PR.
 import test from 'node:test';
@@ -16,7 +17,8 @@ import { readFileSync } from 'node:fs';
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const html = read('index.html');
 const css = read('style.css').replace(/\/\*[\s\S]*?\*\//g, ''); // sans les commentaires
-const app = read('js/app.js');
+const echap = read('js/interface/app/fenetres/branchements/echap.js'); // gestionnaire d'Échap des fenêtres
+const topSheetSrc = read('js/interface/app/outils/top-sheet.js'); // la fenêtre du dessus (D-417)
 
 // Les fenêtres, dans l'ordre du HTML, chacune avec son bout de HTML (jusqu'à la suivante).
 const ids = [...html.matchAll(/<div id="(sheet-[\w-]+)" class="sheet\b/g)].map((m) => ({ id: m[1], at: m.index }));
@@ -34,16 +36,16 @@ test('chaque fenêtre a sa croix, que Échap clique', () => {
 });
 
 test('Échap prend la dernière fenêtre visible, pas la première', () => {
-  const handler = app.match(/addEventListener\('keydown', \(e\) => \{\s*if \(e\.key !== 'Escape'\) return;[\s\S]*?\n\}\);/);
-  assert.ok(handler, 'gestionnaire d’Échap trouvé dans js/app.js');
+  const handler = echap.match(/addEventListener\('keydown', \(e\) => \{\s*if \(e\.key !== 'Escape'\) return;[\s\S]*?\n\}\);/);
+  assert.ok(handler, 'gestionnaire d’Échap trouvé dans js/interface/app/fenetres/branchements/echap.js');
   // La fenêtre du dessus vient de `topSheet`, partagée avec le « retour » en partie (D-417).
   assert.match(handler[0], /topSheet\(\)\?\.querySelector\('\.close-btn'\)/);
   assert.doesNotMatch(handler[0], /\.find\(/);
-  assert.match(app, /const topSheet = \(\) => \[\.\.\.document\.querySelectorAll\('\.sheet'\)\]\.findLast\(\(s\) => !s\.hidden\);/);
+  assert.match(topSheetSrc, /const topSheet = \(\) => \[\.\.\.document\.querySelectorAll\('\.sheet'\)\]\.findLast\(\(s\) => !s\.hidden\);/);
 });
 
 test('fiche de planète puis journal : un Échap ferme le journal, un deuxième la fiche', () => {
-  // La même règle que js/app.js, sur l'ordre réel des fenêtres.
+  // La même règle que le gestionnaire d'Échap, sur l'ordre réel des fenêtres.
   const open = new Set(['sheet-planet', 'sheet-journal']);
   const escape = () => {
     const top = sheets.findLast((s) => open.has(s.id));

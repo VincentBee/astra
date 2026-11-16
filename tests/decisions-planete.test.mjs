@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { game, fleet, newGame, Session, clone } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
 
-const { TECHS, SHIPS, techCost, researchDuration } = await import('../js/tech.js');
+const { TECHS, SHIPS, techCost, researchDuration } = await import('../js/regles/tech/index.js');
 const scenario = scenarios(import.meta.url);
 
 const T0 = 10_000_000;
@@ -392,7 +392,7 @@ scenario('D-048 : l’arbre des technologies est un graphe avec bâtiments, tech
   const graphOf = async (race) => {
     globalThis.location = { hash: `#${race}` };
     els.clear();
-    await import(`../js/techtree.js?${race}`);
+    await import(`../js/interface/techtree/main.js?${race}`);
     return els.get('graph').innerHTML;
   };
   for (const race of game.RACE_KEYS) {

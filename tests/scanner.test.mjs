@@ -57,8 +57,11 @@ function fakeBrowser({ qrAfter = Infinity } = {}) {
 }
 
 let fresh = 0;
-/** scanner.js neuf à chaque test : jsQR pas encore chargé. */
-const load = () => import(`../js/scanner.js?t=${++fresh}`);
+/** scanner neuf à chaque test : jsQR pas encore chargé (son état, `etat`, remis à zéro). */
+const load = async () => {
+  Object.assign((await import('../js/reseau/scanner/etat.js')).etat, { jsQRLoading: null });
+  return import(`../js/reseau/scanner/index.js?t=${++fresh}`);
+};
 
 /** Lance un scan, annule après `ms`, et renvoie ce qu'on a vu 1 s après l'annulation. */
 async function cancelAfter(ms) {

@@ -54,8 +54,9 @@ test('Partie : un rendez-vous raté est retenté tout seul (battement de cœur),
 test('Rendez-vous : raté réseau coupé, réussi au nouvel essai, à une autre adresse', async () => {
   net.down = true;
   net.urls.length = 0;
-  // rendezvous.js neuf : celui de session.js a déjà chargé Trystero au test d'avant.
-  const { Rendezvous } = await import('../js/rendezvous.js?t=2');
+  // Rendez-vous neuf : celui de session a déjà chargé Trystero au test d'avant (état remis à zéro).
+  Object.assign((await import('../js/reseau/rendezvous/etat.js')).etat, { lib: null, failures: 0 });
+  const { Rendezvous } = await import('../js/reseau/rendezvous/index.js');
   const rdv = new Rendezvous({ gid: 'g1', key: 'k', me: 'moi', onLink() {} });
   await rdv.join();
   assert.equal(rdv.state, 'failed');
@@ -97,7 +98,7 @@ test('Lecteur de QR : jsQR raté réseau coupé, rechargé au nouvel appui sur S
   });
   const video = { srcObject: null, videoWidth: 640, videoHeight: 480, setAttribute() {}, play: async () => {} };
   try {
-    const { scanQr } = await import('../js/scanner.js');
+    const { scanQr } = await import('../js/reseau/scanner/index.js');
     await assert.rejects(scanQr(video), /Lecteur de QR introuvable/);
     down = false;
     assert.equal(await scanQr(video), 'astra:invitation', 'réseau revenu : le scanner lit le QR');

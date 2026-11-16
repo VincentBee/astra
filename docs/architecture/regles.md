@@ -1,6 +1,7 @@
 # Règles du jeu : le moteur
 
 > Décrit le code au commit `1eeb2c1`. Dates et heures en UTC.
+> **Découpage du 2026-11-16 (D-540)** : chaque ancien fichier `js/x.js` est devenu un dossier (`js/fleet.js` → `js/regles/fleet/`, une fonction par fichier). Dans cette page, `js/x.js` veut dire ce module, et les numéros de ligne (`l.153`, `x.js:166`) valent pour le commit `6e2f7cf` (ceux de l'achat automatique, D-530 à D-534 : `851a3d4`). Carte complète : [fichiers.md](fichiers.md).
 
 Ce document explique le code qui fait les règles d'Astra : l'état d'une partie, le temps,
 l'économie, les races, les technologies, les flottes, le combat, les échanges, les colonies,
@@ -21,14 +22,14 @@ Toutes les références sont `fichier:ligne` au commit `1eeb2c1`.
 
 | Fichier | Rôle | Pur ? |
 |---|---|---|
-| `js/game.js` | Races, bâtiments, économie, temps, constructions, pouvoirs aliens, univers (carte, soleil, climat, planètes, places), score | Oui : « fonctions pures, sans réseau ni DOM » (`js/game.js:1`) |
-| `js/tech.js` | Technologies, vaisseaux, détection, bonus | Oui, données pures (`js/tech.js:1`) |
-| `js/fleet.js` | Flottes : décollage, déplacement, carburant, transferts, poursuite, combat, pillage | Oui (`js/fleet.js:1`) |
-| `js/trade.js` | Échanges entre joueurs : quantités, séquestre, issue d'une offre | Oui (`js/trade.js:1`) |
-| `js/session.js` (partie « règles », l. 696-1771) | Applique les règles à la fiche du joueur : ordres, `tick()`, arrivées, combats contre planètes, rapports de dégâts, échanges, colonies | Non : c'est la classe `Session`, qui porte aussi le réseau |
-| `js/replay.js` | Rejoue une partie à partir des journaux d'ordres | Utilise `Session` sans réseau |
-| `js/techtree.js` | Page `technologies.html` : dessine le graphe à partir des données de `tech.js` et `game.js` | DOM (rendu détaillé : interface.md) |
-| `js/galaxy.js` | Fond d'écran étoilé (immobile depuis D-137), importé par `js/app.js:11`. **Ce n'est pas une règle du jeu** (détail : interface.md) | DOM |
+| `js/regles/game/` (ex-`js/game.js`) | Races, bâtiments, économie, temps, constructions, pouvoirs aliens, univers (carte, soleil, climat, planètes, places), score | Oui : « fonctions pures, sans réseau ni DOM » (`js/game.js:1`) |
+| `js/regles/tech/` (ex-`js/tech.js`) | Technologies, vaisseaux, détection, bonus | Oui, données pures (`js/tech.js:1`) |
+| `js/regles/fleet/` (ex-`js/fleet.js`) | Flottes : décollage, déplacement, carburant, transferts, poursuite, combat, pillage | Oui (`js/fleet.js:1`) |
+| `js/regles/trade/` (ex-`js/trade.js`) | Échanges entre joueurs : quantités, séquestre, issue d'une offre | Oui (`js/trade.js:1`) |
+| `js/session/` (ex-`js/session.js`) (partie « règles », l. 696-1771) | Applique les règles à la fiche du joueur : ordres, `tick()`, arrivées, combats contre planètes, rapports de dégâts, échanges, colonies | Non : c'est la classe `Session`, qui porte aussi le réseau |
+| `js/regles/replay/` (ex-`js/replay.js`) | Rejoue une partie à partir des journaux d'ordres | Utilise `Session` sans réseau |
+| `js/interface/techtree/` (ex-`js/techtree.js`) | Page `technologies.html` : dessine le graphe à partir des données de `tech.js` et `game.js` | DOM (rendu détaillé : interface.md) |
+| `js/interface/galaxy/` (ex-`js/galaxy.js`) | Fond d'écran étoilé (immobile depuis D-137), importé par `js/app.js:11`. **Ce n'est pas une règle du jeu** (détail : interface.md) | DOM |
 
 Frontière avec la doc réseau : ici on décrit les méthodes de jeu de `Session`
 (`addPlayer` … `fleetHit`, `js/session.js:696-1770`) et le journal d'ordres. La réception des
@@ -69,7 +70,7 @@ Créée par `addPlayer` (`js/session.js:696-713`), complétée par `normalize`
 | `id`, `name`, `color`, `secretHash` | identité | `js/session.js:701-706` |
 | `rank` | heure d'arrivée (ordre d'arrivée) | `js/session.js:704` |
 | `actAt` | heure de la dernière modification (la plus récente gagne) | `js/session.js:712`, `touch` `js/session.js:586` |
-| `v` | version du format (`FORMAT = 12` depuis D-547 ; ce tableau date de `FORMAT = 7`) | `js/session.js:41`, `js/session.js:587` |
+| `v` | version du format (`FORMAT = 13` depuis D-557 ; ce tableau date de `FORMAT = 7`) | `js/session.js:41`, `js/session.js:587` |
 | `race` | `human`, `machine` ou `alien` ; définitive dès que la partie part (avant, une IA peut en changer, D-400) | `chooseRace` |
 | `left` | heure à laquelle le joueur a quitté la partie avant le départ (IA retirée du lobby, D-399) ; absent sinon | `Session.leave` |
 | `ready` | heure à laquelle le joueur s'est dit prêt (D-120) ; absent tant qu'il ne l'est pas | `Session.ready` |
@@ -129,7 +130,7 @@ dedans, 40 au plus, `js/fleet.js:275`).
   (`fuelAt`, `js/fleet.js:73-77`).
 - `order` : ce qui s'applique à l'arrivée : `dock`, `colonize`, `attack`, ou `chase`
   (poursuite) (`ORDERS`, `js/fleet.js:29-34`) ; `null` = simple déplacement. `join` (D-159) et
-  `shuttle` (navette, §8.7, D-540) restent sur la flotte d'une arrivée à l'autre.
+  `shuttle` (navette, §8.7, D-550) restent sur la flotte d'une arrivée à l'autre.
 
 ### 3.5 Une entrée du journal d'ordres
 
@@ -583,18 +584,18 @@ Sinon `moveTo` vers `intoId.to` (la case où l'autre attend, ou celle où elle v
 Pas de nouveau `FORMAT` : un téléphone d'avant affiche « Ordre » pour un ordre qu'il ne connaît
 pas (`ORDERS[kind]?.name || 'Ordre'`) et n'exécute jamais les ordres des flottes des autres.
 
-### 8.7 Navette (2026-11-16, D-540 à D-548)
+### 8.7 Navette (2026-11-16, D-550 à D-558)
 
 Une flotte avec au moins un cargo fait seule des allers-retours entre deux de mes planètes : elle
 charge sur A les ressources choisies, les pose sur B, revient à vide, et recommence, jusqu'à
-ce qu'on l'arrête. Pas de transport dans les deux sens (D-540).
+ce qu'on l'arrête. Pas de transport dans les deux sens (D-550).
 
 - **Ordre** : `Session.shuttleFleet(id, a, b, res)` (dans `ORDER_KINDS`, donc au journal
   d'ordres et rejoué). `a`, `b` : deux **cases** de mes planètes (mère ou colonies), pas des clés
   (« home » change de planète, D-360). `res` : minéraux et/ou nourriture (`SOIL`) ; l'énergie ne
   voyage pas en soute (c'est le carburant). Refus : planète qui n'est pas à moi ou gelée, A = B,
   ressource inconnue ou aucune, **pas de cargo** (tous les vaisseaux ont un peu de soute ; il
-  faut au moins un `cargo`, D-541), réservoirs trop petits pour aller de A à B, pas assez de
+  faut au moins un `cargo`, D-551), réservoirs trop petits pour aller de A à B, pas assez de
   carburant pour rejoindre A. `shuttleFleet(id)` sans `a` : arrête la navette, la flotte finit
   son trajet et attend en orbite. Une navette réglée autrement en route vers A ou B garde son
   trajet (pas de demi-tour).
@@ -607,21 +608,21 @@ ce qu'on l'arrête. Pas de transport dans les deux sens (D-540).
   part vers A (`moveTo`).
 - **Escale sur A** (`shuttleStop`) : elle charge autant que ses soutes le permettent, sans rien
   laisser des ressources choisies, en parts égales tant qu'il en reste de chaque
-  (`shuttleTake`, `js/fleet.js`, D-543). Rien à charger et soutes vides : elle attend sur A
+  (`shuttleTake`, `js/fleet.js`, D-553). Rien à charger et soutes vides : elle attend sur A
   (`wait: 'a'`) ; en attente, elle ne repart qu'avec un vrai lot (`SHUTTLE_MIN_DROP` = 100, ou
   des soutes pleines). Soutes déjà chargées : elle part quand même vers B. Le plein se fait
   **avant** de charger : si le trajet vers B ne tient pas, rien n'est pris sur A.
 - **Escale sur B** : elle pose ce qui rentre dans l'entrepôt de B (plafond `prod.caps` de
   `stateAt`, `shuttleGive`) ; `sent` augmente, et `trips` + 1 quand les soutes sont vides (un
   reste posé plus tard ne compte pas une livraison de plus). Ce qui ne rentre pas reste dans les
-  soutes, et elle attend sur B (`wait: 'b'`) qu'il y ait de la place (D-544) : en attente, elle
+  soutes, et elle attend sur B (`wait: 'b'`) qu'il y ait de la place (D-554) : en attente, elle
   ne pose qu'un vrai lot (`SHUTTLE_MIN_DROP` = 100, ou tout son reste), pas une unité à chaque
   passage. Rien n'est perdu ni créé : la somme A + B + soutes ne change pas (test
   `navette.test.mjs`).
 - **Carburant** : à chaque escale, plein avec l'énergie de la planète (`refuel`, sur A avant de charger), puis le
   trajet suivant s'il tient dans le réservoir ; sinon la navette s'arrête (« pas assez d'énergie
   sur … pour le plein »), sans tomber en panne en route.
-- **Arrêts** (D-542), chacun avec sa ligne au journal partagé (« La navette de X entre A et B
+- **Arrêts** (D-552), chacun avec sa ligne au journal partagé (« La navette de X entre A et B
   s'arrête : … ») et un message : un autre ordre (`moveFleet`, `returnFleet`, `stopFleet`,
   `chaseFleet`, `joinFleet`, `mergeFleets`, `transferFleet`, `splitFleet` : `shuttlesOf` avant,
   `quitShuttles` après ; une autre flotte qui la rejoint et s'y fond à l'arrivée, `arrive`) ; un combat (`fight` : elle attaque ; `fleetHit` : elle est attaquée ;
@@ -629,7 +630,7 @@ ce qu'on l'arrête. Pas de transport dans les deux sens (D-540).
   plus aucun cargo ; pas assez d'énergie pour le plein ; l'arrêt demandé. Un échange en cours
   la retient (`offerHolds`) : elle reprend après la réponse. La navette n'écrit **pas** une
   ligne par trajet (40 lignes au plus au journal partagé) : seulement son départ et son arrêt.
-- **Rattrapage** (D-545) : `tick` appelle `shuttle(p, f, now)` pour une flotte en navette (à la
+- **Rattrapage** (D-555) : `tick` appelle `shuttle(p, f, now)` pour une flotte en navette (à la
   place d'`arrive`) : les escales dues s'enchaînent dans le même passage, **chacune à son
   heure** (`f.arrive` ; ou `now` si la flotte attendait déjà), 2 000 au plus par passage
   (`SHUTTLE_MAX_STOPS`, la suite au passage suivant). Après deux heures d'absence, un seul
@@ -641,12 +642,17 @@ ce qu'on l'arrête. Pas de transport dans les deux sens (D-540).
   ou le stock sont revenus ; les trajets enchaînés pendant une absence ne sont visibles que de
   moi : une flotte ennemie ne peut croiser que le dernier.
 - **Les autres téléphones** n'exécutent jamais mes ordres ; ils voient `Navette` (`ORDERS`).
-  `FORMAT` passe à 13 (D-547 ; 12 : achat automatique, D-531) : un téléphone d'avant, qui ne connaît pas `shuttle`, effacerait
+  `FORMAT` passe à 13 (D-557 ; 12 : achat automatique, D-531) : un téléphone d'avant, qui ne connaît pas `shuttle`, effacerait
   l'ordre en le prenant pour une arrivée ; il est prié de recharger.
 - **Fiches reçues** (§14.3) : `normalize` → `cleanShuttle` garde la forme seulement (deux cases
   différentes, ressources du sol, `go` 'a' ou 'b', compteurs bornés) ; une navette abîmée tombe,
   la flotte reste. Que A et B soient à moi se vérifie à chaque escale.
-- **IA** : les IA ne font pas de navettes (D-548).
+- **IA** : les IA ne font pas de navettes (D-558).
+- **Fichiers** (code en petits fichiers, D-540) : `js/regles/fleet/navette/` (`shuttleTake`,
+  `shuttleGive`), `js/session/methodes/navette/` (`shuttleFleet`, `shuttleStop`, `shuttle`,
+  `endShuttle`, `shuttlesOf`, `quitShuttles`, `offerHolds`, `shuttlePlanet`),
+  `js/session/constantes/shuttle-max-stops.js`, `shuttle-min-drop.js`,
+  `js/session/fiches/clean-shuttle.js`.
 - Tests : `tests/navette.test.mjs` (10 scénarios, dont un pour les points de la revue de la PR #209 : allers-retours et somme conservée, longue
   absence, entrepôt de B plein, arrêt par un autre ordre, planète perdue et plus de cargo,
   attaquée (la flotte survit), navette agressive qui combat, navettes refusées et nettoyées,
@@ -1075,7 +1081,7 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
   ≥ 0. L'économie se garde aussi elle-même : `flows` et `advance` lisent un stock non fini
   comme 0, `extract` ne rend jamais une quantité négative. Rien ne change pour un nombre
   valide : une partie normale garde exactement ses résultats.
-- Ordre de navette d'une fiche reçue ou relue (D-540) : `cleanShuttle` (dans `normalize`) garde
+- Ordre de navette d'une fiche reçue ou relue (D-550) : `cleanShuttle` (dans `normalize`) garde
   deux cases différentes, des ressources du sol, `go` 'a' ou 'b', des compteurs ≥ 0 ; sinon
   l'ordre tombe et la flotte reste où elle est. Nettoyer deux fois ne change rien (le rejeu
   compare des fiches normalisées). Que A et B soient bien à moi se vérifie à chaque escale.

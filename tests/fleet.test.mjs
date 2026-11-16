@@ -242,7 +242,7 @@ scenario('raids : pas d’attaque sans armes, et un seul pillage par planète to
 });
 
 scenario('une flotte va à la vitesse de son vaisseau le plus lent', async (film) => {
-  const { fleetSpeed, slowestShip, tripMs } = await import('../js/fleet.js');
+  const { fleetSpeed, slowestShip, tripMs } = await import('../js/regles/fleet/index.js');
   const mixed = { fighter: 5, colony: 1, cargo: 2 };
   // Sur la carte : deux flottes de A partent ensemble pour 12 cases, l'une de 5 chasseurs, l'autre
   // avec un colonisateur en plus ; la rapide arrive la première. Les vitesses sont vérifiées par les asserts.

@@ -1,0 +1,12 @@
+{
+  "name": "astra",
+  "private": true,
+  "description": "Astra : jeu de conquête spatiale entre téléphones, en pair à pair. Les sources se jouent telles quelles (modules ES) ; `node build.mjs` fabrique dist/ (pages assemblées et minifiées) pour la mise en ligne.",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

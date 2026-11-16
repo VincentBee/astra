@@ -30,7 +30,7 @@ Aucune conversation ne les prouve.
 - 2026-10-25 14:41. Créer le jeu.
 - Choix : site statique en JS vanilla, modules ES, sans build ; les téléphones se parlent en
   WebRTC après un échange de QR codes ; installable (service worker).
-- Qui : déduit. Source : `a4553ee` (corps du commit, README d'origine). Statut : en vigueur.
+- Qui : déduit. Source : `a4553ee` (corps du commit, README d'origine). Statut : en vigueur ; « sans build » modifié par D-545 (les sources se jouent toujours sans build, mais le site mis en ligne est assemblé et minifié par `build.mjs`).
 
 **D-002 — Règles « port de `game.rs` », vitesse ×60**
 - 2026-10-25 14:41. Choix : règles reprises d'un `game.rs` (origine inconnue, absent du dépôt),
@@ -2495,7 +2495,7 @@ Numéro pris haut (D-220) : D-163 à D-219 sont pris ou réservés par les autre
   comportement normal). Ne touche ni #84 (`technologies.html` absente de `FILES`) ni #89 (les
   réponses d'erreur sont mises en cache, y compris la réponse tardive, comme avant).
 - Qui : **choix de Claude** (le ticket laissait le choix de la méthode). Source : session
-  `7bec2792`, issue #40. Statut : en vigueur.
+  `7bec2792`, issue #40. Statut : en vigueur (depuis D-545, `tests/sw.test.mjs` et `tests/sw-browser.mjs` vérifient le `sw.js` de `dist/`, limite de 2 s inchangée).
 - Tests : `tests/sw.test.mjs` (vrai `sw.js` dans un `vm`, serveur local qui répond, lent, muet,
   coupé) ; `tests/sw-browser.mjs` (même parcours dans Chromium, hors `node --test`).
 
@@ -3665,7 +3665,7 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   de l'accueil : `technologies.html` depuis le cache, 20 bulles dans le graphe (sur `main` :
   `net::ERR_FAILED`).
 - Qui : Claude par défaut (piste donnée par l'issue). Source : worker `worker-techno-horsligne`,
-  session `37ab6d84`, issue #84. Statut : en vigueur.
+  session `37ab6d84`, issue #84. Statut : en vigueur ; modifiée par D-543 (le test suit `export … from`), puis par D-546 (`FILES` écrit par le build, le test porte sur `dist/`).
 
 **D-501 — Cache `astra-p2p-v123`**
 - 2026-11-08 12:11 UTC (mise à jour 12:45 : `main` était passé à v122 avec #196 et #202, la PR
@@ -3929,7 +3929,8 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 **D-533 — Cache `astra-p2p-v131`**
 - 2026-11-16 21:45 UTC. `sw.js` : `VERSION` passe de v130 (`main`) à v131 pour que les
   téléphones prennent le nouveau code (D-530) ; remontée si `main` bouge avant la fusion.
-  Qui : Claude (règle du dépôt). Source : session `a7e3826e`. Statut : en vigueur.
+  Qui : Claude (règle du dépôt). Source : session `a7e3826e`. Statut : remplacée par D-546
+  (`VERSION` est maintenant écrite par le build, empreinte du contenu de `dist/`).
 
 **D-534 — Le bouton d'achat automatique devient « ×∞ », à la place de ×5 (modifie D-532)**
 - 2026-11-16 23:40 UTC. Contexte : Vincent, en voyant la PR #207 : « je pense qu'on peux
@@ -3946,9 +3947,188 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - Qui : Vincent (demande), détails par le router (par défaut). Source : session `a7e3826e`,
   message du router. Statut : en vigueur.
 
-## 16 novembre 2026 — navette de cargos entre deux planètes
+## 16 novembre 2026 — le code en petits fichiers
 
-**D-540 — Ordre de flotte « Navette » : de A vers B, retour à vide, jusqu'à ce qu'on l'arrête**
+**D-540 — Une fonction par fichier, rangée par domaine puis par module**
+- 2026-11-16 UTC. Contexte : demande de Vincent, « je voudrais que tu split les fichiers du jeux
+  en plein de petits fichiers, pour eviter les conflits, une fonction/classe par fichier, split un
+  maximum. fait une structure de fichier coherente ». Plusieurs sessions travaillent en même temps
+  sur Astra (swarms) : 25 gros fichiers (`js/session.js` 3 586 lignes, `js/app.js` 3 491,
+  `js/game.js` 1 453) donnaient des conflits de fusion à chaque PR.
+- Choix :
+  - Chaque identifiant top-level (fonction, classe, constante, exportée ou non) dans son fichier,
+    nommé en kebab-case (`fleetPos` → `fleet-pos.js`). Pas d'exception gardée : une constante
+    par fichier, même scalaire.
+  - Arborescence : `js/<domaine>/<module>/`, domaines `reseau/`, `regles/`, `ia/`, `session/`,
+    `interface/`. Au-delà d'environ 15 fichiers, sous-dossiers par thème, noms en français et en
+    minuscules. Carte : [fichiers.md](architecture/fichiers.md).
+  - Chaque module a un `index.js` qui ré-exporte exactement son API d'avant (ré-exports nommés,
+    jamais `export *`).
+  - Zéro changement de comportement : déplacement mécanique (D-541).
+- Écarté : découper par thème avec plusieurs fonctions par fichier (moins de fichiers, mais deux
+  sessions se croisent encore dans le même fichier) ; un outil de build ou un bundler (contraire à
+  D-001 : pas de build, GitHub Pages sert les fichiers tels quels).
+- Qui : Vincent (la demande) ; arborescence et règles fixées par le router du swarm
+  `split-astra-2026-11-16` ; conventions de détail par le pilote (Claude par défaut). Source :
+  sessions du swarm (router « Refactoriser », 7 workers). Statut : en vigueur.
+
+**D-541 — Le découpage est un déplacement mécanique, vérifié par un inventaire avant / après**
+- 2026-11-16 UTC. Contexte : D-540 touche tout le code ; il faut prouver qu'aucun comportement ne
+  change.
+- Choix :
+  - Corps des fonctions identiques octet pour octet ; les commentaires suivent leur code ; seuls
+    changent les imports ajoutés et ce qu'imposent les deux règles suivantes.
+  - Un `let` top-level réassigné et lu par plusieurs fichiers devient une clé d'un objet d'état
+    du module (`export const etat = { … }`, `etat.js`), car un binding importé ne se réassigne
+    pas. Modules concernés : `reseau/scanner`, `reseau/rendezvous`, `reseau/save`,
+    `interface/galaxy`, `interface/replay-view`, `interface/techtree`, `interface/app` (36 clés).
+  - Méthodes de `Session` : une par fichier (`js/session/methodes/<thème>/`), posées par
+    `Object.defineProperties` avec les mêmes descripteurs (non énumérables). Ce qui utilise `#`
+    ou `super` reste dans la classe.
+  - Effets de bord de tête (écouteurs, lancement) dans un `main.js`, dans le même ordre. Pour
+    l'interface (`js/interface/app/`, 109 effets), un fichier par effet, et `main.js` ne fait que
+    les importer dans l'ordre ; vérifié en suivant l'ordre d'évaluation des modules : 109 effets,
+    même ordre, même texte (à `etat.` près).
+  - Exception de la règle « un identifiant par fichier » : les références DOM d'un même thème
+    restent ensemble (`js/interface/app/planete/entete/entete-dom.js` : `BAR`, `STICKY`, `TABS`).
+  - Un chemin relatif lu par le navigateur depuis le fichier (`new URL('../vendor/jsQR.js',
+    import.meta.url)`, `import('../vendor/trystero-nostr.mjs')`) a été corrigé pour viser le même
+    fichier depuis le nouveau dossier (`../../../vendor/…`).
+  - Vérification par module avec un script hors dépôt (`inventaire.mjs`, parseur acorn) :
+    mêmes identifiants, mêmes méthodes (genre get/set/static), mêmes corps, mêmes exports,
+    un identifiant par fichier, mêmes effets de bord, aucun commentaire perdu, aucun nom sans
+    import, descripteurs vérifiés à l'exécution.
+  - Un seul écart accepté : `Session.seesCell` était écrite deux fois dans l'original
+    (`js/session.js` l.2300 et l.2314 au commit `6e2f7cf`) ; la première était du code mort,
+    écrasée par la seconde. Seule la seconde est gardée : aucun changement de comportement.
+  - Dans `js/interface/techtree/main.js`, `etat.race` est posé en tête (6 effets de bord au lieu
+    de 5) pour que le test D-048 rejoue la page pour chaque race.
+- Écarté : réécrire ou renommer en passant (risque de changer le comportement sans le voir).
+- Qui : router (plan), pilote (script et conventions). Statut : en vigueur.
+
+**D-542 — Plus de façades : on importe un module par son `index.js`, chaque page charge son point d'entrée**
+- 2026-11-16 UTC. Contexte : pendant le découpage, chaque ancien `js/x.js` est resté comme
+  façade (`export * from './<domaine>/x/index.js'`) pour que les 7 sessions travaillent sans se
+  gêner. À l'intégration : garder ou supprimer ces 25 fichiers.
+- Choix : supprimer les façades. Tous les imports (code et tests) visent le `index.js` du module ;
+  `replay.html` charge `js/interface/replay-view/main.js` et `technologies.html`
+  `js/interface/techtree/main.js`. `Session` s'importe par `js/session/index.js` (qui charge
+  `main.js`, l'enveloppe du journal d'ordres), jamais par `js/session/session.js`.
+  Deux tests qui voulaient un module neuf à chaque import (`scanner.js?t=N`,
+  `rendezvous.js?t=2`) remettent maintenant à zéro l'objet `etat` du module avant d'importer
+  (les façades le faisaient). `tests/ui/server.mjs` sert aussi les sous-dossiers de `js/`.
+  `index.html` charge `js/interface/app/main.js`. `tests/escape.test.mjs` lit le gestionnaire
+  d'Échap dans `js/interface/app/fenetres/branchements/echap.js` et `topSheet` dans
+  `js/interface/app/outils/top-sheet.js`.
+- Écarté : garder les façades (deux chemins pour le même module, 25 fichiers de plus dans `FILES`,
+  et une remise à zéro d'état cachée dans la façade de `scanner` et `rendezvous`).
+- Qui : Claude par défaut (intégrateur, le plan proposait de les supprimer). Statut : en vigueur.
+
+**D-543 — `FILES` liste chaque petit fichier ; le contrôle suit aussi `export … from`**
+- 2026-11-16 UTC. Contexte : D-500 exige que `FILES` (`sw.js`) contienne tout ce que les pages
+  demandent. Avec D-540, cela fait des centaines de fichiers. Et `tests/sw-files.test.mjs` ne
+  suivait que `import … from` : il ne voyait ni les façades ni les `index.js` (`export … from`), et
+  passait à tort pendant le découpage alors que les nouveaux fichiers manquaient au cache hors ligne.
+- Choix : le test suit aussi `export … from` (vérifié : il échoue avec l'ancien `FILES`, 718
+  fichiers manquants, puis passe) ; `FILES` est rempli avec tous les fichiers atteints depuis les
+  trois pages, triés (généré une fois par un script hors dépôt qui suit les mêmes liens que le
+  test ; ensuite, le test garde la liste juste). Cache `astra-p2p-v131`.
+- Écarté : mettre `FILES` à la main (plus de 600 lignes) ; mettre des dossiers dans `FILES`
+  (`cache.addAll` ne prend que des fichiers).
+- Coût mesuré (2026-11-16, vrai Chromium par Playwright, HTTP/2 comme GitHub Pages, 150 ms par
+  requête ≈ 4G, médiane de 3) : avec les sources découpées servies telles quelles, l'accueil
+  s'ouvrait en 2,10 s au lieu de 0,83 s (854 requêtes au lieu de 25, découvertes étage par
+  étage), et hors ligne en 0,95 s au lieu de 0,05 s ; `tests/sw-browser.mjs` (D-230) échouait
+  (2,7 s pour 2 s permises). D'où D-545 : le site mis en ligne est assemblé.
+- Erreur trouvée et corrigée : `vendor/trystero-nostr.mjs` était sorti de `FILES` (son
+  `import()` conditionnel n'était suivi ni par le script ni par le test) ; le test suit
+  maintenant tout chemin relatif vers `vendor/` écrit dans une chaîne.
+- Qui : Claude par défaut (intégrateur). Statut : modifiée par D-546 (`FILES` et `VERSION` écrits
+  par le build ; liste vide dans les sources).
+
+**D-544 — Les vieux chemins `js/x.js` dans les commentaires et la doc veulent dire « le module x »**
+- 2026-11-16 UTC. Contexte : des centaines de commentaires du code et de lignes de doc citent
+  `js/fleet.js` ou `js/game.js:969`.
+- Choix : ne pas corriger les commentaires du code (les fichiers restent identiques octet pour
+  octet, D-541) ; dans la doc, une note en tête de chaque page d'architecture : `js/x.js` = le
+  module, numéros de ligne = commit `6e2f7cf`. Les tableaux « rôle de chaque fichier » donnent
+  le nouveau dossier.
+- Écarté : réécrire toutes les références (plus de 400, avec le risque d'en fausser).
+- Qui : Claude par défaut (intégrateur). Statut : en vigueur.
+
+**D-545 — Le site mis en ligne est assemblé et minifié par un build (esbuild) ; les sources restent jouables sans build**
+- 2026-11-16 ~22:40 UTC. Contexte : après D-540, servir ~900 petits fichiers rendait le jeu plus lent
+  à ouvrir (D-543). Vincent, via le router : « il faudrait que le projet soit compiler et
+  minifier/uglifier pour ameliorer les probleme de rapidité ». Modifie D-001 (« aucune étape de
+  build »).
+- Choix :
+  - `build.mjs` à la racine, sans framework, avec esbuild (seule dépendance, devDependency,
+    version exacte 0.28.2, `package-lock.json`). `node build.mjs` (ou `npm run build`)
+    fabrique `dist/` (ignoré par git) : un fichier JS par page, assemblé depuis son point
+    d'entrée et minifié (espaces, syntaxe, noms locaux), avec source map ; `style.css` minifié ;
+    `vendor/jsQR.js` et `vendor/trystero-nostr.mjs` copiés (chargés à la demande) ; pages,
+    `manifest.json`, icônes. Carte : [fichiers.md](architecture/fichiers.md) §5.
+  - Les chemins vers `vendor/` lus au moment voulu (`new URL(…, import.meta.url)`, `import()`
+    conditionnel avec `?r=N`, D-510) sont réécrits au build pour viser le même fichier depuis
+    `dist/js/` ; le build échoue si l'un d'eux ne tombe pas sur un fichier de `dist/`.
+  - Les sources ne changent pas de forme : `python3 -m http.server`, `tests/ui/server.mjs` et les
+    tests Node importent toujours `js/` directement.
+  - Mise en ligne : `.github/workflows/deploy.yml`. Sur push vers `main` (ou à la main) : `npm ci`,
+    `npm test`, `node build.mjs`, publication de `dist/` sur GitHub Pages. Sur une pull request :
+    tests et build seulement.
+  - Tests : `tests/build.test.mjs` (le build réussit, une page = un fichier assemblé sans import
+    relatif restant, sans commentaires, `FILES` et `VERSION` justes et stables) ;
+    `sw.test.mjs`, `sw-files.test.mjs`, `sw-browser.mjs` et `chargement-browser.mjs` portent sur
+    `dist/`. `chargement-browser.mjs` passe par l'appli pour le rendez-vous (Créer une partie)
+    au lieu d'importer un module des sources.
+- Mesures (2026-11-16, même banc que D-543 : Chromium, HTTP/2, médiane de 3 ; avant = `6e2f7cf`) :
+
+  | 150 ms par requête | avant | découpage seul | `dist/` |
+  |---|---|---|---|
+  | `index.html` | 0,83 s (25 req., 656 Ko) | 2,10 s (854 req.) | 0,36 s (3 req., 347 Ko) |
+  | `replay.html` | 0,96 s | 2,19 s | 0,34 s (3 req., 214 Ko) |
+  | `technologies.html` | 0,49 s | 1,17 s | 0,35 s (2 req., 31 Ko) |
+  | hors ligne, `index.html` | 52 ms | 0,95 s (avec l'ancien `FILES`) ; échoue sans pré-cache | 36 ms |
+  | téléchargement du cache hors ligne (`cache.addAll` depuis une page) | 183 ms (37 fichiers) | 1,63 s (923 fichiers) | 164 ms (14 fichiers) |
+
+  « avant » et « découpage seul » : sans #207 ; `dist/` : code final, avec #207 (achat automatique).
+
+  `tests/sw-browser.mjs` sur `dist/` : serveur coupé, accueil en 36 ms (limite D-230 : 2 s).
+- Prérequis, fait à la main par Vincent : Settings → Pages → Source « GitHub Actions ». Tant que
+  la source reste « Deploy from a branch », Pages sert les sources de `main` : le jeu marche en
+  ligne, mais **plus hors ligne après une première visite** (le `sw.js` des sources n'a plus de
+  liste à pré-charger, D-546). À changer avant de fusionner.
+- Écarté : garder le site sans build (lent, D-543) ; un bundler avec configuration et serveur de
+  développement (Vite, etc. : plus de dépendances que nécessaire) ; découper les bundles par
+  morceaux partagés (`splitting`) : plus de requêtes pour un gain de cache faible.
+- Qui : Vincent (faire un build, minifier) ; esbuild, `build.mjs` et le déploiement par
+  GitHub Actions choisis par le router ; le reste Claude par défaut (intégrateur). Source :
+  swarm `split-astra-2026-11-16`, session `8b99ed96`. Statut : en vigueur. Modifie D-001.
+  Non confirmé : le premier déploiement réel (le workflow ne peut tourner qu'après la fusion et
+  le changement de réglage).
+
+**D-546 — `FILES` et `VERSION` du service worker sont écrits par le build**
+- 2026-11-16 ~22:40 UTC. Contexte : `FILES` (D-500) et `VERSION` (changée à la main à chaque mise en
+  ligne) étaient la source de conflits la plus fréquente entre PR (chaque PR passait
+  `astra-p2p-vNNN` au numéro suivant, puis devait le refaire quand `main` bougeait).
+- Choix : le `sw.js` des sources garde deux marqueurs, `const VERSION = 'astra-sources';` et
+  `const FILES = [];`. `build.mjs` les remplace (exactement une fois chacun, sinon il échoue) dans
+  `dist/sw.js` : `FILES` = `./` + les fichiers de `dist/` sauf les source maps, `sw.js`,
+  `.nojekyll` et les licences ; `VERSION` = `astra-` + 12 caractères de l'empreinte SHA-256 du
+  `sw.js` source et du contenu des fichiers listés (la même pour deux builds des mêmes sources,
+  vérifié par `build.test.mjs`). L'ancien cache (`astra-p2p-v130`, …) est effacé à l'activation,
+  comme avant (tout cache d'un autre nom).
+  Dans les sources, rien n'est pré-chargé ; chaque fichier chargé en ligne est mis en cache au
+  passage (comportement inchangé du `fetch`), testé par `sw.test.mjs`.
+- Écarté : garder la liste à la main dans les sources (920 lignes et un numéro de version à
+  changer à chaque PR) ; un nom de version par date (change à chaque build même sans changement).
+- Qui : router (FILES et VERSION par le build), Claude par défaut (marqueurs, empreinte).
+  Statut : en vigueur. Modifie D-500 et D-543 ; remplace la règle « changer `VERSION` à chaque
+  mise en ligne ».
+
+## 16 novembre 2026 — navette de cargos entre deux planètes (D-550 à D-558, d'abord numérotées D-540 à D-548)
+
+**D-550 — Ordre de flotte « Navette » : de A vers B, retour à vide, jusqu'à ce qu'on l'arrête**
 - 2026-11-16 23:15 UTC. Contexte : Vincent : « je voudrais aussi qu'il soit possible
   d'automatiser les aller retour de transporter entre deux planetes pour transferer des
   ressources ». Choix posés par le router (session « Achat auto de vaisseaux depuis la map »).
@@ -3963,7 +4143,7 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - Qui : router, par défaut (Claude). Source : session `e722e02e` (worker-navettes). Statut : en
   vigueur.
 
-**D-541 — Une navette va entre deux de mes planètes (par leur case), avec au moins un cargo**
+**D-551 — Une navette va entre deux de mes planètes (par leur case), avec au moins un cargo**
 - 2026-11-16 23:15 UTC. Contexte : tous les vaisseaux ont un peu de soute (chasseurs 20 à 50) ;
   « une flotte sans cargo l'arrête » demandait de trancher.
 - Choix : A et B sont deux de mes planètes, désignées par leur **case** (une clé « home »
@@ -3974,7 +4154,7 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - Écarté : accepter toute flotte avec de la soute (une frégate seule ferait une navette de 50).
 - Qui : Claude (par défaut). Source : session `e722e02e`. Statut : en vigueur.
 
-**D-542 — Ce qui arrête la navette, et sa ligne au journal**
+**D-552 — Ce qui arrête la navette, et sa ligne au journal**
 - 2026-11-16 23:15 UTC. Choix : un autre ordre donné à la flotte (déplacement, retour, arrêt,
   poursuite, jonction, fusion, don, scission), un combat (elle attaque ou elle est attaquée),
   une des deux planètes perdue ou gelée, plus aucun cargo, pas assez d'énergie pour le plein,
@@ -3987,7 +4167,7 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - Qui : router (liste des arrêts), Claude (détails). Source : session `e722e02e`. Statut : en
   vigueur.
 
-**D-543 — Sur A : soutes pleines, en parts égales, sans réserve ; A vide, elle attend**
+**D-553 — Sur A : soutes pleines, en parts égales, sans réserve ; A vide, elle attend**
 - 2026-11-16 23:15 UTC. Choix : la flotte prend autant que ses soutes le permettent, sans rien
   laisser sur A des ressources choisies. Plusieurs ressources : parts égales tant qu'il en reste
   de chaque, puis le reste va aux autres (`shuttleTake`, entiers, jamais plus que le stock).
@@ -4004,7 +4184,7 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - Qui : router (soutes pleines, sans réserve, attente), Claude (parts égales). Source : session
   `e722e02e`. Statut : en vigueur.
 
-**D-544 — Sur B : ce qui ne rentre pas dans l'entrepôt reste dans les soutes, la flotte attend**
+**D-554 — Sur B : ce qui ne rentre pas dans l'entrepôt reste dans les soutes, la flotte attend**
 - 2026-11-16 23:15 UTC. Contexte : se poser (`dock`) ajoute au stock sans plafond ; une navette
   qui tourne sans fin aurait rempli B au-delà de son entrepôt.
 - Choix : la flotte pose ce qui rentre sous le plafond de l'entrepôt de B. Le reste reste dans
@@ -4017,7 +4197,7 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   jeter le surplus (perte) ; repartir vers A chargée (allers-retours pour rien).
 - Qui : Claude (par défaut). Source : session `e722e02e`. Statut : en vigueur.
 
-**D-545 — Rattrapage : toutes les escales dues dans un même passage, chacune à son heure**
+**D-555 — Rattrapage : toutes les escales dues dans un même passage, chacune à son heure**
 - 2026-11-16 23:15 UTC. Contexte : « après une longue absence, au retour, le rattrapage doit
   enchaîner tous les trajets dus, pas un seul ».
 - Choix : à chaque passage (`tick`), `shuttle` enchaîne les escales arrivées avant `now`, chacune
@@ -4032,7 +4212,7 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - Qui : Claude (par défaut ; déterministe, pas de question au router). Source : session
   `e722e02e`. Statut : en vigueur.
 
-**D-546 — La navette se règle depuis la fiche de la flotte, et se voit**
+**D-556 — La navette se règle depuis la fiche de la flotte, et se voit**
 - 2026-11-16 23:15 UTC. Choix : bouton « Navette » dans la fiche de la flotte (au moins un cargo
   et deux planètes), fenêtre « Charger sur / Livrer à / ressources », « Lancer », puis « Changer »
   et « Arrêter ». Changer une navette en route vers A ou B garde son trajet. Indicateur : l'état
@@ -4043,15 +4223,17 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   plus difficile à découvrir et à annuler sur un téléphone).
 - Qui : Claude (par défaut). Source : session `e722e02e`. Statut : en vigueur.
 
-**D-547 — `FORMAT` 13 et cache `astra-p2p-v132` (12 et v131 au départ)**
+**D-557 — `FORMAT` 13 (le cache n'est plus réglé à la main)**
 - 2026-11-16 23:15 UTC. Choix : `FORMAT` monte d'un cran : un téléphone d'avant, qui ne connaît
   pas l'ordre `shuttle`, l'effacerait en le prenant pour une arrivée ; il est prié de recharger.
-  `sw.js` : `VERSION` monte d'un cran. Tous deux une version au-dessus de `main`. Au départ 12 et
-  v131 ; la PR #207 (D-531, D-533) a pris 12 et v131 dans `main` : fusion de `main` le
-  2026-11-17, passent à 13 et v132.
+  Au départ 12 et cache v131 ; la PR #207 (D-531, D-533) a pris 12 et v131 dans `main` : 13 et
+  v132 à la première fusion de `main`. Puis la PR #208 a fait écrire `VERSION` par le build
+  (D-546) : `sw.js` des sources ne se touche plus, la navette ne règle plus de cache.
+- Numéros : cette PR avait pris D-540 à D-548 ; la PR #208, fusionnée avant, les a pris aussi.
+  Les décisions de la navette deviennent D-550 à D-558 (fusion de `main` du 2026-11-16).
 - Qui : Claude (règle du router). Source : session `e722e02e`. Statut : en vigueur.
 
-**D-548 — Les IA ne font pas de navettes**
+**D-558 — Les IA ne font pas de navettes**
 - 2026-11-16 23:15 UTC. Choix : `js/bot.js` ne change pas ; une IA ne règle jamais de navette.
 - Qui : router. Source : session `e722e02e`. Statut : en vigueur.
 

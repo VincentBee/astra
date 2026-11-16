@@ -1,46 +1,12 @@
 // Cache hors ligne : une fois l'appli ouverte une fois, elle se lance sans réseau.
-// Penser à changer VERSION à chaque mise en ligne pour que les téléphones
-// récupèrent les nouveaux fichiers.
-const VERSION = 'astra-p2p-v132';
-const FILES = [
-  './',
-  'index.html',
-  'replay.html',
-  'technologies.html',
-  'style.css',
-  'manifest.json',
-  'js/app.js',
-  'js/aim.js',
-  'js/game.js',
-  'js/tech.js',
-  'js/techtree.js',
-  'js/fleet.js',
-  'js/report.js',
-  'js/finish.js',
-  'js/back.js',
-  'js/trade.js',
-  'js/session.js',
-  'js/bot.js',
-  'js/save.js',
-  'js/tablock.js',
-  'js/replay.js',
-  'js/replay-view.js',
-  'js/sky.js',
-  'js/spark.js',
-  'js/icons.js',
-  'js/galaxy.js',
-  'js/peer.js',
-  'js/invite.js',
-  'js/config.js',
-  'js/scanner.js',
-  'js/rendezvous.js',
-  'vendor/qrcode.mjs',
-  'vendor/jsQR.js',
-  'vendor/trystero-nostr.mjs',
-  'icons/icon.svg',
-  'icons/icon-192.png',
-  'icons/icon-512.png',
-];
+//
+// FILES et VERSION sont écrits par build.mjs dans dist/sw.js (D-546) : FILES = la liste réelle
+// des fichiers de dist/, VERSION = l'empreinte de leur contenu (elle change dès qu'un fichier
+// change, et le cache se renouvelle). Ne pas les remplir à la main. Ici, dans les sources
+// (servies sans build, pour développer), la liste est vide : rien n'est mis en cache à
+// l'installation, mais chaque fichier chargé en ligne l'est au passage (voir `fetch`).
+const VERSION = 'astra-sources';
+const FILES = [];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));

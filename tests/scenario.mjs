@@ -12,10 +12,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { basename, dirname, join } from 'node:path';
 import { game, fleet } from './harness.mjs';
 
-const { threatText } = await import('../js/session.js');
+const { threatText } = await import('../js/session/index.js');
 
-const { SHIPS } = await import('../js/tech.js');
-const { reach, underFinger, FINGER } = await import('../js/aim.js');
+const { SHIPS } = await import('../js/regles/tech/index.js');
+const { reach, underFinger, FINGER } = await import('../js/interface/aim/index.js');
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const cell = (p) => `[${+p.x.toFixed(1)}:${+p.y.toFixed(1)}]`;

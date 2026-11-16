@@ -1,0 +1,54 @@
+# Mise en ligne sur GitHub Pages (D-545) : à chaque push sur main, les tests passent, puis
+# build.mjs fabrique dist/ (pages assemblées et minifiées, sw.js rempli), qui est publié.
+# Sur une pull request : tests et build seulement (rien n'est publié).
+# Prérequis (réglage du dépôt, fait à la main une fois) : Settings → Pages → Build and deployment
+# → Source : « GitHub Actions ». Tant que la source reste « Deploy from a branch », Pages sert les
+# sources de main telles quelles et l'étape deploy échoue.
+name: Déployer sur GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  # Une seule mise en ligne à la fois ; les pull requests ont chacune leur file.
+  group: ${{ github.event_name == 'pull_request' && github.ref || 'pages' }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: node build.mjs
+      - if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,8 +1,11 @@
 // Liste du cache hors ligne (FILES de sw.js, D-500) : tout fichier dont une page a
 // besoin doit y être, sinon la page ne s'ouvre pas hors ligne si elle n'a jamais été
 // ouverte en ligne (#84 : technologies.html et js/techtree.js manquaient).
+// Depuis le build (D-545, D-546), c'est le sw.js de dist/ qui part en ligne : build.mjs le
+// remplit avec les fichiers de dist/. On vérifie ici qu'il couvre ce que demandent les pages de
+// dist/, et que les sources, elles, ne demandent que des fichiers qui existent.
 // On part des trois pages (index.html, replay.html, technologies.html) et de
-// manifest.json, puis on suit les liens : src/href des balises, `import … from`,
+// manifest.json, puis on suit les liens : src/href des balises, `import … from`, `export … from`,
 // `import()` (chargement à la demande), `new URL('…', import.meta.url)`,
 // `location.href = '…'`, `.src = '…'` et `fetch('…')`.
 import { test } from 'node:test';
@@ -11,8 +14,10 @@ import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, posix } from 'node:path';
 import vm from 'node:vm';
+import { builtDist } from './dist.mjs';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const sources = join(dirname(fileURLToPath(import.meta.url)), '..');
+const { out: root } = await builtDist();
 const PAGES = ['index.html', 'replay.html', 'technologies.html'];
 
 // FILES, lu dans le vrai sw.js.
@@ -43,6 +48,11 @@ function refsOf(file, text) {
   if (/\.(m?js|html)$/.test(file)) {
     grab(/\bimport\s[^'"`;]*?from\s*['"]([^'"]+)['"]/g);
     grab(/\bimport\s*['"]([^'"]+)['"]/g);
+    grab(/\bexport\s[^'"`;]*?from\s*['"]([^'"]+)['"]/g);
+    grab(/\bimport\s*\{[^}]*\}\s*from\s*['"]([^'"]+)['"]/g); // minifié : import{a as b}from"…" // export { a } from '…', export * from '…' (index.js des modules)
+    // Tout chemin relatif vers vendor/ dans une chaîne, même dans un import() conditionnel
+    // (`import(n ? \`../vendor/x.mjs?r=${n}\` : '../vendor/x.mjs')`, que les lignes au-dessus ne voient pas).
+    grab(/['"`]((?:\.\.?\/)+vendor\/[\w.-]+)/g);
     grab(/\bimport\(\s*['"]([^'"]+)['"]\s*\)/g);
     grab(/new URL\(\s*['"]([^'"]+)['"]\s*,\s*import\.meta\.url/g);
     grab(/\b(?:location\.href|\.src)\s*=\s*['"]([^'"]+)['"]/g, true); // ex. location.href = 'replay.html'
@@ -52,7 +62,7 @@ function refsOf(file, text) {
 }
 
 // Tous les fichiers atteints depuis les pages, avec qui les demande.
-function reached() {
+function reached(root) {
   const seen = new Map(); // fichier → fichier qui le demande
   const todo = [...PAGES, 'manifest.json'].map((f) => [f, '(départ)']);
   while (todo.length) {
@@ -70,17 +80,27 @@ function reached() {
 
 test('FILES contient chaque fichier demandé par index.html, replay.html et technologies.html', () => {
   const files = new Set(swFiles());
-  const missing = [...reached()].filter(([f]) => !files.has(f)).map(([f, by]) => `${f} (demandé par ${by})`);
+  const missing = [...reached(root)].filter(([f]) => !files.has(f)).map(([f, by]) => `${f} (demandé par ${by})`);
   assert.deepEqual(missing, [], 'fichiers absents du cache hors ligne');
 });
 
-test('technologies.html et son module techtree.js sont dans FILES (#84)', () => {
+test('technologies.html et son fichier JS assemblé sont dans FILES (#84)', () => {
   const files = swFiles();
   assert.ok(files.includes('technologies.html'));
-  assert.ok(files.includes('js/techtree.js'));
+  assert.ok(files.includes('js/technologies.js'));
 });
 
 test('chaque fichier de FILES existe (sinon l’installation du cache échoue)', () => {
   const absent = swFiles().filter((f) => !existsSync(join(root, f)));
+  assert.deepEqual(absent, []);
+});
+
+test('les bibliothèques chargées à la demande (jsQR, Trystero) sont dans FILES', () => {
+  const files = swFiles();
+  for (const f of ['vendor/jsQR.js', 'vendor/trystero-nostr.mjs']) assert.ok(files.includes(f), f);
+});
+
+test('sources : chaque fichier demandé depuis les trois pages existe (pas d’import cassé)', () => {
+  const absent = [...reached(sources)].filter(([f]) => !existsSync(join(sources, f))).map(([f, by]) => `${f} (demandé par ${by})`);
   assert.deepEqual(absent, []);
 });

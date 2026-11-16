@@ -2,7 +2,7 @@
 // Le parcours dans un vrai navigateur (historique, fenêtre, « Quitter ») : tests/back-browser.mjs.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { playing, backAction } from '../js/back.js';
+import { playing, backAction } from '../js/interface/back/index.js';
 
 const enCours = { status: 'playing', startedAt: 1000, over: null, gameShown: true, sheetOpen: false };
 

@@ -10,9 +10,9 @@ globalThis.window = globalThis;
 // prendraient l'une l'autre. Les scénarios D-430 passent leur faux navigateur à holdGame.
 Object.defineProperty(globalThis, 'navigator', { value: {}, configurable: true, writable: true });
 
-export const { Session } = await import('../js/session.js');
-export const game = await import('../js/game.js');
-export const fleet = await import('../js/fleet.js');
+export const { Session } = await import('../js/session/index.js');
+export const game = await import('../js/regles/game/index.js');
+export const fleet = await import('../js/regles/fleet/index.js');
 
 // Pas de froid dans les parties de test (tests/end.test.mjs le règle) : elles ne finissent pas d'elles-mêmes.
 game.FROST.delayMs = Infinity;

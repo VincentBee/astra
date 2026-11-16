@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { newGame } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
 
-const { Link } = await import('../js/peer.js');
+const { Link } = await import('../js/reseau/peer/index.js');
 const scenario = scenarios(import.meta.url);
 
 /** Deux bouts d'un canal en mémoire ; `sent` garde la taille de chaque envoi. */

@@ -6,6 +6,8 @@
 > Pour la présentation générale et la liste des fichiers : [README.md](../../README.md).
 >
 > Les références `fichier:ligne` valent pour le commit `1eeb2c1`. Dates et heures en UTC.
+>
+> **Découpage du 2026-11-16 (D-540)** : chaque ancien fichier `js/x.js` est devenu un dossier (`js/fleet.js` → `js/regles/fleet/`, une fonction par fichier). Dans cette page, `js/x.js` veut dire ce module, et les numéros de ligne (`l.153`, `x.js:166`) valent pour le commit `6e2f7cf` (ceux de l'achat automatique, D-530 à D-534 : `851a3d4`). Carte complète : [fichiers.md](fichiers.md).
 
 ## 1. Vue d'ensemble
 
@@ -16,20 +18,20 @@
 
 | Page | Module chargé | Rôle |
 |---|---|---|
-| `index.html` | `js/app.js` | Le jeu : accueil, invitation, race, carte, planète, fenêtres. |
-| `replay.html` | `js/replay-view.js` | Revoir comme un film la partie sauvegardée sur ce téléphone. Ouverte depuis l'historique de l'accueil (`js/app.js:184`). |
-| `technologies.html` | `js/techtree.js` | Page autonome : le graphe bâtiments → technologies → vaisseaux → pouvoirs de chaque race. Aucun lien vers elle depuis le jeu (seul `README.md:37` la cite) ; elle renvoie au jeu par « Retour au jeu » (`technologies.html:153`). |
+| `index.html` | `js/interface/app/main.js` (ex-`js/app.js`) | Le jeu : accueil, invitation, race, carte, planète, fenêtres. |
+| `replay.html` | `js/interface/replay-view/main.js` | Revoir comme un film la partie sauvegardée sur ce téléphone. Ouverte depuis l'historique de l'accueil (`js/app.js:184`). |
+| `technologies.html` | `js/interface/techtree/main.js` | Page autonome : le graphe bâtiments → technologies → vaisseaux → pouvoirs de chaque race. Aucun lien vers elle depuis le jeu (seul `README.md:37` la cite) ; elle renvoie au jeu par « Retour au jeu » (`technologies.html:153`). |
 
 Fichiers d'interface partagés :
 
 | Fichier | Contenu |
 |---|---|
 | `style.css` | Tout le style de `index.html` et `replay.html`. `technologies.html` a son propre `<style>` (§7.5). |
-| `js/icons.js` | Icônes d'interface (`ic`, `fillIcons`). |
-| `js/game.js:31-52` | Icônes des ressources (`resIcon`) et des races (`raceIcon`), à côté des données qu'elles illustrent. |
-| `js/sky.js` | `drawSun` : le soleil, dessiné par la carte du jeu et celle du replay. |
-| `js/spark.js` | Historique des mini-graphes des tuiles, une série par planète (D-340) : `ownHistory`, `addSample`, `sparkPath`. Fonctions pures, testées par `tests/spark.test.mjs`. |
-| `js/galaxy.js` | `startGalaxy` : fond étoilé immobile, derrière toutes les vues du jeu (D-137). |
+| `js/interface/icons/` (ex-`js/icons.js`) | Icônes d'interface (`ic`, `fillIcons`). |
+| `js/regles/game/` (ex-`js/game.js:31-52`) | Icônes des ressources (`resIcon`) et des races (`raceIcon`), à côté des données qu'elles illustrent. |
+| `js/interface/sky/` (ex-`js/sky.js`) | `drawSun` : le soleil, dessiné par la carte du jeu et celle du replay. |
+| `js/interface/spark/` (ex-`js/spark.js`) | Historique des mini-graphes des tuiles, une série par planète (D-340) : `ownHistory`, `addSample`, `sparkPath`. Fonctions pures, testées par `tests/spark.test.mjs`. |
+| `js/interface/galaxy/` (ex-`js/galaxy.js`) | `startGalaxy` : fond étoilé immobile, derrière toutes les vues du jeu (D-137). |
 | `icons/` | `icon.svg` (favicon), `icon-192.png`, `icon-512.png` (icônes PWA, `manifest.json`). |
 
 ## 2. Lancer le jeu en local et le tester à deux
@@ -40,7 +42,12 @@ Commande du README (`README.md:11-20`), depuis la racine du dépôt :
 python3 -m http.server 8080
 ```
 
-Puis ouvrir `http://localhost:8080`. Le service worker ne s'enregistre qu'en `https:` ou sur `localhost` (`js/app.js:1964-1966`) ; la caméra et l'installation sur l'écran d'accueil demandent du https (`README.md:23`).
+Puis ouvrir `http://localhost:8080` : ce sont les sources, sans build (modules ES natifs).
+Pour voir la version mise en ligne (D-545) : `npm ci` une fois, `node build.mjs`, puis
+`python3 -m http.server 8080 --directory dist` (chaque page y charge un seul fichier JS
+assemblé et minifié ; source maps à côté pour déboguer).
+
+Le service worker ne s'enregistre qu'en `https:` ou sur `localhost` (`js/app.js:1964-1966`) ; la caméra et l'installation sur l'écran d'accueil demandent du https (`README.md:23`).
 
 **Deux joueurs sur un ordinateur.** Les deux joueurs doivent avoir un `localStorage` séparé (nom, identité, sauvegarde). Deux onglets de la même origine le partagent. Il faut donc :
 - soit deux fenêtres séparées (normale + privée), comme le dit le README ;
@@ -122,7 +129,7 @@ HTML, cette règle ne tient plus : il faudra une pile d'ouverture.
 | `#sheet-invite` (219-248) | **Inviter un joueur** | QR de l'invitation + copier/partager ; scanner ou coller la réponse. | `openInviteSheet` 297-312, `useAnswer` 341-363, fermeture → `session.cancelInvite()` 328-331. |
 | `#sheet-fleet` (251-275) | **Décoller** (onglet Flottes) | Nombre de vaisseaux, cargaison, carburant ; calcule soutes, vitesse (et le vaisseau le plus lent, qui la fixe), réservoir, portée. | `openFleetSheet` 1147-1165, `updateFleetSheet` 1167-1180, `btn-fleet-go` 1185-1196. |
 | `#sheet-move` (278-295) | « Donner » (`#fi-beside`) ou **Scinder** | Vaisseaux, cargaison, carburant à passer à une autre flotte ou à une nouvelle. La fenêtre garde l'identifiant de sa flotte (`moveSheet.from`) et n'agit que sur elle ; si cette flotte (ou celle qui reçoit) disparaît, elle se ferme avec « Cette flotte n'existe plus. » (`refreshMoveSheet`, appelé par `renderFleetInfo` ; D-350). | `openMoveSheet`, `refreshMoveSheet`, `btn-move-go` (~2836-2890). |
-| `#sheet-shuttle` | Bouton **Navette** (`#btn-fi-shuttle`) de la fiche de la flotte | Charger sur / Livrer à (mes planètes), ressources ; Lancer, Changer, Arrêter la navette (D-546, §21). | `openShuttleSheet`, `btn-shuttle-go`, `btn-shuttle-stop`. |
+| `#sheet-shuttle` | Bouton **Navette** (`#btn-fi-shuttle`) de la fiche de la flotte | Charger sur / Livrer à (mes planètes), ressources ; Lancer, Changer, Arrêter la navette (D-556, §21). | `openShuttleSheet`, `btn-shuttle-go`, `btn-shuttle-stop`. |
 | `#sheet-trade` (298-315) | Bouton échange d'un joueur sur la même case | « Je donne » / « Je demande ». | `openTradeSheet` 1746-1757, `btn-trade-go` 1768-1774. |
 
 ### 3.3 Couches fixes
@@ -655,7 +662,7 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
 - Vérifié dans Chrome (390 × 844) par `tests/back-browser.mjs` (Playwright, hors
   `node --test`) ; la règle seule dans `tests/back.test.mjs`.
 
-## 21. Navette entre deux planètes (2026-11-16, D-546)
+## 21. Navette entre deux planètes (2026-11-16, D-556)
 
 - **Bouton** `#btn-fi-shuttle` (icône `shuttle`, deux planètes et une boucle, `js/icons.js`) dans
   la fiche de la flotte (`#fleet-info`), après « Scinder ». Visible si la flotte a au moins un
@@ -670,6 +677,7 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   `session.shuttleFleet`. Navette en cours : réglages actuels, ligne d'état (`#shuttle-now`),
   **Changer la navette** et **Arrêter la navette** (`#btn-shuttle-stop`, `shuttleFleet(id)`).
   Échap et le fond ferment la fenêtre (`.close-btn`, §3.2).
+- **Fichiers** (D-540) : `js/interface/app/flotte/navette/` (fenêtre, textes, `branchements/`), `js/interface/app/carte/visee/draw-shuttles.js` ; l'id de la flotte de la fenêtre est `etat.shuttleSheet`.
 - **Indicateur** :
   - état de la flotte (`fleetStatus` → `shuttleText`) : « Navette Mira → Lyra · vers Lyra,
     chargée · 1 livraison », « retour vers Mira », « attend sur Mira : rien à charger »,

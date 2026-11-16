@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { newGame } from './harness.mjs';
 import { scenarios } from './scenario.mjs';
 
-const { loadGame } = await import('../js/save.js');
+const { loadGame } = await import('../js/reseau/save/index.js');
 const scenario = scenarios(import.meta.url);
 /** À qui `s` croit que la planète `cell` appartient, en lettre (A, B) : pour les étiquettes. */
 const who = (s, cell, A, B) => ({ [A.me]: 'A', [B.me]: 'B' })[s.knownOwner(cell).owner?.id] || 'personne';

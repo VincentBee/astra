@@ -1,6 +1,7 @@
 # Réseau et vie d'une partie
 
 > Décrit le code au commit `1eeb2c1`. Dates et heures en UTC.
+> **Découpage du 2026-11-16 (D-540)** : chaque ancien fichier `js/x.js` est devenu un dossier (`js/fleet.js` → `js/regles/fleet/`, une fonction par fichier). Dans cette page, `js/x.js` veut dire ce module, et les numéros de ligne (`l.153`, `x.js:166`) valent pour le commit `6e2f7cf` (ceux de l'achat automatique, D-530 à D-534 : `851a3d4`). Carte complète : [fichiers.md](fichiers.md).
 > Pour l'installation et la mise en ligne : voir `README.md`. Pour jouer : `GUIDE.md`.
 > Les règles du jeu (ordres, flottes, combats, échanges, `tick`) sont dans `docs/architecture/regles.md` ;
 > les écrans (`js/app.js`) dans `docs/architecture/interface.md`.
@@ -43,14 +44,14 @@ pas la différence, sauf `link.viaRoom` (voir §6, `attach`).
 
 | Fichier | Rôle |
 |---|---|
-| `js/config.js` | `ICE_SERVERS` (STUN Cloudflare seul, TURN en commentaire) l.9 ; `relayUrls()` l.16 lit `localStorage['astra.relays']` (relais Nostr perso, sinon `null` = relais publics de Trystero) ; `ICE_GATHER_TIMEOUT_MS = 3500` l.26. |
-| `js/peer.js` | WebRTC brut sans serveur de signalisation. `Link` (enveloppe d'un data channel, JSON, découpage en morceaux). Invitations par QR : `createInvite` l.153 / `answerInvite` l.217. Connexions relayées : `makeOffer` l.251 / `makeAnswer` l.269. |
-| `js/invite.js` | Compresse un SDP en code court `o2.<base64url>` (offre) ou `a2.<base64url>` (réponse), ~150 caractères, et le reconstruit. `encode` l.187, `decode` l.195, `inviteLink` l.210, `drawQr` l.215. |
-| `js/scanner.js` | `scanQr(video, {signal})` l.30 : caméra arrière + jsQR chargé à la demande (`loadJsQR` l.6). Un chargement raté est oublié : le prochain scan refait la requête (D-510, #86). Chaque attente (jsQR, `getUserMedia`, `play`, lecture) fait la course avec l'annulation : rejet `AbortError` immédiat, pistes arrêtées, flux tardif éteint à son arrivée (D-250, #42). |
-| `js/rendezvous.js` | Reconnexion automatique sans rescanner : salon Trystero/Nostr propre à la partie, chiffré par la clé de la partie. Classe `Rendezvous` l.91. |
-| `js/session.js` | Classe `Session` l.197 : création/arrivée, messages, fusion des copies, maillage, sauvegarde. Contient aussi toutes les règles (l.696-1771, voir `regles.md`). |
-| `js/save.js` | Copie locale de la partie et identité dans `localStorage` ; historique de 10 parties ; `mergeStates` (fusion de deux copies). |
-| `js/tablock.js` | `holdGame(gid)` (async) : demande « rends la main » (`BroadcastChannel`), attend le verrou `navigator.locks` `astra.game.<gid>`, `steal` après `WAIT` ; poignée `{ onyield, onlost, release }` (D-430). |
+| `js/reseau/config/` (ex-`js/config.js`) | `ICE_SERVERS` (STUN Cloudflare seul, TURN en commentaire) l.9 ; `relayUrls()` l.16 lit `localStorage['astra.relays']` (relais Nostr perso, sinon `null` = relais publics de Trystero) ; `ICE_GATHER_TIMEOUT_MS = 3500` l.26. |
+| `js/reseau/peer/` (ex-`js/peer.js`) | WebRTC brut sans serveur de signalisation. `Link` (enveloppe d'un data channel, JSON, découpage en morceaux). Invitations par QR : `createInvite` l.153 / `answerInvite` l.217. Connexions relayées : `makeOffer` l.251 / `makeAnswer` l.269. |
+| `js/reseau/invite/` (ex-`js/invite.js`) | Compresse un SDP en code court `o2.<base64url>` (offre) ou `a2.<base64url>` (réponse), ~150 caractères, et le reconstruit. `encode` l.187, `decode` l.195, `inviteLink` l.210, `drawQr` l.215. |
+| `js/reseau/scanner/` (ex-`js/scanner.js`) | `scanQr(video, {signal})` l.30 : caméra arrière + jsQR chargé à la demande (`loadJsQR` l.6). Un chargement raté est oublié : le prochain scan refait la requête (D-510, #86). Chaque attente (jsQR, `getUserMedia`, `play`, lecture) fait la course avec l'annulation : rejet `AbortError` immédiat, pistes arrêtées, flux tardif éteint à son arrivée (D-250, #42). |
+| `js/reseau/rendezvous/` (ex-`js/rendezvous.js`) | Reconnexion automatique sans rescanner : salon Trystero/Nostr propre à la partie, chiffré par la clé de la partie. Classe `Rendezvous` l.91. |
+| `js/session/` (ex-`js/session.js`) | Classe `Session` l.197 : création/arrivée, messages, fusion des copies, maillage, sauvegarde. Contient aussi toutes les règles (l.696-1771, voir `regles.md`). |
+| `js/reseau/save/` (ex-`js/save.js`) | Copie locale de la partie et identité dans `localStorage` ; historique de 10 parties ; `mergeStates` (fusion de deux copies). |
+| `js/reseau/tablock/` (ex-`js/tablock.js`) | `holdGame(gid)` (async) : demande « rends la main » (`BroadcastChannel`), attend le verrou `navigator.locks` `astra.game.<gid>`, `steal` après `WAIT` ; poignée `{ onyield, onlost, release }` (D-430). |
 | `sw.js` | Service worker : cache hors ligne, « réseau d'abord », cache si le réseau ne répond pas en 3 s (D-230). |
 | `tests/sw.test.mjs` | Test de `sw.js` (vrai fichier dans un `vm`, cache en mémoire, serveur local qui répond, lent, muet ou coupé). |
 | `tests/sw-browser.mjs` | Même parcours dans un vrai Chromium (Playwright pris hors du dépôt), hors de `node --test`. |
@@ -119,7 +120,7 @@ Découpage convenu avec code-regles : **ici** constructeur, création/arrivée, 
 
 | Élément | Ligne | Rôle |
 |---|---|---|
-| `FORMAT = 13` (D-547 ; 12 : D-531 ; 11 : D-166 ; 10 : D-158 ; 9 : D-120) | 49 | Version du format des fiches (13 : navette, ordre `shuttle` gardé sur la flotte ; 12 : achat automatique `planet.auto` ; 10 : recherches et vaisseaux dans le fil `plan`), écrite dans `p.v` par `touch`. `outdated` (l.1812) est vrai si un autre a un `v` plus grand → `app.js:830` prévient de recharger. |
+| `FORMAT = 13` (D-557 ; 12 : D-531 ; 11 : D-166 ; 10 : D-158 ; 9 : D-120) | 49 | Version du format des fiches (13 : navette, ordre `shuttle` gardé sur la flotte ; 12 : achat automatique `planet.auto` ; 10 : recherches et vaisseaux dans le fil `plan`), écrite dans `p.v` par `touch`. `outdated` (l.1812) est vrai si un autre a un `v` plus grand → `app.js:830` prévient de recharger. |
 | constantes | 54-72 | `MAX_PLAYERS = 8`, `HEARTBEAT_MS = 1500`, `SILENCE_MS = 30000`, `MAX_ORDERS = 1500`. |
 | `normalize(p)` | 90 | Remet une fiche reçue au format actuel et la nettoie (nom ≤ 16, couleur `#rrggbb`, race connue, planètes valides via `planetOk` (heure `at` ramenée au plancher `since` / `claimAt` de la fiche, D-175 ; stock, population, réserve et repousse ramenés à des nombres finis ≥ 0, D-380), quantités bornées via `cleanAmounts` l.158, etc.). Exportée (utilisée par `js/replay.js`). |
 | `pidOk(pid)` | 169 | `[A-Za-z0-9-]{1,24}` : pas de `__proto__`. |
@@ -332,16 +333,21 @@ Le sens de ce journal pour le rejeu (`seenNews`, `replayIds`) est décrit dans `
 - Un message de plus de 256 Ko dépasserait la limite annoncée par `a=max-message-size` (`invite.js:166`, `peer.js:35`) : passer toujours par `Link.send`, qui découpe.
 - Changer le format du code d'invitation : changer `VERSION` dans `invite.js` (sinon décodage faux).
 - Changer le format des fiches : incrémenter `FORMAT` et compléter son commentaire (l.32-40).
-- `sw.js` : changer `VERSION` (`astra-p2p-v123` au 2026-11-08) à chaque mise en ligne. `cache.addAll` est tout ou rien : un fichier absent de `FILES` qui renvoie 404 casse l'installation.
+- `sw.js` : ~~changer `VERSION` à chaque mise en ligne~~ (jusqu'à `astra-p2p-v131`). Depuis D-546, `VERSION` et `FILES` sont écrits par `build.mjs` dans `dist/sw.js` : `VERSION` = `astra-` + empreinte du contenu de `dist/` (elle change dès qu'un fichier change), `FILES` = les fichiers de `dist/` sans les source maps. Le `sw.js` des sources garde `VERSION = 'astra-sources'` et `FILES = []` (marqueurs remplacés une seule fois, sinon le build échoue). `cache.addAll` est tout ou rien : un fichier absent qui renvoie 404 casse l'installation.
 - **`sw.js`, réseau muet (D-230)** : chaque requête fait la course entre le réseau et un délai de 3 s (`NET_WAIT`). Réseau d'abord s'il répond à temps ; sinon la copie en cache (`caches.match`, `ignoreSearch`). Pas de copie en cache : on continue d'attendre le réseau. Après un délai dépassé, le drapeau `mute` fait répondre le cache **tout de suite** aux requêtes suivantes (sans lui, chaque `import` de la chaîne des modules attendait 3 s : l'accueil mettait plus de 10 s dans Chromium) ; la première réponse du réseau le remet à faux. La réponse du réseau, même arrivée après le délai, est écrite dans le cache (`e.waitUntil` appelé tout de suite) : la prochaine ouverture a la nouvelle version. Piège : juste après le retour du réseau, une ouverture peut encore servir le cache une fois (le drapeau tombe à la première réponse) ; `mute` est perdu quand le navigateur arrête le service worker, ce qui revient au comportement normal.
-- **`FILES` doit contenir tout ce que les pages demandent** (D-500) : `tests/sw-files.test.mjs` part de `index.html`, `replay.html`, `technologies.html` et `manifest.json`, suit `src` / `href`, `import`, `import()` et `new URL('…', import.meta.url)`, et échoue si un fichier atteint manque. Un nouveau fichier : l'ajouter à `FILES` et changer `VERSION`. (Avant D-500, `technologies.html` et `js/techtree.js` manquaient : hors ligne, la page ne s'ouvrait que si elle avait déjà été ouverte en ligne, issue #84.)
+- **`FILES` doit contenir tout ce que les pages demandent** (D-500) : `tests/sw-files.test.mjs` part de `index.html`, `replay.html`, `technologies.html` et `manifest.json`, suit `src` / `href`, `import`, `export … from` (les `index.js` des modules, depuis D-543), `import()` et `new URL('…', import.meta.url)`, et échoue si un fichier atteint manque. Depuis le découpage (D-543), `FILES` liste 923 entrées (912 fichiers JS) ; l'installation du service worker les télécharge tous (mesures dans D-543). Un nouveau fichier : l'ajouter à `FILES` et changer `VERSION`. (Avant D-500, `technologies.html` et `js/techtree.js` manquaient : hors ligne, la page ne s'ouvrait que si elle avait déjà été ouverte en ligne, issue #84.)
 - Le service worker n'est enregistré qu'en https ou sur `localhost` (`app.js:1964`). La caméra aussi exige https (`scanner.js:30`).
 - `route()` est copié dans `peer.js:125` et `rendezvous.js:32`.
 - Pas de TURN : derrière certains opérateurs (CGNAT), la connexion peut échouer (`config.js:6-8`).
 
 ## 9. Comment tester
 
-Pas de `package.json` : on lance Node directement (Node 24.14.1 ici).
+Depuis le build (D-545) : `npm ci` une fois (installe esbuild), puis `npm test` ou
+`node --test tests/*.test.mjs` (Node 24). Les tests du service worker (`sw.test.mjs`,
+`sw-files.test.mjs`) et `build.test.mjs` construisent `dist/` dans un dossier temporaire (un par
+fichier de test, car `node --test` les lance en parallèle : `tests/dist.mjs`). Les scripts
+`tests/sw-browser.mjs` et `tests/chargement-browser.mjs` servent aussi `dist/` (ou un autre
+dossier avec `ASTRA_ROOT=…`).
 
 ```bash
 node --test tests/peer.test.mjs

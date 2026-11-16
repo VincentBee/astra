@@ -4,15 +4,23 @@ Jeu de conquête spatiale entre téléphones, en pair à pair. Aucun serveur de 
 
 **Jouer : https://vincentbee.github.io/astra/** (à ouvrir sur chaque téléphone)
 
-JS vanilla, modules ES, aucune étape de build.
+JS vanilla, modules ES, sans framework. Les sources se jouent telles quelles ; pour la mise en ligne, `node build.mjs` les assemble et les minifie dans `dist/` (une page = un fichier JS), et GitHub Actions publie `dist/` à chaque push sur `main` (D-545).
 
 ## Tester
 
 ### Sur ordinateur (deux onglets)
+Les sources, sans build (pour développer) :
 ```sh
-cd astra-p2p
 python3 -m http.server 8080
 ```
+La version mise en ligne (assemblée et minifiée, comme sur GitHub Pages) :
+```sh
+npm ci                 # une fois : installe esbuild
+node build.mjs         # fabrique dist/
+python3 -m http.server 8080 --directory dist
+```
+Tests : `npm test` (ou `node --test tests/*.test.mjs` ; les tests du build ont besoin de `npm ci`).
+
 Ouvre http://localhost:8080 dans **deux fenêtres de navigateur différentes** (ou une fenêtre normale + une privée) :
 1. Fenêtre A : ton nom → **Créer une partie**.
 2. **Copier le lien** et l'ouvrir dans la fenêtre B.
@@ -24,30 +32,35 @@ La caméra et l'installation sur l'écran d'accueil exigent du **https**. Il fau
 
 - **Cloudflare Pages** : dashboard → Workers & Pages → Créer → Pages → « Upload assets » → glisser le dossier.
 - **Netlify** : glisser le dossier sur https://app.netlify.com/drop.
-- **GitHub Pages** : pousser le dossier dans un dépôt, puis Settings → Pages → branche `main`.
+- **GitHub Pages** : le workflow `.github/workflows/deploy.yml` construit `dist/` et le publie à chaque push sur `main`. Réglage à faire une fois : Settings → Pages → Build and deployment → Source : **GitHub Actions**.
+- Ailleurs : `node build.mjs`, puis mettre en ligne le dossier `dist/`.
 
 Ensuite : quelqu'un crée la partie. Pour inviter, n'importe quel joueur appuie sur l'icône **Inviter un joueur** (en haut à droite) ; l'invité scanne le QR avec l'appareil photo de son téléphone (le lien ouvre l'appli), puis l'hôte scanne le QR de réponse avec **Scanner sa réponse**. À distance, on s'envoie le lien et la réponse par message.
 
 ## Comment ça marche
 
+Une fonction par fichier, rangée par domaine puis par module : la carte complète est dans [docs/architecture/fichiers.md](docs/architecture/fichiers.md).
+
 | Fichier | Rôle |
 |---|---|
-| `js/game.js` | Règles pures (port de `game.rs`), en vitesse ×150 (`TEMPO` 2,5 dans `js/tech.js`) : une « heure » de jeu = 24 s. Le soleil s’éteint : le froid part du bord et se resserre vers le soleil (`FROST`), une planète qu’il atteint est perdue ; une planète se prend aussi en gagnant un combat avec un colonisateur. Sans planète, on est éliminé : le dernier en vie gagne |
-| `js/tech.js` | Arbre des technologies et vaisseaux de chaque race (données pures) |
-| `technologies.html`, `js/techtree.js` | Page à part, hors du jeu : le graphe de chaque race (bâtiments, technologies, vaisseaux, pouvoirs), lu dans les données du jeu |
-| `js/fleet.js` | Flottes : décollage, déplacements libres sur la carte, carburant, poursuite, combat sans hasard, pillage |
-| `js/trade.js` | Échanges entre joueurs : séquestre, réception, issue d'une offre |
-| `js/save.js` | Sauvegarde de la partie sur le téléphone et fusion de deux copies |
-| `js/bot.js` | Joueurs IA : une IA joue sur le téléphone de celui qui l'ajoute (« Contre l'IA » à l'accueil, « Ajouter une IA » au départ), avec les mêmes ordres qu'un joueur |
-| `js/session.js` | Une partie vue d'un téléphone : copie de l'état, fiches des joueurs, connexions entre joueurs, invitations, journal des ordres |
-| `js/replay.js` | Rejeu d'une partie à partir des journaux d'ordres des fiches |
-| `replay.html`, `js/replay-view.js` | Écran du replay : la carte, les joueurs et le journal, au fil du temps |
-| `js/rendezvous.js` | Reconnexion automatique, sans rescanner : rendez-vous via des relais Nostr publics (Trystero) |
-| `js/peer.js` | WebRTC : offre/réponse sans serveur de signalisation, canal de données |
-| `js/invite.js` | Code d'invitation compact (≈150 car.) et dessin du QR code |
-| `js/scanner.js` | Lecture de QR par la caméra (jsQR) |
-| `js/config.js` | Serveurs STUN/TURN, relais du rendez-vous |
-| `sw.js`, `manifest.json` | Appli installable et utilisable hors ligne |
+| `js/regles/game/` | Règles pures (port de `game.rs`), en vitesse ×150 (`TEMPO` 2,5 dans `js/tech.js`) : une « heure » de jeu = 24 s. Le soleil s’éteint : le froid part du bord et se resserre vers le soleil (`FROST`), une planète qu’il atteint est perdue ; une planète se prend aussi en gagnant un combat avec un colonisateur. Sans planète, on est éliminé : le dernier en vie gagne |
+| `js/regles/tech/` | Arbre des technologies et vaisseaux de chaque race (données pures) |
+| `technologies.html`, `js/interface/techtree/` | Page à part, hors du jeu : le graphe de chaque race (bâtiments, technologies, vaisseaux, pouvoirs), lu dans les données du jeu |
+| `js/regles/fleet/` | Flottes : décollage, déplacements libres sur la carte, carburant, poursuite, combat sans hasard, pillage |
+| `js/regles/trade/` | Échanges entre joueurs : séquestre, réception, issue d'une offre |
+| `js/reseau/save/` | Sauvegarde de la partie sur le téléphone et fusion de deux copies |
+| `js/ia/bot/` | Joueurs IA : une IA joue sur le téléphone de celui qui l'ajoute (« Contre l'IA » à l'accueil, « Ajouter une IA » au départ), avec les mêmes ordres qu'un joueur |
+| `js/session/` | Une partie vue d'un téléphone : copie de l'état, fiches des joueurs, connexions entre joueurs, invitations, journal des ordres |
+| `js/regles/replay/` | Rejeu d'une partie à partir des journaux d'ordres des fiches |
+| `replay.html`, `js/interface/replay-view/` | Écran du replay : la carte, les joueurs et le journal, au fil du temps |
+| `js/reseau/rendezvous/` | Reconnexion automatique, sans rescanner : rendez-vous via des relais Nostr publics (Trystero) |
+| `js/reseau/peer/` | WebRTC : offre/réponse sans serveur de signalisation, canal de données |
+| `js/reseau/invite/` | Code d'invitation compact (≈150 car.) et dessin du QR code |
+| `js/reseau/scanner/` | Lecture de QR par la caméra (jsQR) |
+| `js/reseau/config/` | Serveurs STUN/TURN, relais du rendez-vous |
+| `sw.js`, `manifest.json` | Appli installable et utilisable hors ligne (la liste des fichiers en cache est écrite par `build.mjs`) |
+| `js/interface/app/` | L'interface du jeu (écrans, carte, fenêtres) |
+| `build.mjs`, `package.json` | Build (esbuild) : `dist/`, le site mis en ligne |
 
 - **Tous au même niveau** : pas de maître du jeu. Chaque joueur est le seul à modifier sa propre fiche (sa planète) : il applique ses ordres tout de suite chez lui, puis envoie sa fiche à jour aux autres. Une fiche porte l'heure de sa dernière modification, et la plus récente l'emporte. Comme personne ne modifie la fiche d'un autre, il n'y a jamais de conflit à arbitrer, même quand le groupe a été coupé en deux.
 - **Tout le monde invite** : n'importe quel joueur montre son QR puis scanne la réponse de l'invité ; ce geste vaut accord, et une invitation ne sert qu'une fois (8 joueurs au plus).
