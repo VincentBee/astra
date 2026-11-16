@@ -4,6 +4,8 @@
 // quatre humeurs : « répond », « lent » (répond après 4 s), « muet » (accepte la
 // connexion mais ne répond jamais) et « coupé » (serveur arrêté).
 // Le même parcours dans un vrai navigateur : tests/sw-browser.mjs.
+// On teste le sw.js du site mis en ligne : celui de dist/, que build.mjs remplit (FILES, VERSION ;
+// D-535, D-536), servi avec les fichiers de dist/.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -11,8 +13,10 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
+import { builtDist } from './dist.mjs';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const sources = join(dirname(fileURLToPath(import.meta.url)), '..');
+const { out: root } = await builtDist();
 
 // --- Serveur local à humeurs ---
 let mode = 'up';
@@ -147,14 +151,14 @@ test('serveur qui répond : la version du réseau est servie, et une modificatio
 test('serveur muet : la copie en cache est servie en moins de 5 s', async () => {
   mode = 'stall';
   // L'accueil et quelques fichiers de FILES, demandés ensemble comme le ferait la page.
-  const [r, ...rest] = await Promise.all(['/index.html', '/', '/style.css', '/js/interface/app/main.js'].map(get));
+  const [r, ...rest] = await Promise.all(['/index.html', '/', '/style.css', '/js/index.js'].map(get));
   assert.ok(r.ms < 5000, `servie en ${r.ms} ms`);
   assert.ok(r.ms >= 2900, `pas avant le délai de 3 s (${r.ms} ms) : le réseau garde sa chance`);
   assert.match(r.text, /NOUVELLE VERSION/);
   for (const x of rest) assert.ok(x.res && x.ms < 5000, `${x.ms} ms`);
   // Le réseau est muet : les fichiers suivants (les `import` en chaîne des modules)
   // viennent du cache tout de suite, sans attendre 3 s chacun.
-  const next = await get('/js/regles/game/index.js');
+  const next = await get('/js/technologies.js');
   assert.ok(next.res && next.ms < 500, `fichier suivant en ${next.ms} ms`);
 });
 
@@ -192,4 +196,33 @@ test('serveur coupé : la copie en cache est servie tout de suite, comme avant',
   const r = await get('/index.html');
   assert.ok(r.ms < 1000, `servie en ${r.ms} ms`);
   assert.match(r.text, /RETOUR DU RÉSEAU/);
+});
+
+test('le sw.js des sources (sans build, FILES vide) s’installe et met en cache au passage', async () => {
+  const listen = {};
+  const memo = new Map();
+  const box = {
+    open: async () => ({ addAll: async (l) => assert.equal(l.length, 0, "FILES vide dans les sources"), put: async (req, res) => memo.set(new URL(req.url).pathname, res) }),
+    keys: async () => [],
+    delete: async () => true,
+    match: async () => undefined,
+  };
+  vm.runInNewContext(readFileSync(join(sources, 'sw.js'), 'utf8'), {
+    self: { addEventListener: (t, fn) => (listen[t] = fn), skipWaiting: () => Promise.resolve(), clients: { claim: () => Promise.resolve() } },
+    caches: box,
+    fetch: async () => new Response('ok'),
+    location: new URL('http://localhost/'),
+    URL,
+    setTimeout,
+    clearTimeout,
+    Promise,
+  });
+  const waits = [];
+  listen.install({ waitUntil: (p) => waits.push(p) });
+  await Promise.all(waits);
+  let answer;
+  listen.fetch({ request: new Request('http://localhost/js/interface/app/main.js'), waitUntil: (p) => waits.push(p), respondWith: (p) => (answer = p) });
+  assert.equal(await (await answer).text(), 'ok');
+  await Promise.all(waits);
+  assert.ok(memo.has('/js/interface/app/main.js'), 'mis en cache au passage');
 });

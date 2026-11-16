@@ -4,15 +4,19 @@
 //
 //   ASTRA_PLAYWRIGHT=/chemin/vers/node_modules/playwright/index.mjs node tests/chargement-browser.mjs [dossier-captures]
 //
-// ASTRA_ROOT=<dossier> sert un autre dossier que le dépôt (une copie de main, pour voir le bug).
+// Par défaut, sert dist/ (le site mis en ligne, D-535), construit dans un dossier temporaire.
+// ASTRA_ROOT=<dossier> sert un autre dossier (les sources : ASTRA_ROOT=., ou une copie de main).
 // Sans service worker (page jamais contrôlée, comme à la toute première visite) ; le réseau est
 // coupé pour vendor/jsQR.js et vendor/trystero-nostr.mjs (page.route), puis rétabli.
 import { createServer } from 'node:http';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, extname } from 'node:path';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 
-const root = process.env.ASTRA_ROOT || join(dirname(fileURLToPath(import.meta.url)), '..');
+const root = process.env.ASTRA_ROOT || (await (await import('../build.mjs')).build({ out: mkdtempSync(join(tmpdir(), 'astra-dist-')), quiet: true })).out;
+console.log(`site servi : ${root}`);
 const spec = process.env.ASTRA_PLAYWRIGHT;
 const { chromium } = await import(spec ? pathToFileURL(spec).href : 'playwright');
 const shots = process.argv[2];
@@ -77,23 +81,21 @@ try {
   check('Scanner, réseau revenu', opened, `${opened ? 'caméra ouverte' : `pas de caméra (« ${err2} »)`} | requêtes jsQR : ${requests.jsQR.length} (${requests.jsQR.join(', ')})`);
   if (opened) await page.click('#btn-scan-cancel');
 
-  // 2. Rendez-vous (Trystero), réseau coupé, puis revenu.
+  // 2. Rendez-vous (Trystero), réseau coupé, puis revenu : par l'appli (Créer une partie), qui
+  // rejoint le rendez-vous de sa partie, puis le retente toutes les 15 s s'il a raté (D-511).
   down = true;
-  const first = await page.evaluate(async () => {
-    const { Rendezvous } = await import('./js/reseau/rendezvous/index.js');
-    window.rdv = new Rendezvous({ gid: 'preuve-86', key: 'k', me: 'moi', onLink() {} });
-    await window.rdv.join();
-    return window.rdv.state;
-  });
+  await page.goto(url);
+  await page.waitForSelector('#btn-create svg', { state: 'visible' });
+  await page.fill('#name', 'Vincent');
+  await page.click('#btn-create');
+  const state = () => page.evaluate(() => window.astra.session?.rdv?.state ?? null);
+  await page.waitForFunction(() => window.astra.session?.rdv?.state === 'failed', null, { timeout: 15000 }).catch(() => {});
+  const first = await state();
   check('Rendez-vous, réseau coupé', first === 'failed', `${first} | requêtes Trystero : ${requests.trystero.length}`);
   down = false;
-  const second = await page.evaluate(async () => {
-    await window.rdv.refresh();
-    const s = window.rdv.state;
-    window.rdv.leave();
-    return s;
-  });
-  check('Rendez-vous, réseau revenu', second === 'on', `${second} | requêtes Trystero : ${requests.trystero.length} (${requests.trystero.join(', ')})`);
+  await page.waitForFunction(() => window.astra.session?.rdv?.state === 'on', null, { timeout: 40000 }).catch(() => {});
+  const second = await state();
+  check('Rendez-vous, réseau revenu', second === 'on' && requests.trystero.some((r) => /\?r=\d/.test(r)), `${second} | requêtes Trystero : ${requests.trystero.length} (${requests.trystero.join(', ')})`);
 } finally {
   await browser.close();
   server.close();

@@ -6,12 +6,16 @@
 //
 // Serveur local à trois humeurs : « répond », « muet » (accepte la connexion,
 // ne répond jamais), « coupé » (serveur arrêté). Affiche les durées mesurées.
+// Par défaut, sert dist/ (le site mis en ligne, D-535), construit dans un dossier temporaire ;
+// ASTRA_ROOT=<dossier> sert un autre dossier (les sources : ASTRA_ROOT=.).
 import { createServer } from 'node:http';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, extname } from 'node:path';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const root = process.env.ASTRA_ROOT || (await (await import('../build.mjs')).build({ out: mkdtempSync(join(tmpdir(), 'astra-dist-')), quiet: true })).out;
+console.log(`site servi : ${root}`);
 const spec = process.env.ASTRA_PLAYWRIGHT;
 const { chromium } = await import(spec ? pathToFileURL(spec).href : 'playwright');
 const shot = process.argv[2];
