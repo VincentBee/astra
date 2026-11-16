@@ -22,10 +22,10 @@ import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity, identityFor, savedGame } from './save.js';
 import { inviteGid } from './invite.js';
 import { holdGame } from './tablock.js';
-import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, PLAN_MAX, planItem, planId, planAhead, tooBig, upgradeCost, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, FROST, sunFor, fortOf, seeded, RES } from './game.js';
+import { newPlanet, settle, stateAt, distance, startBuild, startDemolish, startResearch, startShips, usePower, PLAN_MAX, planItem, planId, planAhead, tooBig, upgradeCost, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, FROST, sunFor, fortOf, seeded, RES } from './game.js';
 import { TECHS, SHIPS, sightRange, TEMPO, techMissing, shipUnlocked } from './tech.js';
 import { cleanReport } from './report.js';
-import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, firstContact, salvage, applyLosses, parkedCell, fleetPos, fleetCargo, fleetTank, ORDERS, MAX_FLEETS, STANCES, aggressive, armed } from './fleet.js';
+import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, firstContact, salvage, applyLosses, parkedCell, fleetPos, fleetCargo, fleetTank, fleetBurn, freeze as freezeFleet, shuttleTake, shuttleGive, ORDERS, MAX_FLEETS, STANCES, aggressive, armed } from './fleet.js';
 import { amounts, isEmpty, holdings, lacks, noRoom, take, put, outcome, OFFER_MS, MAX_OFFERS, GRACE_MS } from './trade.js';
 
 /** « de Beta », « d'Alpha ». */
@@ -45,8 +45,9 @@ const de = (name) => (/^[aeiouyhàâéèêëîïôöûü]/i.test(name) ? `d’${
  *     avec un seul colonisateur qui fonde la planète mère.
  * 10 : recherches et lots de vaisseaux dans le fil d'attente (`plan`, D-158).
  * 11 : heure commune et resynchronisation d'une fiche (`clockFix`, D-165, D-166).
+ * 12 : navette entre deux de mes planètes (ordre `shuttle` gardé sur la flotte, D-540, D-547).
  */
-export const FORMAT = 11;
+export const FORMAT = 12;
 
 const shipsText = (n) => `${n} vaisseau${n > 1 ? 'x' : ''}`;
 
@@ -86,6 +87,8 @@ const RAID_COOLDOWN_MS = (2 * 60_000) / TEMPO;
  * revient jamais.
  */
 const MAX_EFFECTS = 300;
+/** Escales d'une navette traitées en un passage, au plus (rattrapage après une absence, D-545). */
+const SHUTTLE_MAX_STOPS = 2000;
 /** Entrées gardées dans mon carnet (combats et planètes perdues, sur ce téléphone seulement). */
 const JOURNAL_MAX = 100;
 /** Pas (ms) auquel on regarde si le froid atteint une flotte en vol (D-163). */
@@ -175,6 +178,7 @@ export function normalize(p) {
   if (!Array.isArray(p.fleets)) p.fleets = [];
   p.fleets = p.fleets.filter((f) => isObj(f) && isCell(f.from) && isCell(f.to) && isObj(f.ships));
   p.fleets.forEach(upgradeFleet);
+  p.fleets.forEach(cleanShuttle);
   if (!Array.isArray(p.effects)) p.effects = [];
   p.effects = p.effects.filter((e) => isObj(e) && typeof e.to === 'string' && typeof e.id === 'string').map(cleanEffect);
   if (!Array.isArray(p.applied)) p.applied = [];
@@ -282,6 +286,23 @@ function upgradeFleet(f) {
     : { kind: 'dock', key: t.key || f.origin };
   delete f.mission;
   delete f.target;
+}
+
+/**
+ * Ordre de navette (D-540) d'une fiche reçue ou relue : la forme seulement (deux cases, des
+ * ressources du sol, l'escale visée). Une navette abîmée tombe ; la flotte reste où elle est.
+ * Que les deux planètes soient bien les miennes se vérifie à chaque escale (`shuttleStop`).
+ */
+function cleanShuttle(f) {
+  const o = f.order;
+  if (o?.kind !== 'shuttle') return;
+  const ok = isCell(o.a) && isCell(o.b) && !sameCell(o.a, o.b) && Array.isArray(o.res) && o.res.length > 0 && o.res.every((r) => SOIL.includes(r)) && (o.go === 'a' || o.go === 'b');
+  if (!ok) {
+    f.order = null;
+    return;
+  }
+  f.order = { kind: 'shuttle', a: { x: o.a.x, y: o.a.y }, b: { x: o.b.x, y: o.b.y }, res: SOIL.filter((r) => o.res.includes(r)), go: o.go, trips: Number.isInteger(o.trips) && o.trips > 0 ? o.trips : 0, sent: Object.fromEntries(SOIL.map((r) => [r, Math.min(amount(o.sent?.[r]), MAX_AMOUNT)]).filter(([, v]) => v > 0)) };
+  if (o.wait === 'a' || o.wait === 'b') f.order.wait = o.wait;
 }
 
 /** Copie sans les champs des anciennes versions (maître du jeu, époques, ressources d'avant les races). */
@@ -2213,13 +2234,14 @@ export class Session {
       if (!p.home && w.kind && w.kind !== 'planet') return this.refuse(`${w.name} est trop petit pour une planète mère : vise une planète.`);
       order = { kind, world: w.id };
     }
+    const was = this.shuttlesOf([f]);
     const err = moveTo(f, p.race, techOf(p), cell, order, this.now());
     if (err) return this.refuse(err);
     if (f.stranded) this.ontoast?.('Pas assez de carburant : la flotte tombera en panne en route.');
     // Au journal, seulement les ordres qui comptent : les simples déplacements le noieraient.
     const who = here && live && here.owner.id !== this.me ? ` (${here.owner.name})` : ''; // hors de vue, pas de nom (D-190)
     // Marquée de la flotte : la cible ne la lit que si elle voit la flotte (D-210, `showsLog`).
-    this.touch(order ? this.addLog(`La flotte ${de(p.name)} ${ORDERS[order.kind].verb} ${here ? here.name : w.name}${who}.`, { pid: this.me, fleet: f.id }) : null);
+    this.touch(this.quitShuttles(p, was, order ? this.addLog(`La flotte ${de(p.name)} ${ORDERS[order.kind].verb} ${here ? here.name : w.name}${who}.`, { pid: this.me, fleet: f.id }) : null));
     this.changed();
     return true;
   }
@@ -2230,9 +2252,10 @@ export class Session {
     const p = this.state.players[this.me];
     const f = this.myFleet(id);
     if (!f || this.locked(id)) return false;
+    const was = this.shuttlesOf([f]);
     const err = stopAt(f, p.race, techOf(p), this.now());
     if (err) return this.refuse(err);
-    this.touch();
+    this.touch(this.quitShuttles(p, was, null, 'flotte arrêtée'));
     this.changed();
     return true;
   }
@@ -2409,8 +2432,9 @@ export class Session {
     // que je vois est l'état d'avant le combat, et rejouer le combat compterait les pertes deux fois.
     const pendingHit = (p.effects || []).some((e) => e.to === pid && [target.id, ...(target.absorbed || [])].includes(e.fleet) && !enemy.applied?.includes(e.id));
     if (pendingHit) return this.refuse(`Combat déjà livré : en attente du rapport de ${enemy.name}.`);
-    f.order = { kind: 'chase', pid, fleet: target.id, seen: null };
     this.tickLogs = []; // un combat immédiat écrit au journal : ses entrées partent avec ma fiche
+    this.endShuttle(p, f, 'nouvel ordre'); // la poursuite remplace la navette (D-542)
+    f.order = { kind: 'chase', pid, fleet: target.id, seen: null };
     this.pursue(p, f, this.now());
     if (f.order) this.addLog(`La flotte ${de(p.name)} prend en chasse une flotte ${de(enemy.name)}.`, { pid: this.me, fleet: f.id }); // D-210
     const logs = this.tickLogs;
@@ -2509,6 +2533,11 @@ export class Session {
    * `onward` : ma flotte (agressive) garde ensuite son trajet et son ordre.
    */
   fight(p, f, enemy, target, now, onward = false) {
+    // Un combat arrête la navette (D-542) ; la flotte finit son trajet et attend en orbite.
+    if (f.order?.kind === 'shuttle') {
+      this.endShuttle(p, f, `combat contre ${enemy.name}`);
+      f.order = null;
+    }
     // Combat dans le passé : le prochain passage cherche les autres rencontres à partir de là.
     if (now < (this.scanAt ?? Infinity)) this.scanAt = now;
     const res = battle({ race: p.race, ships: f.ships, tech: techOf(p) }, { race: enemy.race, ships: target.ships, tech: enemy.planet?.tech || {} });
@@ -2840,9 +2869,10 @@ export class Session {
     if (!this.canAct) return false;
     const pair = this.pairOf(fromId, toId);
     if (!pair) return false;
+    const was = this.shuttlesOf(pair);
     const err = transfer(pair[0], pair[1], this.state.players[this.me].race, part, this.now());
     if (err) return this.refuse(err);
-    this.touch();
+    this.touch(this.quitShuttles(this.state.players[this.me], was));
     this.changed();
     return true;
   }
@@ -2853,9 +2883,10 @@ export class Session {
     const pair = this.pairOf(fromId, intoId);
     if (!pair) return false;
     const p = this.state.players[this.me];
+    const was = this.shuttlesOf(pair);
     merge(pair[0], pair[1], p.race, this.now());
     p.fleets = p.fleets.filter((f) => f.id !== fromId);
-    this.touch();
+    this.touch(this.quitShuttles(p, was, null, 'flottes fusionnées'));
     this.changed();
     return true;
   }
@@ -2875,11 +2906,208 @@ export class Session {
     if (this.locked(id) || this.locked(intoId)) return false;
     const now = this.now();
     if (together(f, g, now)) return this.mergeFleets(id, intoId);
+    const was = this.shuttlesOf([f]);
     const err = moveTo(f, p.race, techOf(p), { ...g.to }, { kind: 'join', fleet: g.id }, now);
     if (err) return this.refuse(err);
     if (f.stranded) this.ontoast?.('Pas assez de carburant : la flotte tombera en panne en route.');
-    this.touch(this.addLog(`Une flotte ${de(p.name)} part rejoindre une autre de ses flottes en [${g.to.x}:${g.to.y}].`));
+    this.touch(this.quitShuttles(p, was, this.addLog(`Une flotte ${de(p.name)} part rejoindre une autre de ses flottes en [${g.to.x}:${g.to.y}].`)));
     this.changed();
+    return true;
+  }
+
+  // ----- navette (D-540) ------------------------------------------------------
+  //
+  // Une flotte avec des soutes fait des allers-retours entre deux de mes planètes : elle charge
+  // sur A les ressources choisies, autant que ses soutes le permettent, les pose sur B, revient à
+  // vide, et recommence. L'ordre reste sur la flotte (`order.kind = 'shuttle'`), comme une
+  // jonction qui attend (D-159) : `go` dit l'escale visée ('a' ou 'b'), `wait` qu'elle y attend
+  // (rien à charger sur A, entrepôt plein sur B), `trips` et `sent` ce qu'elle a déjà livré.
+
+  /** Ma planète sur cette case, à moi et pas gelée à `at`, ou null (une escale de navette). */
+  shuttlePlanet(p, cell, at) {
+    const pl = isCell(cell) && this.planetsOf(p).find((x) => sameCell(x.cell, cell));
+    return pl && this.ownerAt(pl.cell)?.id === p.id && this.frostOf(pl.cell) > at ? pl : null;
+  }
+
+  /**
+   * Met ma flotte `id` en navette de la planète `a` vers la planète `b` (deux cases), pour les
+   * ressources `res` (minéraux, nourriture). Sans `a` : arrête la navette, la flotte finit son
+   * trajet et attend en orbite. Ailleurs qu'en A ou B, elle part d'abord vers A.
+   */
+  shuttleFleet(id, a, b, res) {
+    if (!this.canAct) return false;
+    const p = this.state.players[this.me];
+    const f = this.myFleet(id);
+    if (!f) return this.refuse('Flotte introuvable.');
+    if (a == null) {
+      if (f.order?.kind !== 'shuttle') return false;
+      const log = this.endShuttle(p, f, 'à la demande de son joueur');
+      f.order = null;
+      this.touch(log);
+      this.changed();
+      return true;
+    }
+    if (this.locked(id)) return false;
+    const now = this.now();
+    const A = this.shuttlePlanet(p, a, now);
+    const B = this.shuttlePlanet(p, b, now);
+    if (!A || !B) return this.refuse('Une navette va entre deux de tes planètes.');
+    if (sameCell(A.cell, B.cell)) return this.refuse('Choisis deux planètes différentes.');
+    const kinds = Array.isArray(res) ? SOIL.filter((r) => res.includes(r)) : [];
+    if (!kinds.length || res.some((r) => !SOIL.includes(r))) return this.refuse('Choisis ce qu’elle transporte : minéraux ou nourriture.');
+    // Il faut au moins un cargo (D-541) : les autres vaisseaux ont un peu de soute, pas assez pour une navette.
+    if (!(f.ships.cargo > 0)) return this.refuse(`Une navette demande au moins un cargo (${SHIPS[p.race].cargo.name}).`);
+    if (fleetBurn(p.race, f.ships) * distance(A.cell, B.cell) > fleetTank(p.race, f.ships) + 1e-9) return this.refuse(`Ses réservoirs sont trop petits pour aller de ${A.name} à ${B.name}.`);
+    // Arrêtée sur A ou B : l'escale se fait tout de suite. En route vers A ou B (une navette qu'on
+    // règle autrement) : elle garde son trajet. Ailleurs : elle part d'abord vers A.
+    const go = moving(f, now) ? null : sameCell(f.to, A.cell) ? 'a' : sameCell(f.to, B.cell) ? 'b' : null;
+    const keep = moving(f, now) && !f.stranded ? (sameCell(f.to, A.cell) ? 'a' : sameCell(f.to, B.cell) ? 'b' : null) : null;
+    if (!go && !keep && fuelNeed(f, p.race, A.cell, now) > fuelAt(f, p.race, now) + 1e-9) return this.refuse(`Pas assez de carburant pour rejoindre ${A.name}.`);
+    const before = f.order?.kind === 'shuttle' ? f.order : null;
+    const order = { kind: 'shuttle', a: { ...A.cell }, b: { ...B.cell }, res: kinds, go: go || keep || 'a', trips: before?.trips || 0, sent: { ...(before?.sent || {}) } };
+    this.tickLogs = []; // la première escale, tout de suite si elle est déjà en A ou en B : ses entrées partent avec ma fiche
+    if (go) {
+      // Déjà arrêtée sur l'escale : son trajet devient immobile maintenant (pas d'escale datée d'avant l'ordre).
+      freezeFleet(f, p.race, now);
+      f.order = order;
+    } else if (keep) {
+      f.order = order;
+    } else {
+      const err = moveTo(f, p.race, techOf(p), A.cell, order, now);
+      if (err) {
+        this.tickLogs = null;
+        return this.refuse(err);
+      }
+    }
+    const names = kinds.map((r) => RES_INFO[r].name.toLowerCase()).join(' et ');
+    this.addLog(`La flotte ${de(p.name)} fait la navette de ${A.name} vers ${B.name} (${names}).`, { pid: this.me, fleet: f.id });
+    if (go) this.shuttle(p, f, now);
+    const logs = this.tickLogs;
+    this.tickLogs = null;
+    this.touch(logs);
+    this.changed();
+    return true;
+  }
+
+  /**
+   * La navette de `f` s'arrête (`why`) : une ligne au journal, renvoyée pour partir avec ma fiche.
+   * Ne touche pas à l'ordre de la flotte : l'appelant le remplace ou l'efface. null sans navette.
+   */
+  endShuttle(p, f, why) {
+    const o = f?.order;
+    if (o?.kind !== 'shuttle') return null;
+    const name = (cell) => this.planets.find((w) => sameCell(w, cell))?.name || `[${cell.x}:${cell.y}]`;
+    this.ontoast?.(`Navette arrêtée : ${why}.`);
+    return this.addLog(`La navette ${de(p.name)} entre ${name(o.a)} et ${name(o.b)} s’arrête : ${why}.`, { pid: this.me, fleet: f.id });
+  }
+
+  /** Les navettes de ces flottes, avant un ordre qui peut les remplacer : [{ id, order }]. */
+  shuttlesOf(fleets) {
+    return fleets.filter((f) => f?.order?.kind === 'shuttle').map((f) => ({ id: f.id, order: f.order }));
+  }
+
+  /**
+   * Après un autre ordre réussi (D-542) : chaque navette de `was` que l'ordre a remplacée (ou
+   * dont la flotte a disparu, fondue dans une autre) s'arrête, avec sa ligne au journal. Renvoie
+   * les entrées du journal à envoyer avec ma fiche (avec `log`, celle de l'ordre), ou null.
+   */
+  quitShuttles(p, was, log = null, why = 'nouvel ordre') {
+    const out = [].concat(log || []);
+    for (const w of was) if (this.myFleet(w.id)?.order !== w.order) out.push(this.endShuttle(p, w, why));
+    return out.length ? out : null;
+  }
+
+  /** Ce qui retient une flotte (un échange en cours), sans message : le passage le relit seul. */
+  offerHolds(id) {
+    return (this.state.players[this.me]?.offers || []).some((o) => o.from.fleet === id);
+  }
+
+  /**
+   * Navette, à chaque passage : enchaîne les escales dues à `now`, chacune à son heure (D-545).
+   * Après une longue absence, tous les allers-retours de l'absence se font ici, l'un après
+   * l'autre, pas un seul. Renvoie true si ma fiche a changé.
+   */
+  shuttle(p, f, now) {
+    let changed = false;
+    for (let i = 0; i < SHUTTLE_MAX_STOPS && f.order?.kind === 'shuttle' && !moving(f, now) && p.fleets.includes(f); i++) {
+      if (!this.shuttleStop(p, f, now)) break;
+      changed = true;
+    }
+    return changed;
+  }
+
+  /**
+   * Une escale de navette : sur A, charger puis partir vers B ; sur B, décharger puis revenir
+   * vers A. L'heure de l'escale est celle de l'arrivée (`f.arrive`), ou `now` si la flotte
+   * attendait déjà. Attendre ne change rien à ma fiche (sauf la première fois, `wait`) : un
+   * passage sans changement n'est pas noté au journal d'ordres, le rejeu ne le refait pas.
+   * Renvoie true si ma fiche a changé.
+   */
+  shuttleStop(p, f, now) {
+    const o = f.order;
+    const t = o.wait ? now : Math.min(now, f.arrive);
+    const stop = (why) => {
+      this.endShuttle(p, f, why);
+      f.order = null;
+      return true;
+    };
+    const A = this.shuttlePlanet(p, o.a, t);
+    const B = this.shuttlePlanet(p, o.b, t);
+    if (!A || !B) {
+      const lost = this.planets.find((w) => sameCell(w, A ? o.b : o.a))?.name || 'une de ses planètes';
+      return stop(`${lost} n’est plus à ${p.name}`);
+    }
+    if (!(f.ships.cargo > 0)) return stop('plus aucun cargo');
+    if (this.offerHolds(f.id)) return false; // un échange la retient : elle reprend après la réponse
+    const here = o.go === 'a' ? A : B;
+    if (!sameCell(f.to, here.cell)) return stop(`elle n’est pas arrivée sur ${here.name}`);
+    const held = SOIL.reduce((x, r) => x + (f.cargo?.[r] || 0), 0);
+    const pause = (w) => {
+      if (o.wait === w) return false;
+      f.order = { ...o, wait: w };
+      return true;
+    };
+    let next;
+    if (o.go === 'a') {
+      // Charger : ce que les soutes peuvent prendre, sans rien laisser des ressources choisies.
+      const s = stateAt(A.planet, Math.max(t, A.planet.at || 0));
+      const take = shuttleTake(s.stock, fleetCargo(p.race, f.ships) - held, o.res);
+      const got = SOIL.reduce((x, r) => x + take[r], 0);
+      if (!got && !held) return pause('a'); // rien à charger : elle attend sur A
+      if (got) {
+        settle(A.planet, t);
+        for (const r of SOIL) A.planet.stock[r] = Math.max(0, (A.planet.stock[r] || 0) - take[r]);
+        f.cargo = Object.fromEntries(SOIL.map((r) => [r, (f.cargo?.[r] || 0) + take[r]]));
+      }
+      next = { from: A, to: B, go: 'b' };
+    } else {
+      // Décharger : tout ce qui rentre dans l'entrepôt de B ; le reste attend dans les soutes.
+      if (held) {
+        const s = stateAt(B.planet, Math.max(t, B.planet.at || 0));
+        const give = shuttleGive(s.stock, s.prod.caps, f.cargo);
+        const put = SOIL.reduce((x, r) => x + give[r], 0);
+        if (!put) return pause('b'); // entrepôt plein : elle attend sur B, chargée
+        settle(B.planet, t);
+        for (const r of SOIL) B.planet.stock[r] = (B.planet.stock[r] || 0) + give[r];
+        f.cargo = Object.fromEntries(SOIL.map((r) => [r, (f.cargo?.[r] || 0) - give[r]]));
+        const sent = { ...(o.sent || {}) };
+        for (const r of SOIL) if (give[r]) sent[r] = (sent[r] || 0) + give[r];
+        f.order = { ...o, trips: (o.trips || 0) + 1, sent };
+        delete f.order.wait;
+        if (put < held) {
+          f.order.wait = 'b'; // une partie ne rentre pas : elle attend la place, avec le reste
+          return true;
+        }
+      }
+      next = { from: B, to: A, go: 'a' };
+    }
+    // Plein sur la planète de l'escale, puis le trajet suivant, s'il tient dans le réservoir.
+    refuel(next.from.planet, f, p.race, t);
+    if (fuelNeed(f, p.race, next.to.cell, t) > fuelAt(f, p.race, t) + 1e-9) return stop(`pas assez d’énergie sur ${next.from.name} pour le plein`);
+    const order = { ...f.order, go: next.go };
+    delete order.wait;
+    const err = moveTo(f, p.race, techOf(p), next.to.cell, order, t);
+    if (err) return stop(err);
     return true;
   }
 
@@ -2893,10 +3121,11 @@ export class Session {
     if (this.locked(id)) return false;
     if (moving(f, now)) return this.refuse('La flotte doit être arrêtée pour se scinder.');
     if (p.fleets.length >= MAX_FLEETS) return this.refuse(`Pas plus de ${MAX_FLEETS} flottes.`);
+    const was = this.shuttlesOf([f]);
     const res = split(f, p.race, part, this.newId(6), now);
     if (res.error) return this.refuse(res.error);
     p.fleets.push(res.fleet);
-    this.touch();
+    this.touch(this.quitShuttles(p, was, null, 'flotte scindée'));
     this.changed();
     return res.fleet.id;
   }
@@ -3015,6 +3244,10 @@ export class Session {
       }
       if (this.engage(p, f, now, from)) changed = true;
       if (!p.fleets.includes(f)) continue; // détruite dans ce combat
+      if (f.order?.kind === 'shuttle') {
+        if (this.shuttle(p, f, now)) changed = true; // ses escales dues, chacune à son heure (D-545)
+        continue;
+      }
       if (f.order && !moving(f, now) && this.arrive(p, f)) changed = true;
     }
     if (this.freezeFleets(p, now, true)) changed = true; // celles restées en orbite après leur arrivée
@@ -3056,6 +3289,11 @@ export class Session {
       const loot = lootText(f.cargo || {});
       this.addLog(`La flotte ${de(p.name)} se pose sur ${pl.name}${loot ? ` avec ${loot}` : ''}.`);
       return true;
+    }
+
+    if (order.kind === 'shuttle') {
+      f.order = order; // la navette garde son ordre : ses escales passent par shuttle() (D-540)
+      return this.shuttle(p, f, now);
     }
 
     if (order.kind === 'join') {
@@ -3394,6 +3632,11 @@ export class Session {
         text: destroyed ? `Ta flotte est détruite par ${other.name}.` : `${other.name} attaque ta flotte.`,
       });
     const pts = this.scoreOf(p); // points d'avant le combat : ce qui départage s'il est éliminé
+    // Attaquée : la navette s'arrête (D-542), la flotte finit son trajet et attend en orbite.
+    if (f.order?.kind === 'shuttle') {
+      this.endShuttle(p, f, `attaquée par ${other.name}`);
+      f.order = null;
+    }
     if (!applyLosses(f, p.race, techOf(p), ships, e.take, now)) {
       p.fleets = p.fleets.filter((x) => x.id !== f.id);
       this.addLog(`Une flotte ${de(p.name)} est détruite par ${other.name}.`);
@@ -3561,7 +3804,7 @@ function maxTech(a, b) {
   return out;
 }
 
-export const ORDER_KINDS = ['chooseRace', 'rename', 'leave', 'ready', 'begin', 'claimPlanet', 'build', 'planBuild', 'planResearch', 'planShips', 'unplan', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'setFleetStance', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'joinFleet', 'splitFleet', 'returnFleet', 'power'];
+export const ORDER_KINDS = ['chooseRace', 'rename', 'leave', 'ready', 'begin', 'claimPlanet', 'build', 'planBuild', 'planResearch', 'planShips', 'unplan', 'demolish', 'research', 'buildShips', 'takeOff', 'moveFleet', 'stopFleet', 'setFleetStance', 'chaseFleet', 'proposeTrade', 'answerTrade', 'refuelFleet', 'transferFleet', 'mergeFleets', 'joinFleet', 'shuttleFleet', 'splitFleet', 'returnFleet', 'power'];
 for (const k of [...ORDER_KINDS, 'tick']) {
   const act = Session.prototype[k];
   Session.prototype[k] = function (...a) {

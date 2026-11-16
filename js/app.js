@@ -1697,9 +1697,27 @@ function fleetStatus(race, f, now) {
     const foe = session.state.players[f.order.pid];
     return `Poursuite d’une flotte ${foe ? de(foe.name) : 'ennemie'}`;
   }
+  if (f.order?.kind === 'shuttle') return shuttleText(f, now);
   const hawk = aggressive(f) ? ' · agressive' : '';
   if (moving(f, now)) return `${f.order ? ORDERS[f.order.kind]?.name || 'Ordre' : 'Déplacement'} → ${where}${hawk}`;
   return `${mapPlanets().some((w) => sameCell(w, f.to)) ? `En orbite ${de(where)}` : `Stationne en ${where}`}${hawk}`;
+}
+
+/**
+ * Navette en cours (D-540), en clair : où elle va ou pourquoi elle attend, et ce qu'elle a déjà
+ * livré. « Navette Kepler → Rigel · vers Rigel, chargée · 3 livraisons ».
+ */
+function shuttleText(f, now) {
+  const o = f.order;
+  const a = cellName(o.a);
+  const b = cellName(o.b);
+  const step =
+    o.wait === 'a' ? `attend sur ${a} : rien à charger`
+    : o.wait === 'b' ? `attend sur ${b} : entrepôt plein`
+    : moving(f, now) ? (o.go === 'b' ? `vers ${b}, chargée` : `retour vers ${a}`)
+    : `escale sur ${o.go === 'b' ? b : a}`;
+  const n = o.trips || 0;
+  return `Navette ${a} → ${b} · ${step} · ${n} livraison${n > 1 ? 's' : ''}`;
 }
 
 $('fleets').addEventListener('click', (e) => {
@@ -2096,6 +2114,7 @@ function drawMap() {
   // Flottes : un petit triangle qui glisse le long de son trajet, ou qui attend en orbite.
   const now = session.now();
   drawRange(ctx, cell, now);
+  drawShuttles(ctx, cell, now);
   const aim = aimRead(now); // flotte traînée vers sa cible (D-126)
   const foe = menu?.foe || aim?.foe; // flotte ennemie visée : cercle rouge
   for (const spot of fleetSpots(now)) {
@@ -2624,6 +2643,50 @@ function drawRange(ctx, cell, now) {
   ctx.restore();
 }
 
+/**
+ * Mes navettes (D-540) : un trait pointillé entre leurs deux planètes, plus marqué pour la
+ * flotte sélectionnée, avec une pointe vers la planète où elles livrent.
+ */
+function drawShuttles(ctx, cell, now) {
+  const p = session.state.players[session.me];
+  const seen = new Set();
+  for (const f of p?.fleets || []) {
+    const o = f.order;
+    if (o?.kind !== 'shuttle') continue;
+    const key = `${o.a.x}:${o.a.y}>${o.b.x}:${o.b.y}`;
+    const sel = f.id === selFleet;
+    if (seen.has(key) && !sel) continue;
+    seen.add(key);
+    const ax = (o.a.x + 0.5) * cell;
+    const ay = (o.a.y + 0.5) * cell;
+    const bx = (o.b.x + 0.5) * cell;
+    const by = (o.b.y + 0.5) * cell;
+    const ang = Math.atan2(by - ay, bx - ax);
+    ctx.save();
+    ctx.strokeStyle = '#6ad1f5';
+    ctx.fillStyle = '#6ad1f5';
+    ctx.globalAlpha = sel ? 0.8 : 0.4;
+    ctx.lineWidth = Math.max(1, cell * (sel ? 0.06 : 0.04));
+    ctx.setLineDash([cell * 0.18, cell * 0.14]);
+    ctx.lineDashOffset = -((now / 120) % (cell * 0.32)); // le pointillé avance vers B
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(bx, by);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const tx = bx - Math.cos(ang) * cell * 0.45;
+    const ty = by - Math.sin(ang) * cell * 0.45;
+    const r = cell * 0.16;
+    ctx.beginPath();
+    ctx.moveTo(tx + Math.cos(ang) * r, ty + Math.sin(ang) * r);
+    ctx.lineTo(tx + Math.cos(ang + 2.4) * r, ty + Math.sin(ang + 2.4) * r);
+    ctx.lineTo(tx + Math.cos(ang - 2.4) * r, ty + Math.sin(ang - 2.4) * r);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
 /** Fiche de la flotte sélectionnée : son état et ses ordres (les ordres vers une cible : menu au doigt, D-126). */
 function renderFleetInfo(me = session?.state?.players[session.me], now = session?.now()) {
   if (!session?.state) return;
@@ -2658,6 +2721,12 @@ function renderFleetInfo(me = session?.state?.players[session.me], now = session
   $('btn-fi-return').hidden = !!mine && here.key === 'home'; // déjà chez elle
   $('btn-fi-refuel').hidden = !mine || fuel >= tank - 0.5;
   $('btn-fi-split').hidden = go || countShips(f.ships) < 2;
+  // Navette (D-540) : au moins un cargo et deux planètes ; allumé quand elle tourne.
+  const shuttling = f.order?.kind === 'shuttle';
+  const shuttle = $('btn-fi-shuttle');
+  shuttle.hidden = !shuttling && !(f.ships.cargo > 0 && session.planetsOf(me).length >= 2);
+  shuttle.className = `${shuttling ? 'primary' : 'secondary'} small icon-only`;
+  shuttle.setAttribute('aria-pressed', String(shuttling));
   const hawk = aggressive(f);
   const stance = $('btn-fi-stance');
   stance.hidden = !hawk && !armed(me.race, f.ships, me.planet?.tech);
@@ -2731,8 +2800,9 @@ function renderMapFleets(me = session?.state?.players[session.me], now = session
     .map((f) => {
       const hot = ['attack', 'conquer', 'chase'].includes(f.order?.kind);
       const dry = fuelAt(f, me.race, now) < DRY;
-      return `<button class="mf${hot ? ' hot' : ''}${dry ? ' dry' : ''}" data-fleet="${esc(f.id)}">
-        <span class="mf-top"><strong>${esc(fleetName(f))}</strong><span class="mf-clock"></span></span>
+      const shuttle = f.order?.kind === 'shuttle'; // navette en cours (D-540) : son icône et sa couleur
+      return `<button class="mf${hot ? ' hot' : ''}${dry ? ' dry' : ''}${shuttle ? ' shuttle' : ''}" data-fleet="${esc(f.id)}">
+        <span class="mf-top"><strong>${shuttle ? ic('shuttle') : ''}${esc(fleetName(f))}</strong><span class="mf-clock"></span></span>
         <span class="mf-ships">${shipIcons(f.ships)}</span>
         <span class="mf-status">${esc(fleetStatus(me.race, f, now))}</span></button>`;
     })
@@ -2968,6 +3038,81 @@ function openMoveSheet(kind, to = null) {
 }
 
 $('btn-fi-split').onclick = () => openMoveSheet('split');
+
+// ---------------------------------------------------------------------------
+// Navette (D-540) : réglée depuis la fiche de la flotte
+// ---------------------------------------------------------------------------
+
+let shuttleSheet = null; // identifiant de la flotte pour laquelle la fenêtre est ouverte
+
+/** Les ressources du sol que ma race utilise (les machines n'ont pas de nourriture). */
+const shuttleRes = (race) => SOIL.filter((r) => RACES[race].resources.includes(r));
+
+/** Coche par défaut les ressources que A a en stock (toutes s'il n'a rien), D-540. */
+function shuttleDefaults() {
+  const me = session.state.players[session.me];
+  const pl = session.planetsOf(me).find((x) => `${x.cell.x}:${x.cell.y}` === $('shuttle-a').value);
+  const s = pl && stateAt(pl.planet, session.now());
+  const has = shuttleRes(me.race).filter((r) => (s?.stock[r] || 0) >= 1);
+  for (const el of document.querySelectorAll('[data-shres]')) el.checked = has.length ? has.includes(el.dataset.shres) : true;
+}
+
+function openShuttleSheet() {
+  const me = session.state.players[session.me];
+  const f = session.myFleet(selFleet);
+  if (!f) return;
+  shuttleSheet = f.id;
+  const mine = session.planetsOf(me);
+  const o = f.order?.kind === 'shuttle' ? f.order : null;
+  const opt = (pl) => `<option value="${pl.cell.x}:${pl.cell.y}">${esc(pl.name)}</option>`;
+  $('shuttle-a').innerHTML = mine.map(opt).join('');
+  $('shuttle-b').innerHTML = mine.map(opt).join('');
+  // Par défaut : A, la planète où elle attend (ou d'où elle vient) ; B, une autre.
+  const now = session.now();
+  const here = !moving(f, now) && mine.find((pl) => sameCell(pl.cell, f.to));
+  const from = o ? mine.find((pl) => sameCell(pl.cell, o.a)) : here || session.planetOf(me, f.origin) || mine[0];
+  const to = o ? mine.find((pl) => sameCell(pl.cell, o.b)) : mine.find((pl) => pl !== from);
+  if (from) $('shuttle-a').value = `${from.cell.x}:${from.cell.y}`;
+  if (to) $('shuttle-b').value = `${to.cell.x}:${to.cell.y}`;
+  $('shuttle-res').innerHTML = shuttleRes(me.race)
+    .map((r) => `<label><input type="checkbox" data-shres="${r}">${resIcon(r)} ${RES_INFO[r].name}</label>`)
+    .join('');
+  if (o) for (const el of document.querySelectorAll('[data-shres]')) el.checked = o.res.includes(el.dataset.shres);
+  else shuttleDefaults();
+  $('shuttle-now').hidden = !o;
+  if (o) $('shuttle-now').textContent = shuttleText(f, now);
+  $('btn-shuttle-go').innerHTML = `${ic('shuttle')}${o ? 'Changer la navette' : 'Lancer la navette'}`;
+  $('btn-shuttle-stop').hidden = !o;
+  $('sheet-shuttle').hidden = false;
+}
+
+const closeShuttleSheet = () => {
+  $('sheet-shuttle').hidden = true;
+  shuttleSheet = null;
+};
+const shuttleCell = (v) => {
+  const [x, y] = String(v).split(':').map(Number);
+  return { x, y };
+};
+$('btn-fi-shuttle').onclick = openShuttleSheet;
+$('btn-shuttle-close').onclick = closeShuttleSheet;
+$('shuttle-a').onchange = () => !session.myFleet(shuttleSheet)?.order?.res && shuttleDefaults();
+$('btn-shuttle-go').onclick = () => {
+  const res = [...document.querySelectorAll('[data-shres]')].filter((el) => el.checked).map((el) => el.dataset.shres);
+  if (!session.shuttleFleet(shuttleSheet, shuttleCell($('shuttle-a').value), shuttleCell($('shuttle-b').value), res)) {
+    if (!session.myFleet(shuttleSheet)) closeShuttleSheet();
+    return;
+  }
+  closeShuttleSheet();
+  renderFleetInfo();
+  renderMapFleets();
+};
+$('btn-shuttle-stop').onclick = () => {
+  session.shuttleFleet(shuttleSheet);
+  closeShuttleSheet();
+  renderFleetInfo();
+  renderMapFleets();
+};
 $('btn-move-close').onclick = () => {
   $('sheet-move').hidden = true;
   moveSheet = null;

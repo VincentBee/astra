@@ -3842,3 +3842,103 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - 2026-11-08 12:20 UTC. `sw.js` : `VERSION` passe à `astra-p2p-v121` pour que les téléphones
   prennent le nouveau code (#50). 2026-11-13 : `main` a bougé (#196 à #204, v129), passe à
   v130. Qui : Claude (règle du dépôt, router). Statut : en vigueur.
+
+## 16 novembre 2026 — navette de cargos entre deux planètes
+
+**D-540 — Ordre de flotte « Navette » : de A vers B, retour à vide, jusqu'à ce qu'on l'arrête**
+- 2026-11-16 23:15 UTC. Contexte : Vincent : « je voudrais aussi qu'il soit possible
+  d'automatiser les aller retour de transporter entre deux planetes pour transferer des
+  ressources ». Choix posés par le router (session « Achat auto de vaisseaux depuis la map »).
+- Choix : un nouvel ordre `shuttle`, gardé sur la flotte d'une escale à l'autre (comme une
+  jonction qui attend, D-159), traité chez le propriétaire. La flotte charge sur A, pose sur B,
+  revient à vide, recommence. Le joueur choisit A, B et les ressources (une ou plusieurs ; par
+  défaut celles que A a en stock). `Session.shuttleFleet` est un ordre du journal (rejoué).
+  Détails : [regles.md](architecture/regles.md) §8.7.
+- Écarté : transport dans les deux sens (plus tard s'il le faut) ; un réglage de planète
+  plutôt qu'un ordre de flotte (la flotte et ses cargos portent la navette, comme les autres
+  ordres).
+- Qui : router, par défaut (Claude). Source : session `e722e02e` (worker-navettes). Statut : en
+  vigueur.
+
+**D-541 — Une navette va entre deux de mes planètes (par leur case), avec au moins un cargo**
+- 2026-11-16 23:15 UTC. Contexte : tous les vaisseaux ont un peu de soute (chasseurs 20 à 50) ;
+  « une flotte sans cargo l'arrête » demandait de trancher.
+- Choix : A et B sont deux de mes planètes, désignées par leur **case** (une clé « home »
+  changerait de planète, D-360), pas gelées, différentes. Il faut au moins un vaisseau `cargo`
+  dans la flotte. Ressources : minéraux et nourriture (`SOIL`) ; l'énergie ne voyage pas en
+  soute (c'est le carburant). Refusé aussi : réservoirs trop petits pour un trajet A → B, pas
+  assez de carburant pour rejoindre A.
+- Écarté : accepter toute flotte avec de la soute (une frégate seule ferait une navette de 50).
+- Qui : Claude (par défaut). Source : session `e722e02e`. Statut : en vigueur.
+
+**D-542 — Ce qui arrête la navette, et sa ligne au journal**
+- 2026-11-16 23:15 UTC. Choix : un autre ordre donné à la flotte (déplacement, retour, arrêt,
+  poursuite, jonction, fusion, don, scission), un combat (elle attaque ou elle est attaquée),
+  une des deux planètes perdue ou gelée, plus aucun cargo, pas assez d'énergie pour le plein,
+  ou l'arrêt demandé (bouton « Arrêter la navette »). Chaque arrêt écrit une ligne au journal
+  partagé (« La navette de X entre A et B s'arrête : … ») et un message. Après un combat ou un
+  arrêt demandé, la flotte finit son trajet et attend en orbite (rien n'est posé tout seul). La
+  navette n'écrit pas une ligne par trajet (le journal partagé garde 40 lignes) : son départ et
+  son arrêt seulement ; les livraisons se comptent sur l'ordre (`trips`, `sent`).
+- Un échange en cours retient la flotte : la navette reprend après la réponse.
+- Qui : router (liste des arrêts), Claude (détails). Source : session `e722e02e`. Statut : en
+  vigueur.
+
+**D-543 — Sur A : soutes pleines, en parts égales, sans réserve ; A vide, elle attend**
+- 2026-11-16 23:15 UTC. Choix : la flotte prend autant que ses soutes le permettent, sans rien
+  laisser sur A des ressources choisies. Plusieurs ressources : parts égales tant qu'il en reste
+  de chaque, puis le reste va aux autres (`shuttleTake`, entiers, jamais plus que le stock).
+  Rien à charger : elle attend sur A et réessaie à chaque passage. Plein de carburant à chaque
+  escale avec l'énergie de la planète (`refuel`) ; si le trajet suivant ne tient pas dans le
+  réservoir, la navette s'arrête et le journal le dit (pas de panne en route).
+- Écarté : remplir d'abord la première ressource cochée (une seule ressource partirait).
+- Qui : router (soutes pleines, sans réserve, attente), Claude (parts égales). Source : session
+  `e722e02e`. Statut : en vigueur.
+
+**D-544 — Sur B : ce qui ne rentre pas dans l'entrepôt reste dans les soutes, la flotte attend**
+- 2026-11-16 23:15 UTC. Contexte : se poser (`dock`) ajoute au stock sans plafond ; une navette
+  qui tourne sans fin aurait rempli B au-delà de son entrepôt.
+- Choix : la flotte pose ce qui rentre sous le plafond de l'entrepôt de B. Le reste reste dans
+  les soutes ; elle attend sur B (« entrepôt plein ») et repart dès que la place revient
+  (consommation, entrepôt agrandi). Rien n'est perdu.
+- Écarté : tout poser au-delà du plafond (B n'accumulerait plus rien d'autre, `advance`) ;
+  jeter le surplus (perte) ; repartir vers A chargée (allers-retours pour rien).
+- Qui : Claude (par défaut). Source : session `e722e02e`. Statut : en vigueur.
+
+**D-545 — Rattrapage : toutes les escales dues dans un même passage, chacune à son heure**
+- 2026-11-16 23:15 UTC. Contexte : « après une longue absence, au retour, le rattrapage doit
+  enchaîner tous les trajets dus, pas un seul ».
+- Choix : à chaque passage (`tick`), `shuttle` enchaîne les escales arrivées avant `now`, chacune
+  à l'heure de son arrivée (chargement, plein, départ datés de cette heure), 2 000 au plus par
+  passage (la suite au suivant). Attendre ne touche pas la fiche (stock lu par `stateAt`) : pas
+  d'entrée au journal d'ordres, et le rejeu redonne la même fiche. Limites acceptées, écrites
+  dans regles.md §8.7 : une planète déjà réglée à `now` dans ce passage donne son stock
+  d'aujourd'hui ; une attente reprend à l'heure du passage ; pendant une absence, seul le dernier
+  trajet peut être croisé par une flotte ennemie.
+- Écarté : un seul trajet par passage (ce que la demande refuse) ; simuler l'heure exacte où le
+  stock revient pendant une attente (calcul lourd pour un cas rare : A qui ne produit pas).
+- Qui : Claude (par défaut ; déterministe, pas de question au router). Source : session
+  `e722e02e`. Statut : en vigueur.
+
+**D-546 — La navette se règle depuis la fiche de la flotte, et se voit**
+- 2026-11-16 23:15 UTC. Choix : bouton « Navette » dans la fiche de la flotte (au moins un cargo
+  et deux planètes), fenêtre « Charger sur / Livrer à / ressources », « Lancer », puis « Changer »
+  et « Arrêter ». Changer une navette en route vers A ou B garde son trajet. Indicateur : l'état
+  (« Navette Mira → Lyra · vers Lyra, chargée · 1 livraison », « attend sur … »), la case de la
+  flotte en bleu ciel avec l'icône, et un trait pointillé animé de A vers B sur la carte.
+  Détails : [interface.md](architecture/interface.md) §21.
+- Écarté : régler la navette en touchant les planètes sur la carte (deux gestes à la suite,
+  plus difficile à découvrir et à annuler sur un téléphone).
+- Qui : Claude (par défaut). Source : session `e722e02e`. Statut : en vigueur.
+
+**D-547 — `FORMAT` 12 et cache `astra-p2p-v131`**
+- 2026-11-16 23:15 UTC. Choix : `FORMAT` passe de 11 à 12 : un téléphone d'avant, qui ne connaît
+  pas l'ordre `shuttle`, l'effacerait en le prenant pour une arrivée ; il est prié de recharger.
+  `sw.js` : `VERSION` passe à `astra-p2p-v131`. Tous deux une version au-dessus de `main` ; à
+  remonter si `main` bouge avant la fusion (la PR #207 touche aussi `FORMAT` et le cache).
+- Qui : Claude (règle du router). Source : session `e722e02e`. Statut : en vigueur.
+
+**D-548 — Les IA ne font pas de navettes**
+- 2026-11-16 23:15 UTC. Choix : `js/bot.js` ne change pas ; une IA ne règle jamais de navette.
+- Qui : router. Source : session `e722e02e`. Statut : en vigueur.
+

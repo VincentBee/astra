@@ -16,6 +16,7 @@ const PATHS = {
   merge: 'M6 3v4l6 6 6-6V3M12 13v8',
   give: 'M4 12h14M13 6l6 6-6 6',
   trade: 'M4 8h15l-4-4M20 16H5l4 4',
+  shuttle: 'M3 12a2 2 0 1 0 4 0 2 2 0 1 0-4 0M17 12a2 2 0 1 0 4 0 2 2 0 1 0-4 0M7 10c3-4 7-4 10 0M17 14c-3 4-7 4-10 0M14.5 7.5l2.5 2.5-3 .5M9.5 16.5L7 14l3-.5', // navette entre deux planètes (D-540)
   fleet: 'M12 3l7 18-7-4-7 4z',
   attack: 'M4 4l10 10M4 4h4M4 4v4M13 17l4-4M15 19l5 1-1-5',
   build: 'M3 21h18M5 21V10l7-5 7 5v11M10 21v-6h4v6',

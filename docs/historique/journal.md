@@ -578,6 +578,12 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 |---|---|---|---|---|---|
 | 08:18 | `b0b71c59` (worker-fil-entrepot) | Router : « MAIN A BOUGÉ — PR #205 : VÉRIFIÉ, et tu es la dernière à merger […] mets VERSION de sw.js à astra-p2p-v130 » | Fusion de `origin/main` (#196 à #204, v129) sans rebase : import de `js/session.js` (`holdGame` de `main`, `tooBig` / `upgradeCost` de la PR), décisions, journal et `tests-decisions.md` gardés des deux côtés ; cache v130 (D-443 mise à jour) | (PR #205) | D-443 |
 
+## 16 novembre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 23:15 | `e722e02e` (worker-navettes) | Router, demande de Vincent : « je voudrais aussi qu'il soit possible d'automatiser les aller retour de transporter entre deux planetes pour transferer des ressources » | Ordre de flotte « Navette » : `Session.shuttleFleet`, escales enchaînées à leur heure au retour d'une absence, arrêts avec leur ligne au journal, nettoyage des fiches ; bouton et fenêtre dans la fiche de la flotte, indicateur (état, case, trait sur la carte) ; `tests/navette.test.mjs` (8 scénarios) ; essayé dans le vrai jeu ; `FORMAT` 12, cache v131 | (PR à venir) | D-540 à D-548 |
+
 ### Travaux en cours au 2026-10-29
 
 - **Rythme des parties** (`26f178b9`) : commité sur `claude/swarm-it-game-pacing-1d4502`
