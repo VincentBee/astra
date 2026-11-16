@@ -3924,9 +3924,24 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   (un lot toutes les 3 s réécrivait la case et faisait rater le toucher sur ses boutons).
 - Écarté : régler la taille du lot par un champ texte (clavier sur téléphone) ; un réglage
   seulement dans l'onglet de la planète (la demande dit « depuis la map »).
-- Qui : Claude par défaut. Source : session `a7e3826e`. Statut : en vigueur.
+- Qui : Claude par défaut. Source : session `a7e3826e`. Statut : modifiée par D-534 (le bouton **Auto** devient **×∞**, à la place de ×5, sur la carte et dans l'onglet).
 
 **D-533 — Cache `astra-p2p-v131`**
 - 2026-11-16 21:45 UTC. `sw.js` : `VERSION` passe de v130 (`main`) à v131 pour que les
   téléphones prennent le nouveau code (D-530) ; remontée si `main` bouge avant la fusion.
   Qui : Claude (règle du dépôt). Source : session `a7e3826e`. Statut : en vigueur.
+
+**D-534 — Le bouton d'achat automatique devient « ×∞ », à la place de ×5 (modifie D-532)**
+- 2026-11-16 23:40 UTC. Contexte : Vincent, en voyant la PR #207 : « je pense qu'on peux
+  remplacer les bouton x5 par ce xInfinite ».
+- Choix : les boutons ×5 disparaissent. Sur la carte (fiche de la planète, `#pi-ships`) : ×1, ×∞,
+  Max ; ×∞ est l'ancien bouton **Auto** (enfoncé et vert pour le vaisseau de la règle, cadre vert
+  avec − / + et Arrêter). Dans l'onglet de la planète (`#ships`) : ×1, ×∞ ; ×∞ y règle ou arrête
+  aussi la règle (même ordre `setAutoShips`, même taille de lot) ; l'état se lit dans la ligne de
+  rappel et dans le bouton enfoncé ; la taille du lot ne se règle que sur la carte. Nom lu :
+  « Acheter des <vaisseau> en automatique, dès que les fonds sont là (le fil passe d'abord) »,
+  ou « Arrêter l'achat automatique de <vaisseau> ».
+- Écarté : garder ×5 à côté de ×∞ (trop de boutons sur une ligne à 375 px). Conséquence voulue :
+  plus d'achat de 5 d'un coup ; ×1 et Max restent (Max sur la carte seulement, comme avant).
+- Qui : Vincent (demande), détails par le router (par défaut). Source : session `a7e3826e`,
+  message du router. Statut : en vigueur.

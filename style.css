@@ -397,7 +397,7 @@ button.danger { color: var(--danger); border-color: color-mix(in srgb, var(--dan
 .pi-auto-text { margin: 0; font-size: 0.88rem; }
 .pi-auto-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .pi-auto-actions button { min-height: 34px; padding: 0 10px; font-size: 0.85rem; }
-.pi-ship [data-pi-auto][aria-pressed='true'] { border-color: var(--ok); color: var(--ok); }
+[data-pi-auto][aria-pressed='true'], [data-auto-ship][aria-pressed='true'] { border-color: var(--ok); color: var(--ok); }
 .mp-auto { display: inline-flex; align-items: center; gap: 1px; margin-left: 4px; color: var(--ok); font-size: 0.75rem; }
 .mf-top .mp-auto .ic { width: 12px; height: 12px; color: var(--ok); }
 .pi-ship .ship-actions button { min-height: 34px; padding: 0 10px; font-size: 0.85rem; }

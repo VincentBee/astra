@@ -650,7 +650,7 @@ function buildStatic() {
       <p class="cost mono"><span data-scost="${k}"></span> <span class="req" data-sreq="${k}" hidden></span></p>
       <div class="ship-actions">
         <button class="secondary small" data-ship="${k}" data-n="1" aria-label="Construire 1 ${esc(S.name)}">×1</button>
-        <button class="secondary small" data-ship="${k}" data-n="5" aria-label="Construire 5 ${esc(S.name)}">×5</button>
+        <button class="secondary small" data-auto-ship="${k}" aria-pressed="false" aria-label="Acheter des ${esc(S.name)} en automatique">×∞</button>
       </div>
       <p class="ship-stats b-desc" data-sstats="${k}"></p>
       <div class="card-bar" hidden><div class="bar-fill"></div></div>
@@ -664,9 +664,8 @@ function buildStatic() {
       <div class="pi-ship-main"><span class="p-name">${esc(S.name)}</span> <span class="cost mono" data-picost="${k}"></span> <span class="hint mono" data-pinote="${k}"></span></div>
       <div class="ship-actions">
         <button class="secondary small" data-pi-ship="${k}" data-n="1" aria-label="Construire 1 ${esc(S.name)}">×1</button>
-        <button class="secondary small" data-pi-ship="${k}" data-n="5" aria-label="Construire 5 ${esc(S.name)}">×5</button>
+        <button class="secondary small" data-pi-auto="${k}" aria-pressed="false" aria-label="Acheter des ${esc(S.name)} en automatique">×∞</button>
         <button class="secondary small" data-pi-ship="${k}" data-n="max" aria-label="Construire autant de ${esc(S.name)} que possible">Max</button>
-        <button class="secondary small" data-pi-auto="${k}" aria-pressed="false">${ic('replay')}Auto</button>
       </div>
     </div>`;
   }).join('');
@@ -761,6 +760,8 @@ $('techs').addEventListener('click', (e) => {
   }
 });
 $('ships').addEventListener('click', (e) => {
+  const auto = e.target.closest('[data-auto-ship]');
+  if (auto && !auto.disabled && session?.state) return toggleAuto(openKey, auto.dataset.autoShip);
   const btn = e.target.closest('[data-ship]');
   if (btn && !btn.disabled) {
     if (btn.dataset.mode === 'plan') session.planShips(btn.dataset.ship, Number(btn.dataset.n), openKey);
@@ -1628,8 +1629,9 @@ function canBuildShips(me, s, k, n) {
 }
 
 /**
- * Chantier naval de la planète ouverte. Chantier libre, fil vide et stock suffisant : ×1 et ×5
- * lancent le lot ; sinon ils l'ajoutent à la fin du fil (+1, +5, D-158, D-420).
+ * Chantier naval de la planète ouverte. Chantier libre, fil vide et stock suffisant : ×1 lance
+ * le lot ; sinon il l'ajoute à la fin du fil (+1, D-158, D-420). ×∞ règle ou arrête l'achat
+ * automatique de ce vaisseau (D-530, D-534).
  */
 function renderYard(me, pl, s, now, ahead) {
   const yard = s.levels.yard || 0;
@@ -1637,9 +1639,9 @@ function renderYard(me, pl, s, now, ahead) {
   const yardName = RACES[me.race].buildings.yard.name;
   $('yard-hint').textContent = yard ? '' : ahead.levels.yard ? `🔒 Il faut un ${yardName} : il est au fil, les vaisseaux peuvent l’y suivre.` : `🔒 Il faut un ${yardName}.`;
   $('yard-hint').hidden = !!yard;
-  // Achat automatique (D-530) : il se règle depuis la carte, l'onglet le rappelle.
+  // Achat automatique (D-530, D-534) : ×∞ le règle ici aussi ; la taille du lot se règle sur la carte.
   $('yard-auto').hidden = !s.auto;
-  $('yard-auto').textContent = s.auto ? `⟳ Achat automatique : ${s.auto.n} × ${S[s.auto.ship].name}, dès que les fonds sont là · ${autoWait(me, s, s.plan || [])}. Il se règle depuis la carte.` : '';
+  $('yard-auto').textContent = s.auto ? `⟳ Achat automatique : ${s.auto.n} × ${S[s.auto.ship].name}, dès que les fonds sont là · ${autoWait(me, s, s.plan || [])}. Taille du lot : fiche de la planète sur la carte.` : '';
   const q = (sel) => document.querySelector(sel);
   for (const k of SHIP_KEYS) {
     const unlocked = shipUnlocked(me.race, k, ahead.tech); // recherche au fil comprise : le lot peut l'y suivre
@@ -1668,7 +1670,32 @@ function renderYard(me, pl, s, now, ahead) {
       btn.title = direct ? `Construire ${n} ${S[k].name}` : plan.length >= PLAN_MAX ? `Fil plein (${PLAN_MAX} au plus)` : `Ajouter ${n} ${S[k].name} au fil : le lot partira dès que possible`;
       btn.setAttribute('aria-label', btn.title);
     }
+    autoButton(q(`[data-auto-ship="${k}"]`), me, s, k, unlocked);
   }
+}
+
+/**
+ * Bouton ×∞ d'un vaisseau (D-534, à la place de ×5) : enfoncé quand la règle d'achat
+ * automatique vise ce vaisseau ; le toucher la règle, le retoucher l'arrête.
+ */
+function autoButton(btn, me, s, k, unlocked) {
+  if (!btn) return;
+  const on = s.auto?.ship === k;
+  const name = SHIPS[me.race][k].name;
+  btn.setAttribute('aria-pressed', String(on));
+  btn.disabled = session.status !== 'playing' || !unlocked;
+  btn.title = on ? `Arrêter l’achat automatique de ${name}` : `Acheter des ${name} en automatique, dès que les fonds sont là (le fil passe d’abord)`;
+  btn.setAttribute('aria-label', btn.title);
+}
+
+/** ×∞ touché (D-534) : la règle passe à ce vaisseau (même taille de lot) ; sur le vaisseau déjà réglé, elle s'arrête. */
+function toggleAuto(key, k) {
+  const me = session?.state?.players[session.me];
+  const pl = me && session.planetOf(me, key);
+  if (!pl) return;
+  const rule = stateAt(pl.planet, session.now()).auto;
+  if (rule?.ship === k) session.setAutoShips(null, 0, key);
+  else session.setAutoShips(k, rule?.n || 1, key);
 }
 
 /** Vaisseaux à quai et flottes. */
@@ -2820,7 +2847,7 @@ function renderMapFleets(me = session?.state?.players[session.me], now = session
 $('map-fleets').addEventListener('click', (e) => {
   if (!session?.state) return;
   const me = session.state.players[session.me];
-  // Construire : la fiche de la planète s'ouvre sur son chantier (×1, ×5, ×N, D-106).
+  // Construire : la fiche de la planète s'ouvre sur son chantier (×1, ×∞, Max, D-106, D-534).
   const build = e.target.closest('[data-mp-build]')?.dataset.mpBuild;
   if (build) {
     const pl = session.planetOf(me, build);
@@ -3340,15 +3367,7 @@ function renderPickAuto(me, s, plan, ahead) {
     $('btn-pi-auto-more').disabled = !more || !!tooBig(me.race, ahead.levels, shipsCost(me.race, rule.ship, more)) || session.status !== 'playing';
     $('btn-pi-auto-stop').disabled = session.status !== 'playing';
   }
-  for (const btn of document.querySelectorAll('[data-pi-auto]')) {
-    const k = btn.dataset.piAuto;
-    const on = rule?.ship === k;
-    const name = SHIPS[me.race][k].name;
-    btn.setAttribute('aria-pressed', String(on));
-    btn.disabled = session.status !== 'playing' || !shipUnlocked(me.race, k, ahead.tech);
-    btn.title = on ? `Arrêter l’achat automatique de ${name}` : `Acheter des ${name} automatiquement, dès que les fonds sont là (le fil passe d’abord)`;
-    btn.setAttribute('aria-label', btn.title);
-  }
+  for (const btn of document.querySelectorAll('[data-pi-auto]')) autoButton(btn, me, s, btn.dataset.piAuto, shipUnlocked(me.race, btn.dataset.piAuto, ahead.tech));
 }
 
 /** Règle d'achat automatique (D-530) de la planète ouverte dans la fiche de la carte. */
@@ -3375,13 +3394,7 @@ $('btn-pi-auto-stop').onclick = () => {
 
 $('pi-ships').addEventListener('click', (e) => {
   const auto = e.target.closest('[data-pi-auto]');
-  if (auto && !auto.disabled && session?.state) {
-    // « Auto » : la règle passe à ce vaisseau (même taille de lot) ; sur le vaisseau déjà réglé, elle s'arrête.
-    const { key, rule } = pickAutoRule();
-    if (rule?.ship === auto.dataset.piAuto) session.setAutoShips(null, 0, key);
-    else session.setAutoShips(auto.dataset.piAuto, rule?.n || 1, key);
-    return;
-  }
+  if (auto && !auto.disabled && session?.state) return toggleAuto($('btn-open-planet').dataset.key, auto.dataset.piAuto);
   const btn = e.target.closest('[data-pi-ship]');
   const key = $('btn-open-planet').dataset.key;
   if (!btn || btn.disabled || !session?.state) return;
