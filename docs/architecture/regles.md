@@ -562,7 +562,9 @@ ce qu'on l'arrête. Pas de transport dans les deux sens (D-540).
 - **Escale sur A** (`shuttleStop`) : elle charge autant que ses soutes le permettent, sans rien
   laisser des ressources choisies, en parts égales tant qu'il en reste de chaque
   (`shuttleTake`, `js/fleet.js`, D-543). Rien à charger et soutes vides : elle attend sur A
-  (`wait: 'a'`). Soutes déjà chargées : elle part quand même vers B.
+  (`wait: 'a'`) ; en attente, elle ne repart qu'avec un vrai lot (`SHUTTLE_MIN_DROP` = 100, ou
+  des soutes pleines). Soutes déjà chargées : elle part quand même vers B. Le plein se fait
+  **avant** de charger : si le trajet vers B ne tient pas, rien n'est pris sur A.
 - **Escale sur B** : elle pose ce qui rentre dans l'entrepôt de B (plafond `prod.caps` de
   `stateAt`, `shuttleGive`) ; `sent` augmente, et `trips` + 1 quand les soutes sont vides (un
   reste posé plus tard ne compte pas une livraison de plus). Ce qui ne rentre pas reste dans les
@@ -570,13 +572,13 @@ ce qu'on l'arrête. Pas de transport dans les deux sens (D-540).
   ne pose qu'un vrai lot (`SHUTTLE_MIN_DROP` = 100, ou tout son reste), pas une unité à chaque
   passage. Rien n'est perdu ni créé : la somme A + B + soutes ne change pas (test
   `navette.test.mjs`).
-- **Carburant** : à chaque escale, plein avec l'énergie de la planète (`refuel`), puis le
+- **Carburant** : à chaque escale, plein avec l'énergie de la planète (`refuel`, sur A avant de charger), puis le
   trajet suivant s'il tient dans le réservoir ; sinon la navette s'arrête (« pas assez d'énergie
   sur … pour le plein »), sans tomber en panne en route.
 - **Arrêts** (D-542), chacun avec sa ligne au journal partagé (« La navette de X entre A et B
   s'arrête : … ») et un message : un autre ordre (`moveFleet`, `returnFleet`, `stopFleet`,
   `chaseFleet`, `joinFleet`, `mergeFleets`, `transferFleet`, `splitFleet` : `shuttlesOf` avant,
-  `quitShuttles` après) ; un combat (`fight` : elle attaque ; `fleetHit` : elle est attaquée ;
+  `quitShuttles` après ; une autre flotte qui la rejoint et s'y fond à l'arrivée, `arrive`) ; un combat (`fight` : elle attaque ; `fleetHit` : elle est attaquée ;
   elle finit alors son trajet et attend en orbite) ; une des deux planètes perdue ou gelée ;
   plus aucun cargo ; pas assez d'énergie pour le plein ; l'arrêt demandé. Un échange en cours
   la retient (`offerHolds`) : elle reprend après la réponse. La navette n'écrit **pas** une
@@ -599,7 +601,7 @@ ce qu'on l'arrête. Pas de transport dans les deux sens (D-540).
   différentes, ressources du sol, `go` 'a' ou 'b', compteurs bornés) ; une navette abîmée tombe,
   la flotte reste. Que A et B soient à moi se vérifie à chaque escale.
 - **IA** : les IA ne font pas de navettes (D-548).
-- Tests : `tests/navette.test.mjs` (9 scénarios : allers-retours et somme conservée, longue
+- Tests : `tests/navette.test.mjs` (10 scénarios, dont un pour les points de la revue de la PR #209 : allers-retours et somme conservée, longue
   absence, entrepôt de B plein, arrêt par un autre ordre, planète perdue et plus de cargo,
   attaquée (la flotte survit), navette agressive qui combat, navettes refusées et nettoyées,
   rejeu fidèle). Les deux arrêts au combat sont contrôlés par mutation.

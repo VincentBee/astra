@@ -3888,9 +3888,11 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - 2026-11-16 23:15 UTC. Choix : la flotte prend autant que ses soutes le permettent, sans rien
   laisser sur A des ressources choisies. Plusieurs ressources : parts égales tant qu'il en reste
   de chaque, puis le reste va aux autres (`shuttleTake`, entiers, jamais plus que le stock).
-  Rien à charger : elle attend sur A et réessaie à chaque passage. Plein de carburant à chaque
-  escale avec l'énergie de la planète (`refuel`) ; si le trajet suivant ne tient pas dans le
-  réservoir, la navette s'arrête et le journal le dit (pas de panne en route).
+  Rien à charger : elle attend sur A et réessaie à chaque passage ; en attente, elle ne repart
+  qu'avec un vrai lot (100 au moins, ou des soutes pleines), pas un voyage pour une unité. Plein
+  de carburant à chaque escale avec l'énergie de la planète (`refuel`), sur A **avant** de
+  charger ; si le trajet suivant ne tient pas dans le réservoir, la navette s'arrête et le
+  journal le dit (pas de panne en route), sans avoir rien pris sur A.
 - Écarté : remplir d'abord la première ressource cochée (une seule ressource partirait).
 - Attention (signalé au router, non tranché) : « sans réserve » vaut aussi pour la nourriture.
   Cochée sur une planète d'humains ou d'aliens, la navette peut vider A jusqu'à la famine (vu

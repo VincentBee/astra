@@ -318,3 +318,41 @@ scenario('navette : le rejeu des journaux redonne la même fiche (escales, atten
   assert.equal(r.faithful[A.me], true);
   assert.ok(r.log.some((l) => l.text.includes('fait la navette')));
 });
+
+scenario('navette (revue) : une jonction qui la rejoint l’arrête avec sa ligne ; pas d’énergie sur A : rien n’est pris ; en attente, pas de voyage pour une unité', (film) => {
+  // Une autre flotte rejoint la navette qui attend sur A (A vide) : à la fusion, la navette s'arrête, au journal.
+  const g = setup({ home: 0, ships: { cargo: 2 } });
+  assert.ok(g.A.shuttleFleet(g.id, g.home, g.B, ['minerals']));
+  assert.equal(g.A.myFleet(g.id).order.wait, 'a');
+  P(g.A).planet.ships = { cargo: 1 };
+  const other = g.A.takeOff('home', { cargo: 1 }, {}, 10);
+  // Elle attend une case à côté, puis part rejoindre la navette.
+  Object.assign(g.A.myFleet(other), { from: { x: g.home.x, y: g.home.y + 1 }, to: { x: g.home.x, y: g.home.y + 1 } });
+  assert.ok(g.A.joinFleet(other, g.id));
+  run(g.A, g.clock, () => !g.A.myFleet(other));
+  assert.equal(g.A.myFleet(g.id).order, null, 'fondue : plus de navette');
+  assert.ok(g.A.state.log.some((l) => l.text.includes('s’arrête : flottes fusionnées')), 'au journal');
+
+  // Plus d'énergie sur A et un réservoir vide : la navette s'arrête sans vider A.
+  const h = setup();
+  P(h.A).planet.stock.energy = 0;
+  h.A.myFleet(h.id).fuel = 0;
+  assert.ok(h.A.shuttleFleet(h.id, h.home, h.B, ['minerals']));
+  assert.equal(h.A.myFleet(h.id).order, null);
+  assert.equal(h.A.myFleet(h.id).cargo.minerals, 0, 'rien dans les soutes');
+  assert.equal(Math.round(game.stateAt(P(h.A).planet, h.clock.t).stock.minerals), 3000, 'A garde tout');
+  assert.ok(h.A.state.log.some((l) => l.text.includes('pas assez d’énergie')));
+
+  // En attente sur A : 40 minéraux ne la font pas partir, 100 si.
+  const k = setup({ home: 0 });
+  assert.ok(k.A.shuttleFleet(k.id, k.home, k.B, ['minerals']));
+  const n = P(k.A).orders.length;
+  P(k.A).planet.stock.minerals = 40;
+  k.A.tick();
+  assert.equal(k.A.myFleet(k.id).order.wait, 'a', '40 : elle attend encore');
+  assert.equal(P(k.A).orders.length, n, 'sans écrire au journal d’ordres');
+  P(k.A).planet.stock.minerals = 100;
+  k.A.tick();
+  assert.equal(k.A.myFleet(k.id).cargo.minerals, 100, '100 : elle part');
+  film.look(k.A, 'la navette part avec un vrai lot');
+});

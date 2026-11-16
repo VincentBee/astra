@@ -3096,7 +3096,7 @@ const shuttleCell = (v) => {
 };
 $('btn-fi-shuttle').onclick = openShuttleSheet;
 $('btn-shuttle-close').onclick = closeShuttleSheet;
-$('shuttle-a').onchange = () => !session.myFleet(shuttleSheet)?.order?.res && shuttleDefaults();
+$('shuttle-a').onchange = shuttleDefaults; // une autre planète A : ses ressources en stock
 $('btn-shuttle-go').onclick = () => {
   const res = [...document.querySelectorAll('[data-shres]')].filter((el) => el.checked).map((el) => el.dataset.shres);
   if (!session.shuttleFleet(shuttleSheet, shuttleCell($('shuttle-a').value), shuttleCell($('shuttle-b').value), res)) {

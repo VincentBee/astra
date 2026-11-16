@@ -89,7 +89,7 @@ const RAID_COOLDOWN_MS = (2 * 60_000) / TEMPO;
 const MAX_EFFECTS = 300;
 /** Escales d'une navette traitées en un passage, au plus (rattrapage après une absence, D-545). */
 const SHUTTLE_MAX_STOPS = 2000;
-/** Ce qu'une navette qui attend la place sur B y pose au moins d'un coup (sauf son dernier reste, D-544). */
+/** Lot minimum d'une navette qui attend : ce qu'elle charge sur A (sauf soutes pleines, D-543) ou pose sur B (sauf son dernier reste, D-544). */
 const SHUTTLE_MIN_DROP = 100;
 /** Entrées gardées dans mon carnet (combats et planètes perdues, sur ce téléphone seulement). */
 const JOURNAL_MAX = 100;
@@ -3075,7 +3075,13 @@ export class Session {
       const s = stateAt(A.planet, Math.max(t, A.planet.at || 0));
       const take = shuttleTake(s.stock, fleetCargo(p.race, f.ships) - held, o.res);
       const got = SOIL.reduce((x, r) => x + take[r], 0);
-      if (!got && !held) return pause('a'); // rien à charger : elle attend sur A
+      const room = fleetCargo(p.race, f.ships) - held;
+      // Rien à charger : elle attend sur A. En attente, elle ne part qu'avec un vrai lot
+      // (SHUTTLE_MIN_DROP, ou des soutes pleines) : pas un voyage pour une unité (D-543).
+      if (!held && (!got || (o.wait === 'a' && got < Math.min(room, SHUTTLE_MIN_DROP)))) return pause('a');
+      // Le plein d'abord : si le trajet vers B ne tient pas, rien n'est pris sur A.
+      refuel(A.planet, f, p.race, t);
+      if (fuelNeed(f, p.race, B.cell, t) > fuelAt(f, p.race, t) + 1e-9) return stop(`pas assez d’énergie sur ${A.name} pour le plein`);
       if (got) {
         settle(A.planet, t);
         for (const r of SOIL) A.planet.stock[r] = Math.max(0, (A.planet.stock[r] || 0) - take[r]);
@@ -3106,8 +3112,8 @@ export class Session {
       }
       next = { from: B, to: A, go: 'a' };
     }
-    // Plein sur la planète de l'escale, puis le trajet suivant, s'il tient dans le réservoir.
-    refuel(next.from.planet, f, p.race, t);
+    // Plein sur la planète de l'escale (sur A, déjà fait avant de charger), puis le trajet suivant, s'il tient dans le réservoir.
+    if (next.from === B) refuel(B.planet, f, p.race, t);
     if (fuelNeed(f, p.race, next.to.cell, t) > fuelAt(f, p.race, t) + 1e-9) return stop(`pas assez d’énergie sur ${next.from.name} pour le plein`);
     const order = { ...f.order, go: next.go };
     delete order.wait;
@@ -3305,7 +3311,9 @@ export class Session {
       // La flotte à rejoindre, ou celle qui l'a absorbée entre-temps.
       const g = (p.fleets || []).find((x) => x !== f && (x.id === order.fleet || x.absorbed?.includes(order.fleet)));
       if (g && together(f, g, now) && !this.locked(g.id) && !this.locked(f.id)) {
+        const was = this.shuttlesOf([g]); // une navette rejointe s'arrête, et le journal le dit (D-542)
         merge(f, g, p.race, now);
+        this.quitShuttles(p, was, null, 'flottes fusionnées');
         drop();
         this.addLog(`Une flotte ${de(p.name)} en rejoint une autre en [${g.to.x}:${g.to.y}] : elles fusionnent.`);
         return true;
