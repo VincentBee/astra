@@ -3882,14 +3882,22 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
     pas de `type`) arrête la règle : pas `null` seul, que `js/replay.js` lit comme un argument
     absent (constaté : la règle arrêtée revenait au rejeu).
   - `AUTO_MAX` = 1000 lots au plus par calcul de `stateAt` : une fiche datée de très loin (D-175)
-    ne fait pas des milliers de lots à chaque affichage (1000 lots ≈ 10 ms). Au-delà, le stock
-    attend le calcul suivant.
+    ne fait pas des milliers de lots à chaque affichage (1000 lots ≈ 10 ms). `settle` écrit par
+    morceaux de `AUTO_MAX` lots (40 au plus) : au retour d'une absence, aucun lot perdu.
+    (Première version : « le stock attend le calcul suivant » ; faux, la revue a montré 1000
+    cargos au lieu de 1686 après 6 h téléphone éteint. Corrigé le 2026-11-16.)
+  - `planForecast` ne compte que 60 lots de la règle par passe : elle repart chaque seconde.
   - `AUTO_SETTLE` = 5 min : `tick` n'écrit une planète pour sa seule règle qu'au plus toutes les
     5 min. Un passage par lot (toutes les 3 s) aurait rempli le journal d'ordres
     (`MAX_ORDERS` = 1500) en un peu plus d'une heure, et la partie ne se rejouerait plus depuis
     le début. Mesuré : 65 passages en 5 h de jeu avec la règle.
   - Journal de partie : une ligne par vaisseau et par écriture (« reçoit 18 × Cargo Hermès …
-    (achat auto) »), pas une par lot ; pas de ligne « met en chantier » pour la règle.
+    (achat auto) »), pas une par lot ; pas de ligne « met en chantier » pour la règle. Toute
+    écriture d'une de mes planètes par la session passe par `settleLog` (décollage, plein,
+    construction, atterrissage, pertes…) : aucun vaisseau de la règle sans sa ligne.
+  - Dans `tick`, le fil ne force l'écriture que pour ses propres événements : ceux de la règle
+    attendent `AUTO_SETTLE` même quand le fil attend (sans ça : 561 passages par heure au lieu
+    de 12, avec une recherche au fil).
   - `FORMAT` 11 → 12 : un téléphone d'avant ne connaît pas la règle et calculerait mal la planète
     d'un autre ; il est prévenu de recharger (`outdated`).
   - Règle arrêtée : son dernier lot (déjà payé) finit comme un lot ordinaire, écrit au passage
@@ -3897,8 +3905,8 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   - Lot plus cher que l'entrepôt (fil compris) : refusé (`tooBig`, comme D-441), il ne partirait
     jamais.
   - Limites connues : la fiche, et le score qu'on en tire (`empireScore`), peuvent avoir 5 min de
-    retard sur les vaisseaux de la règle ; `AUTO_MAX` peut jouer après ~1 h d'absence sur une
-    planète riche avec des lots de 1.
+    retard sur les vaisseaux de la règle ; chez les autres, la planète d'un joueur absent depuis
+    plus de `AUTO_MAX` lots montre moins de vaisseaux jusqu'à son retour.
 - Écarté : un passage par lot (journal plein) ; aucune limite de lots (page figée sur une vieille
   fiche) ; garder FORMAT 11 (calculs faux en silence chez un joueur pas à jour).
 - Qui : Claude par défaut. Source : session `a7e3826e`. Statut : en vigueur.

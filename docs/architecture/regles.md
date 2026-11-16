@@ -333,9 +333,13 @@ Tests : `tests/alerts.test.mjs`. L'affichage est dans [interface.md](interface.m
   `{ kind: 'start', lane: 'yard', auto: true, … }` dans `done` (sans `i`) et un `yard` marqué
   `auto: true`. `stateAt` renvoie `auto` (la règle nettoyée). Tout se calcule depuis la fiche :
   même résultat téléphone éteint, au rattrapage, chez les autres et au rejeu.
-  - **`AUTO_MAX` = 1000** lots au plus par calcul (`js/game.js`) : sans limite, une fiche datée de
-    très loin (D-175) ferait des milliers de lots à chaque affichage. Au-delà, le stock attend le
-    calcul suivant. Mesuré : 1000 lots ≈ 10 ms.
+  - **`AUTO_MAX` = 1000** lots au plus par calcul de `stateAt` (`js/game.js`) : sans limite, une
+    fiche datée de très loin (D-175) ferait des milliers de lots à chaque affichage. `stateAt`
+    s'arrête alors de compter la règle et rend l'heure du dernier lot compté (`autoFull`).
+    `settle`, lui, écrit la planète **par morceaux** (jusqu'à `autoFull`, puis il reprend de là,
+    `AUTO_CHUNKS` = 40 morceaux au plus) : le propriétaire ne perd aucun lot au retour d'une
+    longue absence. Mesuré : 1000 lots ≈ 10 ms. `planForecast` (estimation du fil, recalculée
+    chaque seconde) ne compte que 60 lots de la règle par passe (`stateAt(…, autoMax)`).
   - **`AUTO_SETTLE` = 5 min** (`js/session.js`) : `tick` n'écrit une planète pour sa seule règle
     (lot automatique fini, ou lot à lancer) qu'au plus toutes les 5 min, sinon un passage par lot
     (toutes les 3 s) remplirait le journal d'ordres (`MAX_ORDERS` = 1500) et la partie ne se
@@ -346,10 +350,17 @@ Tests : `tests/alerts.test.mjs`. L'affichage est dans [interface.md](interface.m
   - Lot plus cher que l'entrepôt (fil compris) : refusé par l'ordre (`tooBig`, comme D-441) ;
     le bouton + de la fiche ne propose pas une taille qui ne rentrerait pas.
   - Journal de partie : une ligne par vaisseau et par écriture, « J0 reçoit 18 × Cargo Hermès
-    sur Aldébaran (achat auto). » (`autoLog`), pas une par lot.
-  - Limite connue (D-531) : `AUTO_MAX` peut jouer après environ 1 h d'absence sur une planète
-    riche avec des lots de 1 (mesuré : 403 lots de 1 cargo en 1 h) ; la planète d'un autre joueur
-    resté longtemps hors ligne coûte jusqu'à ~10 ms par `stateAt`.
+    sur Aldébaran (achat auto). » (`autoLog`), pas une par lot. Tout `settle` d'une de mes
+    planètes fait par la session passe par `Session.settleLog` (avant `startBuild`,
+    `startShips`, `launch`, `refuel`, `usePower`…, à l'atterrissage, aux pertes, à la recherche
+    partagée) : aucun vaisseau de la règle n'entre dans la fiche sans sa ligne.
+  - `tick` : le fil n'écrit la planète que pour ses propres lancements et fins (`done` sans
+    `auto`) ; ceux de la règle attendent `AUTO_SETTLE`, même quand le fil attend.
+  - Limites connues (D-531) : chez les autres, la planète d'un joueur absent depuis longtemps
+    (plus de `AUTO_MAX` lots depuis sa dernière écriture, ~1 h sur une planète riche avec des
+    lots de 1) montre moins de vaisseaux que la vérité jusqu'à son retour, et une attaque
+    pendant ce temps ne voit que ceux-là ; elle coûte jusqu'à ~10 ms par `stateAt`. Au-delà
+    d'`AUTO_CHUNKS` × `AUTO_MAX` lots (40 000, fiche datée de très loin), le reste est perdu.
   - **Limite connue (D-530)** : pas de réserve de ressources. Une règle qui se déclenche dépense ;
     seul le fil passe avant elle. Un élément du fil qui attend un prérequis (labo, chantier en
     cours) ne retient pas le stock : la règle peut le dépenser entre-temps.

@@ -253,3 +253,71 @@ scenario('une fiche datée de très loin : la règle s’arrête à AUTO_MAX lot
   assert.ok(performance.now() - t < 2000, 'le calcul reste court');
   assert.equal(autoStarts(s).length, game.AUTO_MAX);
 });
+
+/** A, humain, sur `yardPlanet()` à l'heure de la partie ; `texts` reçoit chaque ligne de journal (le journal de la partie n'en garde que 40). */
+function playing() {
+  const { players: [A], clock } = newGame(1, ['human']);
+  const P = A.state.players[A.me];
+  const texts = [];
+  const add = A.addLog.bind(A);
+  A.addLog = (text, mark) => {
+    texts.push(text);
+    return add(text, mark);
+  };
+  const p = yardPlanet();
+  p.at = clock.t;
+  P.planet = p;
+  return { A, P, clock, texts };
+}
+
+scenario('règle active et fil qui attend : la planète n’est pas écrite à chaque lot (AUTO_SETTLE)', () => {
+  const { A, P, clock } = playing();
+  // Une recherche au labo et une autre au fil : le fil attend, sans bâtiment en chantier.
+  P.planet.levels.lab = 1;
+  const keys = Object.keys(TECHS.human).filter((k) => !TECHS.human[k].requires);
+  P.planet.research = { key: keys[0], level: 1, start: clock.t, end: clock.t + 10 * HOUR };
+  P.planet.plan = [{ tech: keys[1] }];
+  A.setAutoShips('cargo', 1);
+  const before = P.orders.length;
+  for (let i = 0; i < 1200; i++) {
+    clock.t += 3000; // un passage toutes les 3 s, comme le vrai jeu (1 h)
+    A.tick();
+  }
+  const ticks = P.orders.slice(before).filter((o) => o.k === 'tick').length;
+  assert.ok(game.stateAt(P.planet, clock.t).ships.cargo > 100, 'la règle a acheté');
+  assert.ok(ticks <= HOUR / AUTO_SETTLE + 2, `${ticks} passages notés en 1 h (12 attendus)`);
+});
+
+scenario('longue absence : au retour, settle ne perd aucun lot au-delà de AUTO_MAX', () => {
+  const often = yardPlanet();
+  often.levels = { ...often.levels, mine: 9, solar: 9, store: 6 };
+  often.auto = { ship: 'cargo', n: 1 };
+  const once = clone(often);
+  for (let t = T0 + MIN; t <= T0 + 6 * HOUR; t += MIN) game.settle(often, t);
+  game.settle(once, T0 + 6 * HOUR); // téléphone éteint 6 h : un seul calcul au retour
+  const a = often.ships.cargo || 0;
+  const b = once.ships.cargo || 0;
+  assert.ok(a > game.AUTO_MAX, `${a} cargos avec des passages réguliers`);
+  assert.ok(b > game.AUTO_MAX, `${b} cargos au retour : pas coupé à AUTO_MAX`);
+  assert.ok(Math.abs(a - b) / a < 0.05, `à 5 % près : ${a} et ${b}`);
+});
+
+scenario('chaque vaisseau de la règle a sa ligne au journal, même écrit par un décollage', () => {
+  const { A, P, clock, texts } = playing();
+  A.setAutoShips('cargo', 1);
+  let flown = 0;
+  for (let i = 0; i < 60; i++) {
+    clock.t += 15_000;
+    A.tick();
+    // Toutes les 4 min : un cargo décolle (launch écrit la planète, avec les lots pas encore notés).
+    if (i % 16 === 15 && (game.stateAt(P.planet, clock.t).ships.cargo || 0) > 0) {
+      if (A.takeOff('home', { cargo: 1 }, {}, 0)) flown++;
+    }
+  }
+  A.setAutoShips(null, 0); // écrit tout
+  clock.t += 10 * MIN;
+  A.tick(); // le dernier lot de la règle arrêtée
+  const logged = texts.map((t) => t.match(/reçoit (\d+) × Cargo Hermès .*\(achat auto\)/)).filter(Boolean).reduce((n, m) => n + Number(m[1]), 0);
+  assert.ok(flown > 0, 'des cargos ont décollé');
+  assert.equal(logged, (P.planet.ships.cargo || 0) + flown, 'cargos notés au journal = cargos reçus');
+});

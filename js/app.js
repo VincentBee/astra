@@ -6,7 +6,7 @@ import { scanQr } from './scanner.js';
 import {
   RACES, RACE_KEYS, RES_INFO, resIcon, raceIcon, POWERS, POWER_KEYS, stateAt, upgradeCost, buildDuration, covers, score, power,
   powerReadyAt, powerCost, liftGain, secs, fmt, UNIVERSE, SOIL, sameCell, sunFor, climateName, kindLabel, usedPlaces, TEMPO, frostLine, planForecast, PLAN_MAX, planAhead, planId, tooBig, storageCap, storeFor,
-  shipsAffordable, planetAlerts, FROST,
+  shipsAffordable, planetAlerts, FROST, shipsCost,
 } from './game.js';
 import { drawSun } from './sky.js';
 import { ownHistory, addSample, sparkPath } from './spark.js';
@@ -3309,9 +3309,6 @@ function renderPickYard(me, pl, s, now) {
 /** Tailles de lot proposées par − et + pour l'achat automatique (D-530). */
 const AUTO_STEPS = [1, 2, 3, 5, 10, 20, 50];
 
-/** Prix d'un lot de `n` vaisseaux `k`. */
-const lotCost = (race, k, n) => Object.fromEntries(Object.entries(SHIPS[race][k].cost).map(([r, v]) => [r, v * n]));
-
 /** Ce que fait la règle d'achat automatique en ce moment, en clair (D-530). */
 function autoWait(me, s, plan) {
   const rule = s.auto;
@@ -3320,7 +3317,7 @@ function autoWait(me, s, plan) {
   if (s.yard) return 'attend que le chantier naval se libère';
   if (!s.levels.yard) return 'attend le chantier naval';
   if (!shipUnlocked(me.race, rule.ship, s.tech)) return 'attend la recherche';
-  const big = tooBig(me.race, s.levels, lotCost(me.race, rule.ship, rule.n));
+  const big = tooBig(me.race, s.levels, shipsCost(me.race, rule.ship, rule.n));
   if (big) return big;
   // Le stock paie le lot, mais un élément prêt du fil le garde pour lui (le fil passe d'abord).
   if (plan.length && shipsAffordable(me.race, rule.ship, s.stock) >= rule.n) return 'attend : le fil passe d’abord';
@@ -3340,7 +3337,7 @@ function renderPickAuto(me, s, plan, ahead) {
     $('btn-pi-auto-less').disabled = rule.n <= AUTO_STEPS[0] || session.status !== 'playing';
     const more = AUTO_STEPS.find((x) => x > rule.n);
     // Pas de lot plus cher que l'entrepôt (fil compris) : il ne partirait jamais.
-    $('btn-pi-auto-more').disabled = !more || !!tooBig(me.race, ahead.levels, lotCost(me.race, rule.ship, more)) || session.status !== 'playing';
+    $('btn-pi-auto-more').disabled = !more || !!tooBig(me.race, ahead.levels, shipsCost(me.race, rule.ship, more)) || session.status !== 'playing';
     $('btn-pi-auto-stop').disabled = session.status !== 'playing';
   }
   for (const btn of document.querySelectorAll('[data-pi-auto]')) {

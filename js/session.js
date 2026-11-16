@@ -22,7 +22,7 @@ import { Rendezvous } from './rendezvous.js';
 import { saveGame, loadGame, mergeStates, loadIdentity, saveIdentity, identityFor, savedGame } from './save.js';
 import { inviteGid } from './invite.js';
 import { holdGame } from './tablock.js';
-import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, PLAN_MAX, planItem, planId, planAhead, autoRule, tooBig, upgradeCost, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, FROST, sunFor, fortOf, seeded, RES } from './game.js';
+import { newPlanet, settle, stateAt, startBuild, startDemolish, startResearch, startShips, usePower, PLAN_MAX, planItem, planId, planAhead, autoRule, shipsCost, tooBig, upgradeCost, RACES, RES_INFO, POWERS, planetsFor, sameCell, SOIL, UNIVERSE, usedPlaces, empireScore, frostAt, FROST, sunFor, fortOf, seeded, RES } from './game.js';
 import { TECHS, SHIPS, sightRange, TEMPO, techMissing, shipUnlocked } from './tech.js';
 import { cleanReport } from './report.js';
 import { launch, battle, plunder, moveTo, stopAt, moving, countShips, fuelAt, fuelNeed, refuel, together, transfer, split, merge, intercept, inContact, firstContact, salvage, applyLosses, parkedCell, fleetPos, fleetCargo, fleetTank, ORDERS, MAX_FLEETS, STANCES, aggressive, armed } from './fleet.js';
@@ -1597,7 +1597,7 @@ export class Session {
     }
     const colonies = { ...p.colonies };
     delete colonies[next.key];
-    settle(next.planet, at);
+    this.settleLog(p, next, at);
     p.colonies = colonies;
     p.home = { ...next.cell };
     p.claimAt = next.planet.claimAt || at;
@@ -1868,7 +1868,7 @@ export class Session {
     p.fleets ||= [];
     // Pas de limite de flottes ici : c'est un retour forcé, pas un ordre ; sinon les vaisseaux disparaîtraient (#80, D-470).
     if (!colony) return null;
-    settle(colony, now);
+    this.settleLog(p, { planet: colony, name: w?.name || '' }, now);
     // Le colonisateur qui l'a fondée repart avec la flotte ; une colonie prise au combat n'en a pas consommé (D-200).
     colony.ships = { ...(colony.ships || {}) };
     if (!colony.captured) colony.ships.colony = (colony.ships.colony || 0) + 1;
@@ -1904,6 +1904,7 @@ export class Session {
     // Une planète d'avant la place garde au moins ce qu'elle a déjà bâti.
     const w = this.planets.find((x) => sameCell(x, pl.cell));
     if (w?.places) pl.planet.places = Number.isFinite(pl.planet.places) ? w.places : Math.max(w.places, usedPlaces(pl.planet.levels));
+    this.settleLog(p, pl);
     const err = startBuild(pl.planet, key, this.now());
     if (err) return this.ontoast?.(err);
     const b = RACES[p.race].buildings[key];
@@ -1962,9 +1963,20 @@ export class Session {
 
   /** Écrit l'état de la planète maintenant, et note au journal ce que le fil a lancé entre-temps. */
   settlePlan(p, pl) {
-    const done = settle(pl.planet, this.now());
+    this.settleLog(p, pl);
+  }
+
+  /**
+   * Écrit la planète `pl` (une des miennes) à l'heure `at`, et note au journal ce que le fil a
+   * lancé et ce que l'achat automatique a reçu entre-temps (D-531) : tout `settle` d'une de mes
+   * planètes passe par ici, sinon des vaisseaux de la règle entreraient dans la fiche sans une
+   * ligne. Renvoie ce qui s'est passé (`done` de settle).
+   */
+  settleLog(p, pl, at = this.now()) {
+    const done = settle(pl.planet, at);
     for (const d of done) if (d.kind === 'start' && !d.auto) this.addLog(planStartText(p, d, pl.name));
     autoLog(this, p, pl, done);
+    return done;
   }
 
   /**
@@ -2054,7 +2066,7 @@ export class Session {
     if (!ahead.levels.yard) return this.ontoast?.('Il faut un chantier naval (ou en mettre un au fil).');
     if (!shipUnlocked(p.race, type, ahead.tech)) return this.ontoast?.('Ce vaisseau n’est pas encore recherché (fil compris).');
     // Lot plus cher que l'entrepôt (fil compris) : il ne partirait jamais (comme D-441). Au rejeu, un vieux journal garde son sens.
-    const big = !this.replaying && tooBig(p.race, ahead.levels, Object.fromEntries(Object.entries(S[type].cost).map(([r, v]) => [r, v * count])));
+    const big = !this.replaying && tooBig(p.race, ahead.levels, shipsCost(p.race, type, count));
     if (big) return this.ontoast?.(`${big} pour un lot de ${count} (fil compris).`);
     const old = pl.planet.auto;
     if (old?.ship === type && old?.n === count) return this.ontoast?.('Cet achat automatique est déjà réglé.');
@@ -2088,6 +2100,7 @@ export class Session {
     const p = this.state.players[this.me];
     const pl = this.myPlanet(where);
     if (!pl) return;
+    this.settleLog(p, pl);
     const err = startDemolish(pl.planet, key, this.now());
     if (err) return this.ontoast?.(err);
     const b = RACES[p.race].buildings[key];
@@ -2110,9 +2123,10 @@ export class Session {
     if (other) return this.ontoast?.(`Cette technologie est déjà en recherche sur ${other.name}.`);
     // La copie des technologies d'une colonie peut avoir un passage de retard : on part des plus hautes.
     if (pl.key !== 'home' && Object.entries(p.planet.tech || {}).some(([k, n]) => n > (pl.planet.tech?.[k] || 0))) {
-      settle(pl.planet, this.now());
+      this.settleLog(p, pl);
       pl.planet.tech = maxTech(pl.planet.tech, techOf(p));
     }
+    this.settleLog(p, pl);
     const err = startResearch(pl.planet, key, this.now());
     if (err) return this.ontoast?.(err);
     this.touch(this.addLog(`${p.name} lance la recherche ${TECHS[p.race][key].name} niv. ${pl.planet.research.level} sur ${pl.name}.`));
@@ -2126,6 +2140,7 @@ export class Session {
     const pl = this.myPlanet(where);
     if (!pl) return;
     if (this.queuedBehind(pl)) return this.toPlan('planShips', type, count, where);
+    this.settleLog(p, pl);
     const err = startShips(pl.planet, type, count, this.now());
     if (err) return this.ontoast?.(err);
     this.touch(this.addLog(`${p.name} met en chantier ${count} × ${SHIPS[p.race][type].name} sur ${pl.name}.`));
@@ -2230,6 +2245,7 @@ export class Session {
       this.ontoast?.(`Pas plus de ${MAX_FLEETS} flottes.`);
       return false;
     }
+    this.settleLog(p, from);
     const res = launch(from.planet, { ships, cargo, fuel, at: from.cell, origin: fromKey, id: this.newId(6) }, this.now());
     if (res.error) {
       this.ontoast?.(res.error);
@@ -2869,6 +2885,7 @@ export class Session {
     const here = this.planetsAt(parkedCell(f))[0]; // en panne tout près : elle est en orbite
     const pl = here?.owner.id === this.me && this.planetOf(p, here.key);
     if (!pl) return this.refuse('Le plein se fait en orbite d’une de tes planètes.');
+    this.settleLog(p, pl, now);
     const give = refuel(pl.planet, f, p.race, now);
     if (!give) return this.refuse('Pas d’énergie à verser, ou réservoirs déjà pleins.');
     this.ontoast?.(`Plein : ${give} d’énergie.`);
@@ -2981,6 +2998,7 @@ export class Session {
     const p = this.state.players[this.me];
     const pl = p?.planet && this.myPlanet(where);
     if (!pl) return;
+    this.settleLog(p, pl);
     const res = usePower(pl.planet, key, this.now());
     if (res.error) return this.ontoast?.(res.error);
     this.touch(this.addLog(`${p.name} ${res.text}.`));
@@ -3035,7 +3053,7 @@ export class Session {
         techAt = Math.min(techAt, d.end);
         // Trouvée dans une colonie : elle vaut aussi pour la planète mère, qui la donne aux autres.
         if (pl.key !== 'home') {
-          settle(p.planet, d.end); // la planète mère profite du bonus à partir de la fin, pas avant
+          this.settleLog(p, this.planetOf(p, 'home') || { planet: p.planet, name: '' }, d.end); // la planète mère profite du bonus à partir de la fin, pas avant
           p.planet.tech = maxTech(techOf(p), { [d.key]: d.level });
           colonyTech = true;
         }
@@ -3047,7 +3065,9 @@ export class Session {
     // partir de la fin de la recherche (et pas seulement du passage qui s'en aperçoit).
     const shareTech = (pl) => {
       if (pl.key === 'home' || sameTech(pl.planet.tech, techOf(p))) return;
-      for (const d of settle(pl.planet, Math.min(techAt, now))) report(pl, d);
+      const done = settle(pl.planet, Math.min(techAt, now));
+      for (const d of done) report(pl, d);
+      autoLog(this, p, pl, done);
       p.planet.tech = maxTech(techOf(p), pl.planet.tech); // une recherche finie ici et pas encore partagée
       pl.planet.tech = { ...p.planet.tech };
       changed = true;
@@ -3062,7 +3082,11 @@ export class Session {
       const auto = !!pl.planet.auto && now - pl.planet.at >= AUTO_SETTLE;
       // Règle arrêtée : son dernier lot finit comme un lot ordinaire (sinon il resterait en chantier dans la fiche).
       const ended = (k) => pl.planet[k] && pl.planet[k].end <= now && (k !== 'yard' || !pl.planet.yard.auto || !pl.planet.auto || auto);
-      const due = ['queue', 'research', 'yard'].some(ended) || ((auto || (!pl.planet.queue && pl.planet.plan?.length)) && stateAt(pl.planet, now).done.length > 0);
+      // Le fil n'écrit la planète que pour ses propres lancements et fins : ceux de la règle
+      // attendent AUTO_SETTLE (sinon chaque lot automatique ferait un passage dès que le fil attend).
+      const plan = !pl.planet.queue && pl.planet.plan?.length;
+      const seen = (auto || plan) && stateAt(pl.planet, now).done;
+      const due = ['queue', 'research', 'yard'].some(ended) || (auto && seen.length > 0) || (plan && seen.some((d) => !d.auto));
       if (due) {
         const done = settle(pl.planet, now);
         for (const d of done) report(pl, d);
@@ -3113,7 +3137,7 @@ export class Session {
         this.addLog(`La flotte ${de(p.name)} ne trouve pas où se poser : elle reste en orbite.`);
         return true;
       }
-      settle(pl.planet, now);
+      this.settleLog(p, pl, now);
       pl.planet.ships ||= {};
       for (const [k, n] of Object.entries(f.ships)) pl.planet.ships[k] = (pl.planet.ships[k] || 0) + n;
       for (const [r, v] of Object.entries(f.cargo || {})) pl.planet.stock[r] = (pl.planet.stock[r] || 0) + v;
@@ -3384,7 +3408,7 @@ export class Session {
         this.losePlanet(p, pl.key, e.at, `prise par ${other.name}`);
         continue;
       }
-      settle(pl.planet, now);
+      this.settleLog(p, pl, now);
       pl.planet.ships ||= {};
       for (const [k, n] of Object.entries(e.ships || {})) pl.planet.ships[k] = Math.max(0, (pl.planet.ships[k] || 0) - n);
       for (const [r, v] of Object.entries(e.take || {})) pl.planet.stock[r] = Math.max(0, (pl.planet.stock[r] || 0) - v);
