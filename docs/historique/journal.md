@@ -578,6 +578,12 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 |---|---|---|---|---|---|
 | 08:18 | `b0b71c59` (worker-fil-entrepot) | Router : « MAIN A BOUGÉ — PR #205 : VÉRIFIÉ, et tu es la dernière à merger […] mets VERSION de sw.js à astra-p2p-v130 » | Fusion de `origin/main` (#196 à #204, v129) sans rebase : import de `js/session.js` (`holdGame` de `main`, `tooBig` / `upgradeCost` de la PR), décisions, journal et `tests-decisions.md` gardés des deux côtés ; cache v130 (D-443 mise à jour) | (PR #205) | D-443 |
 
+## 16 novembre 2026
+
+| Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
+|---|---|---|---|---|---|
+| 21:45 | `a7e3826e` (worker-auto-ships) | Worker du router, demande de Vincent : « je voudrais qu'on puisse programmer depuis la map des achats de vaisseau automatique dès qu'on a les fonds / pour que sur une planette ou on ne veux plus que faire des vaisseau de guerre par ex, on puisse ne plus se preoccuper de la production » | Règle `planet.auto = { ship, n }` dans le moteur (`stateAt`, `planNext`, `autoRule`, `AUTO_MAX`, `js/game.js`) : dernier élément du fil qui ne s'en va jamais ; ordre `setAutoShips` (`js/session.js`, nettoyage des fiches, `AUTO_SETTLE`, journal groupé, FORMAT 12) ; bouton **Auto**, cadre de la règle, − / + / Arrêter dans la fiche de la planète sur la carte, flèche verte sur la carte, icône et statut dans sa case, ligne dans l'onglet (`js/app.js`, `index.html`, `style.css`) ; `tests/auto-ships.test.mjs` (7 scénarios, rejeu fidèle) ; vrai jeu servi par `node tests/ui/server.mjs` : règle réglée depuis la carte, cargos achetés seuls, arrêt ; cache v131 | (PR) | D-530, D-531, D-532, D-533 |
+
 ### Travaux en cours au 2026-10-29
 
 - **Rythme des parties** (`26f178b9`) : commité sur `claude/swarm-it-game-pacing-1d4502`

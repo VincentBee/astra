@@ -3842,3 +3842,76 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - 2026-11-08 12:20 UTC. `sw.js` : `VERSION` passe à `astra-p2p-v121` pour que les téléphones
   prennent le nouveau code (#50). 2026-11-13 : `main` a bougé (#196 à #204, v129), passe à
   v130. Qui : Claude (règle du dépôt, router). Statut : en vigueur.
+
+## 16 novembre 2026 — achat automatique de vaisseaux depuis la carte
+
+**D-530 — Achat automatique de vaisseaux : une règle par planète, dans le moteur, après le fil**
+- 2026-11-16 21:45 UTC. Contexte : Vincent : « je voudrais qu'on puisse programmer depuis la map
+  des achats de vaisseau automatique dès qu'on a les fonds / pour que sur une planette ou on ne
+  veux plus que faire des vaisseau de guerre par ex, on puisse ne plus se preoccuper de la
+  production ».
+- Choix :
+  1. La règle fait partie du **moteur déterministe** (`stateAt`, comme le fil, D-105, D-158) :
+     elle tourne téléphone éteint, et le rejeu redonne le même état. Pas de minuterie côté
+     interface.
+  2. **Une seule règle par planète** : `planet.auto = { ship, n }` (vaisseau de la race, lot de 1
+     à 50), ou rien. On la change ou l'arrête à tout moment ; la nouvelle remplace l'ancienne.
+  3. **Le fil passe d'abord** : la règle est un dernier élément du fil qui ne s'en va jamais
+     (`planNext`). Elle ne prend le chantier naval que s'il est libre et qu'aucun lot de
+     vaisseaux n'est au fil. Conséquence assumée : un élément du fil prêt et payable un jour
+     (même un bâtiment) garde la priorité sur le stock (comme dans le fil, D-158) ; la règle ne
+     passe devant que ceux qu'on ne pourra pas payer avec la production actuelle (D-270).
+  4. **Pas de réserve de ressources** : si la règle se déclenche, elle dépense. Limite connue :
+     un élément du fil qui attend un prérequis (labo, chantier en cours) ne retient pas le stock.
+  5. Ordre valide seulement pour une planète du joueur et un vaisseau de sa race, débloqué
+     (fil compris) et avec un chantier naval (fil compris) ; une fiche abîmée ou trafiquée est
+     nettoyée (`autoRule`, `planetOk`), comme `planItem`.
+  6. La règle vaut à partir de l'ordre (`settle` d'abord) : rien n'est acheté dans le passé.
+- Écarté : une minuterie dans l'interface (ne marche pas téléphone éteint, pas rejouable) ; une
+  règle qui dépense avant les éléments prêts du fil (elle affamerait tout élément plus cher qu'un
+  lot) ; une réserve de ressources (plus tard si besoin) ; plusieurs règles par planète.
+- Qui : points 1 à 5 : router, par défaut (Claude par défaut) ; point 3 (priorité du fil sur le
+  stock) et 6 : Claude par défaut. Source : session `a7e3826e` (worker-auto-ships). Statut : en
+  vigueur.
+
+**D-531 — Ordre `setAutoShips`, format de fiche 12, garde-fous du journal**
+- 2026-11-16 21:45 UTC. Contexte : D-530. La règle n'a pas de fin, à la différence du fil
+  (12 lancements au plus).
+- Choix :
+  - Ordre `Session.setAutoShips(type, count, where)`, dans `ORDER_KINDS` (rejoué). `count` 0 (ou
+    pas de `type`) arrête la règle : pas `null` seul, que `js/replay.js` lit comme un argument
+    absent (constaté : la règle arrêtée revenait au rejeu).
+  - `AUTO_MAX` = 1000 lots au plus par calcul de `stateAt` : une fiche datée de très loin (D-175)
+    ne fait pas des milliers de lots à chaque affichage (1000 lots ≈ 10 ms). Au-delà, le stock
+    attend le calcul suivant.
+  - `AUTO_SETTLE` = 5 min : `tick` n'écrit une planète pour sa seule règle qu'au plus toutes les
+    5 min. Un passage par lot (toutes les 3 s) aurait rempli le journal d'ordres
+    (`MAX_ORDERS` = 1500) en un peu plus d'une heure, et la partie ne se rejouerait plus depuis
+    le début. Mesuré : 65 passages en 5 h de jeu avec la règle.
+  - Journal de partie : une ligne par vaisseau et par écriture (« reçoit 18 × Cargo Hermès …
+    (achat auto) »), pas une par lot ; pas de ligne « met en chantier » pour la règle.
+  - `FORMAT` 11 → 12 : un téléphone d'avant ne connaît pas la règle et calculerait mal la planète
+    d'un autre ; il est prévenu de recharger (`outdated`).
+- Écarté : un passage par lot (journal plein) ; aucune limite de lots (page figée sur une vieille
+  fiche) ; garder FORMAT 11 (calculs faux en silence chez un joueur pas à jour).
+- Qui : Claude par défaut. Source : session `a7e3826e`. Statut : en vigueur.
+
+**D-532 — La règle se règle depuis la fiche de la planète sur la carte, et se voit sur la carte**
+- 2026-11-16 21:45 UTC. Contexte : D-530 (« depuis la map »).
+- Choix : dans la partie Chantier de la fiche d'une de mes planètes (`#pi-yard`), un bouton
+  **Auto** par vaisseau : il règle la règle sur ce vaisseau (même taille de lot, 1 au départ),
+  le retoucher l'arrête. Règle active : cadre vert « 2 × Cargo Hermès en automatique, dès que les
+  fonds sont là · attend les fonds » (ce qu'elle attend, en clair), − et + (tailles 1, 2, 3, 5,
+  10, 20, 50) et **Arrêter**. Indicateurs : sur la carte, petite flèche en rond verte en bas à
+  gauche de la planète ; dans sa case sous la carte, icône verte + vaisseau après le nom et
+  statut « Auto : 1 × Cargo Hermès · 4 à quai » ; dans l'onglet de la planète, une ligne qui la
+  rappelle. Les vaisseaux à quai et le statut d'une case de planète sont mis à jour en place
+  (un lot toutes les 3 s réécrivait la case et faisait rater le toucher sur ses boutons).
+- Écarté : régler la taille du lot par un champ texte (clavier sur téléphone) ; un réglage
+  seulement dans l'onglet de la planète (la demande dit « depuis la map »).
+- Qui : Claude par défaut. Source : session `a7e3826e`. Statut : en vigueur.
+
+**D-533 — Cache `astra-p2p-v131`**
+- 2026-11-16 21:45 UTC. `sw.js` : `VERSION` passe de v130 (`main`) à v131 pour que les
+  téléphones prennent le nouveau code (D-530) ; remontée si `main` bouge avant la fusion.
+  Qui : Claude (règle du dépôt). Source : session `a7e3826e`. Statut : en vigueur.

@@ -100,8 +100,9 @@ Créée par `newPlanet(race, now, world)` (`js/game.js:404-420`) :
 | `levels` | `{ bâtiment: niveau }`, départ : `buildings[k].start` |
 | `queue` | chantier en cours `{ key, level, start, end }` ou `null` (`js/game.js:645`) |
 | `plan` | fil d'attente, 12 au plus (D-105, D-158) : un bâtiment est son nom (`"mine"`), une recherche `{ tech }`, un lot de vaisseaux `{ ship, n }` (1 à 50) ; absent sur une planète d'avant. Format de fiche 10 |
+| `auto` | achat automatique de vaisseaux (D-530) : `{ ship, n }` (un vaisseau de la race, lot de 1 à 50), ou absent. Format de fiche 12 |
 | `research` | recherche en cours `{ key, level, start, end }` (`js/game.js:669`) |
-| `yard` | lot de vaisseaux en cours `{ type, count, start, end }` (`js/game.js:688`) |
+| `yard` | lot de vaisseaux en cours `{ type, count, start, end }` (`js/game.js:688`), plus `auto: true` si c'est la règle automatique qui l'a lancé (D-530) |
 | `tech` | `{ technologie: niveau }` |
 | `ships` | vaisseaux posés sur la planète `{ type: nombre }` |
 | `powers` | `{ pouvoir: heure où il redevient prêt }` (aliens) |
@@ -318,6 +319,32 @@ Tests : `tests/alerts.test.mjs`. L'affichage est dans [interface.md](interface.m
   toucher. Tous font d'abord `settle` (`settlePlan`, qui note au journal ce que le fil a lancé),
   pour que le fil parte de maintenant. Le lancement automatique est décrit en §4.3. Un bâtiment
   sans place bloque les bâtiments du fil jusqu'à ce que le joueur le retire ou déconstruise.
+- **Achat automatique de vaisseaux** (`planet.auto`, D-530, D-531) : une règle `{ ship, n }` par
+  planète, ou aucune. Ordre `Session.setAutoShips(type, count, where)` : règle `count` × `type`
+  (1 à 50 ; chantier naval et vaisseau débloqué comptés fil compris, comme `planShips`), qui
+  remplace l'ancienne ; `count` 0 (ou pas de `type`) l'arrête. Pas `null` seul : le rejeu
+  (`js/replay.js`) lit un `null` du journal comme un argument absent. L'ordre fait d'abord
+  `settle` : la règle vaut à partir de maintenant, rien n'est acheté dans le passé.
+  Moteur (`stateAt`, `planNext`, `autoRule`, `js/game.js`) : la règle est un **dernier élément
+  du fil qui ne s'en va jamais**. Elle ne prend le chantier naval que s'il est libre et qu'aucun
+  lot de vaisseaux n'est au fil ; un élément du fil prêt et payable un jour (même un bâtiment)
+  garde la priorité sur le stock, comme dans le fil (D-158) ; la règle passe devant seulement
+  ceux qu'on ne pourra pas payer avec la production actuelle (D-270). Chaque lancement donne
+  `{ kind: 'start', lane: 'yard', auto: true, … }` dans `done` (sans `i`) et un `yard` marqué
+  `auto: true`. `stateAt` renvoie `auto` (la règle nettoyée). Tout se calcule depuis la fiche :
+  même résultat téléphone éteint, au rattrapage, chez les autres et au rejeu.
+  - **`AUTO_MAX` = 1000** lots au plus par calcul (`js/game.js`) : sans limite, une fiche datée de
+    très loin (D-175) ferait des milliers de lots à chaque affichage. Au-delà, le stock attend le
+    calcul suivant. Mesuré : 1000 lots ≈ 10 ms.
+  - **`AUTO_SETTLE` = 5 min** (`js/session.js`) : `tick` n'écrit une planète pour sa seule règle
+    (lot automatique fini, ou lot à lancer) qu'au plus toutes les 5 min, sinon un passage par lot
+    (toutes les 3 s) remplirait le journal d'ordres (`MAX_ORDERS` = 1500) et la partie ne se
+    rejouerait plus depuis le début. Les lots se calculent quand même entre-temps (`stateAt`).
+  - Journal de partie : une ligne par vaisseau et par écriture, « J0 reçoit 18 × Cargo Hermès
+    sur Aldébaran (achat auto). » (`autoLog`), pas une par lot.
+  - **Limite connue (D-530)** : pas de réserve de ressources. Une règle qui se déclenche dépense ;
+    seul le fil passe avant elle. Un élément du fil qui attend un prérequis (labo, chantier en
+    cours) ne retient pas le stock : la règle peut le dépenser entre-temps.
 - **Fil pas vide → à la fin du fil** (D-420) : `Session.build`, `research` et `buildShips`
   regardent d'abord le fil de la planète à l'heure de l'ordre (`queuedBehind` : `stateAt(…).plan`).
   S'il n'est pas vide, l'ordre devient `planBuild`, `planResearch` ou `planShips` (`toPlan` ; le
@@ -941,6 +968,11 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
 - Ne pas compter deux fois : `defenseAt`, `pendingFight`, `engaged`/`ack`, `applied`,
   `RAID_COOLDOWN_MS`.
 - `normalize`, `planetOk`, `cleanAmounts` (formes et bornes des fiches reçues) : reseau.md.
+- Achat automatique (D-530) : `planetOk` ne garde `auto` que s'il passe `autoRule` (vaisseau de
+  la race par `own`, `n` entier de 1 à 50), recopié en `{ ship, n }` ; sinon il l'efface. Un
+  `yard.auto` qui n'est pas `true` est effacé. `stateAt` repasse aussi `autoRule` : une règle
+  trafiquée ne lance rien. Les clés de vaisseaux sont les mêmes pour les trois races (`cargo`,
+  `colony`, `fighter`, `heavy`) : « un vaisseau d'une autre race » est donc une clé inconnue.
 - Heure d'une planète reçue (D-175, #32) : `planetOk` ramène `at` à un plancher tiré de la fiche
   elle-même, s'il est connu : l'entrée du joueur dans la course (`since`) pour la planète mère,
   et pour une colonie le plus tardif de `since` et de son heure de prise (`claimAt`). Ce

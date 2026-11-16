@@ -694,6 +694,27 @@ export function planAhead(s) {
   return { levels, tech };
 }
 
+/**
+ * Achat automatique de vaisseaux (D-530) : une règle par planète, `planet.auto = { ship, n }`.
+ * Chantier naval libre, plus aucun lot de vaisseaux au fil, et stock suffisant : un lot de
+ * `n` vaisseaux `ship` part tout seul, encore et encore. Elle se calcule dans stateAt comme le
+ * fil (même résultat téléphone éteint, au rattrapage et au rejeu) : c'est un dernier élément du
+ * fil qui ne s'en va jamais. Renvoie la règle recopiée proprement, ou null.
+ */
+export function autoRule(race, rule) {
+  if (!RACES[race] || !rule || typeof rule !== 'object' || Array.isArray(rule)) return null;
+  if (typeof rule.ship !== 'string' || !own(SHIPS[race], rule.ship)) return null;
+  return Number.isInteger(rule.n) && rule.n >= 1 && rule.n <= 50 ? { ship: rule.ship, n: rule.n } : null;
+}
+
+/**
+ * Lots lancés au plus par la règle automatique dans un même calcul (D-530). Le fil s'arrête
+ * à PLAN_MAX lancements ; la règle, elle, n'a pas de fin : sans limite, une fiche datée de très
+ * loin (D-175) ferait des milliers de lots à chaque affichage. Au-delà, le stock attend le
+ * calcul suivant (le propriétaire écrit sa planète au moins toutes les AUTO_SETTLE).
+ */
+export const AUTO_MAX = 1000;
+
 /** Prix d'un lot de `n` vaisseaux. */
 const shipsCost = (race, type, n) => Object.fromEntries(Object.entries(SHIPS[race][type].cost).map(([r, v]) => [r, v * n]));
 
@@ -781,7 +802,7 @@ function starved(cost, stock, f) {
  * le premier de la liste que le stock couvre. Sans famine ni panne, la liste
  * n'a qu'un élément : le calcul est celui d'avant. null si rien n'est prêt.
  */
-function planNext(race, places, s, q, plan) {
+function planNext(race, places, s, q, plan, auto = null) {
   const waiting = new Set();
   const late = [];
   const f = () => flows(race, s.levels, s.pop, s.stock, 1 / 3600, 1, s.nature, s.reserve, s.tech, s.climate);
@@ -802,6 +823,15 @@ function planNext(race, places, s, q, plan) {
       continue;
     }
     return [...late, pick];
+  }
+  // La règle automatique (D-530), après tout le fil : chantier naval libre et aucun lot au fil.
+  if (auto && !q.yard && !waiting.has('yard') && !plan.some((x) => planLane(x.item) === 'yard')) {
+    const need = planNeed(race, places, s, auto);
+    if (!need.why) {
+      const pick = { lane: 'yard', auto: true, ...need };
+      if (!starved(need.cost, s.stock, f)) return [...late, pick];
+      late.push(pick);
+    }
   }
   return late.length ? late : null;
 }
@@ -860,13 +890,15 @@ export function stateAt(planet, now) {
   const q = { queue: planet.queue || null, research: planet.research || null, yard: planet.yard || null };
   // Le fil, avec la place de chaque élément dans le fil de départ (pour planForecast).
   const plan = (Array.isArray(planet.plan) ? planet.plan : []).map((item, i) => ({ item: planItem(race, item), i })).filter((x) => x.item);
+  const auto = autoRule(race, planet.auto);
+  let autoLeft = AUTO_MAX;
   const done = [];
   for (;;) {
     const next = Object.entries(q)
       .filter(([, v]) => v && v.end <= now)
       .sort((x, y) => x[1].end - y[1].end || (x[0] < y[0] ? -1 : 1))[0];
     // Un chantier libre : le fil attend que le stock couvre le prix, au plus jusqu'au prochain événement.
-    const picks = planNext(race, planet.places, s, q, plan);
+    const picks = planNext(race, planet.places, s, q, plan, autoLeft > 0 ? auto : null);
     if (picks) {
       const limit = next ? Math.max(at, next[1].end) : now;
       const r = until(race, s, at, limit, picks.map((p) => p.cost), planet.trance || 0);
@@ -877,6 +909,13 @@ export function stateAt(planet, now) {
         const stock = { ...s.stock };
         for (const [k, v] of Object.entries(pick.cost)) stock[k] -= v;
         s = { ...s, stock };
+        if (pick.auto) {
+          // La règle ne quitte pas la planète : elle relancera un lot au prochain chantier libre.
+          q.yard = { ...pick.job(at), auto: true };
+          autoLeft--;
+          done.push({ kind: 'start', lane: 'yard', auto: true, ...q.yard });
+          continue;
+        }
         q[pick.lane] = pick.job(at);
         const [{ i }] = plan.splice(pick.pos, 1);
         done.push({ kind: 'start', lane: pick.lane, i, ...q[pick.lane] });
@@ -896,7 +935,7 @@ export function stateAt(planet, now) {
   s = simulate(race, s, at, now, planet.trance);
   // Rythme actuel, pour l'affichage (sur une seconde de jeu).
   const prod = flows(race, s.levels, s.pop, s.stock, 1 / 3600, (planet.trance || 0) > now ? 2 : 1, s.nature, s.reserve, s.tech, s.climate);
-  return { stock: s.stock, pop: s.pop, levels: s.levels, reserve: s.reserve, tech: s.tech, ships: s.ships, ...q, plan: plan.map((x) => x.item), done, prod };
+  return { stock: s.stock, pop: s.pop, levels: s.levels, reserve: s.reserve, tech: s.tech, ships: s.ships, ...q, plan: plan.map((x) => x.item), auto, done, prod };
 }
 
 /** « Mine niv 8 », « Armes niv 2 », « 5 × Chasseur » : un élément du fil, pour un message. */
