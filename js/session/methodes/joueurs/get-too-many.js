@@ -5,6 +5,6 @@ import { MAX_PLAYERS } from '../../constantes/max-players.js';
  * retrouvés (D-480). La partie ne part pas tant qu'il en reste trop : seul le téléphone qui
  * fait jouer une IA peut la retirer (D-399).
  */
-export function tooMany() {
+export function getTooMany() {
   return this.roster.length > MAX_PLAYERS;
 }

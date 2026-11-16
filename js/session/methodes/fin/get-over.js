@@ -1,7 +1,7 @@
 import { isObj } from '../../fiches/is-obj.js';
 
 /** Fin de la partie, ou null : { at, winner }, la plus ancienne qu'un joueur a vue. */
-export function over() {
+export function getOver() {
   const players = this.state?.players || {};
   // winner null : partie seule perdue, personne ne gagne (D-142).
   const seen = Object.values(players).map((p) => p.over).filter((o) => isObj(o) && Number.isFinite(o.at) && (o.winner === null || Object.hasOwn(players, o.winner)));

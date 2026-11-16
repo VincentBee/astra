@@ -3,7 +3,7 @@
  * plus ancien vu par un joueur). Une partie d'avant le départ commun partait à la première
  * installation (`since`). null : pas encore partie (ou partie d'avant la course, sans fin).
  */
-export function startedAt() {
+export function getStartedAt() {
   const players = Object.values(this.state?.players || {});
   const go = players.map((p) => p.go).filter(Number.isFinite);
   if (go.length) return Math.min(...go);
