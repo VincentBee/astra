@@ -216,3 +216,10 @@ que fait le code.
 | D-534 | ×∞ (achat automatique) à la place de ×5, sur la carte et dans l'onglet | non testable |  | boutons DOM : vérifiés dans le vrai jeu (Chrome, 375 px) ; l'ordre `setAutoShips` est testé par `auto-ships.test.mjs` |
 | D-442 | Plafond de l'entrepôt sur la carte Entrepôt | non testable |  | DOM : vérifié dans le vrai jeu (« niv 0 · max 1 000 ») |
 | D-443 | Cache `astra-p2p-v130` (v121 au départ) | non testable |  | `sw.test.mjs` vérifie la liste des fichiers |
+| D-540 | Une fonction par fichier, rangée par domaine puis par module | non testable |  | Structure du code. Vérifiée par `inventaire.mjs` (hors dépôt) sur les 25 modules : mêmes identifiants, corps, exports, commentaires (sortie dans la PR) |
+| D-541 | Découpage mécanique, inventaire avant / après | test existant | toute la suite (347 tests d'avant, verts sans changement de leur logique) | Effets de bord : même ordre, vérifié en suivant l'ordre d'évaluation des modules |
+| D-542 | Plus de façades : imports par `index.js`, pages sur leur point d'entrée | nouveau test | `sw-files.test.mjs` « sources : chaque fichier demandé depuis les trois pages existe » ; `escape.test.mjs` lit les fichiers découpés | `scanner.test.mjs`, `chargement.test.mjs` : état du module remis à zéro avant import |
+| D-543 | `FILES` complet ; le contrôle suit `export … from` et les chemins vers `vendor/` | nouveau test | `sw-files.test.mjs` (échouait avec l'ancien `FILES` : 718 fichiers manquants, puis `vendor/trystero-nostr.mjs`) | modifiée par D-546 |
+| D-544 | Vieux chemins `js/x.js` = le module x | non testable |  | Convention de lecture de la doc |
+| D-545 | Build esbuild : `dist/`, une page = un fichier minifié | nouveau test | `build.test.mjs` (4 tests) ; `sw-browser.mjs` et `chargement-browser.mjs` sur `dist/` (hors `node --test`) | Mesures avant / découpage / `dist/` dans D-545 |
+| D-546 | `FILES` et `VERSION` écrits par le build | nouveau test | `build.test.mjs` « sw.js de dist/ : FILES = les fichiers de dist/…, VERSION = empreinte stable » et « marqueurs » ; `sw.test.mjs` « le sw.js des sources s’installe » | |

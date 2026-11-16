@@ -1,6 +1,7 @@
 # Règles du jeu : le moteur
 
 > Décrit le code au commit `1eeb2c1`. Dates et heures en UTC.
+> **Découpage du 2026-11-16 (D-540)** : chaque ancien fichier `js/x.js` est devenu un dossier (`js/fleet.js` → `js/regles/fleet/`, une fonction par fichier). Dans cette page, `js/x.js` veut dire ce module, et les numéros de ligne (`l.153`, `x.js:166`) valent pour le commit `6e2f7cf` (ceux de l'achat automatique, D-530 à D-534 : `851a3d4`). Carte complète : [fichiers.md](fichiers.md).
 
 Ce document explique le code qui fait les règles d'Astra : l'état d'une partie, le temps,
 l'économie, les races, les technologies, les flottes, le combat, les échanges, les colonies,
@@ -21,14 +22,14 @@ Toutes les références sont `fichier:ligne` au commit `1eeb2c1`.
 
 | Fichier | Rôle | Pur ? |
 |---|---|---|
-| `js/game.js` | Races, bâtiments, économie, temps, constructions, pouvoirs aliens, univers (carte, soleil, climat, planètes, places), score | Oui : « fonctions pures, sans réseau ni DOM » (`js/game.js:1`) |
-| `js/tech.js` | Technologies, vaisseaux, détection, bonus | Oui, données pures (`js/tech.js:1`) |
-| `js/fleet.js` | Flottes : décollage, déplacement, carburant, transferts, poursuite, combat, pillage | Oui (`js/fleet.js:1`) |
-| `js/trade.js` | Échanges entre joueurs : quantités, séquestre, issue d'une offre | Oui (`js/trade.js:1`) |
-| `js/session.js` (partie « règles », l. 696-1771) | Applique les règles à la fiche du joueur : ordres, `tick()`, arrivées, combats contre planètes, rapports de dégâts, échanges, colonies | Non : c'est la classe `Session`, qui porte aussi le réseau |
-| `js/replay.js` | Rejoue une partie à partir des journaux d'ordres | Utilise `Session` sans réseau |
-| `js/techtree.js` | Page `technologies.html` : dessine le graphe à partir des données de `tech.js` et `game.js` | DOM (rendu détaillé : interface.md) |
-| `js/galaxy.js` | Fond d'écran étoilé (immobile depuis D-137), importé par `js/app.js:11`. **Ce n'est pas une règle du jeu** (détail : interface.md) | DOM |
+| `js/regles/game/` (ex-`js/game.js`) | Races, bâtiments, économie, temps, constructions, pouvoirs aliens, univers (carte, soleil, climat, planètes, places), score | Oui : « fonctions pures, sans réseau ni DOM » (`js/game.js:1`) |
+| `js/regles/tech/` (ex-`js/tech.js`) | Technologies, vaisseaux, détection, bonus | Oui, données pures (`js/tech.js:1`) |
+| `js/regles/fleet/` (ex-`js/fleet.js`) | Flottes : décollage, déplacement, carburant, transferts, poursuite, combat, pillage | Oui (`js/fleet.js:1`) |
+| `js/regles/trade/` (ex-`js/trade.js`) | Échanges entre joueurs : quantités, séquestre, issue d'une offre | Oui (`js/trade.js:1`) |
+| `js/session/` (ex-`js/session.js`) (partie « règles », l. 696-1771) | Applique les règles à la fiche du joueur : ordres, `tick()`, arrivées, combats contre planètes, rapports de dégâts, échanges, colonies | Non : c'est la classe `Session`, qui porte aussi le réseau |
+| `js/regles/replay/` (ex-`js/replay.js`) | Rejoue une partie à partir des journaux d'ordres | Utilise `Session` sans réseau |
+| `js/interface/techtree/` (ex-`js/techtree.js`) | Page `technologies.html` : dessine le graphe à partir des données de `tech.js` et `game.js` | DOM (rendu détaillé : interface.md) |
+| `js/interface/galaxy/` (ex-`js/galaxy.js`) | Fond d'écran étoilé (immobile depuis D-137), importé par `js/app.js:11`. **Ce n'est pas une règle du jeu** (détail : interface.md) | DOM |
 
 Frontière avec la doc réseau : ici on décrit les méthodes de jeu de `Session`
 (`addPlayer` … `fleetHit`, `js/session.js:696-1770`) et le journal d'ordres. La réception des
