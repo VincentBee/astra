@@ -3892,6 +3892,10 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   escale avec l'énergie de la planète (`refuel`) ; si le trajet suivant ne tient pas dans le
   réservoir, la navette s'arrête et le journal le dit (pas de panne en route).
 - Écarté : remplir d'abord la première ressource cochée (une seule ressource partirait).
+- Attention (signalé au router, non tranché) : « sans réserve » vaut aussi pour la nourriture.
+  Cochée sur une planète d'humains ou d'aliens, la navette peut vider A jusqu'à la famine (vu
+  dans le vrai jeu : 903 de nourriture presque vidés en deux passages). La case est cochée par
+  défaut si A en a.
 - Qui : router (soutes pleines, sans réserve, attente), Claude (parts égales). Source : session
   `e722e02e`. Statut : en vigueur.
 
@@ -3900,7 +3904,10 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   qui tourne sans fin aurait rempli B au-delà de son entrepôt.
 - Choix : la flotte pose ce qui rentre sous le plafond de l'entrepôt de B. Le reste reste dans
   les soutes ; elle attend sur B (« entrepôt plein ») et repart dès que la place revient
-  (consommation, entrepôt agrandi). Rien n'est perdu.
+  (consommation, entrepôt agrandi). Rien n'est perdu. En attente, elle ne pose qu'un vrai lot
+  (100 au moins, ou tout son reste) : sinon une planète qui consomme lui ferait poser une unité,
+  et écrire une entrée au journal d'ordres, à chaque passage. Une livraison (`trips`) compte
+  quand les soutes sont vides.
 - Écarté : tout poser au-delà du plafond (B n'accumulerait plus rien d'autre, `advance`) ;
   jeter le surplus (perte) ; repartir vers A chargée (allers-retours pour rien).
 - Qui : Claude (par défaut). Source : session `e722e02e`. Statut : en vigueur.

@@ -582,7 +582,7 @@ Tout aboutit au **seul commit `1eeb2c1`** (23:14:27), poussé sur `main`.
 
 | Heure | Session | Demande | Ce qui a été fait | Commit | Décision |
 |---|---|---|---|---|---|
-| 23:15 | `e722e02e` (worker-navettes) | Router, demande de Vincent : « je voudrais aussi qu'il soit possible d'automatiser les aller retour de transporter entre deux planetes pour transferer des ressources » | Ordre de flotte « Navette » : `Session.shuttleFleet`, escales enchaînées à leur heure au retour d'une absence, arrêts avec leur ligne au journal, nettoyage des fiches ; bouton et fenêtre dans la fiche de la flotte, indicateur (état, case, trait sur la carte) ; `tests/navette.test.mjs` (8 scénarios) ; essayé dans le vrai jeu ; `FORMAT` 12, cache v131 | (PR à venir) | D-540 à D-548 |
+| 23:15 | `e722e02e` (worker-navettes) | Router, demande de Vincent : « je voudrais aussi qu'il soit possible d'automatiser les aller retour de transporter entre deux planetes pour transferer des ressources » | Ordre de flotte « Navette » : `Session.shuttleFleet`, escales enchaînées à leur heure au retour d'une absence, arrêts avec leur ligne au journal, nettoyage des fiches ; bouton et fenêtre dans la fiche de la flotte, indicateur (état, case, trait sur la carte) ; `tests/navette.test.mjs` (9 scénarios) ; essayé dans le vrai jeu ; `FORMAT` 12, cache v131 | (PR à venir) | D-540 à D-548 |
 
 ### Travaux en cours au 2026-10-29
 

@@ -564,9 +564,12 @@ ce qu'on l'arrête. Pas de transport dans les deux sens (D-540).
   (`shuttleTake`, `js/fleet.js`, D-543). Rien à charger et soutes vides : elle attend sur A
   (`wait: 'a'`). Soutes déjà chargées : elle part quand même vers B.
 - **Escale sur B** : elle pose ce qui rentre dans l'entrepôt de B (plafond `prod.caps` de
-  `stateAt`, `shuttleGive`) ; `trips` + 1, `sent` augmente. Ce qui ne rentre pas reste dans les
-  soutes, et elle attend sur B (`wait: 'b'`) qu'il y ait de la place (D-544). Rien n'est perdu
-  ni créé : la somme A + B + soutes ne change pas (test `navette.test.mjs`).
+  `stateAt`, `shuttleGive`) ; `sent` augmente, et `trips` + 1 quand les soutes sont vides (un
+  reste posé plus tard ne compte pas une livraison de plus). Ce qui ne rentre pas reste dans les
+  soutes, et elle attend sur B (`wait: 'b'`) qu'il y ait de la place (D-544) : en attente, elle
+  ne pose qu'un vrai lot (`SHUTTLE_MIN_DROP` = 100, ou tout son reste), pas une unité à chaque
+  passage. Rien n'est perdu ni créé : la somme A + B + soutes ne change pas (test
+  `navette.test.mjs`).
 - **Carburant** : à chaque escale, plein avec l'énergie de la planète (`refuel`), puis le
   trajet suivant s'il tient dans le réservoir ; sinon la navette s'arrête (« pas assez d'énergie
   sur … pour le plein »), sans tomber en panne en route.
@@ -596,9 +599,10 @@ ce qu'on l'arrête. Pas de transport dans les deux sens (D-540).
   différentes, ressources du sol, `go` 'a' ou 'b', compteurs bornés) ; une navette abîmée tombe,
   la flotte reste. Que A et B soient à moi se vérifie à chaque escale.
 - **IA** : les IA ne font pas de navettes (D-548).
-- Tests : `tests/navette.test.mjs` (8 scénarios : allers-retours et somme conservée, longue
+- Tests : `tests/navette.test.mjs` (9 scénarios : allers-retours et somme conservée, longue
   absence, entrepôt de B plein, arrêt par un autre ordre, planète perdue et plus de cargo,
-  combat, navettes refusées et nettoyées, rejeu fidèle).
+  attaquée (la flotte survit), navette agressive qui combat, navettes refusées et nettoyées,
+  rejeu fidèle). Les deux arrêts au combat sont contrôlés par mutation.
 
 ### 8.6 Détection
 

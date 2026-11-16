@@ -89,6 +89,8 @@ const RAID_COOLDOWN_MS = (2 * 60_000) / TEMPO;
 const MAX_EFFECTS = 300;
 /** Escales d'une navette traitées en un passage, au plus (rattrapage après une absence, D-545). */
 const SHUTTLE_MAX_STOPS = 2000;
+/** Ce qu'une navette qui attend la place sur B y pose au moins d'un coup (sauf son dernier reste, D-544). */
+const SHUTTLE_MIN_DROP = 100;
 /** Entrées gardées dans mon carnet (combats et planètes perdues, sur ce téléphone seulement). */
 const JOURNAL_MAX = 100;
 /** Pas (ms) auquel on regarde si le froid atteint une flotte en vol (D-163). */
@@ -3086,13 +3088,16 @@ export class Session {
         const s = stateAt(B.planet, Math.max(t, B.planet.at || 0));
         const give = shuttleGive(s.stock, s.prod.caps, f.cargo);
         const put = SOIL.reduce((x, r) => x + give[r], 0);
-        if (!put) return pause('b'); // entrepôt plein : elle attend sur B, chargée
+        // Entrepôt plein : elle attend sur B, chargée. En attente, elle ne pose qu'un vrai lot
+        // (SHUTTLE_MIN_DROP, ou tout le reste) : pas une unité à chaque passage (D-544).
+        if (!put || (o.wait === 'b' && put < Math.min(held, SHUTTLE_MIN_DROP))) return pause('b');
         settle(B.planet, t);
         for (const r of SOIL) B.planet.stock[r] = (B.planet.stock[r] || 0) + give[r];
         f.cargo = Object.fromEntries(SOIL.map((r) => [r, (f.cargo?.[r] || 0) - give[r]]));
         const sent = { ...(o.sent || {}) };
         for (const r of SOIL) if (give[r]) sent[r] = (sent[r] || 0) + give[r];
-        f.order = { ...o, trips: (o.trips || 0) + 1, sent };
+        // Une livraison compte quand les soutes sont vides : un reste posé plus tard n'en fait pas une autre.
+        f.order = { ...o, trips: (o.trips || 0) + (put === held ? 1 : 0), sent };
         delete f.order.wait;
         if (put < held) {
           f.order.wait = 'b'; // une partie ne rentre pas : elle attend la place, avec le reste

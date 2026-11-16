@@ -132,6 +132,15 @@ scenario('navette, longue absence : l’entrepôt de B se remplit, le reste atte
   assert.ok(after.c > 0 && after.c <= fleet.fleetCargo('machine', f.ships), 'le reste dans les soutes, sans les dépasser');
   assert.ok(after.a >= 0);
   assert.ok(Math.abs(after.total - before.total) < 1e-6, 'rien de perdu');
+  // 100 + 800 (une livraison complète), puis 100 posés sur 800 : ce reste n'est pas une livraison de plus.
+  assert.equal(f.order.trips, 1, 'une seule livraison complète');
+  assert.equal(f.order.sent.minerals, 900);
+  // Un peu de place (moins d'un lot) : elle attend encore, sans écrire au journal d'ordres.
+  const n = P(A).orders.length;
+  col.stock.minerals = cap - 40;
+  A.tick();
+  assert.equal(A.myFleet(id).order.wait, 'b');
+  assert.equal(P(A).orders.length, n, 'pas une entrée par passage pour 40 de place');
   // B consomme de nouveau de la place : elle décharge et repart.
   col.stock.minerals = 0;
   A.tick();
@@ -183,15 +192,15 @@ scenario('navette : une planète perdue ou une flotte sans cargo l’arrête', (
   assert.ok(g.A.state.log.some((l) => l.text.includes('plus aucun cargo')));
 });
 
-scenario('navette : un combat l’arrête', (film) => {
-  const { A, clock, sync, players: [, H], id, home, B } = setup({ n: 2 });
+scenario('navette : un combat l’arrête (attaquée, la flotte survit et finit son trajet sans navette)', (film) => {
+  const { A, clock, sync, players: [, H], id, home, B } = setup({ n: 2, ships: { cargo: 6 } });
   assert.ok(A.shuttleFleet(id, home, B, ['minerals']));
-  // H (humains) envoie des chasseurs agressifs sur le chemin de la navette.
+  // H (humains) envoie une seule frégate sur la navette : six cargos (72 de coque) y survivent.
   const hp = P(H);
-  hp.planet.ships = { fighter: 6 };
+  hp.planet.ships = { fighter: 1 };
   hp.planet.stock = { ...hp.planet.stock, energy: 5000 };
   H.touch();
-  const hid = H.takeOff('home', { fighter: 6 }, {}, 200);
+  const hid = H.takeOff('home', { fighter: 1 }, {}, 40);
   Object.assign(H.myFleet(hid), { from: { ...home }, to: { ...home } });
   H.touch();
   sync(H, A);
@@ -204,9 +213,32 @@ scenario('navette : un combat l’arrête', (film) => {
     A.tick();
     sync(H, A);
   }
-  film.look(A, 'H attaque la navette : elle s’arrête (ou la flotte est détruite)', [{ show: 'navette', at: [A, id], expected: 'arrêtée', got: A.myFleet(id)?.order ? 'en cours' : 'arrêtée', ok: !A.myFleet(id)?.order }]);
-  assert.ok(!A.myFleet(id)?.order, 'plus de navette');
-  assert.ok(A.state.log.some((l) => /navette .* s’arrête : attaquée par/.test(l.text)) || !A.myFleet(id), 'au journal');
+  const f = A.myFleet(id);
+  film.look(A, 'H attaque la navette avec une frégate : la flotte survit, la navette s’arrête', [
+    { show: 'flotte', at: [A, id], expected: 'là', got: f ? 'là' : 'détruite' },
+    { show: 'navette', at: [A, id], expected: 'arrêtée', got: f?.order ? 'en cours' : 'arrêtée', ok: !!f && !f.order },
+  ]);
+  assert.ok(f, 'la flotte survit');
+  assert.equal(f.order, null, 'plus de navette');
+  assert.ok(A.state.log.some((l) => /navette .* s’arrête : attaquée par J1/.test(l.text)), 'au journal');
+});
+
+scenario('navette : une navette agressive et armée qui livre combat s’arrête aussi', (film) => {
+  const { A, sync, players: [, H], id, home, B } = setup({ n: 2, ships: { cargo: 2, fighter: 2 } });
+  // Un cargo de H attend sur la planète mère de A, là où passe la navette.
+  const hp = P(H);
+  hp.planet.ships = { cargo: 1 };
+  hp.planet.stock = { ...hp.planet.stock, energy: 5000 };
+  H.touch();
+  const hid = H.takeOff('home', { cargo: 1 }, {}, 10);
+  Object.assign(H.myFleet(hid), { from: { ...home }, to: { ...home } });
+  H.touch();
+  sync(A, H);
+  assert.ok(A.shuttleFleet(id, home, B, ['minerals']));
+  assert.ok(A.setFleetStance(id, 'aggressive'), 'agressive : elle combat le cargo de H à son contact');
+  film.look(A, 'la navette armée devient agressive : elle combat, la navette s’arrête', [{ show: 'navette', at: [A, id], expected: 'arrêtée', got: A.myFleet(id)?.order ? 'en cours' : 'arrêtée', ok: !A.myFleet(id)?.order }]);
+  assert.equal(A.myFleet(id).order, null);
+  assert.ok(A.state.log.some((l) => /navette .* s’arrête : combat contre J1/.test(l.text)));
 });
 
 scenario('navette invalide : refusée (planète d’un autre, ressource inconnue, pas de cargo), ou nettoyée à la lecture', (film) => {
@@ -268,7 +300,7 @@ scenario('navette : le rejeu des journaux redonne la même fiche (escales, atten
   clock.t += 30 * MIN; // une absence
   A.tick(); // un seul passage au retour : tous les voyages de l'absence
   const trips = A.myFleet(id).order.trips;
-  assert.ok(trips >= t0 + 3, `voyages pendant l'absence : ${t0} → ${trips}`);
+  assert.ok(trips >= t0 + 2, `voyages pendant l'absence : ${t0} → ${trips}`);
   run(A, clock, () => false, 1000, 30);
   assert.ok(A.stopFleet(id));
   run(A, clock, () => false, 1000, 30);
@@ -278,10 +310,10 @@ scenario('navette : le rejeu des journaux redonne la même fiche (escales, atten
   assert.equal(replayable(state).ok, true);
   const r = replay(state);
   film.look(A, 'la copie de A rejouée : même fiche', [
-    { show: 'livraisons avant l’arrêt', expected: 'au moins 3', got: trips, ok: trips >= 3 },
+    { show: 'livraisons avant l’arrêt', expected: 'au moins 4', got: trips, ok: trips >= 4 },
     { show: 'fiche rejouée à l’identique', expected: true, got: r.faithful[A.me] },
   ]);
-  assert.ok(trips >= 3, `livraisons : ${trips}`);
+  assert.ok(trips >= 4, `livraisons : ${trips}`);
   assert.equal(comparable(r.players[A.me]), comparable(state.players[A.me]));
   assert.equal(r.faithful[A.me], true);
   assert.ok(r.log.some((l) => l.text.includes('fait la navette')));
