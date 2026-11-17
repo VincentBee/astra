@@ -5,6 +5,7 @@ import { mapPlanets } from '../carte/map-planets.js';
 import { etat } from '../etat.js';
 import { DRY } from '../outils/dry.js';
 import { cellName } from './cell-name.js';
+import { shuttleText } from './navette/shuttle-text.js';
 
 /** Ce que fait une flotte : « Attaque → Kepler », « En orbite de Kepler », « Stationne en [4:7] ». */
 export function fleetStatus(race, f, now) {
@@ -17,6 +18,7 @@ export function fleetStatus(race, f, now) {
     const foe = etat.session.state.players[f.order.pid];
     return `Poursuite d’une flotte ${foe ? de(foe.name) : 'ennemie'}`;
   }
+  if (f.order?.kind === 'shuttle') return shuttleText(f, now);
   const hawk = aggressive(f) ? ' · agressive' : '';
   if (moving(f, now)) return `${f.order ? ORDERS[f.order.kind]?.name || 'Ordre' : 'Déplacement'} → ${where}${hawk}`;
   return `${mapPlanets().some((w) => sameCell(w, f.to)) ? `En orbite ${de(where)}` : `Stationne en ${where}`}${hawk}`;

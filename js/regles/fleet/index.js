@@ -41,6 +41,15 @@ export { setShips } from './deplacement/set-ships.js';
 export { fuelNeed } from './deplacement/fuel-need.js';
 export { refuel } from './deplacement/refuel.js';
 
+// ----- Navette (D-550) --------------------------------------------------------
+//
+// Une flotte en navette charge sur ma planète A, décharge sur ma planète B,
+// revient à vide, et recommence. Ces deux fonctions disent seulement quoi
+// prendre et quoi poser ; c'est la session qui déplace les ressources.
+
+export { shuttleTake } from './navette/shuttle-take.js';
+export { shuttleGive } from './navette/shuttle-give.js';
+
 // ----- Entre mes flottes ----------------------------------------------------
 //
 // Deux de mes flottes arrêtées sur la même case peuvent s'échanger

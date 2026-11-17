@@ -45,6 +45,7 @@ export const etat = {
   openKey: 'home', // planète ouverte : « home » ou l'identifiant d'une colonie
   mapFrame: null,
   selected: null, // planète touchée sur la carte : { x, y }
+  shuttleSheet: null, // flotte pour laquelle la fenêtre Navette est ouverte (D-556)
   selFleet: null, // id d'une de mes flottes, sélectionnée pour la piloter
   // Menu posé sur la carte, au doigt (D-126) : le choix d'un ordre, ou de l'objet visé quand
   // plusieurs sont sous le doigt. { at: { x, y } en cases, cell, foe, title, items: [{ label, primary, run }] }

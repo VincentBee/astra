@@ -17,10 +17,11 @@ export function joinFleet(id, intoId) {
   if (this.locked(id) || this.locked(intoId)) return false;
   const now = this.now();
   if (together(f, g, now)) return this.mergeFleets(id, intoId);
+  const was = this.shuttlesOf([f]);
   const err = moveTo(f, p.race, techOf(p), { ...g.to }, { kind: 'join', fleet: g.id }, now);
   if (err) return this.refuse(err);
   if (f.stranded) this.ontoast?.('Pas assez de carburant : la flotte tombera en panne en route.');
-  this.touch(this.addLog(`Une flotte ${de(p.name)} part rejoindre une autre de ses flottes en [${g.to.x}:${g.to.y}].`));
+  this.touch(this.quitShuttles(p, was, this.addLog(`Une flotte ${de(p.name)} part rejoindre une autre de ses flottes en [${g.to.x}:${g.to.y}].`)));
   this.changed();
   return true;
 }

@@ -39,15 +39,15 @@ corrigés, pour garder les fichiers identiques octet pour octet (D-544).
 | `js/reseau/rendezvous/` | `js/rendezvous.js` | 8 | — (état : `etat.js`) | reseau |
 | `js/reseau/save/` | `js/save.js` | 40 | alerte, historique, identite, partie, stockage | reseau |
 | `js/reseau/tablock/` | `js/tablock.js` | 4 | — | reseau |
-| `js/session/` | `js/session.js` | 226 | constantes, fiches, horloge, methodes (18 thèmes), outils, textes | reseau + regles |
+| `js/session/` | `js/session.js` | 237 | constantes, fiches, horloge, methodes (19 thèmes, dont `navette`, D-550), outils, textes | reseau + regles |
 | `js/regles/game/` | `js/game.js` | 100 | carte, climat, construction, economie, outils, plan, planete, pouvoirs, races, ressources, score, temps | regles |
 | `js/regles/tech/` | `js/tech.js` | 16 | — | regles |
-| `js/regles/fleet/` | `js/fleet.js` | 37 | caracteristiques, combat, deplacement, entre-flottes, ordres | regles |
+| `js/regles/fleet/` | `js/fleet.js` | 39 | caracteristiques, combat, deplacement, entre-flottes, navette, ordres | regles |
 | `js/regles/trade/` | `js/trade.js` | 15 | — | regles |
 | `js/regles/report/` | `js/report.js` | 17 | — | regles |
 | `js/regles/replay/` | `js/replay.js` | 10 | — | regles |
 | `js/ia/bot/` | `js/bot.js` | 47 | cerveau, colonisation, donnees, flottes, hote, lien, planetes | regles §20 |
-| `js/interface/app/` | `js/app.js` | 270 | accueil, alertes, carte, depart, echanges, fenetres, flotte, invitation, journal, lecture, outils, partie, planete, race, rejoindre, retour (état : `etat.js`, 36 clés) | interface |
+| `js/interface/app/` | `js/app.js` | 282 | accueil, alertes, carte, depart, echanges, fenetres, flotte, invitation, journal, lecture, outils, partie, planete, race, rejoindre, retour (état : `etat.js`, 36 clés) | interface |
 | `js/interface/aim/` | `js/aim.js` | 9 | — | interface |
 | `js/interface/back/` | `js/back.js` | 3 | — | interface |
 | `js/interface/finish/` | `js/finish.js` | 3 | — | interface |

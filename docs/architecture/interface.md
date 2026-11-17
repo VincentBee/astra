@@ -129,6 +129,7 @@ HTML, cette règle ne tient plus : il faudra une pile d'ouverture.
 | `#sheet-invite` (219-248) | **Inviter un joueur** | QR de l'invitation + copier/partager ; scanner ou coller la réponse. | `openInviteSheet` 297-312, `useAnswer` 341-363, fermeture → `session.cancelInvite()` 328-331. |
 | `#sheet-fleet` (251-275) | **Décoller** (onglet Flottes) | Nombre de vaisseaux, cargaison, carburant ; calcule soutes, vitesse (et le vaisseau le plus lent, qui la fixe), réservoir, portée. | `openFleetSheet` 1147-1165, `updateFleetSheet` 1167-1180, `btn-fleet-go` 1185-1196. |
 | `#sheet-move` (278-295) | « Donner » (`#fi-beside`) ou **Scinder** | Vaisseaux, cargaison, carburant à passer à une autre flotte ou à une nouvelle. La fenêtre garde l'identifiant de sa flotte (`moveSheet.from`) et n'agit que sur elle ; si cette flotte (ou celle qui reçoit) disparaît, elle se ferme avec « Cette flotte n'existe plus. » (`refreshMoveSheet`, appelé par `renderFleetInfo` ; D-350). | `openMoveSheet`, `refreshMoveSheet`, `btn-move-go` (~2836-2890). |
+| `#sheet-shuttle` | Bouton **Navette** (`#btn-fi-shuttle`) de la fiche de la flotte | Charger sur / Livrer à (mes planètes), ressources ; Lancer, Changer, Arrêter la navette (D-556, §21). | `openShuttleSheet`, `btn-shuttle-go`, `btn-shuttle-stop`. |
 | `#sheet-trade` (298-315) | Bouton échange d'un joueur sur la même case | « Je donne » / « Je demande ». | `openTradeSheet` 1746-1757, `btn-trade-go` 1768-1774. |
 
 ### 3.3 Couches fixes
@@ -660,3 +661,34 @@ Ajouts de la session `26f178b9` (D-083 à D-096). Les règles sont dans [regles.
   montre pas (non confirmé sur un vrai téléphone).
 - Vérifié dans Chrome (390 × 844) par `tests/back-browser.mjs` (Playwright, hors
   `node --test`) ; la règle seule dans `tests/back.test.mjs`.
+
+## 21. Navette entre deux planètes (2026-11-16, D-556)
+
+- **Bouton** `#btn-fi-shuttle` (icône `shuttle`, deux planètes et une boucle, `js/icons.js`) dans
+  la fiche de la flotte (`#fleet-info`), après « Scinder ». Visible si la flotte a au moins un
+  cargo et que j'ai au moins deux planètes, ou si elle fait déjà la navette ; bleu plein
+  (`primary`, `aria-pressed="true"`) pendant la navette (`renderFleetInfo`).
+- **Fenêtre** `#sheet-shuttle` (`openShuttleSheet`) : texte d'aide, deux listes **Charger sur**
+  (`#shuttle-a`) et **Livrer à** (`#shuttle-b`) avec mes planètes (valeur `x:y`), cases à cocher
+  des ressources du sol de ma race (`#shuttle-res`, `shuttleRes` : les machines n'ont pas de
+  nourriture). Par défaut : A = la planète où la flotte attend (sinon celle d'où elle vient),
+  B = une autre ; cochées : les ressources que A a en stock (toutes s'il n'a rien,
+  `shuttleDefaults`, refait quand on change A). Bouton **Lancer la navette** →
+  `session.shuttleFleet`. Navette en cours : réglages actuels, ligne d'état (`#shuttle-now`),
+  **Changer la navette** et **Arrêter la navette** (`#btn-shuttle-stop`, `shuttleFleet(id)`).
+  Échap et le fond ferment la fenêtre (`.close-btn`, §3.2).
+- **Fichiers** (D-540) : `js/interface/app/flotte/navette/` (fenêtre, textes, `branchements/`), `js/interface/app/carte/visee/draw-shuttles.js` ; l'id de la flotte de la fenêtre est `etat.shuttleSheet`.
+- **Indicateur** :
+  - état de la flotte (`fleetStatus` → `shuttleText`) : « Navette Mira → Lyra · vers Lyra,
+    chargée · 1 livraison », « retour vers Mira », « attend sur Mira : rien à charger »,
+    « attend sur Lyra : entrepôt plein » ; dans la fiche de la flotte et sur sa case sous la
+    carte ;
+  - case de la flotte sous la carte (`renderMapFleets`) : classe `.mf.shuttle` (bord gauche
+    bleu ciel `#6ad1f5`) et l'icône `shuttle` devant son nom ;
+  - carte (`drawShuttles`, juste après `drawRange`) : un trait pointillé bleu ciel entre A et B,
+    qui avance vers B, avec une pointe vers B ; plus marqué pour la flotte sélectionnée.
+- Vérifié dans le vrai jeu (Chromium, 375 × 812, serveur de test `node tests/ui/server.mjs`,
+  2026-11-16) : réglage depuis la fiche de la flotte, deux livraisons, indicateur, réglage changé
+  en route sans demi-tour, arrêt. La partie (planète mère, colonie, cargos) a été préparée par la
+  console (`window.astra.session`) pour ne pas attendre la construction.
+

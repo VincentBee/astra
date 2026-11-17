@@ -12,6 +12,11 @@ import { lootText } from '../../textes/loot-text.js';
  * `onward` : ma flotte (agressive) garde ensuite son trajet et son ordre.
  */
 export function fight(p, f, enemy, target, now, onward = false) {
+  // Un combat arrête la navette (D-552) ; la flotte finit son trajet et attend en orbite.
+  if (f.order?.kind === 'shuttle') {
+    this.endShuttle(p, f, `combat contre ${enemy.name}`);
+    f.order = null;
+  }
   // Combat dans le passé : le prochain passage cherche les autres rencontres à partir de là.
   if (now < (this.scanAt ?? Infinity)) this.scanAt = now;
   const res = battle({ race: p.race, ships: f.ships, tech: techOf(p) }, { race: enemy.race, ships: target.ships, tech: enemy.planet?.tech || {} });

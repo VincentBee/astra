@@ -15,6 +15,7 @@ import { fleetSpots } from './selection/fleet-spots.js';
 import { aimRead } from './visee/aim-read.js';
 import { drawAim } from './visee/draw-aim.js';
 import { drawRange } from './visee/draw-range.js';
+import { drawShuttles } from './visee/draw-shuttles.js';
 import { zoom } from './zoom/zoom.js';
 import { drawAutoMark } from '../alertes/draw-auto-mark.js';
 
@@ -142,6 +143,7 @@ export function drawMap() {
   // Flottes : un petit triangle qui glisse le long de son trajet, ou qui attend en orbite.
   const now = etat.session.now();
   drawRange(ctx, cell, now);
+  drawShuttles(ctx, cell, now);
   const aim = aimRead(now); // flotte traînée vers sa cible (D-126)
   const foe = etat.menu?.foe || aim?.foe; // flotte ennemie visée : cercle rouge
   for (const spot of fleetSpots(now)) {

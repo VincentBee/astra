@@ -10,10 +10,11 @@ export function splitFleet(id, part) {
   if (this.locked(id)) return false;
   if (moving(f, now)) return this.refuse('La flotte doit être arrêtée pour se scinder.');
   if (p.fleets.length >= MAX_FLEETS) return this.refuse(`Pas plus de ${MAX_FLEETS} flottes.`);
+  const was = this.shuttlesOf([f]);
   const res = split(f, p.race, part, this.newId(6), now);
   if (res.error) return this.refuse(res.error);
   p.fleets.push(res.fleet);
-  this.touch();
+  this.touch(this.quitShuttles(p, was, null, 'flotte scindée'));
   this.changed();
   return res.fleet.id;
 }

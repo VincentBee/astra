@@ -32,6 +32,11 @@ export function fleetHit(p, other, e, now) {
       text: destroyed ? `Ta flotte est détruite par ${other.name}.` : `${other.name} attaque ta flotte.`,
     });
   const pts = this.scoreOf(p); // points d'avant le combat : ce qui départage s'il est éliminé
+  // Attaquée : la navette s'arrête (D-552), la flotte finit son trajet et attend en orbite.
+  if (f.order?.kind === 'shuttle') {
+    this.endShuttle(p, f, `attaquée par ${other.name}`);
+    f.order = null;
+  }
   if (!applyLosses(f, p.race, techOf(p), ships, e.take, now)) {
     p.fleets = p.fleets.filter((x) => x.id !== f.id);
     this.addLog(`Une flotte ${de(p.name)} est détruite par ${other.name}.`);

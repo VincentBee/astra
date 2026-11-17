@@ -151,6 +151,14 @@ import { transferFleet } from './methodes/flottes/transfer-fleet.js';
 import { mergeFleets } from './methodes/flottes/merge-fleets.js';
 import { joinFleet } from './methodes/flottes/join-fleet.js';
 import { splitFleet } from './methodes/flottes/split-fleet.js';
+import { shuttlePlanet } from './methodes/navette/shuttle-planet.js';
+import { shuttleFleet } from './methodes/navette/shuttle-fleet.js';
+import { endShuttle } from './methodes/navette/end-shuttle.js';
+import { shuttlesOf } from './methodes/navette/shuttles-of.js';
+import { quitShuttles } from './methodes/navette/quit-shuttles.js';
+import { offerHolds } from './methodes/navette/offer-holds.js';
+import { shuttle } from './methodes/navette/shuttle.js';
+import { shuttleStop } from './methodes/navette/shuttle-stop.js';
 import { returnFleet } from './methodes/flottes/return-fleet.js';
 import { refuse } from './methodes/journal/refuse.js';
 import { power } from './methodes/chantiers/power.js';
@@ -370,6 +378,14 @@ Object.defineProperties(Session.prototype, {
   transferFleet: { value: transferFleet, writable: true, configurable: true },
   mergeFleets: { value: mergeFleets, writable: true, configurable: true },
   joinFleet: { value: joinFleet, writable: true, configurable: true },
+  shuttlePlanet: { value: shuttlePlanet, writable: true, configurable: true },
+  shuttleFleet: { value: shuttleFleet, writable: true, configurable: true },
+  endShuttle: { value: endShuttle, writable: true, configurable: true },
+  shuttlesOf: { value: shuttlesOf, writable: true, configurable: true },
+  quitShuttles: { value: quitShuttles, writable: true, configurable: true },
+  offerHolds: { value: offerHolds, writable: true, configurable: true },
+  shuttle: { value: shuttle, writable: true, configurable: true },
+  shuttleStop: { value: shuttleStop, writable: true, configurable: true },
   splitFleet: { value: splitFleet, writable: true, configurable: true },
   returnFleet: { value: returnFleet, writable: true, configurable: true },
   refuse: { value: refuse, writable: true, configurable: true },

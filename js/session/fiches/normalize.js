@@ -6,6 +6,7 @@ import { isCell } from './is-cell.js';
 import { isObj } from './is-obj.js';
 import { planetOk } from './planet-ok.js';
 import { upgradeFleet } from './upgrade-fleet.js';
+import { cleanShuttle } from './clean-shuttle.js';
 
 /**
  * Fiche d'un joueur au format actuel. Avant les races, les planètes
@@ -33,6 +34,7 @@ export function normalize(p) {
   if (!Array.isArray(p.fleets)) p.fleets = [];
   p.fleets = p.fleets.filter((f) => isObj(f) && isCell(f.from) && isCell(f.to) && isObj(f.ships));
   p.fleets.forEach(upgradeFleet);
+  p.fleets.forEach(cleanShuttle);
   if (!Array.isArray(p.effects)) p.effects = [];
   p.effects = p.effects.filter((e) => isObj(e) && typeof e.to === 'string' && typeof e.id === 'string').map(cleanEffect);
   if (!Array.isArray(p.applied)) p.applied = [];

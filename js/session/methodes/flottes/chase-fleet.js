@@ -17,8 +17,9 @@ export function chaseFleet(id, pid, targetId) {
   // que je vois est l'état d'avant le combat, et rejouer le combat compterait les pertes deux fois.
   const pendingHit = (p.effects || []).some((e) => e.to === pid && [target.id, ...(target.absorbed || [])].includes(e.fleet) && !enemy.applied?.includes(e.id));
   if (pendingHit) return this.refuse(`Combat déjà livré : en attente du rapport de ${enemy.name}.`);
-  f.order = { kind: 'chase', pid, fleet: target.id, seen: null };
   this.tickLogs = []; // un combat immédiat écrit au journal : ses entrées partent avec ma fiche
+  this.endShuttle(p, f, 'nouvel ordre'); // la poursuite remplace la navette (D-552)
+  f.order = { kind: 'chase', pid, fleet: target.id, seen: null };
   this.pursue(p, f, this.now());
   if (f.order) this.addLog(`La flotte ${de(p.name)} prend en chasse une flotte ${de(enemy.name)}.`, { pid: this.me, fleet: f.id }); // D-210
   const logs = this.tickLogs;

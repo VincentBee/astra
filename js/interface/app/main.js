@@ -167,6 +167,12 @@ import './echanges/branchements/a-cote.js';
 import './echanges/branchements/separer.js';
 import './echanges/branchements/transfert-fermer.js';
 import './echanges/branchements/transferer.js';
+// Navette (D-556) : réglée depuis la fiche de la flotte
+import './flotte/navette/branchements/ouvrir.js';
+import './flotte/navette/branchements/fermer.js';
+import './flotte/navette/branchements/changer-a.js';
+import './flotte/navette/branchements/lancer.js';
+import './flotte/navette/branchements/arreter.js';
 import './depart/branchements/pret.js';
 import './depart/branchements/ma-flotte.js';
 import './depart/branchements/inviter.js';

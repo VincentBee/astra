@@ -438,6 +438,11 @@ button.danger { color: var(--danger); border-color: color-mix(in srgb, var(--dan
 .mf-status { color: var(--muted); font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mf.hot { border-left-color: #ff7a93; }
 .mf.dry { opacity: 0.55; }
+.mf.shuttle { border-left-color: #6ad1f5; } /* navette en cours (D-540) */
+.mf.shuttle .mf-top .ic { color: #6ad1f5; }
+.shuttle-res { display: flex; gap: 16px; flex-wrap: wrap; }
+.shuttle-res label { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; }
+.shuttle-res input { width: auto; padding: 0; }
 .mf[aria-pressed='true'] { border-color: var(--text); background: var(--panel-2); }
 /* Case d'une de mes planètes (D-115) : boutons Construire et Décoller en bas ; cadre fin partout, sans bord gauche coloré (D-301). */
 .mf.mp { border-left: 1px solid var(--line); }

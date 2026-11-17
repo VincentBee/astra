@@ -70,7 +70,7 @@ Créée par `addPlayer` (`js/session.js:696-713`), complétée par `normalize`
 | `id`, `name`, `color`, `secretHash` | identité | `js/session.js:701-706` |
 | `rank` | heure d'arrivée (ordre d'arrivée) | `js/session.js:704` |
 | `actAt` | heure de la dernière modification (la plus récente gagne) | `js/session.js:712`, `touch` `js/session.js:586` |
-| `v` | version du format (`FORMAT = 7`) | `js/session.js:41`, `js/session.js:587` |
+| `v` | version du format (`FORMAT = 13` depuis D-557 ; ce tableau date de `FORMAT = 7`) | `js/session.js:41`, `js/session.js:587` |
 | `race` | `human`, `machine` ou `alien` ; définitive dès que la partie part (avant, une IA peut en changer, D-400) | `chooseRace` |
 | `left` | heure à laquelle le joueur a quitté la partie avant le départ (IA retirée du lobby, D-399) ; absent sinon | `Session.leave` |
 | `ready` | heure à laquelle le joueur s'est dit prêt (D-120) ; absent tant qu'il ne l'est pas | `Session.ready` |
@@ -129,7 +129,8 @@ dedans, 40 au plus, `js/fleet.js:275`).
 - `fuel` est le carburant **au départ du segment** ; le carburant à un instant se calcule
   (`fuelAt`, `js/fleet.js:73-77`).
 - `order` : ce qui s'applique à l'arrivée : `dock`, `colonize`, `attack`, ou `chase`
-  (poursuite) (`ORDERS`, `js/fleet.js:29-34`) ; `null` = simple déplacement.
+  (poursuite) (`ORDERS`, `js/fleet.js:29-34`) ; `null` = simple déplacement. `join` (D-159) et
+  `shuttle` (navette, §8.7, D-550) restent sur la flotte d'une arrivée à l'autre.
 
 ### 3.5 Une entrée du journal d'ordres
 
@@ -583,6 +584,80 @@ Sinon `moveTo` vers `intoId.to` (la case où l'autre attend, ou celle où elle v
 Pas de nouveau `FORMAT` : un téléphone d'avant affiche « Ordre » pour un ordre qu'il ne connaît
 pas (`ORDERS[kind]?.name || 'Ordre'`) et n'exécute jamais les ordres des flottes des autres.
 
+### 8.7 Navette (2026-11-16, D-550 à D-558)
+
+Une flotte avec au moins un cargo fait seule des allers-retours entre deux de mes planètes : elle
+charge sur A les ressources choisies, les pose sur B, revient à vide, et recommence, jusqu'à
+ce qu'on l'arrête. Pas de transport dans les deux sens (D-550).
+
+- **Ordre** : `Session.shuttleFleet(id, a, b, res)` (dans `ORDER_KINDS`, donc au journal
+  d'ordres et rejoué). `a`, `b` : deux **cases** de mes planètes (mère ou colonies), pas des clés
+  (« home » change de planète, D-360). `res` : minéraux et/ou nourriture (`SOIL`) ; l'énergie ne
+  voyage pas en soute (c'est le carburant). Refus : planète qui n'est pas à moi ou gelée, A = B,
+  ressource inconnue ou aucune, **pas de cargo** (tous les vaisseaux ont un peu de soute ; il
+  faut au moins un `cargo`, D-551), réservoirs trop petits pour aller de A à B, pas assez de
+  carburant pour rejoindre A. `shuttleFleet(id)` sans `a` : arrête la navette, la flotte finit
+  son trajet et attend en orbite. Une navette réglée autrement en route vers A ou B garde son
+  trajet (pas de demi-tour).
+- **Forme** (`f.order`) : `{ kind: 'shuttle', a, b, res, go, trips, sent, wait? }`. `go` : l'escale
+  visée (`'a'` ou `'b'`) ; `trips`, `sent` : livraisons faites et quantités livrées (pour
+  l'affichage) ; `wait` : elle attend sur A (`'a'`, rien à charger) ou sur B (`'b'`, entrepôt
+  plein). L'ordre reste sur la flotte, comme une jonction qui attend (§8.5).
+- **Départ** : arrêtée sur A (ou B), l'escale se fait tout de suite (son trajet devient immobile
+  à l'heure de l'ordre, `freeze`, pour ne pas dater une escale d'avant l'ordre). Ailleurs, elle
+  part vers A (`moveTo`).
+- **Escale sur A** (`shuttleStop`) : elle charge autant que ses soutes le permettent, sans rien
+  laisser des ressources choisies, en parts égales tant qu'il en reste de chaque
+  (`shuttleTake`, `js/fleet.js`, D-553). Rien à charger et soutes vides : elle attend sur A
+  (`wait: 'a'`) ; en attente, elle ne repart qu'avec un vrai lot (`SHUTTLE_MIN_DROP` = 100, ou
+  des soutes pleines). Soutes déjà chargées : elle part quand même vers B. Le plein se fait
+  **avant** de charger : si le trajet vers B ne tient pas, rien n'est pris sur A.
+- **Escale sur B** : elle pose ce qui rentre dans l'entrepôt de B (plafond `prod.caps` de
+  `stateAt`, `shuttleGive`) ; `sent` augmente, et `trips` + 1 quand les soutes sont vides (un
+  reste posé plus tard ne compte pas une livraison de plus). Ce qui ne rentre pas reste dans les
+  soutes, et elle attend sur B (`wait: 'b'`) qu'il y ait de la place (D-554) : en attente, elle
+  ne pose qu'un vrai lot (`SHUTTLE_MIN_DROP` = 100, ou tout son reste), pas une unité à chaque
+  passage. Rien n'est perdu ni créé : la somme A + B + soutes ne change pas (test
+  `navette.test.mjs`).
+- **Carburant** : à chaque escale, plein avec l'énergie de la planète (`refuel`, sur A avant de charger), puis le
+  trajet suivant s'il tient dans le réservoir ; sinon la navette s'arrête (« pas assez d'énergie
+  sur … pour le plein »), sans tomber en panne en route.
+- **Arrêts** (D-552), chacun avec sa ligne au journal partagé (« La navette de X entre A et B
+  s'arrête : … ») et un message : un autre ordre (`moveFleet`, `returnFleet`, `stopFleet`,
+  `chaseFleet`, `joinFleet`, `mergeFleets`, `transferFleet`, `splitFleet` : `shuttlesOf` avant,
+  `quitShuttles` après ; une autre flotte qui la rejoint et s'y fond à l'arrivée, `arrive`) ; un combat (`fight` : elle attaque ; `fleetHit` : elle est attaquée ;
+  elle finit alors son trajet et attend en orbite) ; une des deux planètes perdue ou gelée ;
+  plus aucun cargo ; pas assez d'énergie pour le plein ; l'arrêt demandé. Un échange en cours
+  la retient (`offerHolds`) : elle reprend après la réponse. La navette n'écrit **pas** une
+  ligne par trajet (40 lignes au plus au journal partagé) : seulement son départ et son arrêt.
+- **Rattrapage** (D-555) : `tick` appelle `shuttle(p, f, now)` pour une flotte en navette (à la
+  place d'`arrive`) : les escales dues s'enchaînent dans le même passage, **chacune à son
+  heure** (`f.arrive` ; ou `now` si la flotte attendait déjà), 2 000 au plus par passage
+  (`SHUTTLE_MAX_STOPS`, la suite au passage suivant). Après deux heures d'absence, un seul
+  passage fait tous les voyages dus. Attendre ne touche pas la fiche (le stock se lit avec
+  `stateAt`, sans `settle`) : un passage sans changement n'est pas noté au journal d'ordres, et
+  le rejeu ne le refait pas. Limites connues : si la planète a déjà été réglée à `now` dans ce
+  passage (chantier fini…), une escale passée lit son stock d'aujourd'hui (`settle` ne recule
+  pas) ; une attente sur A ou B reprend à l'heure du passage, pas à l'instant exact où la place
+  ou le stock sont revenus ; les trajets enchaînés pendant une absence ne sont visibles que de
+  moi : une flotte ennemie ne peut croiser que le dernier.
+- **Les autres téléphones** n'exécutent jamais mes ordres ; ils voient `Navette` (`ORDERS`).
+  `FORMAT` passe à 13 (D-557 ; 12 : achat automatique, D-531) : un téléphone d'avant, qui ne connaît pas `shuttle`, effacerait
+  l'ordre en le prenant pour une arrivée ; il est prié de recharger.
+- **Fiches reçues** (§14.3) : `normalize` → `cleanShuttle` garde la forme seulement (deux cases
+  différentes, ressources du sol, `go` 'a' ou 'b', compteurs bornés) ; une navette abîmée tombe,
+  la flotte reste. Que A et B soient à moi se vérifie à chaque escale.
+- **IA** : les IA ne font pas de navettes (D-558).
+- **Fichiers** (code en petits fichiers, D-540) : `js/regles/fleet/navette/` (`shuttleTake`,
+  `shuttleGive`), `js/session/methodes/navette/` (`shuttleFleet`, `shuttleStop`, `shuttle`,
+  `endShuttle`, `shuttlesOf`, `quitShuttles`, `offerHolds`, `shuttlePlanet`),
+  `js/session/constantes/shuttle-max-stops.js`, `shuttle-min-drop.js`,
+  `js/session/fiches/clean-shuttle.js`.
+- Tests : `tests/navette.test.mjs` (10 scénarios, dont un pour les points de la revue de la PR #209 : allers-retours et somme conservée, longue
+  absence, entrepôt de B plein, arrêt par un autre ordre, planète perdue et plus de cargo,
+  attaquée (la flotte survit), navette agressive qui combat, navettes refusées et nettoyées,
+  rejeu fidèle). Les deux arrêts au combat sont contrôlés par mutation.
+
 ### 8.6 Détection
 
 - Portée de base : 3 cases autour d'une planète, 2 autour d'une flotte (`SIGHT`,
@@ -1006,6 +1081,10 @@ Fonctions pures dans `js/trade.js`, application dans `js/session.js:1199-1428`.
   ≥ 0. L'économie se garde aussi elle-même : `flows` et `advance` lisent un stock non fini
   comme 0, `extract` ne rend jamais une quantité négative. Rien ne change pour un nombre
   valide : une partie normale garde exactement ses résultats.
+- Ordre de navette d'une fiche reçue ou relue (D-550) : `cleanShuttle` (dans `normalize`) garde
+  deux cases différentes, des ressources du sol, `go` 'a' ou 'b', des compteurs ≥ 0 ; sinon
+  l'ordre tombe et la flotte reste où elle est. Nettoyer deux fois ne change rien (le rejeu
+  compare des fiches normalisées). Que A et B soient bien à moi se vérifie à chaque escale.
 
 ## 15. Constantes d'équilibrage : où les changer
 

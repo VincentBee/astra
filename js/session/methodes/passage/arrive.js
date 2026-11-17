@@ -34,11 +34,18 @@ export function arrive(p, f) {
       return true;
     }
 
+    if (order.kind === 'shuttle') {
+      f.order = order; // la navette garde son ordre : ses escales passent par shuttle() (D-550)
+      return this.shuttle(p, f, now);
+    }
+
     if (order.kind === 'join') {
       // La flotte à rejoindre, ou celle qui l'a absorbée entre-temps.
       const g = (p.fleets || []).find((x) => x !== f && (x.id === order.fleet || x.absorbed?.includes(order.fleet)));
       if (g && together(f, g, now) && !this.locked(g.id) && !this.locked(f.id)) {
+        const was = this.shuttlesOf([g]); // une navette rejointe s'arrête, et le journal le dit (D-552)
         merge(f, g, p.race, now);
+        this.quitShuttles(p, was, null, 'flottes fusionnées');
         drop();
         this.addLog(`Une flotte ${de(p.name)} en rejoint une autre en [${g.to.x}:${g.to.y}] : elles fusionnent.`);
         return true;

@@ -111,6 +111,10 @@ export function tick() {
       }
       if (this.engage(p, f, now, from)) changed = true;
       if (!p.fleets.includes(f)) continue; // détruite dans ce combat
+      if (f.order?.kind === 'shuttle') {
+        if (this.shuttle(p, f, now)) changed = true; // ses escales dues, chacune à son heure (D-555)
+        continue;
+      }
       if (f.order && !moving(f, now) && this.arrive(p, f)) changed = true;
     }
     if (this.freezeFleets(p, now, true)) changed = true; // celles restées en orbite après leur arrivée

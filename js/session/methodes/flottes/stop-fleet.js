@@ -7,9 +7,10 @@ export function stopFleet(id) {
   const p = this.state.players[this.me];
   const f = this.myFleet(id);
   if (!f || this.locked(id)) return false;
+  const was = this.shuttlesOf([f]);
   const err = stopAt(f, p.race, techOf(p), this.now());
   if (err) return this.refuse(err);
-  this.touch();
+  this.touch(this.quitShuttles(p, was, null, 'flotte arrêtée'));
   this.changed();
   return true;
 }

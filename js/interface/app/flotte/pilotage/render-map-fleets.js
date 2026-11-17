@@ -55,8 +55,9 @@ export function renderMapFleets(me = etat.session?.state?.players[etat.session.m
     .map((f) => {
       const hot = ['attack', 'conquer', 'chase'].includes(f.order?.kind);
       const dry = fuelAt(f, me.race, now) < DRY;
-      return `<button class="mf${hot ? ' hot' : ''}${dry ? ' dry' : ''}" data-fleet="${esc(f.id)}">
-        <span class="mf-top"><strong>${esc(fleetName(f))}</strong><span class="mf-clock"></span></span>
+      const shuttle = f.order?.kind === 'shuttle'; // navette en cours (D-556) : son icône et sa couleur
+      return `<button class="mf${hot ? ' hot' : ''}${dry ? ' dry' : ''}${shuttle ? ' shuttle' : ''}" data-fleet="${esc(f.id)}">
+        <span class="mf-top"><strong>${shuttle ? ic('shuttle') : ''}${esc(fleetName(f))}</strong><span class="mf-clock"></span></span>
         <span class="mf-ships">${shipIcons(f.ships)}</span>
         <span class="mf-status">${esc(fleetStatus(me.race, f, now))}</span></button>`;
     })

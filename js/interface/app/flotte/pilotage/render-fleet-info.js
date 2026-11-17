@@ -47,6 +47,12 @@ export function renderFleetInfo(me = etat.session?.state?.players[etat.session.m
   $('btn-fi-return').hidden = !!mine && here.key === 'home'; // déjà chez elle
   $('btn-fi-refuel').hidden = !mine || fuel >= tank - 0.5;
   $('btn-fi-split').hidden = go || countShips(f.ships) < 2;
+  // Navette (D-556) : au moins un cargo et deux planètes ; allumé quand elle tourne.
+  const shuttling = f.order?.kind === 'shuttle';
+  const shuttle = $('btn-fi-shuttle');
+  shuttle.hidden = !shuttling && !(f.ships.cargo > 0 && etat.session.planetsOf(me).length >= 2);
+  shuttle.className = `${shuttling ? 'primary' : 'secondary'} small icon-only`;
+  shuttle.setAttribute('aria-pressed', String(shuttling));
   const hawk = aggressive(f);
   const stance = $('btn-fi-stance');
   stance.hidden = !hawk && !armed(me.race, f.ships, me.planet?.tech);

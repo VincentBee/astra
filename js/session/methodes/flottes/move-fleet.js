@@ -36,13 +36,14 @@ export function moveFleet(id, cell, kind = 'move') {
     if (!p.home && w.kind && w.kind !== 'planet') return this.refuse(`${w.name} est trop petit pour une planète mère : vise une planète.`);
     order = { kind, world: w.id };
   }
+  const was = this.shuttlesOf([f]);
   const err = moveTo(f, p.race, techOf(p), cell, order, this.now());
   if (err) return this.refuse(err);
   if (f.stranded) this.ontoast?.('Pas assez de carburant : la flotte tombera en panne en route.');
   // Au journal, seulement les ordres qui comptent : les simples déplacements le noieraient.
   const who = here && live && here.owner.id !== this.me ? ` (${here.owner.name})` : ''; // hors de vue, pas de nom (D-190)
   // Marquée de la flotte : la cible ne la lit que si elle voit la flotte (D-210, `showsLog`).
-  this.touch(order ? this.addLog(`La flotte ${de(p.name)} ${ORDERS[order.kind].verb} ${here ? here.name : w.name}${who}.`, { pid: this.me, fleet: f.id }) : null);
+  this.touch(this.quitShuttles(p, was, order ? this.addLog(`La flotte ${de(p.name)} ${ORDERS[order.kind].verb} ${here ? here.name : w.name}${who}.`, { pid: this.me, fleet: f.id }) : null));
   this.changed();
   return true;
 }

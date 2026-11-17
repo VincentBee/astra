@@ -12,5 +12,7 @@
  *     avec un seul colonisateur qui fonde la planète mère.
  * 10 : recherches et lots de vaisseaux dans le fil d'attente (`plan`, D-158).
  * 11 : heure commune et resynchronisation d'une fiche (`clockFix`, D-165, D-166).
+ * 12 : achat automatique de vaisseaux (`planet.auto`, D-530).
+ * 13 : navette entre deux de mes planètes (ordre `shuttle` gardé sur la flotte, D-550, D-557).
  */
-export const FORMAT = 12; // 12 : achat automatique `planet.auto` (D-530)
+export const FORMAT = 13;
