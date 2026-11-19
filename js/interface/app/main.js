@@ -138,6 +138,8 @@ import './carte/fiche/branchements/voir-planete.js';
 import './carte/zoom/branchements/plus.js';
 import './carte/zoom/branchements/moins.js';
 import './carte/zoom/branchements/tout-voir.js';
+import './carte/zoom/branchements/incliner.js';
+import './carte/zoom/branchements/inclinaison-retenue.js';
 import './carte/zoom/branchements/doigt-pose.js';
 import './carte/zoom/branchements/doigt-glisse.js';
 import './carte/zoom/branchements/doigt-leve.js';

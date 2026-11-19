@@ -13,7 +13,7 @@ export function aimRead(now) {
   if (!a?.started || !a.at || !etat.session.myFleet(a.id)) return null;
   const from = fleetSpots(now).find((s) => s.p.id === etat.session.me && s.f.id === a.id);
   if (!from) return null;
-  const t = readTap(mapItems(now), a.at, cellCss(), a.id, true);
+  const t = readTap(mapItems(now), a.at, cellCss(a.at), a.id, true);
   const it = t.kind === 'one' ? t.it : null;
   const items = t.kind === 'many' ? [] : actionsFor(a.id, it, a.at);
   const back = Math.hypot(from.x - a.at.x, from.y - a.at.y) < 0.5 && !it;

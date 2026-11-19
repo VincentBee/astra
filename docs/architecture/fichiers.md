@@ -47,7 +47,7 @@ corrigés, pour garder les fichiers identiques octet pour octet (D-544).
 | `js/regles/report/` | `js/report.js` | 17 | — | regles |
 | `js/regles/replay/` | `js/replay.js` | 10 | — | regles |
 | `js/ia/bot/` | `js/bot.js` | 47 | cerveau, colonisation, donnees, flottes, hote, lien, planetes | regles §20 |
-| `js/interface/app/` | `js/app.js` | 282 | accueil, alertes, carte, depart, echanges, fenetres, flotte, invitation, journal, lecture, outils, partie, planete, race, rejoindre, retour (état : `etat.js`, 36 clés) | interface |
+| `js/interface/app/` | `js/app.js` | 301 (dont `carte/bassin/`, la carte en 3D, D-559) | accueil, alertes, carte, depart, echanges, fenetres, flotte, invitation, journal, lecture, outils, partie, planete, race, rejoindre, retour (état : `etat.js`, 36 clés) | interface |
 | `js/interface/aim/` | `js/aim.js` | 9 | — | interface |
 | `js/interface/back/` | `js/back.js` | 3 | — | interface |
 | `js/interface/finish/` | `js/finish.js` | 3 | — | interface |

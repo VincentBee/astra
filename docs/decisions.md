@@ -4237,3 +4237,62 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
 - 2026-11-16 23:15 UTC. Choix : `js/bot.js` ne change pas ; une IA ne règle jamais de navette.
 - Qui : router. Source : session `e722e02e`. Statut : en vigueur.
 
+
+**D-559 — La carte en 3D : un petit bassin peu profond, en Canvas 2D**
+- 2026-11-19 ~20:45 UTC (approchée). Contexte : Vincent veut « de la 3D » sur la carte, « comme un petit
+  bassin peu profond dans lequel on voit les planètes en 3D et des petits vaisseaux se
+  déplacer », sans changer les règles : le jeu reste sur un plan, seul l'affichage change.
+- Choix : le même `canvas#map` en Canvas 2D, avec une projection en perspective écrite à la
+  main (`js/interface/app/carte/bassin/`, `makeView`) : caméra inclinée d'environ 32°, fond du
+  bassin 0,5 case sous le plan du jeu, rebord et face avant, planètes en boules éclairées par le
+  soleil avec leur anneau penché, petits vaisseaux à deux pans qui volent un peu au-dessus du
+  plan (réacteur allumé en route), ombres sur le fond, objets dessinés du fond vers l'avant. Le
+  canvas passe de carré à 50 / 41 (hauteur 0,82 × largeur) : le bassin vu de biais est moins
+  haut que large, la carte garde toute la largeur. Planètes un peu plus grosses à l'écran
+  (rayon 0,28 case au lieu de 0,26 ; libres 0,22 au lieu de 0,2), vaisseaux un peu plus grands :
+  affichage seulement, l'aimant du toucher (D-126) ne change pas.
+- Écarté : WebGL avec three.js (≈ 600 ko de plus à charger sur un téléphone, une deuxième façon
+  de dessiner à maintenir, et tout le toucher à refaire par lancer de rayons) ; WebGL écrit à la
+  main (beaucoup de code pour des boules et des triangles) ; une vue « isométrique » sans
+  perspective (moins l'effet de bassin) ; incliner le canvas en CSS (`rotateX`) (texte et
+  boules écrasés, toucher faux).
+- Qui : Claude (par défaut ; l'effet demandé vient de Vincent). Source : session `012yisg3`.
+  Statut : en vigueur.
+
+**D-560 — Le toucher passe par la projection inverse, sur le plan du jeu**
+- 2026-11-19 ~20:45 UTC (approchée). Choix : le plan du jeu est à la hauteur du rebord (h = 0) : le centre des
+  planètes y est posé, et un toucher est ramené sur ce plan (`unproj`), puis en cases comme avant.
+  La taille d'une case varie avec la perspective : l'aimant reçoit celle de l'endroit touché
+  (`cellCss(at)`), la portée du doigt reste 18 px à l'écran. Glisser et pincer gardent sous le
+  doigt le point du plan qu'il touchait. Le menu au doigt et les repères des rapports de test
+  (D-146, D-147) sont posés par la projection. Les vaisseaux volent 0,22 case au-dessus du
+  plan : à l'écran, 1 à 2 px plus haut que leur point de toucher à zoom 1, sans effet sensible.
+- Écarté : toucher le fond du bassin (les planètes ne seraient plus sous le doigt) ; viser en
+  pixels d'écran plutôt qu'en cases (il faudrait réécrire `js/interface/aim/` et ses tests).
+- Qui : Claude (par défaut). Source : session `012yisg3`. Statut : en vigueur.
+
+**D-561 — Le replay reste en 2D**
+- 2026-11-19 ~20:45 UTC (approchée). Choix : la 3D ne touche que la carte du jeu (`index.html`) ;
+  `replay.html` garde sa carte plate (`js/interface/replay-view/dessin/draw-map.js`) et
+  `drawSun` (`js/interface/sky/`) ne change pas. La demande parlait de « la page de la map ».
+- Écarté : passer aussi le replay en 3D maintenant (à faire si Vincent le demande).
+- Qui : Claude (par défaut). Source : session `012yisg3`. Statut : en vigueur.
+
+**D-562 — On peut incliner la vue de la carte en 3D**
+- 2026-11-19 ~21:35 UTC. Contexte : Vincent, après la carte en 3D (D-559) : « Il faut qu'on
+  puisse incliner la vue ».
+- Choix : l'inclinaison de la caméra devient un réglage (`zoom.t`, en radians depuis la
+  verticale), de 0 (vue de dessus) à 1 (~57°), 0,55 au départ. Trois façons : **deux doigts
+  côte à côte qui montent ou descendent ensemble** (vers le haut : plus penchée), comme sur une
+  carte de téléphone ; le geste à deux doigts se décide à son premier mouvement (côte à côte,
+  surtout vertical, écart presque constant → incliner ; sinon pincer et glisser comme avant) ;
+  **Maj + molette** à l'ordinateur ; un **bouton « Incliner »** sous les boutons de zoom, qui
+  passe d'un cran à l'autre (de biais 0,55 → très penché 1 → de dessus 0). L'inclinaison est
+  retenue sur le téléphone (`localStorage['astra.tilt']`), pas dans la partie. La projection
+  reste exacte à toute inclinaison (le toucher aussi) ; presque de dessus, la vue tient dans la
+  hauteur du canvas au lieu de sa largeur.
+- Écarté : au-delà de 1 rad, les cases du fond deviennent trop petites pour le doigt ; tourner
+  la carte autour de la verticale (pas demandé, et le nord de la carte sert de repère à tous les
+  joueurs) ; un curseur (prend de la place sur la carte).
+- Qui : Vincent (incliner) ; Claude (gestes, bornes, crans, mémoire par téléphone). Source :
+  session `012yisg3`. Statut : en vigueur.

@@ -7,7 +7,7 @@ import { orderAt } from './order-at.js';
 /** On lâche la flotte traînée : même règle qu'un toucher, sans choisir une autre de mes flottes. */
 export function dropFleet(fid, at) {
   if (!etat.session?.state || !etat.session.myFleet(fid)) return;
-  const px = cellCss();
+  const px = cellCss(at);
   const items = mapItems();
   const t = readTap(items, at, px, fid, true);
   // Lâchée sur elle-même (plus près d'elle que de toute cible) : rien, elle reste sélectionnée.

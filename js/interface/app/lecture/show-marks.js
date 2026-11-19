@@ -1,6 +1,5 @@
 import { fleetSpots } from '../carte/selection/fleet-spots.js';
-import { cellCss } from '../carte/zoom/cell-css.js';
-import { zoom } from '../carte/zoom/zoom.js';
+import { mapView } from '../carte/bassin/map-view.js';
 import { etat } from '../etat.js';
 import { $ } from '../outils/dollar.js';
 import { esc } from '../outils/esc.js';
@@ -26,16 +25,17 @@ export function showMarks(snap) {
   // Après la mise en page : la taille du canvas donne celle des cases.
   requestAnimationFrame(() => {
     const canvas = $('map');
-    const size = cellCss();
+    const view = mapView(); // carte en perspective (D-559)
     const place = (el, x, y) => {
-      el.style.left = `${canvas.offsetLeft + (x + 0.5 - zoom.x) * size}px`;
-      el.style.top = `${canvas.offsetTop + (y + 0.5 - zoom.y) * size}px`;
+      const pt = view.pt(x + 0.5, y + 0.5, 0);
+      el.style.left = `${canvas.offsetLeft + pt.x}px`;
+      el.style.top = `${canvas.offsetTop + pt.y}px`;
       box.append(el);
     };
     if (f) {
       const el = document.createElement('div');
       el.className = 'view-finger';
-      el.style.width = el.style.height = `${2 * f.r * size}px`;
+      el.style.width = el.style.height = `${2 * f.r * view.pt(f.x + 0.5, f.y + 0.5, 0).s}px`;
       // Portée sans le minimum (MIN_REACH), plus petite : un cercle plein dedans.
       const raw = f.raw < f.r ? `<i style="width:${(100 * f.raw) / f.r}%;height:${(100 * f.raw) / f.r}%"></i>` : '';
       el.innerHTML = `${raw}<span>${esc(f.text)}</span>`;
