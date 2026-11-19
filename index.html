@@ -135,6 +135,7 @@
           <button id="btn-zoom-in" class="secondary small icon-only" title="Zoomer" aria-label="Zoomer"><i data-ic="plus"></i></button>
           <button id="btn-zoom-out" class="secondary small icon-only" title="Dézoomer" aria-label="Dézoomer"><i data-ic="minus"></i></button>
           <button id="btn-zoom-fit" class="secondary small icon-only" title="Voir toute la carte" aria-label="Voir toute la carte" hidden><i data-ic="fit"></i></button>
+          <button id="btn-tilt" hidden class="secondary small icon-only" title="Incliner la vue (ou deux doigts vers le haut / le bas)" aria-label="Incliner la vue"><i data-ic="tilt"></i></button>
         </div>
         <!-- Menu au doigt (D-126) : choisir l'ordre, ou l'objet visé quand plusieurs sont sous le doigt -->
         <div id="map-menu" class="map-menu" role="menu" aria-label="Que faire ici ?" hidden></div>
@@ -295,6 +296,10 @@
           <option value="aucun">Sans étoiles (le plus économe)</option>
         </select>
       </label>
+      <!-- Carte en 3D, en option (D-563) : son code ne se télécharge que si la case est cochée -->
+      <label class="check" for="relief"><input type="checkbox" id="relief"> Carte en 3D</label>
+      <p class="hint">Visuels en plus : la carte en petit bassin, planètes en relief, vaisseaux qui volent, vue inclinable. Téléchargés seulement si tu coches (environ 16 ko).</p>
+      <p id="relief-note" class="hint" hidden></p>
     </div>
   </div>
 

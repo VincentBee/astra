@@ -47,7 +47,7 @@ corrigés, pour garder les fichiers identiques octet pour octet (D-544).
 | `js/regles/report/` | `js/report.js` | 17 | — | regles |
 | `js/regles/replay/` | `js/replay.js` | 10 | — | regles |
 | `js/ia/bot/` | `js/bot.js` | 47 | cerveau, colonisation, donnees, flottes, hote, lien, planetes | regles §20 |
-| `js/interface/app/` | `js/app.js` | 282 | accueil, alertes, carte, depart, echanges, fenetres, flotte, invitation, journal, lecture, outils, partie, planete, race, rejoindre, retour (état : `etat.js`, 36 clés) | interface |
+| `js/interface/app/` | `js/app.js` | 320 (dont `carte/bassin/`, la carte en 3D en option, D-559, D-563, et `carte/relief/`, son chargement à la demande) | accueil, alertes, carte, depart, echanges, fenetres, flotte, invitation, journal, lecture, outils, partie, planete, race, rejoindre, retour (état : `etat.js`, 36 clés) | interface |
 | `js/interface/aim/` | `js/aim.js` | 9 | — | interface |
 | `js/interface/back/` | `js/back.js` | 3 | — | interface |
 | `js/interface/finish/` | `js/finish.js` | 3 | — | interface |
@@ -107,6 +107,9 @@ téléphones, `node build.mjs` (esbuild, seule dépendance, en devDependency) fa
 | `vendor/jsQR.js`, `vendor/trystero-nostr.mjs` | copiés : chargés à la demande (`qrcode.mjs` est assemblé) |
 | `manifest.json`, `icons/` | copiés |
 | `sw.js` | le `sw.js` des sources, avec `FILES` (les fichiers de `dist/`) et `VERSION` (empreinte) |
+| `js/bassin-3d.js` (+ `.map`) | la carte en 3D (D-563), assemblée à part depuis `js/interface/app/carte/bassin/index.js` (`ADDONS` de `build.mjs`) : téléchargée seulement si « Carte en 3D » est cochée, **pas** dans `FILES` |
+
+Le chemin du module à part dans `new URL('../bassin/index.js', import.meta.url)` (`carte/relief/load-relief.js`) est réécrit en `./bassin-3d.js`. Ce module n'importe aucun module du jeu qui a un état (il aurait ses propres copies) : le jeu les lui donne (`installDeps`, D-563).
 
 Les chemins vers `vendor/` lus au moment voulu (`new URL('…', import.meta.url)`, `import()`)
 sont réécrits pour viser le même fichier depuis `dist/js/`, et le build échoue si l'un d'eux ne

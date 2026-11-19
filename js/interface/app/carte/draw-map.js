@@ -17,6 +17,7 @@ import { drawAim } from './visee/draw-aim.js';
 import { drawRange } from './visee/draw-range.js';
 import { drawShuttles } from './visee/draw-shuttles.js';
 import { zoom } from './zoom/zoom.js';
+import { reliefOn } from './relief/relief-on.js';
 import { drawAutoMark } from '../alertes/draw-auto-mark.js';
 
 export function drawMap() {
@@ -25,9 +26,16 @@ export function drawMap() {
   // L'image suivante est demandée tout de suite : une erreur dans celle-ci ne fige pas la carte.
   etat.mapFrame = requestAnimationFrame(drawMap);
   const canvas = $('map');
+  // Carte en 3D cochée dans les Réglages et téléchargée (D-563) : c'est elle qui dessine.
+  const relief3d = reliefOn();
+  if (canvas.classList.contains('bassin') !== !!relief3d) {
+    canvas.classList.toggle('bassin', !!relief3d);
+    $('btn-tilt').hidden = !relief3d;
+  }
+  if (relief3d) return relief3d.drawMap3d();
   const dpr = Math.min(3, window.devicePixelRatio || 1);
   const css = canvas.clientWidth;
-  if (canvas.width !== Math.round(css * dpr)) canvas.width = canvas.height = Math.round(css * dpr);
+  if (canvas.width !== Math.round(css * dpr) || canvas.height !== canvas.width) canvas.width = canvas.height = Math.round(css * dpr);
   const W0 = canvas.width;
   // Zoom (D-117) : les cases grandissent, et le dessin se décale jusqu'au coin de la partie vue.
   const cell = (W0 * zoom.z) / UNIVERSE.w;

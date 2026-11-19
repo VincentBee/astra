@@ -30,11 +30,19 @@ export const PAGES = [
   { html: 'technologies.html', entry: 'js/interface/techtree/main.js', out: 'js/technologies.js' },
 ];
 
+/**
+ * Modules chargés à la demande, assemblés chacun à part (D-563) : le jeu de base ne les contient
+ * pas, et ils ne sont pas dans le cache hors ligne de départ (le service worker les garde au
+ * passage, une fois téléchargés). Le jeu les vise par `new URL('…', import.meta.url)` depuis le
+ * fichier source : le chemin est réécrit vers `out`, à côté de js/index.js.
+ */
+export const ADDONS = [{ entry: 'js/interface/app/carte/bassin/index.js', out: 'js/bassin-3d.js' }];
+
 /** Copiés tels quels (chargés à la demande, ou pas du JS). */
 const COPY = ['manifest.json', 'icons', 'vendor/jsQR.js', 'vendor/jsQR.LICENSE', 'vendor/trystero-nostr.mjs', 'vendor/README.txt', '.nojekyll'];
 
 /** Dans dist/ mais pas dans le cache hors ligne : utiles au débogage ou au dépôt, pas au jeu. */
-const notCached = (f) => f === 'sw.js' || f.endsWith('.map') || f === '.nojekyll' || f.startsWith('vendor/') && !/\.(m?js)$/.test(f);
+const notCached = (f) => f === 'sw.js' || f.endsWith('.map') || f === '.nojekyll' || f.startsWith('vendor/') && !/\.(m?js)$/.test(f) || ADDONS.some((a) => f === a.out);
 
 // Un chemin relatif vers vendor/ lu par le navigateur au moment voulu (`new URL('../../../vendor/jsQR.js',
 // import.meta.url)`, `import('../../../vendor/trystero-nostr.mjs')`) est relatif au fichier source.
@@ -50,8 +58,14 @@ const vendorPaths = {
     b.onLoad({ filter: /[\\/]js[\\/].*\.js$/ }, async (args) => {
       const src = await readFile(args.path, 'utf8');
       const same = (up, rest) => resolve(dirname(args.path), up + rest) === join(root, rest);
-      const code = src.replace(/(['"`])((?:\.\.?\/)+)(vendor\/[\w.-]+)(['"]?)/g, (m, q, up, rest, close, at) => {
-        const before = src.slice(Math.max(0, at - 40), at);
+      // Un module à part (ADDONS, D-563) visé par `new URL('…', import.meta.url)` : vers son fichier assemblé.
+      const addon = (rel) => ADDONS.find((a) => resolve(dirname(args.path), rel) === join(root, a.entry));
+      const near = src.replace(/(new URL\(\s*)(['"])((?:\.\.?\/)+[\w./-]+)\2(\s*,\s*import\.meta\.url)/g, (m, open, q, rel, rest) => {
+        const a = addon(rel);
+        return a ? `${open}${q}./${posix.relative('js', a.out)}${q}${rest}` : m;
+      });
+      const code = near.replace(/(['"`])((?:\.\.?\/)+)(vendor\/[\w.-]+)(['"]?)/g, (m, q, up, rest, close, at) => {
+        const before = near.slice(Math.max(0, at - 40), at);
         if (/\b(from|import)\s*$/.test(before) || !same(up, rest)) return m; // import statique, ou autre chose
         if (/new URL\(\s*$/.test(before)) return `${q}../${rest}${close}`;
         const url = `new URL('../${rest}', import.meta.url).href`;
@@ -102,6 +116,24 @@ export async function build({ out = join(root, 'dist'), quiet = false } = {}) {
     logLevel: quiet ? 'error' : 'warning',
     plugins: [vendorPaths],
   });
+
+  // 1 bis. Les modules à part (ADDONS) : un fichier chacun, mêmes réglages.
+  for (const a of ADDONS) {
+    await esbuild.build({
+      absWorkingDir: root,
+      entryPoints: { [a.out.replace(/\.js$/, '')]: a.entry },
+      outdir: out,
+      bundle: true,
+      format: 'esm',
+      minify: true,
+      sourcemap: 'linked',
+      target: 'es2022',
+      charset: 'utf8',
+      legalComments: 'eof',
+      logLevel: quiet ? 'error' : 'warning',
+      plugins: [vendorPaths],
+    });
+  }
 
   // 2. Le style, minifié.
   await esbuild.build({ absWorkingDir: root, entryPoints: ['style.css'], outfile: join(out, 'style.css'), bundle: true, minify: true, charset: 'utf8', logLevel: quiet ? 'error' : 'warning' });

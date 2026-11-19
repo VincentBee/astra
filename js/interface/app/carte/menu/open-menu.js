@@ -3,8 +3,7 @@ import { ic } from '../../../icons/index.js';
 import { etat } from '../../etat.js';
 import { $ } from '../../outils/dollar.js';
 import { esc } from '../../outils/esc.js';
-import { cellCss } from '../zoom/cell-css.js';
-import { zoom } from '../zoom/zoom.js';
+import { mapView } from '../relief/map-view.js';
 import { closeMenu } from './close-menu.js';
 
 /** Ouvre le menu au doigt, sur la carte, à côté du point `at` (en cases). */
@@ -18,9 +17,9 @@ export function openMenu(at, items, { title = '', cell = null, fleet = null, foe
   box.hidden = false;
   const canvas = $('map');
   const wrap = box.parentElement;
-  const size = cellCss();
-  const sx = canvas.offsetLeft + (at.x + 0.5 - zoom.x) * size;
-  const sy = canvas.offsetTop + (at.y + 0.5 - zoom.y) * size;
+  const pt = mapView().pt(at.x + 0.5, at.y + 0.5, 0); // carte en perspective (D-559)
+  const sx = canvas.offsetLeft + pt.x;
+  const sy = canvas.offsetTop + pt.y;
   const pos = menuPlace(sx, sy, box.offsetWidth, box.offsetHeight, wrap.clientWidth, wrap.clientHeight);
   box.style.left = `${pos.x}px`;
   box.style.top = `${pos.y}px`;

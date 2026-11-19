@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, posix } from 'node:path';
 import vm from 'node:vm';
 import { builtDist } from './dist.mjs';
+import { ADDONS } from '../build.mjs';
 
 const sources = join(dirname(fileURLToPath(import.meta.url)), '..');
 const { out: root } = await builtDist();
@@ -80,7 +81,9 @@ function reached(root) {
 
 test('FILES contient chaque fichier demandé par index.html, replay.html et technologies.html', () => {
   const files = new Set(swFiles());
-  const missing = [...reached(root)].filter(([f]) => !files.has(f)).map(([f, by]) => `${f} (demandé par ${by})`);
+  // Sauf les modules à part (ADDONS, D-563) : téléchargés seulement si on les demande (test plus bas).
+  const optional = new Set(ADDONS.map((a) => a.out));
+  const missing = [...reached(root)].filter(([f]) => !files.has(f) && !optional.has(f)).map(([f, by]) => `${f} (demandé par ${by})`);
   assert.deepEqual(missing, [], 'fichiers absents du cache hors ligne');
 });
 
@@ -103,4 +106,14 @@ test('les bibliothèques chargées à la demande (jsQR, Trystero) sont dans FILE
 test('sources : chaque fichier demandé depuis les trois pages existe (pas d’import cassé)', () => {
   const absent = [...reached(sources)].filter(([f]) => !existsSync(join(sources, f))).map(([f, by]) => `${f} (demandé par ${by})`);
   assert.deepEqual(absent, []);
+});
+
+test('la carte en 3D (D-563) : à part, demandée par le jeu, mais pas dans le cache hors ligne de départ', () => {
+  const files = swFiles();
+  const seen = reached(root);
+  for (const a of ADDONS) {
+    assert.ok(existsSync(join(root, a.out)), `${a.out} existe dans dist/`);
+    assert.ok(seen.has(a.out), `${a.out} est bien visé par le jeu`);
+    assert.ok(!files.includes(a.out), `${a.out} ne doit pas être téléchargé à l'installation (option non cochée)`);
+  }
 });

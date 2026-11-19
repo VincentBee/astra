@@ -27,7 +27,7 @@ $('map').addEventListener('click', (e) => {
   if (etat.menu) return closeMenu(); // toucher à côté du menu le ferme, sans rien faire d'autre
   const at = toCells(e.clientX, e.clientY);
   const fid = etat.selFleet && etat.session.myFleet(etat.selFleet) ? etat.selFleet : null;
-  const t = readTap(mapItems(), at, cellCss(), fid);
+  const t = readTap(mapItems(), at, cellCss(at), fid);
   if (t.kind === 'many') {
     if (!fid) return openMenu(at, t.list.flatMap((it) => actionsFor(null, it, at)), { title: 'Lequel ?' });
     return orderAt(fid, t, at);
