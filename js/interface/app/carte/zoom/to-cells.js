@@ -1,5 +1,5 @@
 import { $ } from '../../outils/dollar.js';
-import { mapView } from '../bassin/map-view.js';
+import { mapView } from '../relief/map-view.js';
 
 // Doigts et souris : un doigt glisse la vue (si elle est zoomée), deux doigts pincent.
 // Un geste qui a bougé n'est pas un toucher : le clic qui suit est ignoré.

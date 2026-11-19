@@ -3,6 +3,7 @@ import { $ } from '../../../outils/dollar.js';
 import { closeMenu } from '../../menu/close-menu.js';
 import { selectFleet } from '../../selection/select-fleet.js';
 import { gesture } from '../gesture.js';
+import { reliefOn } from '../../relief/relief-on.js';
 import { panBy } from '../pan-by.js';
 import { setTilt } from '../set-tilt.js';
 import { toCells } from '../to-cells.js';
@@ -39,13 +40,13 @@ $('map').addEventListener('pointermove', (e) => {
     const other = pts.find((q) => q !== p);
     const before = Math.hypot(p.x - other.x, p.y - other.y);
     const after = Math.hypot(e.clientX - other.x, e.clientY - other.y);
-    // Deux doigts côte à côte qui montent ou descendent ensemble : on incline la vue (D-562).
+    // Carte en 3D : deux doigts côte à côte qui montent ou descendent ensemble inclinent la vue (D-562).
     if (!gesture.two) {
       const dx = e.clientX - p.x;
       const dy = e.clientY - p.y;
       if (Math.hypot(dx, dy) < 6) return; // pas encore assez bougé pour décider (le point n'est pas mis à jour)
       const side = Math.abs(p.y - other.y) < 0.6 * Math.abs(p.x - other.x);
-      gesture.two = side && Math.abs(dy) > 2 * Math.abs(dx) && Math.abs(after - before) < 0.5 * Math.abs(dy) ? 'tilt' : 'pinch';
+      gesture.two = reliefOn() && side && Math.abs(dy) > 2 * Math.abs(dx) && Math.abs(after - before) < 0.5 * Math.abs(dy) ? 'tilt' : 'pinch';
     }
     if (gesture.two === 'tilt') {
       setTilt(zoom.t - (e.clientY - p.y) / 300); // vers le haut : plus penchée

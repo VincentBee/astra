@@ -469,8 +469,10 @@ button.danger { color: var(--danger); border-color: color-mix(in srgb, var(--dan
   padding: 6px;
 }
 .map-wrap canvas { display: block; width: 100%; height: auto; aspect-ratio: 1; border-radius: 0; touch-action: none; }
-/* Carte en 3D (D-559) : le bassin vu de biais est moins haut que large (hauteur = 0,82 × largeur). */
-#map { aspect-ratio: 50 / 41; }
+/* Carte en 3D, en option (D-559, D-563) : le bassin vu de biais est moins haut que large (hauteur = 0,82 × largeur). */
+#map.bassin { aspect-ratio: 50 / 41; }
+.check { display: flex; align-items: center; gap: 10px; color: var(--text); }
+.check input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); }
 /* Zoom de la carte (D-117) : boutons en colonne, en haut à droite, par-dessus le canvas. */
 .map-wrap { position: relative; }
 .map-wrap[hidden] { display: none; } /* avant le départ, pas de carte du tout (D-241) */

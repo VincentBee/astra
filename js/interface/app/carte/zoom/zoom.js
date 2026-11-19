@@ -1,4 +1,4 @@
-import { BASSIN } from '../bassin/bassin.js';
+import { TILT } from './tilt.js';
 
-// t : inclinaison de la vue en 3D, en radians depuis la verticale (D-562).
-export const zoom = { z: 1, x: 0, y: 0, t: BASSIN.tilt };
+// t : inclinaison de la vue, seulement pour la carte en 3D (D-562, D-563).
+export const zoom = { z: 1, x: 0, y: 0, t: TILT.start };

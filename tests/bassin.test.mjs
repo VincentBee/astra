@@ -1,9 +1,10 @@
-// La carte en 3D (D-559) : la projection du bassin, sans navigateur.
+// La carte en 3D (D-559, en option : D-563) : la projection du bassin, sans navigateur.
 // Le jeu reste sur un plan : le toucher doit retrouver exactement la case dessinée.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeView } from '../js/interface/app/carte/bassin/make-view.js';
 import { UNIVERSE } from '../js/regles/game/index.js';
+import { flatView } from '../js/interface/app/carte/relief/flat-view.js';
 
 const near = (a, b, eps = 1e-6) => assert.ok(Math.abs(a - b) < eps, `${a} ≠ ${b}`);
 
@@ -60,4 +61,21 @@ test('bassin : on peut incliner la vue (D-562), de dessus à très penchée, le 
   const ratio = (t) => { const v = makeView(400, 328, 1, 0, 0, t); return v.pt(10, 0.5, 0).s / v.pt(10, 19.5, 0).s; };
   assert.ok(ratio(1) < ratio(0.55) && ratio(0.55) < ratio(0));
   near(ratio(0), 1);
+});
+
+test('carte 2D d’origine (D-563) : la projection plate redonne exactement l’ancien calcul du toucher', () => {
+  const size = 360;
+  for (const [z, x0, y0] of [[1, 0, 0], [2.5, 4, 7]]) {
+    const view = flatView(size, z, x0, y0);
+    const cell = (size * z) / UNIVERSE.w; // ancien `cellCss()`
+    for (const [px, py] of [[0, 0], [123.4, 56.7], [359, 359]]) {
+      const w = view.unproj(px, py);
+      near(w.u - 0.5, x0 + px / cell - 0.5); // ancien `toCells`
+      near(w.v - 0.5, y0 + py / cell - 0.5);
+      const p = view.pt(w.u, w.v, 1);
+      near(p.x, px);
+      near(p.y, py);
+      near(p.s, cell);
+    }
+  }
 });

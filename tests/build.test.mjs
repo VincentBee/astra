@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
-import { build, PAGES } from '../build.mjs';
+import { ADDONS, build, PAGES } from '../build.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const tmp = () => mkdtempSync(join(tmpdir(), 'astra-build-'));
@@ -67,4 +67,19 @@ test('le sw.js des sources garde ses marqueurs (le build les remplace une seule 
   const sw = readFileSync(join(root, 'sw.js'), 'utf8');
   assert.equal(sw.split("const VERSION = 'astra-sources';").length, 2);
   assert.equal(sw.split('const FILES = [];').length, 2);
+});
+
+test('carte en 3D (D-563) : son code est dans js/bassin-3d.js, pas dans le jeu de base', async () => {
+  const { out } = await build({ out: tmp(), quiet: true });
+  const base = readFileSync(join(out, 'js/index.js'), 'utf8');
+  const addon = readFileSync(join(out, ADDONS[0].out), 'utf8');
+  // Des couleurs qui n'existent que dans le dessin 3D (face avant du bassin, lueur du réacteur).
+  for (const mark of ['#26315c', 'rgba(255,240,200,0.95)']) {
+    assert.ok(addon.includes(mark), `${mark} dans le module 3D`);
+    assert.ok(!base.includes(mark), `${mark} absent du jeu de base`);
+  }
+  assert.ok(base.includes("'./bassin-3d.js'") || base.includes('"./bassin-3d.js"'), 'le jeu vise le module 3D à côté de lui');
+  // Le module 3D n'emporte pas de copie des règles (elles lui sont données par le jeu).
+  assert.ok(!addon.includes('Humains') && !addon.includes('Machines'), 'pas de races dans le module 3D');
+  rmSync(out, { recursive: true, force: true });
 });

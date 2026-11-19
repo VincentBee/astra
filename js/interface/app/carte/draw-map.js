@@ -1,276 +1,248 @@
 import { countShips, fleetTank, fuelAt } from '../../../regles/fleet/index.js';
-import { sameCell, sunFor } from '../../../regles/game/index.js';
+import { sameCell, sunFor, UNIVERSE } from '../../../regles/game/index.js';
+import { drawSun } from '../../sky/index.js';
 import { drawAlertDot } from '../alertes/draw-alert-dot.js';
 import { myColonizer } from '../depart/my-colonizer.js';
 import { etat } from '../etat.js';
 import { $ } from '../outils/dollar.js';
 import { DRY } from '../outils/dry.js';
-import { BASSIN } from './bassin/bassin.js';
-import { drawBall } from './bassin/draw-ball.js';
-import { drawBasin } from './bassin/draw-basin.js';
-import { drawShadow } from './bassin/draw-shadow.js';
-import { drawShip3d } from './bassin/draw-ship-3d.js';
-import { drawSun3d } from './bassin/draw-sun-3d.js';
-import { drawSunPool } from './bassin/draw-sun-pool.js';
-import { lightDir } from './bassin/light-dir.js';
-import { makeView } from './bassin/make-view.js';
-import { planePath } from './bassin/plane-path.js';
-import { quadPath } from './bassin/quad-path.js';
-import { ringPath } from './bassin/ring-path.js';
 import { drawFrost } from './draw-frost.js';
 import { drawSmallBody } from './draw-small-body.js';
 import { mapPlanets } from './map-planets.js';
 import { mapVeiled } from './map-veiled.js';
+import { noise } from './noise.js';
 import { fleetSpots } from './selection/fleet-spots.js';
 import { aimRead } from './visee/aim-read.js';
 import { drawAim } from './visee/draw-aim.js';
 import { drawRange } from './visee/draw-range.js';
 import { drawShuttles } from './visee/draw-shuttles.js';
 import { zoom } from './zoom/zoom.js';
+import { reliefOn } from './relief/relief-on.js';
 import { drawAutoMark } from '../alertes/draw-auto-mark.js';
 
-/**
- * La carte en 3D (D-559) : un petit bassin peu profond vu de devant et d'en haut. Les planètes
- * (boules éclairées par le soleil) et les vaisseaux sont posés sur le plan du jeu, au niveau du
- * rebord ; leurs ombres tombent sur le fond étoilé. Le jeu reste en 2D : seules les places à
- * l'écran passent par la projection (`makeView`), que le toucher inverse (`toCells`).
- */
 export function drawMap() {
   etat.mapFrame = null;
   if (!etat.session || etat.currentView !== 'map') return;
   // L'image suivante est demandée tout de suite : une erreur dans celle-ci ne fige pas la carte.
   etat.mapFrame = requestAnimationFrame(drawMap);
   const canvas = $('map');
+  // Carte en 3D cochée dans les Réglages et téléchargée (D-563) : c'est elle qui dessine.
+  const relief3d = reliefOn();
+  if (canvas.classList.contains('bassin') !== !!relief3d) {
+    canvas.classList.toggle('bassin', !!relief3d);
+    $('btn-tilt').hidden = !relief3d;
+  }
+  if (relief3d) return relief3d.drawMap3d();
   const dpr = Math.min(3, window.devicePixelRatio || 1);
-  const W0 = Math.round(canvas.clientWidth * dpr);
-  const H0 = Math.round(canvas.clientHeight * dpr);
-  if (canvas.width !== W0 || canvas.height !== H0) Object.assign(canvas, { width: W0, height: H0 });
-  // Zoom (D-117) : la projection montre la partie vue (zoom.x, zoom.y, zoom.z) en perspective, inclinée de zoom.t (D-562).
-  const view = makeView(W0, H0, zoom.z, zoom.x, zoom.y, zoom.t);
+  const css = canvas.clientWidth;
+  if (canvas.width !== Math.round(css * dpr) || canvas.height !== canvas.width) canvas.width = canvas.height = Math.round(css * dpr);
+  const W0 = canvas.width;
+  // Zoom (D-117) : les cases grandissent, et le dessin se décale jusqu'au coin de la partie vue.
+  const cell = (W0 * zoom.z) / UNIVERSE.w;
+  const W = cell * UNIVERSE.w; // tout l'univers, en pixels du canvas
   const ctx = canvas.getContext('2d');
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, W0, H0);
+  ctx.clearRect(0, 0, W0, W0);
+  ctx.fillStyle = '#05070f';
+  ctx.fillRect(0, 0, W0, W0);
+  ctx.setTransform(1, 0, 0, 1, -zoom.x * cell, -zoom.y * cell);
 
+  // Étoiles et quadrillage : du décor, très discret, pour que seuls les objets qu'on peut toucher ressortent.
+  for (let y = 0; y < UNIVERSE.h; y++) {
+    for (let x = 0; x < UNIVERSE.w; x++) {
+      const n = noise(x, y);
+      if (n > 0.72) {
+        ctx.fillStyle = `rgba(220,230,255,${0.05 + (n - 0.72) * 0.6})`;
+        const r = Math.max(0.5, cell * 0.025 * (n * 2));
+        ctx.beginPath();
+        ctx.arc((x + noise(y, x)) * cell, (y + noise(x + 7, y + 3)) * cell, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+  ctx.strokeStyle = 'rgba(150,170,230,0.05)';
+  ctx.lineWidth = Math.max(1, dpr * 0.5);
+  ctx.beginPath();
+  for (let i = 1; i < UNIVERSE.w; i++) {
+    ctx.moveTo(i * cell, 0);
+    ctx.lineTo(i * cell, W);
+    ctx.moveTo(0, i * cell);
+    ctx.lineTo(W, i * cell);
+  }
+  ctx.stroke();
   const veiled = mapVeiled();
   $('map-wrap').hidden = veiled;
   const sun = sunFor(etat.session.state.gid);
-  const su = sun.x + sun.size / 2;
-  const sv = sun.y + sun.size / 2;
-  const sunAt = view.pt(su, sv, 0);
-  const now = etat.session.now();
+  if (!veiled) drawSun(ctx, sun, cell);
+  drawFrost(ctx, sun, cell, W);
+
   const me = etat.session.state.players[etat.session.me];
   const picking = !!myColonizer(me); // colonisateur de départ en jeu : les planètes libres clignotent
   const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 300);
-  const planets = mapPlanets();
-  const spots = fleetSpots(now);
-  // Ombre un peu poussée à l'opposé du soleil.
-  const away = (u, v) => {
-    const d = Math.hypot(u - su, v - sv) || 1;
-    return [u + ((u - su) / d) * 0.18, v + ((v - sv) / d) * 0.18];
-  };
 
-  drawBasin(ctx, view, () => {
-    if (!veiled) drawSunPool(ctx, view, sun);
-    // Portée de détection : ce que je vois, en léger halo sur le fond (hors du halo, les flottes adverses sont cachées).
-    if (me?.planet) {
-      ctx.fillStyle = me.color || '#8d95b3';
-      ctx.globalAlpha = 0.09;
-      ctx.beginPath();
-      for (const e of etat.session.eyes(now)) planePath(ctx, view, e.x + 0.5, e.y + 0.5, e.r, -BASSIN.floor, 40);
-      ctx.fill(); // un seul tracé : les zones qui se recouvrent ne s'assombrissent pas
-      ctx.globalAlpha = 1;
-    }
-    drawFrost(ctx, view, sun);
-    for (const w of planets) {
-      const [u, v] = away(w.x + 0.5, w.y + 0.5);
-      const small = w.kind === 'asteroid' || w.kind === 'comet';
-      drawShadow(ctx, view, u, v, small ? 0.16 : w.owner ? 0.3 : 0.24, w.owner && !w.live ? 0.3 : 0.5);
-    }
-    for (const spot of spots) {
-      const [u, v] = away(spot.x + 0.5, spot.y + 0.5);
-      drawShadow(ctx, view, u, v, spot.moving ? 0.2 : 0.16, 0.45);
-    }
-  });
-
-  // Sur le plan du jeu : navettes, autonomie, trajets, points de panne, case visée.
-  drawRange(ctx, view, now);
-  drawShuttles(ctx, view, now);
-  for (const spot of spots) {
-    const { p, f } = spot;
-    if (!spot.moving) continue;
-    const a = view.pt(spot.x + 0.5, spot.y + 0.5, BASSIN.ship);
-    const b = view.pt(f.to.x + 0.5, f.to.y + 0.5, BASSIN.ship);
-    ctx.strokeStyle = p.color;
-    ctx.globalAlpha = 0.35;
-    ctx.lineWidth = Math.max(1, dpr * 0.6);
-    ctx.setLineDash([a.s * 0.15, a.s * 0.15]);
+  // Portée de détection : ce que je vois, en léger halo (hors du halo, les flottes adverses sont cachées).
+  if (me?.planet) {
+    ctx.fillStyle = me.color || '#8d95b3';
+    ctx.globalAlpha = 0.07;
     ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
+    for (const e of etat.session.eyes(etat.session.now())) {
+      ctx.moveTo((e.x + 0.5 + e.r) * cell, (e.y + 0.5) * cell);
+      ctx.arc((e.x + 0.5) * cell, (e.y + 0.5) * cell, e.r * cell, 0, Math.PI * 2);
+    }
+    ctx.fill(); // un seul tracé : les zones qui se recouvrent ne s'assombrissent pas
+    ctx.globalAlpha = 1;
+  }
+
+  for (const w of mapPlanets()) {
+    const cx = (w.x + 0.5) * cell;
+    const cy = (w.y + 0.5) * cell;
+    const o = w.owner;
+    const mine = o?.id === etat.session.me;
+    // Planète libre : grise, plus lumineuse quand on cherche où s'installer. Gelée : presque effacée.
+    const memo = o && !w.live; // souvenir (D-124) : propriétaire vu la dernière fois, plus en vue
+    ctx.globalAlpha = etat.session.frostOf(w) <= etat.session.now() ? 0.15 : memo ? 0.4 : o ? (o.online ? 1 : 0.45) : picking && w.kind === 'planet' ? 0.55 + 0.35 * pulse : 0.6;
+    const color = o ? o.color : '#8d95b3';
+    ctx.fillStyle = color;
+    if (w.kind === 'asteroid' || w.kind === 'comet') {
+      drawSmallBody(ctx, w, cx, cy, cell, color);
+      if (sameCell(etat.selected, w) || mine) {
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = Math.max(1.5, cell * 0.06);
+        ctx.beginPath();
+        ctx.arc(cx, cy, cell * 0.4, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      if (mine) drawAlertDot(ctx, w, cx, cy, cell, pulse);
+      continue;
+    }
+    ctx.beginPath();
+    ctx.arc(cx, cy, cell * (o ? 0.26 : 0.2), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(1, cell * 0.06);
+    if (!o || memo) ctx.setLineDash([cell * 0.12, cell * 0.1]);
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, cell * 0.42, cell * 0.14, -0.35, 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
-    ctx.globalAlpha = 1;
-    if (f.stranded) {
-      // Point de panne : une croix au bout du trajet.
-      const u = f.to.x + 0.5;
-      const v = f.to.y + 0.5;
-      const r = 0.18;
-      const q = (du, dv) => view.pt(u + du, v + dv, 0);
-      const [p1, p2, p3, p4] = [q(-r, -r), q(r, r), q(r, -r), q(-r, r)];
-      ctx.strokeStyle = '#ff7a93';
-      ctx.lineWidth = Math.max(1, b.s * 0.06);
+    if (mine || sameCell(etat.selected, w)) {
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = mine ? 'rgba(255,255,255,0.85)' : '#ffffff';
+      ctx.lineWidth = Math.max(1.5, cell * 0.07);
       ctx.beginPath();
-      ctx.moveTo(p1.x, p1.y);
-      ctx.lineTo(p2.x, p2.y);
-      ctx.moveTo(p3.x, p3.y);
-      ctx.lineTo(p4.x, p4.y);
+      ctx.arc(cx, cy, cell * 0.5, 0, Math.PI * 2);
       ctx.stroke();
     }
+    // Nom du propriétaire au-dessus
+    if (o) {
+      ctx.globalAlpha = memo ? 0.5 : o.online ? 1 : 0.6;
+      ctx.font = `600 ${Math.max(9 * dpr, cell * 0.36)}px system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = mine ? '#ffffff' : 'rgba(232,235,247,0.8)';
+      const label = o.name.length > 8 ? o.name.slice(0, 7) + '…' : o.name;
+      ctx.fillText(label, cx, Math.max(cell * 0.4, cy - cell * 0.5));
+    }
+    if (mine) drawAlertDot(ctx, w, cx, cy, cell, pulse);
+    if (mine && w.pl?.planet?.auto) drawAutoMark(ctx, cx, cy, cell, dpr);
   }
-  if (etat.menu?.cell) {
-    // Case visée, en attente d'un choix (se poser, coloniser, attaquer…).
-    const { x, y } = etat.menu.cell;
-    ctx.strokeStyle = '#ffffff';
-    ctx.globalAlpha = 0.6 + 0.4 * pulse;
-    ctx.lineWidth = Math.max(1, view.pt(x + 0.5, y + 0.5, 0).s * 0.05);
-    ctx.beginPath();
-    quadPath(ctx, view, [[x + 0.04, y + 0.04, 0], [x + 0.96, y + 0.04, 0], [x + 0.96, y + 0.96, 0], [x + 0.04, y + 0.96, 0]]);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-  }
+  ctx.globalAlpha = 1;
 
-  // Les objets, du fond vers l'avant : les plus proches passent devant.
+  // Flottes : un petit triangle qui glisse le long de son trajet, ou qui attend en orbite.
+  const now = etat.session.now();
+  drawRange(ctx, cell, now);
+  drawShuttles(ctx, cell, now);
   const aim = aimRead(now); // flotte traînée vers sa cible (D-126)
   const foe = etat.menu?.foe || aim?.foe; // flotte ennemie visée : cercle rouge
-  const things = [];
-  if (!veiled) things.push({ v: sv, draw: () => drawSun3d(ctx, view, sun) });
-  const alphaOf = (w, o, memo) => (etat.session.frostOf(w) <= now ? 0.15 : memo ? 0.4 : o ? (o.online ? 1 : 0.45) : picking && w.kind === 'planet' ? 0.55 + 0.35 * pulse : 0.6);
-  for (const w of planets) {
-    things.push({
-      v: w.y + 0.5,
-      draw: () => {
-        const u = w.x + 0.5;
-        const v = w.y + 0.5;
-        const P = view.pt(u, v, 0);
-        const o = w.owner;
-        const mine = o?.id === etat.session.me;
-        // Planète libre : grise, plus lumineuse quand on cherche où s'installer. Gelée : presque effacée.
-        const memo = o && !w.live; // souvenir (D-124) : propriétaire vu la dernière fois, plus en vue
-        ctx.globalAlpha = alphaOf(w, o, memo);
-        const color = o ? o.color : '#8d95b3';
-        const ring = (r, h = 0) => {
-          ctx.globalAlpha = 1;
-          ctx.strokeStyle = mine && !sameCell(etat.selected, w) ? 'rgba(255,255,255,0.85)' : '#ffffff';
-          ctx.lineWidth = Math.max(1.5, P.s * 0.07);
-          ctx.beginPath();
-          planePath(ctx, view, u, v, r, h, 40);
-          ctx.stroke();
-        };
-        if (w.kind === 'asteroid' || w.kind === 'comet') {
-          drawSmallBody(ctx, view, w, P, color, sunAt);
-          if (sameCell(etat.selected, w) || mine) ring(0.4);
-          return;
-        }
-        ctx.strokeStyle = color;
-        ctx.lineWidth = Math.max(1, P.s * 0.06);
-        if (!o || memo) ctx.setLineDash([P.s * 0.12, P.s * 0.1]);
-        ctx.beginPath();
-        ringPath(ctx, view, u, v, 0.42, true);
-        ctx.stroke();
-        drawBall(ctx, P.x, P.y, P.s * (o ? 0.28 : 0.22), color, lightDir(P.x, P.y, sunAt));
-        ctx.strokeStyle = color;
-        ctx.lineWidth = Math.max(1, P.s * 0.06);
-        ctx.beginPath();
-        ringPath(ctx, view, u, v, 0.42, false);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        if (mine || sameCell(etat.selected, w)) ring(0.5);
-      },
-    });
-  }
-  const phase = (s) => [...String(s)].reduce((a, ch) => a + ch.charCodeAt(0), 0);
-  const shipH = (spot) => BASSIN.ship + 0.035 * Math.sin(now / 650 + phase(`${spot.p.id}${spot.f.id}`));
-  for (const spot of spots) {
-    things.push({
-      v: spot.y + 0.5,
-      draw: () => {
-        const { p, f, x, y } = spot;
-        const u = x + 0.5;
-        const v = y + 0.5;
-        const h = shipH(spot);
-        const halo = (col) => {
-          ctx.globalAlpha = 1;
-          ctx.strokeStyle = col;
-          ctx.lineWidth = Math.max(1.5, view.pt(u, v, h).s * 0.06);
-          ctx.beginPath();
-          planePath(ctx, view, u, v, 0.3, h, 32);
-          ctx.stroke();
-        };
-        if (foe && p.id === foe.pid && f.id === foe.id) halo('#ff7a93');
-        if (p.id === etat.session.me && f.id === etat.selFleet) halo('#ffffff');
-        ctx.globalAlpha = !spot.moving && fuelAt(f, p.race, now) < DRY ? 0.5 : 1; // à sec : grisée
-        const color = ['attack', 'conquer', 'chase'].includes(f.order?.kind) || f.mission === 'attack' ? '#ff7a93' : p.color;
-        drawShip3d(ctx, view, u, v, h, spot.ang, spot.moving ? 1.15 : 0.95, color, spot.moving, now);
-        ctx.globalAlpha = 1;
-      },
-    });
-  }
-  things.sort((a, b) => a.v - b.v);
-  for (const t of things) t.draw();
-  ctx.globalAlpha = 1;
-
-  // Par-dessus tout : noms, alertes, jauges, effectifs (toujours lisibles).
-  for (const w of planets) {
-    const o = w.owner;
-    if (!o) continue;
-    const P = view.pt(w.x + 0.5, w.y + 0.5, 0);
-    const mine = o?.id === etat.session.me;
-    if (o && w.kind !== 'asteroid' && w.kind !== 'comet') {
-      // Nom du propriétaire au-dessus
-      const memo = !w.live;
-      ctx.globalAlpha = memo ? 0.5 : o.online ? 1 : 0.6;
-      const fs = Math.max(9 * dpr, P.s * 0.36);
-      ctx.font = `600 ${fs}px system-ui, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.lineWidth = Math.max(2, fs * 0.22);
-      ctx.strokeStyle = 'rgba(5,8,18,0.75)';
-      ctx.fillStyle = mine ? '#ffffff' : 'rgba(232,235,247,0.85)';
-      const label = o.name.length > 8 ? o.name.slice(0, 7) + '…' : o.name;
-      const ly = Math.max(fs, P.y - P.s * 0.52);
-      ctx.strokeText(label, P.x, ly);
-      ctx.fillText(label, P.x, ly);
+  for (const spot of fleetSpots(now)) {
+    const { p, f, x, y } = spot;
+    const cx = (x + 0.5) * cell;
+    const cy = (y + 0.5) * cell;
+    if (spot.moving) {
+      ctx.strokeStyle = p.color;
+      ctx.globalAlpha = 0.35;
+      ctx.lineWidth = Math.max(1, dpr * 0.6);
+      ctx.setLineDash([cell * 0.15, cell * 0.15]);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo((f.to.x + 0.5) * cell, (f.to.y + 0.5) * cell);
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
-    if (mine) drawAlertDot(ctx, w, P.x, P.y, P.s, pulse);
-    if (mine && w.pl?.planet?.auto) drawAutoMark(ctx, P.x, P.y, P.s, dpr);
-  }
-  ctx.globalAlpha = 1;
-  for (const spot of spots) {
-    const { p, f } = spot;
-    const P = view.pt(spot.x + 0.5, spot.y + 0.5, shipH(spot));
+    ctx.globalAlpha = 1;
+    if (foe && p.id === foe.pid && f.id === foe.id) {
+      ctx.strokeStyle = '#ff7a93';
+      ctx.lineWidth = Math.max(1.5, cell * 0.06);
+      ctx.beginPath();
+      ctx.arc(cx, cy, cell * 0.3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (p.id === etat.session.me && f.id === etat.selFleet) {
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = Math.max(1.5, cell * 0.06);
+      ctx.beginPath();
+      ctx.arc(cx, cy, cell * 0.3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (f.stranded && spot.moving) {
+      // Point de panne : une croix au bout du trajet.
+      const px = (f.to.x + 0.5) * cell;
+      const py = (f.to.y + 0.5) * cell;
+      const r = cell * 0.18;
+      ctx.strokeStyle = '#ff7a93';
+      ctx.lineWidth = Math.max(1, cell * 0.06);
+      ctx.beginPath();
+      ctx.moveTo(px - r, py - r);
+      ctx.lineTo(px + r, py + r);
+      ctx.moveTo(px + r, py - r);
+      ctx.lineTo(px - r, py + r);
+      ctx.stroke();
+    }
     if (p.id === etat.session.me) {
       // Jauge de carburant sous mes flottes.
       const k = Math.min(1, fuelAt(f, p.race, now) / Math.max(1, fleetTank(p.race, f.ships)));
-      const w = P.s * 0.5;
-      const th = Math.max(1.5, P.s * 0.06);
-      ctx.fillStyle = 'rgba(5,8,18,0.6)';
-      ctx.fillRect(P.x - w / 2 - 1, P.y + P.s * 0.22 - 1, w + 2, th + 2);
+      const w = cell * 0.5;
       ctx.fillStyle = 'rgba(255,255,255,0.18)';
-      ctx.fillRect(P.x - w / 2, P.y + P.s * 0.22, w, th);
+      ctx.fillRect(cx - w / 2, cy + cell * 0.24, w, Math.max(1.5, cell * 0.06));
       ctx.fillStyle = k < 0.25 ? '#ff7a93' : '#f5c96a';
-      ctx.fillRect(P.x - w / 2, P.y + P.s * 0.22, w * k, th);
-    } else {
-      // Effectif des flottes adverses (D-133), en haut à droite du vaisseau.
-      ctx.font = `700 ${Math.max(9 * dpr, P.s * 0.34)}px system-ui, sans-serif`;
+      ctx.fillRect(cx - w / 2, cy + cell * 0.24, w * k, Math.max(1.5, cell * 0.06));
+    }
+    ctx.globalAlpha = !spot.moving && fuelAt(f, p.race, now) < DRY ? 0.5 : 1; // à sec : grisée
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(spot.ang);
+    ctx.fillStyle = ['attack', 'conquer', 'chase'].includes(f.order?.kind) || f.mission === 'attack' ? '#ff7a93' : p.color;
+    const k = spot.moving ? 1 : 0.8;
+    ctx.beginPath();
+    ctx.moveTo(cell * 0.28 * k, 0);
+    ctx.lineTo(-cell * 0.18 * k, cell * 0.16 * k);
+    ctx.lineTo(-cell * 0.18 * k, -cell * 0.16 * k);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    ctx.globalAlpha = 1;
+    if (p.id !== etat.session.me) {
+      // Effectif des flottes adverses (D-133), en haut à droite du triangle.
+      ctx.font = `700 ${Math.max(9 * dpr, cell * 0.34)}px system-ui, sans-serif`;
       ctx.textAlign = 'left';
-      ctx.lineWidth = Math.max(2, P.s * 0.08);
+      ctx.lineWidth = Math.max(2, cell * 0.08);
       ctx.strokeStyle = 'rgba(5,8,18,0.9)';
       ctx.fillStyle = '#ffffff';
       const n = String(countShips(f.ships));
-      ctx.strokeText(n, P.x + P.s * 0.2, P.y - P.s * 0.14);
-      ctx.fillText(n, P.x + P.s * 0.2, P.y - P.s * 0.14);
+      ctx.strokeText(n, cx + cell * 0.2, cy - cell * 0.14);
+      ctx.fillText(n, cx + cell * 0.2, cy - cell * 0.14);
     }
   }
-  drawAim(ctx, view, dpr, aim);
+  // Case visée, en attente d'un choix (se poser, coloniser, attaquer…).
+  if (etat.menu?.cell) {
+    ctx.strokeStyle = '#ffffff';
+    ctx.globalAlpha = 0.6 + 0.4 * pulse;
+    ctx.lineWidth = Math.max(1, cell * 0.05);
+    ctx.strokeRect(etat.menu.cell.x * cell + 1, etat.menu.cell.y * cell + 1, cell - 2, cell - 2);
+    ctx.globalAlpha = 1;
+  }
+  drawAim(ctx, cell, dpr, aim);
 
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   $('my-coords').textContent = me?.home ? `[${me.home.x}:${me.home.y}]` : me?.out ? 'éliminé' : etat.session.startedAt == null ? 'préparation' : 'à fonder';
 }

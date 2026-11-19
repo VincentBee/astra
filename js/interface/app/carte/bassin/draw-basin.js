@@ -1,4 +1,4 @@
-import { UNIVERSE } from '../../../../regles/game/index.js';
+import { UNIVERSE } from '../../../../regles/game/carte/universe.js';
 import { noise } from '../noise.js';
 import { BASSIN } from './bassin.js';
 import { quadPath } from './quad-path.js';

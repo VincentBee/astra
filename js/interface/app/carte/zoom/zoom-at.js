@@ -1,4 +1,4 @@
-import { mapView } from '../bassin/map-view.js';
+import { mapView } from '../relief/map-view.js';
 import { clampZoom } from './clamp-zoom.js';
 import { ZOOM_MAX } from './zoom-max.js';
 import { zoom } from './zoom.js';

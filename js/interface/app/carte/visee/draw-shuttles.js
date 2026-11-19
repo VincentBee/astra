@@ -2,9 +2,9 @@ import { etat } from '../../etat.js';
 
 /**
  * Mes navettes (D-556) : un trait pointillé entre leurs deux planètes, plus marqué pour la
- * flotte sélectionnée, avec une pointe vers la planète où elles livrent. Sur le plan du jeu (D-559).
+ * flotte sélectionnée, avec une pointe vers la planète où elles livrent.
  */
-export function drawShuttles(ctx, view, now) {
+export function drawShuttles(ctx, cell, now) {
   const p = etat.session.state.players[etat.session.me];
   const seen = new Set();
   for (const f of p?.fleets || []) {
@@ -14,33 +14,30 @@ export function drawShuttles(ctx, view, now) {
     const sel = f.id === etat.selFleet;
     if (seen.has(key) && !sel) continue;
     seen.add(key);
-    const a = view.pt(o.a.x + 0.5, o.a.y + 0.5, 0);
-    const b = view.pt(o.b.x + 0.5, o.b.y + 0.5, 0);
-    const s = (a.s + b.s) / 2;
-    const ang = Math.atan2(o.b.y - o.a.y, o.b.x - o.a.x); // sur le plan, en cases
+    const ax = (o.a.x + 0.5) * cell;
+    const ay = (o.a.y + 0.5) * cell;
+    const bx = (o.b.x + 0.5) * cell;
+    const by = (o.b.y + 0.5) * cell;
+    const ang = Math.atan2(by - ay, bx - ax);
     ctx.save();
     ctx.strokeStyle = '#6ad1f5';
     ctx.fillStyle = '#6ad1f5';
     ctx.globalAlpha = sel ? 0.8 : 0.4;
-    ctx.lineWidth = Math.max(1, s * (sel ? 0.06 : 0.04));
-    ctx.setLineDash([s * 0.18, s * 0.14]);
-    ctx.lineDashOffset = -((now / 120) % (s * 0.32)); // le pointillé avance vers B
+    ctx.lineWidth = Math.max(1, cell * (sel ? 0.06 : 0.04));
+    ctx.setLineDash([cell * 0.18, cell * 0.14]);
+    ctx.lineDashOffset = -((now / 120) % (cell * 0.32)); // le pointillé avance vers B
     ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(bx, by);
     ctx.stroke();
     ctx.setLineDash([]);
-    const tu = o.b.x + 0.5 - Math.cos(ang) * 0.45;
-    const tv = o.b.y + 0.5 - Math.sin(ang) * 0.45;
-    const r = 0.16;
-    const q = (t) => view.pt(tu + Math.cos(t) * r, tv + Math.sin(t) * r, 0);
-    const p0 = q(ang);
-    const p1 = q(ang + 2.4);
-    const p2 = q(ang - 2.4);
+    const tx = bx - Math.cos(ang) * cell * 0.45;
+    const ty = by - Math.sin(ang) * cell * 0.45;
+    const r = cell * 0.16;
     ctx.beginPath();
-    ctx.moveTo(p0.x, p0.y);
-    ctx.lineTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
+    ctx.moveTo(tx + Math.cos(ang) * r, ty + Math.sin(ang) * r);
+    ctx.lineTo(tx + Math.cos(ang + 2.4) * r, ty + Math.sin(ang + 2.4) * r);
+    ctx.lineTo(tx + Math.cos(ang - 2.4) * r, ty + Math.sin(ang - 2.4) * r);
     ctx.closePath();
     ctx.fill();
     ctx.restore();

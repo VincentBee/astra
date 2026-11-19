@@ -4257,7 +4257,9 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   perspective (moins l'effet de bassin) ; incliner le canvas en CSS (`rotateX`) (texte et
   boules écrasés, toucher faux).
 - Qui : Claude (par défaut ; l'effet demandé vient de Vincent). Source : session `012yisg3`.
-  Statut : en vigueur.
+  Statut : **modifiée par D-563** (la 3D n'est plus la carte de tout le monde : une option, dans
+  un module téléchargé à la demande ; la carte de base redevient la carte 2D d'origine, carrée,
+  planètes et vaisseaux à leur taille d'avant).
 
 **D-560 — Le toucher passe par la projection inverse, sur le plan du jeu**
 - 2026-11-19 ~20:45 UTC (approchée). Choix : le plan du jeu est à la hauteur du rebord (h = 0) : le centre des
@@ -4269,7 +4271,8 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   plan : à l'écran, 1 à 2 px plus haut que leur point de toucher à zoom 1, sans effet sensible.
 - Écarté : toucher le fond du bassin (les planètes ne seraient plus sous le doigt) ; viser en
   pixels d'écran plutôt qu'en cases (il faudrait réécrire `js/interface/aim/` et ses tests).
-- Qui : Claude (par défaut). Source : session `012yisg3`. Statut : en vigueur.
+- Qui : Claude (par défaut). Source : session `012yisg3`. Statut : en vigueur (en 3D ; en 2D, la
+  projection plate redonne exactement l'ancien calcul, D-563).
 
 **D-561 — Le replay reste en 2D**
 - 2026-11-19 ~20:45 UTC (approchée). Choix : la 3D ne touche que la carte du jeu (`index.html`) ;
@@ -4295,4 +4298,43 @@ prise dans `main` (carte voilée avant le départ), renumérotée D-415 à la fu
   la carte autour de la verticale (pas demandé, et le nord de la carte sert de repère à tous les
   joueurs) ; un curseur (prend de la place sur la carte).
 - Qui : Vincent (incliner) ; Claude (gestes, bornes, crans, mémoire par téléphone). Source :
-  session `012yisg3`. Statut : en vigueur.
+  session `012yisg3`. Statut : en vigueur, **modifiée par D-563** : seulement avec la carte en 3D
+  (bouton caché, gestes inactifs en 2D).
+
+**D-563 — La carte en 3D devient une option, téléchargée seulement si on la coche**
+- 2026-11-19 ~22:00 UTC. Contexte : Vincent : « Il faut que la version originale du jeu reste
+  sans artifice visuel et que ce JS additionnel ne se télécharge que si l'utilisateur a coché une
+  option dans ses settings, pour ne pas alourdir le jeu de base pour tout le monde, mais seulement
+  pour ceux qui veulent des visuels supplémentaires. »
+- Choix :
+  - la carte de base redevient **la carte 2D d'origine** : les fichiers de dessin
+    (`draw-map.js`, `draw-frost.js`, `draw-small-body.js`, `visee/draw-aim.js`, `draw-range.js`,
+    `draw-shuttles.js`) sont ceux de `05bea99`, à l'exception de deux lignes de `drawMap` (passer
+    la main à la 3D si elle est cochée et chargée ; remettre le canvas carré en revenant de la
+    3D) ; canvas carré, planètes et vaisseaux à leur taille d'avant ;
+  - **case « Carte en 3D » dans les Réglages** (`#relief`), retenue sur le téléphone
+    (`localStorage['astra.carte3d']`) ; cochée, le module se télécharge (tout de suite, puis à
+    chaque ouverture) ; non cochée, rien n'est téléchargé ;
+  - tout le dessin 3D dans `js/interface/app/carte/bassin/`, que le jeu n'importe jamais :
+    `carte/relief/load-relief.js` le charge par `import(new URL('../bassin/index.js',
+    import.meta.url))`. Le build l'assemble à part dans `dist/js/bassin-3d.js` (`ADDONS`,
+    16 ko, 6,5 ko compressé) et **ne le met pas dans le cache hors ligne de départ** (sinon le
+    service worker le téléchargerait chez tout le monde à l'installation) ; chez qui l'a coché, le
+    service worker le garde au passage (réseau d'abord, cache ensuite). Hors ligne après une mise
+    à jour, si le module n'est pas encore en cache, la carte reste en 2D et la case dit que le
+    téléchargement a raté ;
+  - le module 3D reçoit du jeu (`installDeps`) les modules qui ont un état et les fonctions des
+    règles : assemblé à part, il aurait sinon ses propres copies (vides, ou en double : 27 ko au
+    lieu de 16). Exception à la règle « importer un module par son `index.js` » (fichiers.md §1) :
+    il importe directement `regles/game/carte/universe.js`, pour ne rien emporter d'autre ;
+  - le toucher, le glissé, le zoom, le menu au doigt et les repères des rapports passent par une
+    projection (`mapView`) : plate (`flatView`, exactement l'ancien calcul) ou en 3D. Ce code,
+    l'option et les gestes d'inclinaison restent dans le jeu de base : +2,6 ko (+1,3 ko compressé)
+    par rapport à `05bea99` ;
+  - l'inclinaison (D-562) ne marche qu'en 3D (bouton caché, gestes inactifs en 2D).
+- Écarté : le découpage automatique d'esbuild (`splitting`) : le jeu de base deviendrait deux
+  fichiers (une partie commune et la page), et tout le build « une page = un fichier » serait à
+  revoir ; garder la 3D par défaut avec une case pour l'enlever (contraire à la demande) ; mettre
+  le module 3D dans le cache de départ (il serait téléchargé par tous).
+- Qui : Vincent (option, téléchargement à la demande) ; Claude (module à part, hors du cache de
+  départ, dépendances données par le jeu). Source : session `012yisg3`. Statut : en vigueur.

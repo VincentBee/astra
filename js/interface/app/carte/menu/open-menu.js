@@ -3,7 +3,7 @@ import { ic } from '../../../icons/index.js';
 import { etat } from '../../etat.js';
 import { $ } from '../../outils/dollar.js';
 import { esc } from '../../outils/esc.js';
-import { mapView } from '../bassin/map-view.js';
+import { mapView } from '../relief/map-view.js';
 import { closeMenu } from './close-menu.js';
 
 /** Ouvre le menu au doigt, sur la carte, à côté du point `at` (en cases). */

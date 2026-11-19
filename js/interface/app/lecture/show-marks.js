@@ -1,5 +1,5 @@
 import { fleetSpots } from '../carte/selection/fleet-spots.js';
-import { mapView } from '../carte/bassin/map-view.js';
+import { mapView } from '../carte/relief/map-view.js';
 import { etat } from '../etat.js';
 import { $ } from '../outils/dollar.js';
 import { esc } from '../outils/esc.js';

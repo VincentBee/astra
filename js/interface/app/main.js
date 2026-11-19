@@ -44,6 +44,8 @@ import './accueil/branchements/nom-retenu.js';
 import './outils/branchements/reglages-ouvrir.js';
 import './outils/branchements/reglages-fermer.js';
 import './outils/branchements/reglages-ciel.js';
+import './carte/relief/branchements/relief-retenu.js';
+import './carte/relief/branchements/reglage-relief.js';
 import './accueil/branchements/boutons-aller.js';
 import './accueil/branchements/historique-parties.js';
 import './partie/branchements/sauver-en-quittant.js';

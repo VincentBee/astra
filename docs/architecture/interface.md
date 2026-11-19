@@ -125,7 +125,7 @@ HTML, cette règle ne tient plus : il faudra une pile d'ouverture.
 | Fenêtre | Ouverte par | Contenu / action | Code |
 |---|---|---|---|
 | `#sheet-players` (`index.html:203-216`) | `#net` (seulement après le départ, D-310 ; fermée par `renderLobby` tant que `mapVeiled()`) | Détail réseau, **Inviter un joueur**, classement (`#players`). | 319-327 ; liste `renderState` 765-779 ; lignes `renderLive` 835-865 (score, `style.order` pour trier sans redessiner, 864). |
-| `#sheet-settings` | roue crantée (`[data-settings]` : accueil et `#btn-settings` dans la rangée du jeu) | Réglages de l'appareil : liste **Fond** (`#sky`, D-112). | branchement près de l'accueil dans `app.js` (D-114). |
+| `#sheet-settings` | roue crantée (`[data-settings]` : accueil et `#btn-settings` dans la rangée du jeu) | Réglages de l'appareil : liste **Fond** (`#sky`, D-112) ; case **Carte en 3D** (`#relief`, D-563 : télécharge le module 3D, §6.5). | branchement près de l'accueil dans `app.js` (D-114). |
 | `#sheet-invite` (219-248) | **Inviter un joueur** | QR de l'invitation + copier/partager ; scanner ou coller la réponse. | `openInviteSheet` 297-312, `useAnswer` 341-363, fermeture → `session.cancelInvite()` 328-331. |
 | `#sheet-fleet` (251-275) | **Décoller** (onglet Flottes) | Nombre de vaisseaux, cargaison, carburant ; calcule soutes, vitesse (et le vaisseau le plus lent, qui la fixe), réservoir, portée. | `openFleetSheet` 1147-1165, `updateFleetSheet` 1167-1180, `btn-fleet-go` 1185-1196. |
 | `#sheet-move` (278-295) | « Donner » (`#fi-beside`) ou **Scinder** | Vaisseaux, cargaison, carburant à passer à une autre flotte ou à une nouvelle. La fenêtre garde l'identifiant de sa flotte (`moveSheet.from`) et n'agit que sur elle ; si cette flotte (ou celle qui reçoit) disparaît, elle se ferme avec « Cette flotte n'existe plus. » (`refreshMoveSheet`, appelé par `renderFleetInfo` ; D-350). | `openMoveSheet`, `refreshMoveSheet`, `btn-move-go` (~2836-2890). |
@@ -222,59 +222,25 @@ Retour de la session vers l'interface : seulement deux rappels, `session.onchang
 
 ## 6. La carte (`canvas#map`)
 
-### 6.1 Dessin en 3D : le bassin (`drawMap`, `js/interface/app/carte/draw-map.js`, D-559)
+### 6.1 Dessin (`drawMap`, `js/app.js:1349-1538`, aujourd'hui `js/interface/app/carte/draw-map.js`)
 
-Depuis le 2026-11-19, la carte est dessinée en 3D : **un petit bassin peu profond** vu de devant
-et d'en haut, dans lequel on voit les planètes en boules éclairées et les vaisseaux qui volent.
-**Le jeu reste sur un plan** (règles, cases, distances, toucher : rien ne change) ; seules les
-places à l'écran passent par une projection en perspective. Pas de WebGL ni de bibliothèque : le
-même `canvas#map` en Canvas 2D (D-559).
+La carte de tout le monde : plate, sans effet. Seule différence avec le texte ci-dessous depuis le
+2026-11-19 : en tête de `drawMap`, si « Carte en 3D » est cochée et son module téléchargé, c'est
+lui qui dessine (§6.5, D-563) ; et le canvas est remis carré si sa hauteur ne l'est plus (retour
+de la 3D).
 
-- **Projection** (`js/interface/app/carte/bassin/make-view.js`, sans DOM, testée par
-  `tests/bassin.test.mjs`) : `makeView(largeur, hauteur, zoom.z, zoom.x, zoom.y)` donne
-  `pt(u, v, h)` (point de l'univers, en cases, à la hauteur `h` → pixels du canvas, et `s` =
-  pixels par case à cet endroit) et `unproj(sx, sy)` (pixel → point du **plan du jeu**, h = 0,
-  l'inverse exact). Caméra inclinée de `zoom.t` radians depuis la verticale (0,55, ~32°, au
-  départ ; réglable de 0 à 1, D-562), à 2,4 largeurs de vue : à 0,55, une case du fond fait
-  ~0,8 fois une case de devant. Le bord proche de la vue prend 95 % de la
-  largeur. Réglages dans `bassin/bassin.js` (`BASSIN`). `mapView()` : la même projection en
-  pixels CSS du canvas affiché (toucher, menu, repères des rapports).
-- **Hauteurs** (en cases) : plan du jeu = 0, au niveau du rebord ; fond du bassin à −0,5
-  (`floor`) ; vaisseaux à +0,22 (`ship`), avec un léger balancement (±0,035, visuel seulement) ;
-  rebord de 0,3 case de large, face avant de 0,45 sous le fond.
-- **Canvas** : plus carré. `#map { aspect-ratio: 50 / 41 }` (`style.css`) : hauteur = 0,82 ×
-  largeur, parce que le bassin vu de biais est moins haut que large. Taille en pixels =
-  taille CSS × `devicePixelRatio` (max 3), largeur et hauteur.
-- L'image suivante est demandée **avant** de dessiner : une erreur ne fige pas la carte.
+
+- Canvas carré (`aspect-ratio: 1`, `style.css:356`), redimensionné à `largeur CSS × devicePixelRatio` (max 3). Une case = `largeur × zoom.z / UNIVERSE.w` pixels ; tout est dessiné sous `ctx.setTransform(1, 0, 0, 1, -zoom.x × case, -zoom.y × case)` (zoom, D-117, §6.4).
+- L'image suivante est demandée **avant** de dessiner : une erreur ne fige pas la carte (1352-1353).
 - Ordre des couches :
-  1. le bassin (`bassin/draw-basin.js`) : le vide autour, la face avant, puis dans l'ouverture
-     les parois et le fond (dégradé, étoiles fixes tirées de `noise(x, y)`, quadrillage pâle des
-     cases, ombre au pied des parois) ;
-  2. **sur le fond**, limité au fond visible : la lumière du soleil (`draw-sun-pool.js`), le halo
-     de détection de ma couleur (un seul tracé, les zones superposées ne foncent pas), le froid
-     (`drawFrost`, zone gelée et cercle pointillé), les **ombres** des planètes et des vaisseaux
-     (`draw-shadow.js`, poussées un peu à l'opposé du soleil) ; puis le rebord, plus clair sur
-     son arête intérieure ;
-  3. **sur le plan du jeu** : losange d'autonomie de la flotte sélectionnée (`drawRange`),
-     navettes (`drawShuttles`), trajets en pointillés des flottes en route (à la hauteur des
-     vaisseaux), croix rouge au point de panne, case visée en attente d'un choix (carré blanc qui
-     pulse, couché sur le plan) ;
-  4. **les objets, du fond vers l'avant** (triés par ligne : les plus proches passent devant) :
-     le soleil (boule de lumière, `draw-sun-3d.js`) ; les planètes (`draw-ball.js` : boule éclairée
-     du côté du soleil, avec un liseré d'atmosphère ; anneau penché dont la moitié de derrière
-     passe derrière la boule, `ring-path.js` ; libre = gris `#8d95b3`, plus petite, anneau en
-     pointillés, pulsation pendant le choix de planète ; à moi ou touchée = cercle blanc couché
-     sur le plan ; hors ligne, souvenir ou gelée = transparence comme avant) ; astéroïdes
-     (caillou ombré, `draw-rock.js`) et comètes (tête en boule, queue couchée sur le plan,
-     opposée au soleil) : `drawSmallBody` ; les flottes (`draw-ship-3d.js` : petite flèche à
-     deux pans et arête dorsale, nez dans le sens de la marche, réacteur allumé en route ; rouge
-     `#ff7a93` si attaque ou poursuite ; grisée à sec ; cercle blanc couché autour de ma flotte
-     sélectionnée, rouge autour de la proie visée) ;
-  5. **par-dessus tout**, toujours lisibles : nom du propriétaire au-dessus de la planète
-     (tronqué à 8 caractères, contour sombre), petit rond d'alerte, flèche verte d'achat
-     automatique (D-532), jauge de carburant sous mes flottes, effectif des flottes adverses
-     (D-133), puis la visée d'une flotte traînée (`drawAim`, D-126 : trait, cible entourée sur le
-     plan, ordre écrit au-dessus du doigt, gardé dans le canvas).
+  1. fond `#05070f`, étoiles fixes tirées de `noise(x, y)` (bruit déterministe : mêmes étoiles partout, 1305-1308) et quadrillage très pâle (1365-1387) ;
+  2. soleil : `drawSun(ctx, sunFor(gid), cell)` (`js/sky.js`) ;
+  3. halo de détection de ma couleur, en un seul tracé pour que les zones superposées ne foncent pas (1394-1405) ;
+  4. planètes (`mapPlanets()`, 1286-1299) : disque + anneau incliné ; libre = gris `#8d95b3` et anneau en pointillés, et pulsation pendant le choix de planète ; à moi ou touchée = cercle blanc ; nom du propriétaire au-dessus (tronqué à 8 caractères) ; joueur hors ligne = transparence ; une de mes planètes qui a une règle d'achat automatique porte en bas à gauche une petite flèche en rond verte (`drawAutoMark`, lue dans la fiche `pl.planet.auto`, sans `stateAt`, D-532). Astéroïdes (polygone irrégulier) et comètes (tête + queue opposée au soleil) : `drawSmallBody` (1314-1347) ;
+  5. flottes (`fleetSpots`, 1546-1566) : triangle orienté ; en route, pointillés jusqu'à la destination ; à l'arrêt, posées en couronne autour du centre de la case ; rouge `#ff7a93` si attaque ou poursuite ; cercle blanc = ma flotte sélectionnée, cercle rouge = proie visée ; croix rouge au point de panne ; jauge de carburant sous mes flottes ; flotte à sec grisée ;
+  6. case visée en attente d'un choix (menu au doigt ouvert) : carré blanc qui pulse ;
+     losange d'autonomie de la flotte sélectionnée (`drawRange`) et visée d'une flotte traînée
+     (`drawAim`) : voir §6.2 (D-126).
 - Seules les flottes que je vois (`session.sees`, portée de détection) sont dessinées (1552).
 - Planètes des autres (D-124) : `mapPlanets` passe par `session.knownOwner`. Jamais vue = dessinée
   libre ; planète mère hors de l'univers jamais vue = pas dessinée du tout ; vue autrefois =
@@ -286,8 +252,9 @@ même `canvas#map` en Canvas 2D (D-559).
 ### 6.2 Toucher et viser (D-126)
 
 Le point touché est converti en cases par `toCells` : le pixel est ramené sur le plan du jeu par
-la projection inverse (`mapView().unproj`, D-559), moins 0,5 (le centre d'une case tombe sur ses
-coordonnées entières, comme les planètes et `fleetSpots`). La taille d'une case dépend de
+la projection inverse (`mapView().unproj` : plate, c'est `zoom.x + pixels CSS / case` comme
+avant ; en 3D, la perspective, §6.5), moins 0,5 (le centre d'une case tombe sur ses
+coordonnées entières, comme les planètes et `fleetSpots`). En 3D, la taille d'une case dépend de
 l'endroit (perspective) : `cellCss(at)` donne celle sous le doigt, et c'est elle que l'aimant
 reçoit (`px`) ; la portée du doigt reste donc de 18 px à l'écran, au fond comme devant.
 Un clic qui termine un glissé, un pincement ou une visée (`gesture.moved`) est ignoré.
@@ -359,7 +326,7 @@ colonie), `mapFrame`, `selected` (planète dont la fiche est ouverte), `selFleet
 
 - État : `zoom = { z, x, y, t }` (`t` : inclinaison de la vue en 3D, D-562 ; `z` de 1 à `ZOOM_MAX` = 4, soit 20 à 5 cases de large ; `x`, `y` = coin haut-gauche de la partie vue, en cases). `clampZoom` garde la vue dans l'univers et met à jour les boutons. Le zoom n'est pas sauvegardé : chaque ouverture de l'appli repart de la carte entière.
 - Gestes sur `canvas#map` (événements `pointer*`, `touch-action: none` déjà posé) : un doigt ou la souris **glisse** la vue (au-delà de 8 px, sinon c'est un toucher) ; deux doigts **pincent** (l'écart donne le zoom, le milieu suit les doigts) ; la **molette** zoome autour du curseur (`zoomAt` garde fixe le point visé).
-- **Incliner la vue** (D-562) : deux doigts côte à côte qui montent ou descendent ensemble
+- **Incliner la vue**, en 3D seulement (D-562, D-563) : deux doigts côte à côte qui montent ou descendent ensemble
   (vers le haut : plus penchée, 300 px de doigt par radian ; `gesture.two` décide au premier
   mouvement : `'tilt'` si les doigts sont côte à côte, le mouvement surtout vertical et leur
   écart presque constant, sinon `'pinch'`) ; Maj + molette ; bouton `#btn-tilt` (icône `tilt`)
@@ -367,18 +334,110 @@ colonie), `mapFrame`, `selected` (planète dont la fiche est ouverte), `selFleet
   entre `tiltMin` = 0 (vue de dessus) et `tiltMax` = 1 et retient la valeur dans
   `localStorage['astra.tilt']` (relue au chargement, `inclinaison-retenue.js`). Presque de
   dessus, la vue tient dans la hauteur du canvas.
-- Avec la perspective (D-559), le glissé (`panBy`) et le zoom (`zoomAt`) passent par
+- Le glissé (`panBy`) et le zoom (`zoomAt`) passent par
   `unproj` : le point du plan du jeu sous le doigt reste sous le doigt. La projection ne dépend
-  que de la case moins le coin de la vue, donc décaler `zoom.x`, `zoom.y` suffit. La vue zoomée
-  est montrée dans la même perspective (le bord proche de la vue prend la largeur) ; ce qui
+  que de la case moins le coin de la vue, donc décaler `zoom.x`, `zoom.y` suffit (en 2D, c'est
+  le calcul d'avant). En 3D, la vue zoomée est montrée dans la même perspective (le bord proche de la vue prend la largeur) ; ce qui
   dépasse de la vue en haut et sur les côtés reste visible, comme le reste du bassin.
 - Boutons `.map-zoom` en haut à droite du canvas : `#btn-zoom-in` (+), `#btn-zoom-out` (−), `#btn-zoom-fit` (vue entière, caché à zoom 1) ; facteur 1,6 autour du centre de la vue.
 
 ### 6.3 Carte du replay
 
-**Reste en 2D** (D-561) : la 3D ne concerne que la carte du jeu (`index.html`).
+**Reste en 2D** (D-561) : la 3D, en option, ne concerne que la carte du jeu (`index.html`).
 
 `js/replay-view.js:116-199` redessine une carte plus simple sur le même principe (fond, quadrillage, `drawSun`, planètes `planetsFor(gid)`, nom sous les planètes possédées, flottes en **losange**, décalées quand elles sont arrêtées).
+
+### 6.5 Carte en 3D, en option : le bassin (D-559, D-563)
+
+Depuis le 2026-11-19, **pour qui coche « Carte en 3D » dans les Réglages** (D-563), la carte est
+dessinée en 3D : **un petit bassin peu profond** vu de devant et d'en haut, dans lequel on voit
+les planètes en boules éclairées et les vaisseaux qui volent. **Le jeu reste sur un plan**
+(règles, cases, distances, toucher : rien ne change) ; seules les places à l'écran passent par une
+projection en perspective. Pas de WebGL ni de bibliothèque : le même `canvas#map` en Canvas 2D
+(D-559). Sans la case cochée, rien de tout cela n'est téléchargé : la carte est celle du §6.1.
+
+**Le module à part (D-563).** Tout le dessin 3D est dans `js/interface/app/carte/bassin/`
+(point d'entrée `index.js` : `installDeps`, `makeView`, `drawMap3d`). Le jeu ne l'importe jamais :
+`carte/relief/` (dans le jeu de base, quelques lignes) le télécharge à la demande :
+- `relief` : `{ on, mod, loading, failed, tries }` ; `RELIEF_KEY` = `localStorage['astra.carte3d']`
+  (`'1'` si cochée) ;
+- `relief-retenu.js` (au chargement) : cochée la dernière fois → `loadRelief()` tout de suite ;
+- `reglage-relief.js` : la case `#relief` des Réglages → `setRelief` (retient et télécharge) ;
+  `reliefNote()` écrit sous la case « Téléchargement… » ou l'échec ;
+- `loadRelief()` : `import(new URL('../bassin/index.js', import.meta.url))`, une seule fois, retenté
+  avec `?r=N` après un échec ; puis `installDeps` donne au module les modules du jeu qui ont un
+  état (`etat`, `zoom`, `gesture`, `mapPlanets`, `mapVeiled`, `fleetSpots`, `aimRead`,
+  `myColonizer`, `drawAlertDot`) et les fonctions des règles dont il se sert (`fuelAt`,
+  `fleetTank`, `fleetBurn`, `fleetPos`, `countShips`, `frostLine`, `sameCell`, `sunFor`) : assemblé
+  à part, il aurait sinon ses propres copies, vides ou en double. Il importe seulement
+  `regles/game/carte/universe.js` (une constante) et des fonctions de dessin sans état ;
+- `reliefOn()` : le module si coché **et** téléchargé, sinon null ; `drawMap` lui passe la main
+  (`drawMap3d`), met la classe `bassin` au canvas et montre le bouton « Incliner » ;
+- `mapView()` (`relief/map-view.js`) : la projection de la carte affichée, plate (`flatView`,
+  exactement l'ancien calcul : une case = largeur × z / 20) ou en perspective (`makeView`). Le
+  toucher, le glissé, le zoom, le menu au doigt et les repères des rapports passent par elle, en 2D
+  comme en 3D.
+
+Build (D-563) : `ADDONS` de `build.mjs` assemble `dist/js/bassin-3d.js` à part (16 ko, 6,5 ko
+compressé ; le jeu de base `dist/js/index.js` ne contient pas le dessin 3D, vérifié par
+`build.test.mjs`) et réécrit le chemin du `new URL(…)` vers `./bassin-3d.js`. Il n'est pas dans
+`FILES` de `sw.js` (cache hors ligne de départ) : le service worker ne le télécharge pas chez tout
+le monde, il le garde au passage chez qui l'a demandé (`sw-files.test.mjs`).
+
+- **Projection** (`js/interface/app/carte/bassin/make-view.js`, sans DOM, testée par
+  `tests/bassin.test.mjs`) : `makeView(largeur, hauteur, zoom.z, zoom.x, zoom.y)` donne
+  `pt(u, v, h)` (point de l'univers, en cases, à la hauteur `h` → pixels du canvas, et `s` =
+  pixels par case à cet endroit) et `unproj(sx, sy)` (pixel → point du **plan du jeu**, h = 0,
+  l'inverse exact). Caméra inclinée de `zoom.t` radians depuis la verticale (0,55, ~32°, au
+  départ ; réglable de 0 à 1, D-562), à 2,4 largeurs de vue : à 0,55, une case du fond fait
+  ~0,8 fois une case de devant. Le bord proche de la vue prend 95 % de la
+  largeur. Réglages dans `bassin/bassin.js` (`BASSIN`) ; inclinaison dans `zoom/tilt.js` (`TILT`, dans le jeu
+  de base). `mapView()` : la projection en pixels CSS du canvas affiché (toucher, menu, repères des
+  rapports).
+- **Hauteurs** (en cases) : plan du jeu = 0, au niveau du rebord ; fond du bassin à −0,5
+  (`floor`) ; vaisseaux à +0,22 (`ship`), avec un léger balancement (±0,035, visuel seulement) ;
+  rebord de 0,3 case de large, face avant de 0,45 sous le fond.
+- **Canvas** : plus carré en 3D. `#map.bassin { aspect-ratio: 50 / 41 }` (`style.css`) : hauteur
+  = 0,82 × largeur, parce que le bassin vu de biais est moins haut que large. Taille en pixels =
+  taille CSS × `devicePixelRatio` (max 3), largeur et hauteur.
+- L'image suivante est demandée **avant** de dessiner : une erreur ne fige pas la carte.
+- Ordre des couches :
+  1. le bassin (`draw-basin.js`, comme les fichiers suivants dans `bassin/`) : le vide autour, la face avant, puis dans l'ouverture
+     les parois et le fond (dégradé, étoiles fixes tirées de `noise(x, y)`, quadrillage pâle des
+     cases, ombre au pied des parois) ;
+  2. **sur le fond**, limité au fond visible : la lumière du soleil (`draw-sun-pool.js`), le halo
+     de détection de ma couleur (un seul tracé, les zones superposées ne foncent pas), le froid
+     (`drawFrost3d`, zone gelée et cercle pointillé), les **ombres** des planètes et des vaisseaux
+     (`draw-shadow.js`, poussées un peu à l'opposé du soleil) ; puis le rebord, plus clair sur
+     son arête intérieure ;
+  3. **sur le plan du jeu** : losange d'autonomie de la flotte sélectionnée (`drawRange3d`),
+     navettes (`drawShuttles3d`), trajets en pointillés des flottes en route (à la hauteur des
+     vaisseaux), croix rouge au point de panne, case visée en attente d'un choix (carré blanc qui
+     pulse, couché sur le plan) ;
+  4. **les objets, du fond vers l'avant** (triés par ligne : les plus proches passent devant) :
+     le soleil (boule de lumière, `draw-sun-3d.js`) ; les planètes (`draw-ball.js` : boule éclairée
+     du côté du soleil, avec un liseré d'atmosphère ; anneau penché dont la moitié de derrière
+     passe derrière la boule, `ring-path.js` ; libre = gris `#8d95b3`, plus petite, anneau en
+     pointillés, pulsation pendant le choix de planète ; à moi ou touchée = cercle blanc couché
+     sur le plan ; hors ligne, souvenir ou gelée = transparence comme avant) ; astéroïdes
+     (caillou ombré, `draw-rock.js`) et comètes (tête en boule, queue couchée sur le plan,
+     opposée au soleil) : `drawSmallBody3d` ; les flottes (`draw-ship-3d.js` : petite flèche à
+     deux pans et arête dorsale, nez dans le sens de la marche, réacteur allumé en route ; rouge
+     `#ff7a93` si attaque ou poursuite ; grisée à sec ; cercle blanc couché autour de ma flotte
+     sélectionnée, rouge autour de la proie visée) ;
+  5. **par-dessus tout**, toujours lisibles : nom du propriétaire au-dessus de la planète
+     (tronqué à 8 caractères, contour sombre), petit rond d'alerte, flèche verte d'achat
+     automatique (D-532), jauge de carburant sous mes flottes, effectif des flottes adverses
+     (D-133), puis la visée d'une flotte traînée (`drawAim3d`, D-126 : trait, cible entourée sur le
+     plan, ordre écrit au-dessus du doigt, gardé dans le canvas).
+- Seules les flottes que je vois (`session.sees`, portée de détection) sont dessinées (1552).
+- Planètes des autres (D-124) : `mapPlanets` passe par `session.knownOwner`. Jamais vue = dessinée
+  libre ; planète mère hors de l'univers jamais vue = pas dessinée du tout ; vue autrefois =
+  souvenir : couleur et nom de son propriétaire d'alors, pâles, anneau en pointillés, sans son
+  état (`pl` nul). La fiche dit « vue il y a … , hors de portée » (`seenAgo`) et ne montre que ce
+  que tout le monde sait de l'univers (gisements de départ, climat, places).
+- Coordonnées de ma planète mère dans `#my-coords`, ou « à choisir » (1537).
+
 
 ## 7. Style
 

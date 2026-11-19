@@ -1,4 +1,5 @@
-import { UNIVERSE } from '../../../../regles/game/index.js';
+import { UNIVERSE } from '../../../../regles/game/carte/universe.js';
+import { TILT } from '../zoom/tilt.js';
 import { BASSIN } from './bassin.js';
 
 /**
@@ -12,7 +13,7 @@ import { BASSIN } from './bassin.js';
  * La projection ne dépend de x0, y0 que par u − x0, v − y0 : glisser la vue de d cases
  * déplace `unproj` de d cases (le glissé et le pincement s'en servent).
  */
-export function makeView(size, height = size, z = 1, x0 = 0, y0 = 0, tilt = BASSIN.tilt) {
+export function makeView(size, height = size, z = 1, x0 = 0, y0 = 0, tilt = TILT.start) {
   const c = Math.cos(tilt);
   const s = Math.sin(tilt);
   const D = BASSIN.dist;
